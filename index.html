@@ -588,60 +588,186 @@
   </div>
 
   <!-- INTERAKTIVES TAGES-DETAIL MODAL (Pop-up beim Klick auf einen der 10 Tage) -->
+  <!-- INTERAKTIVES TAGES-DETAIL MODAL (Tiefenanalyse beim Klick auf einen der 10 Tage) -->
   <div class="modal-overlay" id="day-detail-modal" style="display:none;">
     <div class="modal-card glass-card">
+      
+      <!-- 1. Header mit Tag, Datum, Ort und Wetterzustand -->
       <div class="modal-header">
         <div class="modal-title-col">
-          <h2 class="modal-day-title" id="modal-day-name">Montag, 19. Oktober</h2>
-          <span class="modal-condition" id="modal-day-condition">Sonnig und trocken</span>
+          <div class="modal-location-badge" id="modal-location-badge">📍 München (520 m)</div>
+          <h2 class="modal-day-title" id="modal-day-name">Montag, 19. Oktober 2026</h2>
+          <span class="modal-condition" id="modal-day-condition">🌦️ Leichte Regenschauer • Herbstliches Wetter</span>
         </div>
-        <button id="close-modal-btn" class="close-modal-btn">✕</button>
+        <button id="close-modal-btn" class="close-modal-btn" title="Schließen (Esc)">✕</button>
       </div>
 
-      <div class="modal-temp-banner">
-        <div class="mtb-item">
-          <span class="mtb-label">Tageshöchstwert</span>
-          <span class="mtb-val text-accent" id="modal-max-temp">--°C</span>
+      <!-- 2. Bento Hauptmetriken (6 Karten) -->
+      <div class="modal-bento-overview">
+        <div class="mbo-card">
+          <span class="mbo-icon">🌡️</span>
+          <span class="mbo-label">Temperaturspanne</span>
+          <div class="mbo-val"><span id="modal-max-temp" class="text-accent">--°</span> / <span id="modal-min-temp">--°</span></div>
+          <span class="mbo-sub" id="modal-apparent-range">Gefühlt: --° / --°</span>
         </div>
-        <div class="mtb-item">
-          <span class="mtb-label">Tiefstwert (Nacht)</span>
-          <span class="mtb-val" id="modal-min-temp">--°C</span>
+
+        <div class="mbo-card">
+          <span class="mbo-icon">💧</span>
+          <span class="mbo-label">Niederschlag & Regen</span>
+          <div class="mbo-val text-cyan" id="modal-pop">--%</div>
+          <span class="mbo-sub" id="modal-precip-sum">Menge: -- mm • -- h</span>
         </div>
-        <div class="mtb-item">
-          <span class="mtb-label">Regenrisiko</span>
-          <span class="mtb-val text-cyan" id="modal-pop">--%</span>
+
+        <div class="mbo-card">
+          <span class="mbo-icon">💨</span>
+          <span class="mbo-label">Wind & Böen</span>
+          <div class="mbo-val" id="modal-wind-spd">-- km/h</div>
+          <span class="mbo-sub" id="modal-wind-gusts">Spitzen bis -- km/h</span>
         </div>
-        <div class="mtb-item">
-          <span class="mtb-label">Niederschlag</span>
-          <span class="mtb-val" id="modal-precip-sum">-- mm</span>
+
+        <div class="mbo-card">
+          <span class="mbo-icon">☀️</span>
+          <span class="mbo-label">Sonne & Tageslicht</span>
+          <div class="mbo-val text-yellow" id="modal-sunshine-dur">-- h</div>
+          <span class="mbo-sub" id="modal-daylight-dur">Tageslänge: -- h</span>
+        </div>
+
+        <div class="mbo-card">
+          <span class="mbo-icon">🛡️</span>
+          <span class="mbo-label">UV-Index & Schutz</span>
+          <div class="mbo-val" id="modal-uv-max">--</div>
+          <span class="mbo-sub" id="modal-uv-hint">Geringe Belastung</span>
+        </div>
+
+        <div class="mbo-card">
+          <span class="mbo-icon">🌫️</span>
+          <span class="mbo-label">Taupunkt & Feuchte</span>
+          <div class="mbo-val" id="modal-humidity-range">--%</div>
+          <span class="mbo-sub" id="modal-dew-point">Taupunkt: --°C</span>
         </div>
       </div>
 
-      <!-- Tageszeiten-Aufdröselung (Morgens, Mittags, Abends, Nachts) -->
-      <h3 class="modal-sub-heading">Tagesabschnitte</h3>
-      <div class="day-parts-grid" id="modal-day-parts">
-        <!-- Dynamisch befüllt -->
+      <!-- 3. Stündlicher 24-Stunden-Verlauf für DIESEN Tag -->
+      <div class="modal-section">
+        <div class="modal-section-header">
+          <span class="msh-title">⏱️ 24-STUNDEN-VERLAUF DIESES TAGES</span>
+          <span class="msh-hint">Stündliche Entwicklung (00:00 – 23:00)</span>
+        </div>
+        <div class="modal-hourly-scroller" id="modal-day-hourly-list">
+          <!-- Dynamisch 24 Stunden dieses Tages -->
+        </div>
       </div>
 
-      <!-- Weitere Detail-Metriken für diesen Tag -->
-      <div class="modal-metrics-grid">
-        <div class="mm-item">
-          <span class="mm-label">Max. Windböen:</span>
-          <span class="mm-val" id="modal-wind-gusts">-- km/h</span>
+      <!-- 4. 4 Ausführliche Tagesabschnitte -->
+      <div class="modal-section">
+        <div class="modal-section-header">
+          <span class="msh-title">🌅 DETAILLIERTE TAGESABSCHNITTE</span>
         </div>
-        <div class="mm-item">
-          <span class="mm-label">Max. UV-Index:</span>
-          <span class="mm-val" id="modal-uv-max">--</span>
-        </div>
-        <div class="mm-item">
-          <span class="mm-label">Sonnenaufgang:</span>
-          <span class="mm-val" id="modal-sunrise">--:--</span>
-        </div>
-        <div class="mm-item">
-          <span class="mm-label">Sonnenuntergang:</span>
-          <span class="mm-val" id="modal-sunset">--:--</span>
+        <div class="day-parts-grid" id="modal-day-parts">
+          <!-- Dynamisch befüllt mit ausführlichen Parametern -->
         </div>
       </div>
+
+      <!-- 5. Berg- & Atmosphären-Parameter -->
+      <div class="modal-section">
+        <div class="modal-section-header">
+          <span class="msh-title">🏔️ ATMOSPHÄRE, HÖHE & LUFTDRUCK</span>
+        </div>
+        <div class="modal-deep-grid">
+          <div class="mdg-box">
+            <span class="mdg-label">❄️ 0°C Schneefallgrenze</span>
+            <span class="mdg-val text-cyan" id="modal-freezing-level">-- m</span>
+            <span class="mdg-sub" id="modal-snowfall-val">Neuschnee: 0 cm</span>
+          </div>
+          <div class="mdg-box">
+            <span class="mdg-label">👁️ Sichtweite & Trübung</span>
+            <span class="mdg-val" id="modal-visibility-val">-- km</span>
+            <span class="mdg-sub" id="modal-cloud-cover">Bewölkung: --%</span>
+          </div>
+          <div class="mdg-box">
+            <span class="mdg-label">⏲️ Luftdruck (Meereshöhe)</span>
+            <span class="mdg-val" id="modal-pressure-msl">-- hPa</span>
+            <span class="mdg-sub" id="modal-pressure-surface">Station: -- hPa</span>
+          </div>
+          <div class="mdg-box">
+            <span class="mdg-label">🧭 Hauptwindrichtung</span>
+            <span class="mdg-val" id="modal-wind-direction">--°</span>
+            <span class="mdg-sub" id="modal-wind-compass">West-Nordwest</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Astronomie & Mond -->
+      <div class="modal-section">
+        <div class="modal-section-header">
+          <span class="msh-title">🌙 ASTRONOMIE & DÄMMERUNG</span>
+        </div>
+        <div class="modal-astro-row">
+          <div class="astro-item">
+            <span class="ai-icon">🌅</span>
+            <div>
+              <span class="ai-label">Sonnenaufgang</span>
+              <strong class="ai-time" id="modal-sunrise">--:--</strong>
+              <small class="ai-sub" id="modal-dawn-civil">Dämmerung: --:--</small>
+            </div>
+          </div>
+          <div class="astro-item">
+            <span class="ai-icon">🌇</span>
+            <div>
+              <span class="ai-label">Sonnenuntergang</span>
+              <strong class="ai-time" id="modal-sunset">--:--</strong>
+              <small class="ai-sub" id="modal-dusk-civil">Abendrot: --:--</small>
+            </div>
+          </div>
+          <div class="astro-item">
+            <span class="ai-icon">⏳</span>
+            <div>
+              <span class="ai-label">Tageslicht</span>
+              <strong class="ai-time" id="modal-daylight-hours">-- h</strong>
+              <small class="ai-sub">Effektives Licht</small>
+            </div>
+          </div>
+          <div class="astro-item">
+            <span class="ai-icon">🌓</span>
+            <div>
+              <span class="ai-label">Mondphase</span>
+              <strong class="ai-time" id="modal-moon-phase">--</strong>
+              <small class="ai-sub" id="modal-moon-illum">Beleuchtung: --%</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Outdoor- & Aktivitäts-Index -->
+      <div class="modal-section activity-recommendation-card">
+        <div class="modal-section-header">
+          <span class="msh-title">🎯 OUTDOOR- & SPORT-EMPFEHLUNG FÜR DIESEN TAG</span>
+        </div>
+        <div class="activity-body">
+          <div class="activity-row">
+            <span class="act-icon">🥾</span>
+            <div>
+              <strong>Wandern & Bergsport:</strong>
+              <p id="modal-rec-hike">Wird berechnet...</p>
+            </div>
+          </div>
+          <div class="activity-row">
+            <span class="act-icon">🚴</span>
+            <div>
+              <strong>Radsport & Laufen:</strong>
+              <p id="modal-rec-bike">Wird berechnet...</p>
+            </div>
+          </div>
+          <div class="activity-row">
+            <span class="act-icon">🧥</span>
+            <div>
+              <strong>Bekleidungsempfehlung:</strong>
+              <p id="modal-rec-clothes">Wird berechnet...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 

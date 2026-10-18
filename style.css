@@ -1625,12 +1625,13 @@ html, body {
 
 .modal-card {
   width: 100%;
-  max-width: 580px;
+  max-width: 760px;
   max-height: 90vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+  padding: 24px;
 }
 
 .modal-header {
@@ -1639,9 +1640,22 @@ html, body {
   justify-content: space-between;
 }
 
+.modal-location-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+  border: 1px solid rgba(255, 209, 102, 0.25);
+  padding: 2px 10px;
+  border-radius: 12px;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
 .modal-day-title {
   font-size: 24px;
   font-weight: 800;
+  margin-bottom: 2px;
 }
 
 .modal-condition {
@@ -1654,56 +1668,152 @@ html, body {
   border: none;
   color: #fff;
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
   cursor: pointer;
+  transition: var(--transition-smooth);
 }
 
-.modal-temp-banner {
+.close-modal-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.08);
+}
+
+/* 2. Bento Hauptmetriken */
+.modal-bento-overview {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 16px;
-  padding: 12px;
-  text-align: center;
 }
 
-.mtb-label {
-  font-size: 10px;
-  color: var(--text-tertiary);
-  display: block;
+.mbo-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.mtb-val {
+.mbo-icon {
   font-size: 18px;
-  font-weight: 800;
-  margin-top: 2px;
+  margin-bottom: 2px;
 }
 
-.modal-sub-heading {
-  font-size: 13px;
-  font-weight: 700;
+.mbo-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
   text-transform: uppercase;
-  color: var(--text-secondary);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
+.mbo-val {
+  font-size: 20px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.mbo-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Section Wrapper */
+.modal-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.msh-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.msh-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+/* 3. 24h Hourly Scroller for Selected Day */
+.modal-hourly-scroller {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 10px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.modal-hourly-item {
+  min-width: 66px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mhi-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.mhi-icon {
+  font-size: 20px;
+}
+
+.mhi-temp {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.mhi-pop {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+}
+
+.mhi-wind {
+  font-size: 9px;
+  color: var(--text-tertiary);
+}
+
+/* 4. Detailed Day Parts Grid */
 .day-parts-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 
 .day-part-box {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  padding: 10px 6px;
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1711,44 +1821,149 @@ html, body {
 }
 
 .dp-name {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-secondary);
 }
 
 .dp-icon {
-  font-size: 20px;
+  font-size: 24px;
 }
 
 .dp-temp {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 800;
 }
 
-.dp-rain {
+.dp-apparent {
   font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.dp-rain {
+  font-size: 11px;
   font-weight: 700;
   color: var(--ios-cyan);
 }
 
-.modal-metrics-grid {
+.dp-wind {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* 5. Deep Atmosphere & Mountain Grid */
+.modal-deep-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
-.mm-item {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 10px 14px;
+.mdg-box {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 12px 14px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.mm-label {
-  font-size: 12px;
+.mdg-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.mdg-val {
+  font-size: 17px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.mdg-sub {
+  font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* 6. Astronomy & Moon */
+.modal-astro-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.astro-item {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-icon {
+  font-size: 24px;
+}
+
+.ai-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  display: block;
+}
+
+.ai-time {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  display: block;
+}
+
+.ai-sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+  display: block;
+}
+
+/* 7. Activity Recommendations */
+.activity-recommendation-card {
+  background: rgba(255, 209, 102, 0.04);
+  border: 1px solid rgba(255, 209, 102, 0.15);
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.activity-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.activity-row strong {
+  color: #ffffff;
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+.act-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.text-yellow {
+  color: #ffd60a !important;
 }
 
 .mm-val {
@@ -1922,6 +2137,31 @@ html, body {
     grid-template-columns: 100px 70px 1fr 80px;
     gap: 8px;
     padding: 10px 12px;
+  }
+
+  .modal-card {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .modal-bento-overview {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .day-parts-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .modal-deep-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .modal-astro-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
 
   .fullscreen-map-wrapper {

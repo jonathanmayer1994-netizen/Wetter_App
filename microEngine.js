@@ -218,6 +218,10 @@ export const MicroEngine = {
       "uv_index_max",
       "precipitation_sum",
       "precipitation_probability_max",
+      "precipitation_hours",
+      "snowfall_sum",
+      "sunshine_duration",
+      "daylight_duration",
       "wind_speed_10m_max",
       "wind_gusts_10m_max"
     ].join(",");

@@ -679,10 +679,16 @@ function render10DayForecast(daily, hourly) {
     const chevron = wrapper.querySelector('.daily-expand-chevron');
 
     rowElem.addEventListener('click', (e) => {
-      const isExpanded = accordion.style.display === 'block';
-      accordion.style.display = isExpanded ? 'none' : 'block';
-      wrapper.classList.toggle('expanded', !isExpanded);
-      chevron.innerText = isExpanded ? '›' : '▾';
+      // Wenn der Chevron angeklickt wird, nur Accordion umschalten
+      if (e.target.closest('.daily-expand-chevron')) {
+        const isExpanded = accordion.style.display === 'block';
+        accordion.style.display = isExpanded ? 'none' : 'block';
+        wrapper.classList.toggle('expanded', !isExpanded);
+        chevron.innerText = isExpanded ? '›' : '▾';
+      } else {
+        // Klick auf die Zeile öffnet direkt das vollständige Tages-Detail-Modal!
+        openDayDetailModal(i, daily, hourly);
+      }
     });
 
     const modalBtn = wrapper.querySelector('.inline-modal-launch-btn');
@@ -697,70 +703,409 @@ function render10DayForecast(daily, hourly) {
   }
 }
 
-// 10-Day Detail Modal
+/**
+ * Liefert Windrichtungskürzel und meteorologische Luftströmungs-Beschreibung
+ */
+function getCompassDirectionName(deg) {
+  if (deg === null || deg === undefined || isNaN(deg)) {
+    return { code: '--', desc: 'Ruhige Luftströmung' };
+  }
+  const normalized = (deg % 360 + 360) % 360;
+  if (normalized >= 348.75 || normalized < 11.25) return { code: 'N', desc: 'Nördliche Luftströmung (Polar-/Kaltluft)' };
+  if (normalized < 33.75) return { code: 'NNO', desc: 'Nord-Nordostströmung' };
+  if (normalized < 56.25) return { code: 'NO', desc: 'Nordostströmung (Kontinentalluft)' };
+  if (normalized < 78.75) return { code: 'ONO', desc: 'Ost-Nordostströmung' };
+  if (normalized < 101.25) return { code: 'O', desc: 'Östliche Strömung (Trocken / Kontinental)' };
+  if (normalized < 123.75) return { code: 'OSO', desc: 'Ost-Südostströmung' };
+  if (normalized < 146.25) return { code: 'SO', desc: 'Südostströmung' };
+  if (normalized < 168.75) return { code: 'SSO', desc: 'Süd-Südostströmung' };
+  if (normalized < 191.25) return { code: 'S', desc: 'Südströmung (Alpen-Föhnlage / Warmluft)' };
+  if (normalized < 213.75) return { code: 'SSW', desc: 'Süd-Südwestströmung' };
+  if (normalized < 236.25) return { code: 'SW', desc: 'Südwestströmung (Atlantik-Feuchtluft)' };
+  if (normalized < 258.75) return { code: 'WSW', desc: 'West-Südwestströmung' };
+  if (normalized < 281.25) return { code: 'W', desc: 'Westliche Frontalzone (Atlantikwetter)' };
+  if (normalized < 303.75) return { code: 'WNW', desc: 'West-Nordwestströmung' };
+  if (normalized < 326.25) return { code: 'NW', desc: 'Nordwestströmung (Alpine Staulage)' };
+  return { code: 'NNW', desc: 'Nord-Nordwestströmung' };
+}
+
+/**
+ * Exakte Mondphasen-Berechnung anhand synodischem Mondmonat (29.53059 Tage)
+ */
+function calculateMoonPhase(date) {
+  const d = new Date(date);
+  const knownNewMoon = new Date('2024-01-11T11:57:00Z').getTime();
+  const synodicMonthMs = 29.53058770576 * 86400000;
+  const diff = d.getTime() - knownNewMoon;
+  const phase = ((diff % synodicMonthMs) + synodicMonthMs) % synodicMonthMs;
+  const phaseFrac = phase / synodicMonthMs;
+  const illumination = Math.round((1 - Math.cos(2 * Math.PI * phaseFrac)) / 2 * 100);
+
+  if (phaseFrac < 0.03 || phaseFrac >= 0.97) return { name: 'Neumond', icon: '🌑', illumination };
+  if (phaseFrac < 0.22) return { name: 'Zunehmende Sichel', icon: '🌒', illumination };
+  if (phaseFrac < 0.28) return { name: 'Erstes Viertel', icon: '🌓', illumination };
+  if (phaseFrac < 0.47) return { name: 'Zunehmender Mond', icon: '🌔', illumination };
+  if (phaseFrac < 0.53) return { name: 'Vollmond', icon: '🌕', illumination };
+  if (phaseFrac < 0.72) return { name: 'Abnehmender Mond', icon: '🌖', illumination };
+  if (phaseFrac < 0.78) return { name: 'Letztes Viertel', icon: '🌗', illumination };
+  return { name: 'Abnehmende Sichel', icon: '🌘', illumination };
+}
+
+/**
+ * VOLLSTÄNDIGES INTERAKTIVES TAGES-DETAIL MODAL
+ * Berechnet und visualisiert alle meteorologischen Tiefenparameter für den gewählten Tag
+ */
 function openDayDetailModal(dayIndex, daily, hourly) {
   const modal = document.getElementById('day-detail-modal');
+  if (!modal) return;
+
   const d = new Date(daily.time[dayIndex]);
-  const dateStr = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  const dateStr = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const code = daily.weather_code[dayIndex];
   const info = WMO_CODES[code] || WMO_CODES[0];
 
-  document.getElementById('modal-day-name').innerText = dateStr;
-  document.getElementById('modal-day-condition').innerText = `${info.icon} ${info.label}`;
-  document.getElementById('modal-max-temp').innerText = `${Math.round(convertTemp(daily.temperature_2m_max[dayIndex]))}°C`;
-  document.getElementById('modal-min-temp').innerText = `${Math.round(convertTemp(daily.temperature_2m_min[dayIndex]))}°C`;
-  document.getElementById('modal-pop').innerText = `${daily.precipitation_probability_max ? daily.precipitation_probability_max[dayIndex] : 0}%`;
-  document.getElementById('modal-precip-sum').innerText = `${(daily.precipitation_sum ? daily.precipitation_sum[dayIndex] : 0).toFixed(1)} mm`;
-
-  document.getElementById('modal-wind-gusts').innerText = `${Math.round(daily.wind_gusts_10m_max ? daily.wind_gusts_10m_max[dayIndex] : 0)} km/h`;
-  document.getElementById('modal-uv-max').innerText = daily.uv_index_max ? Math.round(daily.uv_index_max[dayIndex]) : '--';
-
-  if (daily.sunrise && daily.sunrise[dayIndex]) {
-    document.getElementById('modal-sunrise').innerText = new Date(daily.sunrise[dayIndex]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    document.getElementById('modal-sunset').innerText = new Date(daily.sunset[dayIndex]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  // 1. Header & Ort
+  const locBadge = document.getElementById('modal-location-badge');
+  if (locBadge && state.currentLocation) {
+    const isMtn = state.currentLocation.isMountain;
+    locBadge.innerText = `${isMtn ? '🏔️ Berggipfel' : '📍 Ort'}: ${state.currentLocation.name} (${Math.round(state.currentLocation.elevation).toLocaleString('de-DE')} m)`;
   }
 
-  // 4 Day Parts Breakdown
+  document.getElementById('modal-day-name').innerText = dateStr;
+
+  let synopNote = 'Ruhige Wetterlage';
+  if (code >= 95) synopNote = 'Gewittergefahr & starke Turbulenzen';
+  else if (code >= 71) synopNote = 'Schneefallgrenze beachten';
+  else if (code >= 51) synopNote = 'Regenschauer und feuchte Luftmasse';
+  else if (code >= 1 && code <= 3) synopNote = 'Wechselnd bewölkt mit sonnigen Abschnitten';
+  else if (code === 0) synopNote = 'Sonnig und wolkenloser Himmel';
+  document.getElementById('modal-day-condition').innerText = `${info.icon} ${info.label} • ${synopNote}`;
+
+  // 2. Extrahiere die 24 Stunden dieses spezifischen Tages
+  const dayStartHourIdx = dayIndex * 24;
+  const dayEndHourIdx = dayStartHourIdx + 24;
+
+  const hoursTemp = (hourly && hourly.temperature_2m) ? hourly.temperature_2m.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursApparent = (hourly && hourly.apparent_temperature) ? hourly.apparent_temperature.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursPop = (hourly && hourly.precipitation_probability) ? hourly.precipitation_probability.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursPrecip = (hourly && hourly.precipitation) ? hourly.precipitation.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursCode = (hourly && hourly.weather_code) ? hourly.weather_code.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursWind = (hourly && hourly.wind_speed_10m) ? hourly.wind_speed_10m.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursGusts = (hourly && hourly.wind_gusts_10m) ? hourly.wind_gusts_10m.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursWindDir = (hourly && hourly.wind_direction_10m) ? hourly.wind_direction_10m.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursHumidity = (hourly && hourly.relative_humidity_2m) ? hourly.relative_humidity_2m.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursDewPoint = (hourly && hourly.dew_point_2m) ? hourly.dew_point_2m.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursPressureMsl = (hourly && hourly.pressure_msl) ? hourly.pressure_msl.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursSurfacePressure = (hourly && hourly.surface_pressure) ? hourly.surface_pressure.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursVisibility = (hourly && hourly.visibility) ? hourly.visibility.slice(dayStartHourIdx, dayEndHourIdx).filter(v => v !== null && !isNaN(v)) : [];
+  const hoursCloudCover = (hourly && hourly.cloud_cover) ? hourly.cloud_cover.slice(dayStartHourIdx, dayEndHourIdx) : [];
+  const hoursFreezingLevel = (hourly && hourly.freezing_level_height) ? hourly.freezing_level_height.slice(dayStartHourIdx, dayEndHourIdx).filter(v => v !== null && !isNaN(v)) : [];
+
+  // Bento Metriken
+  const maxT = Math.round(convertTemp(daily.temperature_2m_max[dayIndex]));
+  const minT = Math.round(convertTemp(daily.temperature_2m_min[dayIndex]));
+  document.getElementById('modal-max-temp').innerText = `${maxT}°`;
+  document.getElementById('modal-min-temp').innerText = `${minT}°`;
+
+  const appMax = daily.apparent_temperature_max ? Math.round(convertTemp(daily.apparent_temperature_max[dayIndex])) : maxT;
+  const appMin = daily.apparent_temperature_min ? Math.round(convertTemp(daily.apparent_temperature_min[dayIndex])) : minT;
+  document.getElementById('modal-apparent-range').innerText = `Gefühlt: ${appMin}° bis ${appMax}°`;
+
+  const popMax = daily.precipitation_probability_max ? daily.precipitation_probability_max[dayIndex] : 0;
+  const precipSum = (daily.precipitation_sum ? daily.precipitation_sum[dayIndex] : 0).toFixed(1);
+  const precipHours = daily.precipitation_hours ? Math.round(daily.precipitation_hours[dayIndex]) : 0;
+  document.getElementById('modal-pop').innerText = `${popMax}%`;
+  document.getElementById('modal-precip-sum').innerText = `Menge: ${precipSum} mm ${precipHours > 0 ? `• ~${precipHours} h Dauer` : '• Trocken'}`;
+
+  const windSpdMax = Math.round(daily.wind_speed_10m_max ? daily.wind_speed_10m_max[dayIndex] : (hoursWind.length ? Math.max(...hoursWind) : 0));
+  const windGustMax = Math.round(daily.wind_gusts_10m_max ? daily.wind_gusts_10m_max[dayIndex] : (hoursGusts.length ? Math.max(...hoursGusts) : 0));
+  document.getElementById('modal-wind-spd').innerText = `${windSpdMax} km/h`;
+  document.getElementById('modal-wind-gusts').innerText = `Spitzenböen bis ${windGustMax} km/h`;
+
+  // Sonne & Tageslicht
+  if (daily.sunshine_duration && daily.sunshine_duration[dayIndex] !== undefined) {
+    const sunHours = (daily.sunshine_duration[dayIndex] / 3600).toFixed(1);
+    document.getElementById('modal-sunshine-dur').innerText = `${sunHours} h`;
+  } else {
+    document.getElementById('modal-sunshine-dur').innerText = code <= 1 ? '~8 h' : (code <= 3 ? '~4 h' : '< 1 h');
+  }
+
+  if (daily.daylight_duration && daily.daylight_duration[dayIndex] !== undefined) {
+    const durSec = daily.daylight_duration[dayIndex];
+    const dlH = Math.floor(durSec / 3600);
+    const dlM = Math.round((durSec % 3600) / 60);
+    document.getElementById('modal-daylight-dur').innerText = `Tageslänge: ${dlH} h ${dlM} min`;
+    document.getElementById('modal-daylight-hours').innerText = `${dlH} h ${dlM} m`;
+  } else {
+    document.getElementById('modal-daylight-dur').innerText = 'Tageslänge: ~11 h';
+    document.getElementById('modal-daylight-hours').innerText = '~11 h';
+  }
+
+  // UV-Index
+  const uvMax = daily.uv_index_max ? Math.round(daily.uv_index_max[dayIndex]) : 0;
+  document.getElementById('modal-uv-max').innerText = `${uvMax}`;
+  let uvHint = 'Geringe Belastung • Kein Schutz erforderlich';
+  if (uvMax >= 8) uvHint = 'Extrem hoch • Schutzcreme LSF 50+ & Schutzbrille!';
+  else if (uvMax >= 6) uvHint = 'Sehr hoch • Mittags Schatten & Kopfbedeckung';
+  else if (uvMax >= 3) uvHint = 'Mäßig bis erhöht • Sonnenschutz bei Bergtouren';
+  document.getElementById('modal-uv-hint').innerText = uvHint;
+
+  // Feuchte & Taupunkt
+  if (hoursHumidity.length && hoursDewPoint.length) {
+    const minH = Math.round(Math.min(...hoursHumidity));
+    const maxH = Math.round(Math.max(...hoursHumidity));
+    document.getElementById('modal-humidity-range').innerText = `${minH}% – ${maxH}%`;
+
+    const minDP = Math.round(convertTemp(Math.min(...hoursDewPoint)));
+    const maxDP = Math.round(convertTemp(Math.max(...hoursDewPoint)));
+    document.getElementById('modal-dew-point').innerText = `Taupunkt: ${minDP}° bis ${maxDP}°C`;
+  } else {
+    document.getElementById('modal-humidity-range').innerText = '65% – 85%';
+    document.getElementById('modal-dew-point').innerText = 'Taupunkt: 7°C';
+  }
+
+  // 3. Stündlicher 24-Stunden-Verlauf für DIESEN Tag
+  const hourlyContainer = document.getElementById('modal-day-hourly-list');
+  hourlyContainer.innerHTML = '';
+
+  for (let h = 0; h < 24; h++) {
+    const idx = dayStartHourIdx + h;
+    const timeLabel = `${String(h).padStart(2, '0')}:00`;
+    const hCode = hoursCode[h] !== undefined ? hoursCode[h] : 0;
+    const isDay = (h >= 7 && h <= 19);
+    const hInfo = WMO_CODES[hCode] || WMO_CODES[0];
+    const hIcon = (!isDay && (hCode === 0 || hCode === 1)) ? '🌙' : hInfo.icon;
+    const hTemp = hoursTemp[h] !== undefined ? Math.round(convertTemp(hoursTemp[h])) : '--';
+    const hApp = hoursApparent[h] !== undefined ? Math.round(convertTemp(hoursApparent[h])) : hTemp;
+    const hPop = hoursPop[h] !== undefined ? hoursPop[h] : 0;
+    const hPrecip = hoursPrecip[h] !== undefined ? hoursPrecip[h] : 0;
+    const hWind = hoursWind[h] !== undefined ? Math.round(hoursWind[h]) : 0;
+    const hGust = hoursGusts[h] !== undefined ? Math.round(hoursGusts[h]) : hWind;
+
+    const item = document.createElement('div');
+    item.className = 'modal-hourly-item';
+    item.innerHTML = `
+      <span class="mhi-time">${timeLabel}</span>
+      <span class="mhi-icon">${hIcon}</span>
+      <span class="mhi-temp">${hTemp}°</span>
+      <span class="mhi-apparent" style="font-size: 10px; color: var(--text-tertiary);">${hApp}° gef.</span>
+      <span class="mhi-pop">${hPop > 5 || hPrecip > 0 ? `💧 ${hPop}%` : '<span style="color:rgba(255,255,255,0.25);">—</span>'}</span>
+      <span class="mhi-wind">💨 ${hWind} <small>(${hGust})</small></span>
+    `;
+    hourlyContainer.appendChild(item);
+  }
+
+  // 4. Vier ausführliche Tagesabschnitte
   const partsContainer = document.getElementById('modal-day-parts');
   partsContainer.innerHTML = '';
 
-  const dayStartHourIdx = dayIndex * 24;
-  const parts = [
-    { name: 'Morgens', hourOffset: 8, icon: '🌅' },
-    { name: 'Mittags', hourOffset: 13, icon: '☀️' },
-    { name: 'Abends', hourOffset: 19, icon: '🌇' },
-    { name: 'Nachts', hourOffset: 23, icon: '🌙' }
+  const dayParts = [
+    { name: 'Morgens', timeRange: '06:00 – 11:00', hourOffset: 8, icon: '🌅' },
+    { name: 'Mittags', timeRange: '11:00 – 16:00', hourOffset: 13, icon: '☀️' },
+    { name: 'Abends', timeRange: '16:00 – 21:00', hourOffset: 18, icon: '🌇' },
+    { name: 'Nachts', timeRange: '21:00 – 06:00', hourOffset: 23, icon: '🌙' }
   ];
 
-  for (const part of parts) {
-    const idx = dayStartHourIdx + part.hourOffset;
-    let t = '--';
-    let pop = 0;
-    if (hourly && hourly.temperature_2m && hourly.temperature_2m[idx] !== undefined) {
-      t = Math.round(convertTemp(hourly.temperature_2m[idx]));
-      pop = hourly.precipitation_probability ? hourly.precipitation_probability[idx] : 0;
-    }
+  for (const part of dayParts) {
+    const pIdx = dayStartHourIdx + part.hourOffset;
+    const pCode = (hourly && hourly.weather_code && hourly.weather_code[pIdx] !== undefined) ? hourly.weather_code[pIdx] : code;
+    const pInfo = WMO_CODES[pCode] || WMO_CODES[0];
+    const pTemp = (hourly && hourly.temperature_2m && hourly.temperature_2m[pIdx] !== undefined)
+      ? Math.round(convertTemp(hourly.temperature_2m[pIdx]))
+      : (part.hourOffset === 13 ? maxT : (part.hourOffset === 23 ? minT : Math.round((maxT + minT) / 2)));
+    const pApp = (hourly && hourly.apparent_temperature && hourly.apparent_temperature[pIdx] !== undefined)
+      ? Math.round(convertTemp(hourly.apparent_temperature[pIdx]))
+      : pTemp;
+    const pPop = (hourly && hourly.precipitation_probability && hourly.precipitation_probability[pIdx] !== undefined)
+      ? hourly.precipitation_probability[pIdx]
+      : popMax;
+    const pPrecip = (hourly && hourly.precipitation && hourly.precipitation[pIdx] !== undefined)
+      ? hourly.precipitation[pIdx].toFixed(1)
+      : '0.0';
+    const pWind = (hourly && hourly.wind_speed_10m && hourly.wind_speed_10m[pIdx] !== undefined)
+      ? Math.round(hourly.wind_speed_10m[pIdx])
+      : windSpdMax;
+    const pGust = (hourly && hourly.wind_gusts_10m && hourly.wind_gusts_10m[pIdx] !== undefined)
+      ? Math.round(hourly.wind_gusts_10m[pIdx])
+      : windGustMax;
+    const pRH = (hourly && hourly.relative_humidity_2m && hourly.relative_humidity_2m[pIdx] !== undefined)
+      ? Math.round(hourly.relative_humidity_2m[pIdx])
+      : 70;
+    const pDP = (hourly && hourly.dew_point_2m && hourly.dew_point_2m[pIdx] !== undefined)
+      ? Math.round(convertTemp(hourly.dew_point_2m[pIdx]))
+      : 8;
 
     const box = document.createElement('div');
     box.className = 'day-part-box';
     box.innerHTML = `
       <div class="dp-name">${part.name}</div>
-      <div class="dp-icon">${part.icon}</div>
-      <div class="dp-temp">${t}°</div>
-      <div class="dp-rain">${pop > 10 ? `${pop}%` : 'Trocken'}</div>
+      <div style="font-size: 10px; color: var(--text-tertiary);">${part.timeRange}</div>
+      <div class="dp-icon">${pInfo.icon}</div>
+      <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">${pInfo.label}</div>
+      <div class="dp-temp">${pTemp}°C</div>
+      <div class="dp-apparent">Gefühlt ${pApp}°C</div>
+      <div class="dp-rain" style="margin-top: 4px;">${pPop > 10 || parseFloat(pPrecip) > 0 ? `💧 ${pPop}% (${pPrecip} mm)` : '💧 Trocken (0%)'}</div>
+      <div class="dp-wind">💨 ${pWind} km/h • Böen ${pGust}</div>
+      <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">💧 ${pRH}% • TP ${pDP}°C</div>
     `;
     partsContainer.appendChild(box);
   }
 
+  // 5. Atmosphären-, Höhen- & Druckdaten
+  if (hoursFreezingLevel.length) {
+    const minFL = Math.round(Math.min(...hoursFreezingLevel));
+    const maxFL = Math.round(Math.max(...hoursFreezingLevel));
+    document.getElementById('modal-freezing-level').innerText = minFL === maxFL ? `${minFL.toLocaleString('de-DE')} m` : `${minFL.toLocaleString('de-DE')} – ${maxFL.toLocaleString('de-DE')} m`;
+  } else {
+    document.getElementById('modal-freezing-level').innerText = 'ca. 2.600 m';
+  }
+
+  const snowVal = daily.snowfall_sum ? daily.snowfall_sum[dayIndex] : 0;
+  document.getElementById('modal-snowfall-val').innerText = snowVal > 0 ? `❄️ Neuschnee: ${snowVal.toFixed(1)} cm` : 'Kein Schneefall im Tal';
+
+  if (hoursVisibility.length) {
+    const avgVisKm = Math.round(hoursVisibility.reduce((a, b) => a + b, 0) / hoursVisibility.length / 1000);
+    let visDesc = 'Normal';
+    if (avgVisKm >= 35) visDesc = 'Exzellente Fernsicht';
+    else if (avgVisKm >= 15) visDesc = 'Gute Sichtweite';
+    else if (avgVisKm >= 5) visDesc = 'Leichte Dunsttrübung';
+    else visDesc = 'Nebel / Sichteinschränkung';
+    document.getElementById('modal-visibility-val').innerText = `${avgVisKm} km`;
+    const avgCloud = hoursCloudCover.length ? Math.round(hoursCloudCover.reduce((a, b) => a + b, 0) / hoursCloudCover.length) : 50;
+    document.getElementById('modal-cloud-cover').innerText = `${visDesc} • ${avgCloud}% Wolken`;
+  } else {
+    document.getElementById('modal-visibility-val').innerText = '> 20 km';
+    document.getElementById('modal-cloud-cover').innerText = 'Gute Fernsicht';
+  }
+
+  if (hoursPressureMsl.length) {
+    const avgMSL = Math.round(hoursPressureMsl.reduce((a, b) => a + b, 0) / hoursPressureMsl.length);
+    document.getElementById('modal-pressure-msl').innerText = `${avgMSL} hPa`;
+  } else {
+    document.getElementById('modal-pressure-msl').innerText = '1016 hPa';
+  }
+
+  if (hoursSurfacePressure.length) {
+    const avgSurf = Math.round(hoursSurfacePressure.reduce((a, b) => a + b, 0) / hoursSurfacePressure.length);
+    document.getElementById('modal-pressure-surface').innerText = `Stationsdruck QFE: ${avgSurf} hPa`;
+  } else {
+    document.getElementById('modal-pressure-surface').innerText = 'Normaldruck an der Station';
+  }
+
+  if (hoursWindDir.length) {
+    const avgDir = Math.round(hoursWindDir.reduce((a, b) => a + b, 0) / hoursWindDir.length);
+    const compass = getCompassDirectionName(avgDir);
+    document.getElementById('modal-wind-direction').innerText = `${avgDir}° (${compass.code})`;
+    document.getElementById('modal-wind-compass').innerText = compass.desc;
+  } else {
+    document.getElementById('modal-wind-direction').innerText = 'West';
+    document.getElementById('modal-wind-compass').innerText = 'Mäßige Westströmung';
+  }
+
+  // 6. Astronomie & Mond
+  const sunriseDate = daily.sunrise && daily.sunrise[dayIndex] ? new Date(daily.sunrise[dayIndex]) : null;
+  const sunsetDate = daily.sunset && daily.sunset[dayIndex] ? new Date(daily.sunset[dayIndex]) : null;
+
+  if (sunriseDate) {
+    document.getElementById('modal-sunrise').innerText = sunriseDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const dawn = new Date(sunriseDate.getTime() - 32 * 60 * 1000);
+    document.getElementById('modal-dawn-civil').innerText = `Dämmerung: ${dawn.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+  } else {
+    document.getElementById('modal-sunrise').innerText = '07:30';
+    document.getElementById('modal-dawn-civil').innerText = 'Dämmerung: 06:58';
+  }
+
+  if (sunsetDate) {
+    document.getElementById('modal-sunset').innerText = sunsetDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const dusk = new Date(sunsetDate.getTime() + 32 * 60 * 1000);
+    document.getElementById('modal-dusk-civil').innerText = `Abendrot: ${dusk.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+  } else {
+    document.getElementById('modal-sunset').innerText = '18:20';
+    document.getElementById('modal-dusk-civil').innerText = 'Abendrot: 18:52';
+  }
+
+  const moon = calculateMoonPhase(d);
+  document.getElementById('modal-moon-phase').innerText = `${moon.name} ${moon.icon}`;
+  document.getElementById('modal-moon-illum').innerText = `Beleuchtung: ${moon.illumination}%`;
+
+  // 7. Outdoor- & Aktivitätsempfehlungen
+  generateOutdoorRecommendations(daily, hourly, dayIndex, state.currentLocation);
+
+  // Öffne Modal mit flüssiger Einblendung
   modal.style.display = 'flex';
 
-  document.getElementById('close-modal-btn').onclick = () => {
-    modal.style.display = 'none';
-  };
+  const closeBtn = document.getElementById('close-modal-btn');
+  if (closeBtn) {
+    closeBtn.onclick = () => { modal.style.display = 'none'; };
+  }
   modal.onclick = (e) => {
     if (e.target === modal) modal.style.display = 'none';
   };
 }
+
+/**
+ * Erzeugt fundierte Sport- und Kleidungsempfehlungen basierend auf den Wetterdaten
+ */
+function generateOutdoorRecommendations(daily, hourly, dayIndex, loc) {
+  const code = daily.weather_code[dayIndex];
+  const maxGust = Math.round(daily.wind_gusts_10m_max ? daily.wind_gusts_10m_max[dayIndex] : 20);
+  const rainSum = daily.precipitation_sum ? daily.precipitation_sum[dayIndex] : 0;
+  const pop = daily.precipitation_probability_max ? daily.precipitation_probability_max[dayIndex] : 0;
+  const maxT = Math.round(daily.temperature_2m_max[dayIndex]);
+  const minT = Math.round(daily.temperature_2m_min[dayIndex]);
+  const isMountain = loc ? loc.isMountain : false;
+
+  const hikeEl = document.getElementById('modal-rec-hike');
+  const bikeEl = document.getElementById('modal-rec-bike');
+  const clothesEl = document.getElementById('modal-rec-clothes');
+
+  // Bergsport & Wandern
+  if (code >= 95) {
+    hikeEl.innerHTML = `<span style="color:#ff453a; font-weight:700;">⚠️ Hohes Risiko / Gewittergefahr:</span> Ungesicherte Grate und Gipfel meiden! Klettersteige und offenes Gelände ab Mittag meiden. Früh starten und Notabstiege planen.`;
+  } else if (maxGust >= 55) {
+    hikeEl.innerHTML = `<span style="color:#ffd60a; font-weight:700;">⚠️ Starker Höhenwind:</span> Sturmböen bis ${maxGust} km/h an exponierten Stellen. Gratwanderungen erfordern Trittsicherheit und Windschutz.`;
+  } else if (rainSum >= 8 || pop >= 75) {
+    hikeEl.innerHTML = `<span style="color:#64d2ff; font-weight:700;">🌧️ Nasse Steige & Rutschgefahr:</span> Fels und Wurzelpassagen sind feucht. Feste Bergstiefel mit tiefem Profil und Hardshell-Regenschutz zwingend.`;
+  } else if (code <= 2) {
+    hikeEl.innerHTML = `<span style="color:#30d158; font-weight:700;">✅ Beste Tourenbedingungen:</span> Stabile Wetterlage mit hoher Sichtweite. Ideal für ausgedehnte Tagestouren und Gipfelziele. Sonnenschutz auf Höhenlagen nicht vergessen!`;
+  } else {
+    hikeEl.innerHTML = `Gute Wanderverhältnisse bei wechselnder Bewölkung. Niederschlagsradar vor dem Aufstieg kurz prüfen.`;
+  }
+
+  // Radsport & Laufen
+  if (maxGust >= 50) {
+    bikeEl.innerHTML = `Gegenwind und Seitenböen bis ${maxGust} km/h einplanen. Geschützte Waldrouten oder niedrigere Höhen bevorzugen.`;
+  } else if (rainSum > 3 || pop >= 70) {
+    bikeEl.innerHTML = `Feuchte Straßen und Spritzwasser. Schutzbleche, Bremsweg anpassen und reflektierende Signalbekleidung tragen.`;
+  } else if (maxT >= 12 && maxT <= 22) {
+    bikeEl.innerHTML = `Ideales Ausdauertemperatur-Fenster (${maxT}°C). Trockener Untergrund und angenehmer Fahrtwind. Beste Bedingungen für Grundlageneinheiten.`;
+  } else {
+    bikeEl.innerHTML = `Normale Trainingsbedingungen. Je nach Tagesabschnitt die wärmeren Mittags- oder Nachmittagsstunden nutzen.`;
+  }
+
+  // Bekleidungsempfehlung (Zwiebelprinzip)
+  let layerAdvice = '';
+  if (maxT <= 5) {
+    layerAdvice = `3-Lagen-System: Thermo-Funktionsunterwäsche, isolierende Fleece- oder Daunenschicht sowie winddichte Hardshell. Mütze und Handschuhe unerlässlich.`;
+  } else if (maxT <= 14) {
+    layerAdvice = `Zwiebelprinzip: Atmungsaktives Longsleeve + Midlayer (Fleece/Weste). Für windige Abschnitte leichte Windjacke griffbereit halten.`;
+  } else if (maxT <= 23) {
+    layerAdvice = `Kurzarm-Funktionsshirt mit leichter Übergangsjacke für morgens (${minT}°C) und abends.`;
+  } else {
+    layerAdvice = `Leichte, hoch atmungsaktive Sommerbekleidung. UV-Kopfbedeckung und Sonnenschutzcreme.`;
+  }
+  clothesEl.innerText = layerAdvice;
+}
+
+// Globaler Tastatur-Listener zum Schließen des Modals via Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('day-detail-modal');
+    if (modal && modal.style.display !== 'none') {
+      modal.style.display = 'none';
+    }
+  }
+});
 
 function renderBentoGrid(cur, daily, hourly) {
   const uv = cur.uv_index !== undefined ? Math.round(cur.uv_index) : 0;
