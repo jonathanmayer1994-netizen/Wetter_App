@@ -1557,6 +1557,289 @@ html, body {
   color: #64d2ff;
 }
 
+/* ==========================================================================
+   3D BERG-WETTERMODELL & HÖHENSCHNITT (APPLE / VENTUSKY STYLE)
+   ========================================================================== */
+.city-mountain-switch-card {
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.28) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.cms-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.cms-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 10px rgba(56, 189, 248, 0.45));
+}
+
+.cms-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cms-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #38bdf8;
+  text-transform: uppercase;
+}
+
+.cms-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.cms-mountains-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cms-btn {
+  padding: 7px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cms-btn:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+}
+
+.cms-btn-toggle {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+}
+
+.cms-btn-toggle:hover {
+  background: rgba(245, 158, 11, 0.3);
+  border-color: #f59e0b;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.m3d-controls-dock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-card);
+  margin-bottom: 14px;
+}
+
+.m3d-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.m3d-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  margin-right: 2px;
+}
+
+.m3d-mode-btn, .m3d-layer-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.m3d-mode-btn:hover, .m3d-layer-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.m3d-mode-btn.active {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.85), rgba(0, 113, 227, 0.95));
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(10, 132, 255, 0.4);
+}
+
+.m3d-layer-btn.active {
+  background: rgba(100, 210, 255, 0.18);
+  border-color: var(--ios-cyan);
+  color: var(--ios-cyan);
+  box-shadow: 0 0 10px rgba(100, 210, 255, 0.25);
+}
+
+/* 3D Mountain Viewport */
+.mountain-3d-viewport {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 25%, #172554 0%, #0f172a 65%, #020617 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.4);
+  margin-bottom: 14px;
+}
+
+.mountain-3d-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* HUD Overlay Badges on the 3D Mountain */
+.m3d-hud-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.m3d-hud-badge {
+  position: absolute;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(15, 23, 42, 0.84);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s, box-shadow 0.2s;
+  z-index: 10;
+}
+
+.m3d-hud-badge:hover {
+  transform: scale(1.06);
+  border-color: var(--ios-cyan);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 14px rgba(100, 210, 255, 0.3);
+}
+
+.mhb-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.mhb-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mhb-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.mhb-metric {
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.mhb-metric strong {
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.mhb-sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* Positions of HUD Badges */
+.badge-peak {
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.badge-peak:hover {
+  transform: translateX(-50%) scale(1.06);
+}
+
+.badge-frost {
+  top: 45%;
+  left: 20px;
+  border-color: rgba(100, 210, 255, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(100, 210, 255, 0.25);
+}
+
+.badge-mid {
+  top: 42%;
+  right: 20px;
+  border-color: rgba(48, 209, 88, 0.35);
+}
+
+.badge-valley {
+  bottom: 40px;
+  left: 20px;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* 3D Mountain Bottom Status Bar */
+.m3d-status-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
 /* 4. Altitude Levels Container & Cards */
 .altitude-levels-container {
   display: flex;

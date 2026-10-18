@@ -46,6 +46,20 @@ const state = {
     radarHost: '',
     showStations: false
   },
+  mountain3D: {
+    canvas: null,
+    ctx: null,
+    viewMode: 'massif', // 'massif', 'crossSection', 'wind'
+    showFrostLine: true,
+    showClouds: true,
+    showWind: true,
+    showSun: true,
+    animFrame: null,
+    weatherParticles: [],
+    windParticles: [],
+    cloudDrift: 0,
+    initialized: false
+  },
   canvasEngine: null
 };
 
@@ -299,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSearch();
   setupWallSelector();
   setupAltitudeSlider();
+  setupMountain3DControls();
   setupFavorites();
   setupLocationTypeToggle();
   setupMeteogramControls();
@@ -330,6 +345,12 @@ function switchTab(tabId) {
   document.querySelectorAll('.tab-pane').forEach(p => {
     p.classList.toggle('active', p.id === tabId);
   });
+
+  if (tabId === 'tab-mountain') {
+    setTimeout(() => {
+      renderMountain3DModel();
+    }, 80);
+  }
 
   if (tabId === 'tab-map' && state.map.instance) {
     setTimeout(() => {
@@ -1876,6 +1897,732 @@ function renderAltitudeChart() {
     `;
 
     container.appendChild(card);
+  });
+
+  // 3D-Bergmodell synchronisieren
+  renderMountain3DModel();
+}
+
+/**
+ * ============================================================================
+ * 3D BERGGELÄNDE & WETTER-HÖHENSCHNITT ENGINE (ALPINE 3D RELIEF & METEOROLOGY)
+ * ============================================================================
+ * Bildet das Bergmassiv in 3D mit realistischer Geometrie, echter 0°C-Schneefallgrenze,
+ * Wolkenschicht / Inversionsmeer, Höhenwind-Gradient und interaktiven Höhenstufen ab.
+ */
+function renderMountain3DModel() {
+  updateMountain3DHUD();
+  drawMountain3DCanvas();
+
+  // Starte kontinuierliche Animationsschleife (60fps) für Partikel & Strömung
+  if (!state.mountain3D.animFrame) {
+    startMountain3DAnimation();
+  }
+}
+
+/**
+ * Aktualisiert die DOM-Badges und HUD-Overlays auf dem 3D-Berg (ohne Canvas-Redraw)
+ */
+function updateMountain3DHUD() {
+  const m = state.microData;
+  if (!m || !m.altitudeProfile) return;
+
+  const profiles = m.altitudeProfile;
+  const cur = profiles[state.selectedAltitudeHour] || profiles[0];
+  const levels = cur.levels;
+  if (!levels || levels.length < 3) return;
+
+  const valL = levels[0];
+  const midL = levels[1];
+  const peakL = levels[2];
+  const freezingLevel = cur.freezingLevel;
+  const precip = cur.precip || 0;
+  const peakWind = peakL.wind || 40;
+  const peakGusts = peakL.gusts || Math.round(peakWind * 1.35);
+
+  // 1. Aktualisiere HUD-Badges auf dem 3D-Berg
+  const peakZElem = document.getElementById('m3d-val-peak-z');
+  const peakTempElem = document.getElementById('m3d-val-peak-temp');
+  const peakCondElem = document.getElementById('m3d-val-peak-cond');
+  const peakWindElem = document.getElementById('m3d-val-peak-wind');
+  const peakGustsElem = document.getElementById('m3d-val-peak-gusts');
+
+  const frostZElem = document.getElementById('m3d-val-frost-z');
+  const frostSubElem = document.getElementById('m3d-val-frost-sub');
+
+  const midZElem = document.getElementById('m3d-val-mid-z');
+  const midTempElem = document.getElementById('m3d-val-mid-temp');
+  const midCondElem = document.getElementById('m3d-val-mid-cond');
+  const midWindElem = document.getElementById('m3d-val-mid-wind');
+
+  const valZElem = document.getElementById('m3d-val-valley-z');
+  const valTempElem = document.getElementById('m3d-val-valley-temp');
+  const valCondElem = document.getElementById('m3d-val-valley-cond');
+  const valWindElem = document.getElementById('m3d-val-valley-wind');
+
+  if (peakZElem) peakZElem.innerText = `${peakL.z.toLocaleString('de-DE')} m`;
+  if (peakTempElem) {
+    const t = Math.round(convertTemp(peakL.temp));
+    peakTempElem.innerText = `${t > 0 ? `+${t}` : t}°C`;
+  }
+  if (peakCondElem) peakCondElem.innerText = peakL.precipType === 'Schnee' ? '❄️ Schneefall' : (precip > 0 ? '🌧️ Regen' : '☀️ Klar');
+  if (peakWindElem) peakWindElem.innerText = `${peakL.wind} km/h`;
+  if (peakGustsElem) peakGustsElem.innerText = `${peakGusts} km/h`;
+
+  if (frostZElem) frostZElem.innerText = `${Math.round(freezingLevel).toLocaleString('de-DE')} m`;
+  if (frostSubElem) {
+    if (freezingLevel >= peakL.z) {
+      frostSubElem.innerText = `0°C-Grenze +${Math.round(freezingLevel - peakL.z)} m über Gipfel (Tauwetter)`;
+    } else if (freezingLevel <= valL.z) {
+      frostSubElem.innerText = `Dauerfrost bis ins Tal (${Math.round(valL.z - freezingLevel)} m unter Talboden)`;
+    } else {
+      frostSubElem.innerText = `Darüber Schnee, darunter Regen`;
+    }
+  }
+
+  if (midZElem) midZElem.innerText = `${midL.z.toLocaleString('de-DE')} m`;
+  if (midTempElem) {
+    const t = Math.round(convertTemp(midL.temp));
+    midTempElem.innerText = `${t > 0 ? `+${t}` : t}°C`;
+  }
+  if (midCondElem) midCondElem.innerText = midL.precipType === 'Schnee' ? '❄️ Schnee' : '💧 Regen';
+  if (midWindElem) midWindElem.innerText = `${midL.wind} km/h`;
+
+  if (valZElem) valZElem.innerText = `${valL.z.toLocaleString('de-DE')} m`;
+  if (valTempElem) {
+    const t = Math.round(convertTemp(valL.temp));
+    valTempElem.innerText = `${t > 0 ? `+${t}` : t}°C`;
+  }
+  if (valCondElem) valCondElem.innerText = precip > 0 ? `💧 ${precip.toFixed(1)} mm` : 'Trocken';
+  if (valWindElem) valWindElem.innerText = `${valL.wind} km/h`;
+
+  // Status Bar Indikator
+  const invElem = document.getElementById('msb-inversion-badge');
+  if (invElem) {
+    if (m.atmosphere && m.atmosphere.inversionActive) {
+      invElem.innerText = '⚠️ Inversionslage (Kaltluftsee im Tal, Gipfel wärmer)';
+      invElem.style.color = '#ffd166';
+    } else if (freezingLevel < peakL.z) {
+      invElem.innerText = '❄️ Gipfel in der Frostzone • Tal schneefrei';
+      invElem.style.color = '#64d2ff';
+    } else {
+      invElem.innerText = '☀️ Alpin-Stratosphäre mild';
+      invElem.style.color = '#30d158';
+    }
+  }
+
+  // Positioniere das 0°C Frost Badge dynamisch
+  const canvas = document.getElementById('mountain-3d-canvas');
+  if (canvas) {
+    const h = canvas.clientHeight || 420;
+    const yValley = h * 0.82;
+    const yPeak = h * 0.18;
+    const zRange = Math.max(200, peakL.z - valL.z);
+    const ratio = Math.max(0, Math.min(1.2, (freezingLevel - valL.z) / zRange));
+    const yFrost = yValley - ratio * (yValley - yPeak);
+
+    const badgeFrost = document.getElementById('m3d-hud-frost');
+    if (badgeFrost) {
+      const frostClampY = Math.max(50, Math.min(h - 95, yFrost - 24));
+      badgeFrost.style.top = `${Math.round(frostClampY)}px`;
+      badgeFrost.style.display = state.mountain3D.showFrostLine ? 'flex' : 'none';
+    }
+  }
+}
+
+/**
+ * Zeichnet das 3D-Bergrelief & meteorologische Schichten auf das Canvas
+ */
+function drawMountain3DCanvas() {
+  const canvas = document.getElementById('mountain-3d-canvas');
+  if (!canvas) return;
+
+  const m = state.microData;
+  if (!m || !m.altitudeProfile) return;
+
+  const profiles = m.altitudeProfile;
+  const cur = profiles[state.selectedAltitudeHour] || profiles[0];
+  const levels = cur.levels;
+  if (!levels || levels.length < 3) return;
+
+  const valL = levels[0];
+  const midL = levels[1];
+  const peakL = levels[2];
+  const freezingLevel = cur.freezingLevel;
+  const precip = cur.precip || 0;
+  const peakWind = peakL.wind || 40;
+
+  // 1. Canvas-Dimensionen & DPI-Skalierung
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = rect.width || 800;
+  const h = rect.height || 420;
+
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+
+  const ctx = canvas.getContext('2d');
+  ctx.resetTransform();
+  ctx.scale(dpr, dpr);
+
+  // 2. Höhen-Koordinatenfunktion
+  const yValley = h * 0.82;
+  const yPeak = h * 0.18;
+  const zRange = Math.max(200, peakL.z - valL.z);
+  const getYForZ = (z) => {
+    const ratio = Math.max(0, Math.min(1.2, (z - valL.z) / zRange));
+    return yValley - ratio * (yValley - yPeak);
+  };
+  const yFrost = getYForZ(freezingLevel);
+
+  // Canvas leeren
+  ctx.clearRect(0, 0, w, h);
+
+  // A. Atmosphärischer Alpin-Himmel
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+  skyGrad.addColorStop(0, '#070f26');
+  skyGrad.addColorStop(0.55, '#0f172a');
+  skyGrad.addColorStop(1, '#020617');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Zarte Sterne am Hochgebirgshimmel
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  const starCoords = [[0.12, 0.08], [0.25, 0.14], [0.38, 0.06], [0.72, 0.10], [0.85, 0.07], [0.62, 0.15], [0.92, 0.18]];
+  starCoords.forEach(([sx, sy]) => {
+    ctx.beginPath();
+    ctx.arc(w * sx, h * sy, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // B. Ferne Alpengipfel im Dunst (Tiefenwirkung)
+  ctx.fillStyle = 'rgba(30, 41, 59, 0.40)';
+  ctx.beginPath();
+  ctx.moveTo(0, h * 0.68);
+  ctx.lineTo(w * 0.14, h * 0.44);
+  ctx.lineTo(w * 0.30, h * 0.54);
+  ctx.lineTo(w * 0.52, h * 0.35);
+  ctx.lineTo(w * 0.70, h * 0.48);
+  ctx.lineTo(w * 0.86, h * 0.39);
+  ctx.lineTo(w, h * 0.60);
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Modus-Rendering
+  const mode = state.mountain3D.viewMode || 'massif';
+  if (mode === 'crossSection') {
+    render3DCrossSectionMode(ctx, w, h, valL, midL, peakL, freezingLevel, yValley, yPeak, getYForZ, yFrost, precip);
+  } else if (mode === 'wind') {
+    render3DWindMode(ctx, w, h, valL, midL, peakL, freezingLevel, yValley, yPeak, getYForZ, yFrost, peakWind);
+  } else {
+    render3DMassifMode(ctx, w, h, valL, midL, peakL, freezingLevel, yValley, yPeak, getYForZ, yFrost, precip);
+  }
+}
+
+/**
+ * 3D MASSIF MODUS: Isometrisches Alpenrelief mit Fels-, Schnee- & Waldzonen
+ * sowie dynamischer Niederschlags-Phasenumwandlung (Schnee oben vs. Regen unten)
+ */
+function render3DMassifMode(ctx, w, h, valL, midL, peakL, freezingLevel, yValley, yPeak, getYForZ, yFrost, precip) {
+  const px = w * 0.48; // Peak X
+  const py = yPeak;    // Peak Y
+  const lx = w * 0.12; // Left ridge X
+  const ly = yValley;  // Left ridge Y
+  const rx = w * 0.88; // Right ridge X
+  const ry = yValley;  // Right ridge Y
+  const cx = w * 0.45; // Center-front arête X
+  const cy = yValley + h * 0.05; // Center-front arête Y
+
+  // 1. Linke Wand (Luv / Sonnenhang - Südwand)
+  const leftRockGrad = ctx.createLinearGradient(lx, ly, px, py);
+  leftRockGrad.addColorStop(0, '#1e293b');
+  leftRockGrad.addColorStop(1, state.mountain3D.showSun ? '#475569' : '#334155');
+  ctx.fillStyle = leftRockGrad;
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(lx, ly);
+  ctx.lineTo(cx, cy);
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. Rechte Wand (Lee / Schattenhang - Nordostwand)
+  const rightRockGrad = ctx.createLinearGradient(px, py, rx, ry);
+  rightRockGrad.addColorStop(0, '#1e293b');
+  rightRockGrad.addColorStop(1, '#090d16');
+  ctx.fillStyle = rightRockGrad;
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(cx, cy);
+  ctx.lineTo(rx, ry);
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Felsgrate & Strukturlinien
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(cx, cy);
+  ctx.stroke();
+
+  // 4. ECHTE 3D-SCHNEEDECKE (über 0°C-Frostgrenze)
+  if (freezingLevel < peakL.z) {
+    const frostRatio = Math.max(0, Math.min(1, (yFrost - py) / (cy - py)));
+    const fxLeft = px - (px - lx) * Math.max(0, Math.min(1, (yFrost - py) / (ly - py)));
+    const fxCenter = px - (px - cx) * frostRatio;
+    const fxRight = px + (rx - px) * Math.max(0, Math.min(1, (yFrost - py) / (ry - py)));
+
+    // Linke Schnee-Facette (Strahlendes Alpinweiß)
+    const leftSnowGrad = ctx.createLinearGradient(fxLeft, yFrost, px, py);
+    leftSnowGrad.addColorStop(0, '#bae6fd');
+    leftSnowGrad.addColorStop(0.5, '#e0f2fe');
+    leftSnowGrad.addColorStop(1, '#ffffff');
+    ctx.fillStyle = leftSnowGrad;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(fxLeft, yFrost);
+    // Gezackte Schneezungen in Felsrinnen
+    ctx.lineTo(fxLeft + (fxCenter - fxLeft) * 0.4, yFrost + 14);
+    ctx.lineTo(fxLeft + (fxCenter - fxLeft) * 0.7, yFrost - 6);
+    ctx.lineTo(fxCenter, yFrost);
+    ctx.closePath();
+    ctx.fill();
+
+    // Rechte Schnee-Facette (Kühler Eisschatten)
+    const rightSnowGrad = ctx.createLinearGradient(px, py, fxRight, yFrost);
+    rightSnowGrad.addColorStop(0, '#93c5fd');
+    rightSnowGrad.addColorStop(1, '#3b82f6');
+    ctx.fillStyle = rightSnowGrad;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(fxCenter, yFrost);
+    ctx.lineTo(fxCenter + (fxRight - fxCenter) * 0.4, yFrost + 16);
+    ctx.lineTo(fxCenter + (fxRight - fxCenter) * 0.7, yFrost - 8);
+    ctx.lineTo(fxRight, yFrost);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 5. Unterer Fichtenwald-Gürtel (unterhalb 1.700 m)
+  const yTreeline = getYForZ(Math.min(1700, peakL.z * 0.65));
+  if (yTreeline < yValley) {
+    ctx.fillStyle = '#14532d';
+    // Zeichne Nadelbäume auf den unteren Berghang
+    const treePoints = [
+      [w * 0.18, yValley - 10], [w * 0.24, yValley - 24], [w * 0.32, yValley - 16],
+      [w * 0.58, yValley - 18], [w * 0.68, yValley - 28], [w * 0.78, yValley - 14]
+    ];
+    treePoints.forEach(([tx, ty]) => {
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 16);
+      ctx.lineTo(tx - 7, ty);
+      ctx.lineTo(tx + 7, ty);
+      ctx.closePath();
+      ctx.fill();
+    });
+  }
+
+  // 6. Talboden mit saftigem Wiesengrün
+  const valleyGrad = ctx.createLinearGradient(0, yValley, 0, h);
+  valleyGrad.addColorStop(0, '#166534');
+  valleyGrad.addColorStop(1, '#064e3b');
+  ctx.fillStyle = valleyGrad;
+  ctx.beginPath();
+  ctx.moveTo(0, yValley + 15);
+  ctx.lineTo(w * 0.45, cy);
+  ctx.lineTo(w, yValley + 15);
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+
+  // 7. 0°C-FROSTLINIE ALS LEUCHTENDE 3D-EBENE
+  if (state.mountain3D.showFrostLine) {
+    ctx.save();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#38bdf8';
+    ctx.shadowBlur = 12;
+    ctx.setLineDash([8, 6]);
+
+    ctx.beginPath();
+    ctx.moveTo(w * 0.08, yFrost);
+    ctx.lineTo(w * 0.92, yFrost);
+    ctx.stroke();
+    ctx.restore();
+
+    // 0°C Label auf der Schnittlinie
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '700 11px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`❄️ 0°C Frostgrenze: ${Math.round(freezingLevel)} m`, w * 0.08 + 10, yFrost - 8);
+  }
+
+  // 8. WOLKENSCHICHT / NEBELMEER (INVERSION)
+  if (state.mountain3D.showClouds) {
+    const yCloud = getYForZ(Math.min(peakL.z - 200, Math.max(valL.z + 100, freezingLevel * 0.85)));
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.filter = 'blur(6px)';
+
+    const drift = (state.mountain3D.cloudDrift || 0);
+    for (let c = 0; c < 7; c++) {
+      const cxPos = ((c * 130 + drift) % (w + 160)) - 80;
+      ctx.beginPath();
+      ctx.ellipse(cxPos, yCloud, 75, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 9. DYNAMISCHE 3D-WINDSTRÖMUNG
+  if (state.mountain3D.showWind) {
+    renderWindStreamlines(ctx, w, h, px, py, lx, ly, rx, ry, cy);
+  }
+
+  // 10. DYNAMISCHER NIEDERSCHLAG: PHASENWECHSEL SCHNEE (OBEN) VS. REGEN (UNTEN)
+  renderElevationPrecipitationParticles(ctx, w, h, yFrost, precip);
+}
+
+/**
+ * Zeichnet dynamische Partikel mit Schneefall über der 0°C-Grenze und Regen darunter
+ */
+function renderElevationPrecipitationParticles(ctx, w, h, yFrost, precip) {
+  if (precip <= 0) return;
+
+  if (!state.mountain3D.weatherParticles || state.mountain3D.weatherParticles.length === 0) {
+    state.mountain3D.weatherParticles = [];
+    for (let i = 0; i < 55; i++) {
+      state.mountain3D.weatherParticles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        speed: 1.5 + Math.random() * 2.5,
+        drift: (Math.random() - 0.5) * 0.8,
+        size: 1 + Math.random() * 2
+      });
+    }
+  }
+
+  const particles = state.mountain3D.weatherParticles;
+  particles.forEach(p => {
+    p.y += p.speed;
+    p.x += p.drift + 0.4;
+    if (p.y > h) {
+      p.y = 0;
+      p.x = Math.random() * w;
+    }
+    if (p.x > w) p.x = 0;
+    if (p.x < 0) p.x = w;
+
+    if (p.y < yFrost) {
+      // SCHNEE: Weißer funkelnder Schneepartikel oberhalb der 0°C-Frostgrenze
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // REGEN: Transparente blaue Fallstreifen unterhalb der 0°C-Frostgrenze
+      ctx.strokeStyle = 'rgba(147, 197, 253, 0.7)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - 1, p.y + 6);
+      ctx.stroke();
+    }
+  });
+}
+
+/**
+ * 3D VERTIKALER HÖHENSCHNITT-MODUS: Exakte Skala in Metern mit thermischer Zonierung
+ */
+function render3DCrossSectionMode(ctx, w, h, valL, midL, peakL, freezingLevel, yValley, yPeak, getYForZ, yFrost, precip) {
+  const rulerX = 75;
+
+  // 1. Vertikales Höhenlineal
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(rulerX, yPeak - 20);
+  ctx.lineTo(rulerX, yValley + 20);
+  ctx.stroke();
+
+  // Höhenmarkierungen alle 500m
+  const minZ = Math.floor(valL.z / 500) * 500;
+  const maxZ = Math.ceil(peakL.z / 500) * 500;
+  for (let z = minZ; z <= maxZ; z += 500) {
+    const yz = getYForZ(z);
+    ctx.beginPath();
+    ctx.moveTo(rulerX - 6, yz);
+    ctx.lineTo(rulerX + 6, yz);
+    ctx.stroke();
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '600 10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${z} m`, rulerX - 10, yz + 3);
+  }
+  ctx.textAlign = 'left';
+
+  // 2. Thermische Hintergrund-Zonen
+  // Frostbereich (< 0°C)
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
+  ctx.fillRect(rulerX, yPeak - 20, w - rulerX, Math.max(0, yFrost - (yPeak - 20)));
+
+  // Tauwetterbereich (> 0°C)
+  ctx.fillStyle = 'rgba(34, 197, 94, 0.12)';
+  ctx.fillRect(rulerX, yFrost, w - rulerX, Math.max(0, (yValley + 20) - yFrost));
+
+  // 3. Bergprofil-Querschnitt
+  const px = w * 0.52;
+  const py = yPeak;
+  ctx.fillStyle = 'rgba(30, 41, 59, 0.85)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(rulerX + 40, yValley);
+  ctx.lineTo(px, py);
+  ctx.lineTo(w - 40, yValley);
+  ctx.lineTo(w - 40, yValley + 30);
+  ctx.lineTo(rulerX + 40, yValley + 30);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // 4. Hervorgehobene 0°C-Isotherme
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(rulerX, yFrost);
+  ctx.lineTo(w - 20, yFrost);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#38bdf8';
+  ctx.font = '700 11px system-ui';
+  ctx.fillText(`❄️ 0°C Isotherme: ${Math.round(freezingLevel)} m (Schneefallgrenze)`, rulerX + 15, yFrost - 8);
+
+  // 5. Niederschlags- & Phasenzonen Annotationen
+  ctx.font = '600 10px system-ui';
+  ctx.fillStyle = '#bae6fd';
+  ctx.fillText(`❄️ Frostzone (< 0°C) • Schnee / Reif • Gipfel: ${Math.round(peakL.temp)}°C`, rulerX + 15, yPeak + 14);
+
+  ctx.fillStyle = '#86efac';
+  ctx.fillText(`💧 Tauzone (> 0°C) • Regen / Schmelze • Talboden: ${Math.round(valL.temp)}°C`, rulerX + 15, yValley - 10);
+
+  // Niederschlags-Partikel im Schnitt
+  renderElevationPrecipitationParticles(ctx, w, h, yFrost, precip);
+}
+
+/**
+ * 3D WIND- & STRÖMUNGSMODUS: Düseneffekt & Grat-Beschleunigung
+ */
+function render3DWindMode(ctx, w, h, valL, midL, peakL, freezingLevel, yValley, yPeak, getYForZ, yFrost, peakWind) {
+  // Zeige Bergmassiv abgedunkelt als Silhouette
+  const px = w * 0.48;
+  const py = yPeak;
+  const lx = w * 0.12;
+  const ly = yValley;
+  const rx = w * 0.88;
+  const ry = yValley;
+
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(lx, ly);
+  ctx.lineTo(rx, ry);
+  ctx.closePath();
+  ctx.fill();
+
+  // Dichte aerodynamische Windvektoren über dem Berg
+  const windCount = 38;
+  const time = Date.now() * 0.002;
+
+  for (let i = 0; i < windCount; i++) {
+    const yOffset = ((i * 12 + time * 40) % (h * 0.85)) + h * 0.08;
+    const progress = ((time * (peakWind / 25) + i * 0.15) % 1);
+
+    // Bezier-Stromlinie von links nach rechts über den Berg
+    const startX = 20;
+    const endX = w - 20;
+    const curX = startX + progress * (endX - startX);
+
+    // Wind wird am Gipfel angehoben und komprimiert
+    const distToPeak = Math.abs(curX - px);
+    const lift = Math.max(0, 1 - distToPeak / (w * 0.42)) * 65;
+    const curY = yOffset - lift;
+
+    // Geschwindigkeits-Farbgradient (Tal grün, Gipfel rot/orange)
+    let color = '#22c55e';
+    if (lift > 45) color = '#ef4444';
+    else if (lift > 20) color = '#f59e0b';
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(curX, curY, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Lee-Verwirbelungen auf der rechten Seite
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.ellipse(w * 0.72, yPeak + 75, 45, 20, 0.3, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#f87171';
+  ctx.font = '600 11px system-ui';
+  ctx.fillText('💨 Lee-Verwirbelungen & Abwinde', w * 0.65, yPeak + 115);
+}
+
+/**
+ * Zeichnet animierte 3D-Windstromlinien
+ */
+function renderWindStreamlines(ctx, w, h, px, py, lx, ly, rx, ry, cy) {
+  ctx.save();
+  ctx.lineWidth = 1.8;
+  const streamCount = 14;
+  const t = Date.now() * 0.0018;
+
+  for (let i = 0; i < streamCount; i++) {
+    const p = (t + i / streamCount) % 1;
+    const sx = lx - 40 + p * (rx - lx + 80);
+    const distToPeak = Math.abs(sx - px);
+    const lift = Math.max(0, 1 - distToPeak / (w * 0.45)) * 55;
+    const sy = ly - (p * (ly - py) * 0.9) - lift;
+
+    ctx.strokeStyle = `rgba(100, 210, 255, ${Math.sin(p * Math.PI) * 0.6})`;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx - 16, sy + 3);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Kontinuierliche Animationsschleife für Schneefall, Regen & Wolkendrift
+ */
+function startMountain3DAnimation() {
+  function loop() {
+    state.mountain3D.cloudDrift = ((state.mountain3D.cloudDrift || 0) + 0.35);
+
+    // Rendere Frame nur wenn der Berg-Tab aktiv ist und Bergmodus gewählt ist
+    const tabMountain = document.getElementById('tab-mountain');
+    if (tabMountain && tabMountain.classList.contains('active') && state.currentLocation && state.currentLocation.isMountain) {
+      drawMountain3DCanvas();
+    }
+
+    state.mountain3D.animFrame = requestAnimationFrame(loop);
+  }
+
+  if (state.mountain3D.animFrame) cancelAnimationFrame(state.mountain3D.animFrame);
+  state.mountain3D.animFrame = requestAnimationFrame(loop);
+}
+
+/**
+ * Globaler Helfer zum sofortigen Laden bekannter Berggipfel
+ */
+window.loadNamedMountain = function(name) {
+  const mountainPresets = {
+    'zugspitze': { name: 'Zugspitze', lat: 47.4212, lon: 10.9864, elevation: 2962, country: 'Deutschland', isMountain: true },
+    'matterhorn': { name: 'Matterhorn', lat: 45.9764, lon: 7.6586, elevation: 4478, country: 'Schweiz', isMountain: true },
+    'mont blanc': { name: 'Mont Blanc', lat: 45.8326, lon: 6.8652, elevation: 4808, country: 'Frankreich', isMountain: true },
+    'großglockner': { name: 'Großglockner', lat: 47.0742, lon: 12.6947, elevation: 3798, country: 'Österreich', isMountain: true },
+    'grossglockner': { name: 'Großglockner', lat: 47.0742, lon: 12.6947, elevation: 3798, country: 'Österreich', isMountain: true },
+    'nebelhorn': { name: 'Nebelhorn', lat: 47.4219, lon: 10.3444, elevation: 2224, country: 'Deutschland', isMountain: true }
+  };
+  const key = (name || '').toLowerCase().trim();
+  const target = mountainPresets[key] || state.favorites.find(f => f.name.toLowerCase().includes(key));
+  if (target) {
+    loadLocation(target);
+    switchTab('tab-mountain');
+  }
+};
+
+/**
+ * Richtet alle Event-Listener für das 3D-Bergmodell ein
+ */
+function setupMountain3DControls() {
+  if (state.mountain3D.initialized) return;
+  state.mountain3D.initialized = true;
+
+  // 1. Modus-Buttons (3D Massiv, Vertikalschnitt, Wind)
+  document.querySelectorAll('.m3d-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.m3d-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.mountain3D.viewMode = btn.dataset.mode;
+      renderMountain3DModel();
+    });
+  });
+
+  // 2. Ebenen-Toggles (Frostgrenze, Wolken, Wind, Sonne)
+  document.querySelectorAll('.m3d-layer-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layer = btn.dataset.layer;
+      btn.classList.toggle('active');
+      const isActive = btn.classList.contains('active');
+
+      if (layer === 'frost') state.mountain3D.showFrostLine = isActive;
+      else if (layer === 'clouds') state.mountain3D.showClouds = isActive;
+      else if (layer === 'wind') state.mountain3D.showWind = isActive;
+      else if (layer === 'sun') state.mountain3D.showSun = isActive;
+
+      renderMountain3DModel();
+    });
+  });
+
+  // 3. Klick auf HUD-Badges hebt entsprechende Höhenstufe in den Tier-Karten hervor
+  const badgeMap = {
+    'm3d-hud-peak': 2,
+    'm3d-hud-frost': 1,
+    'm3d-hud-mid': 1,
+    'm3d-hud-valley': 0
+  };
+
+  Object.entries(badgeMap).forEach(([id, tierIdx]) => {
+    const badge = document.getElementById(id);
+    if (badge) {
+      badge.addEventListener('click', () => {
+        const cards = document.querySelectorAll('.altitude-tier-card');
+        if (cards && cards[tierIdx]) {
+          cards[tierIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          cards[tierIdx].classList.add('tier-highlight');
+          setTimeout(() => cards[tierIdx].classList.remove('tier-highlight'), 1500);
+        }
+      });
+    }
+  });
+
+  // 4. Schnellwahl-Buttons für Gipfel aus dem City-Banner
+  document.querySelectorAll('.cms-btn[data-mountain]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mName = btn.dataset.mountain;
+      window.loadNamedMountain(mName);
+    });
+  });
+
+  const toggleBtn = document.getElementById('cms-btn-toggle-mountain');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      state.currentLocation.isMountain = true;
+      loadLocation(state.currentLocation);
+      switchTab('tab-mountain');
+    });
+  }
+
+  // Resize-Listener
+  window.addEventListener('resize', () => {
+    const tabMountain = document.getElementById('tab-mountain');
+    if (tabMountain && tabMountain.classList.contains('active')) {
+      renderMountain3DModel();
+    }
   });
 }
 
