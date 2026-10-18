@@ -3379,7 +3379,7 @@ async function updateWeatherOverlay() {
       showUnifiedRadarFrame(state.map.radarIndex);
     }
 
-    if (legendTitle) legendTitle.innerText = '📡 24h Niederschlags- & Schneefilm (Radar & Prognose):';
+    if (legendTitle) legendTitle.innerText = '📡 48h Niederschlags- & Schneefilm (Radar & Prognose):';
     if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #38bdf8, #22c55e, #eab308, #ef4444, #c084fc, #ffffff)';
     if (legendLabels) {
       legendLabels.innerHTML = `
@@ -3818,8 +3818,10 @@ async function loadUnifiedRadarEngine() {
         return null;
       });
 
-    // 2. 24h-36h Open-Meteo Niederschlags- & Schneeprognose für 21 alpine Stationen
-    const forecastPromise = MicroEngine.fetch24hRadarForecast(REGIONAL_STATIONS);
+    // 2. 48h Open-Meteo Niederschlags- & Schneeprognose für 21 alpine Stationen (DWD ICON & ECMWF)
+    const forecastPromise = MicroEngine.fetch48hRadarForecast
+      ? MicroEngine.fetch48hRadarForecast(REGIONAL_STATIONS)
+      : MicroEngine.fetch24hRadarForecast(REGIONAL_STATIONS);
 
     const [rvData, forecastFrames] = await Promise.all([rvPromise, forecastPromise]);
 
@@ -3871,10 +3873,10 @@ async function loadUnifiedRadarEngine() {
     const liveIdx = unifiedFrames.length - 1;
     unifiedFrames[liveIdx].isLive = true;
 
-    // Baue 24h Zukunfts-Frames auf (+1h bis +24h / +36h)
+    // Baue 48h Zukunfts-Frames auf (+1h bis +48h mit Zwischenschritten)
     if (forecastFrames && Array.isArray(forecastFrames)) {
       forecastFrames.forEach(ff => {
-        if (ff.hoursFromNow > 0) {
+        if (ff.hoursFromNow > 0 && ff.hoursFromNow <= 48) {
           unifiedFrames.push({
             type: 'future',
             hoursFromNow: ff.hoursFromNow,

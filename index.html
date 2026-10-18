@@ -1147,7 +1147,7 @@
               <!-- Overlay Switcher Pills -->
               <div class="mft-group">
                 <span class="mft-label">Wetter:</span>
-                <button class="map-overlay-btn active" data-overlay="precip" title="24-Stunden hochauflösender Niederschlags- & Schneefilm">🌧️❄️ 24h Radar</button>
+                <button class="map-overlay-btn active" data-overlay="precip" title="48-Stunden hochauflösender Niederschlags- & Schneefilm">🌧️❄️ 48h Radar</button>
                 <button class="map-overlay-btn" data-overlay="wind" title="Animierte Windströmung & Böen">💨 Wind</button>
                 <button class="map-overlay-btn" data-overlay="lightning" title="Live-Blitzentladungen & Gewitter-Tracker">⚡ Blitze</button>
                 <button class="map-overlay-btn" data-overlay="clouds" title="Bewölkungsgrad & Wolkenfelder">☁️ Wolken</button>
@@ -1212,13 +1212,13 @@
             </div>
 
             <!-- =================================================================== -->
-            <!-- 2. HIGH-END 24H RADAR TIMELINE PLAYER (APPLE WEATHER / WINDY STYLE) -->
+            <!-- 2. HIGH-END 48H RADAR TIMELINE PLAYER (APPLE WEATHER / WINDY STYLE) -->
             <!-- =================================================================== -->
             <div class="radar-floating-controls modern-radar-player" id="radar-floating-controls">
               <!-- Row 1: Time Display, Mode Chip & Fast Jump Buttons -->
               <div class="radar-player-topline">
                 <div class="radar-info-left">
-                  <span class="radar-mode-chip" id="radar-mode-chip">🔮 24h Prognose-Radar</span>
+                  <span class="radar-mode-chip" id="radar-mode-chip">🔮 48h Prognose-Radar</span>
                   <span class="radar-time-banner" id="radar-time-display">Heute, 14:00 Uhr • +2 Std. Zukunft</span>
                 </div>
 
@@ -1228,7 +1228,12 @@
                   <button class="radar-jump-btn" data-target="3">+3h</button>
                   <button class="radar-jump-btn" data-target="6">+6h</button>
                   <button class="radar-jump-btn" data-target="12">+12h</button>
+                  <button class="radar-jump-btn" data-target="18">+18h</button>
                   <button class="radar-jump-btn" data-target="24">+24h</button>
+                  <button class="radar-jump-btn" data-target="30">+30h</button>
+                  <button class="radar-jump-btn" data-target="36">+36h</button>
+                  <button class="radar-jump-btn" data-target="42">+42h</button>
+                  <button class="radar-jump-btn" data-target="48">+48h</button>
                 </div>
               </div>
 
@@ -1236,19 +1241,20 @@
               <div class="radar-player-bottomline">
                 <div class="radar-transport-btns">
                   <button id="radar-prev-btn" class="radar-transport-btn" title="1 Stunde zurück">⏮</button>
-                  <button id="radar-play-btn" class="radar-play-btn" title="24h-Radar abspielen / pausieren">▶</button>
+                  <button id="radar-play-btn" class="radar-play-btn" title="48h-Radar abspielen / pausieren">▶</button>
                   <button id="radar-next-btn" class="radar-transport-btn" title="1 Stunde vor">⏭</button>
                   <button id="radar-speed-btn" class="radar-speed-btn" title="Geschwindigkeit umschalten">1x</button>
                 </div>
 
                 <div class="radar-slider-container">
-                  <input type="range" id="radar-time-slider" min="0" max="28" value="4" step="1">
+                  <input type="range" id="radar-time-slider" min="0" max="60" value="12" step="1">
                   <div class="radar-timeline-markers">
                     <span class="rtm-past">-2 Std. (Radar)</span>
                     <span class="rtm-now">🔴 JETZT</span>
-                    <span class="rtm-future">+6 Std.</span>
                     <span class="rtm-future">+12 Std.</span>
-                    <span class="rtm-future">+24 Std. (DWD & ECMWF)</span>
+                    <span class="rtm-future">+24 Std.</span>
+                    <span class="rtm-future">+36 Std.</span>
+                    <span class="rtm-future">+48 Std. (DWD & ECMWF)</span>
                   </div>
                 </div>
               </div>

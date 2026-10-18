@@ -1715,15 +1715,15 @@ export const MicroEngine = {
   },
 
   /**
-   * STUFE 11: 24- bis 36-Stunden-Zukunfts-Radar & Niederschlags-Prognose
-   * Lädt stündliche hochauflösende Niederschlags- und Schneefelder für die gesamte Region
+   * STUFE 11: 48-Stunden-Zukunfts-Radar & Niederschlags-Prognose (DWD ICON & ECMWF)
+   * Lädt stündliche hochauflösende Niederschlags- und Schneefelder für die gesamte Region (bis zu +48h)
    */
-  async fetch24hRadarForecast(stations) {
+  async fetch48hRadarForecast(stations) {
     if (!stations || stations.length === 0) return null;
     try {
       const lats = stations.map(s => s.lat.toFixed(3)).join(',');
       const lons = stations.map(s => s.lon.toFixed(3)).join(',');
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=precipitation,snowfall,rain,temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&forecast_days=3`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=precipitation,snowfall,rain,temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&forecast_days=4`;
       
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Radar-Prognose HTTP-Fehler: ${res.status}`);
@@ -1748,9 +1748,9 @@ export const MicroEngine = {
         }
       }
 
-      // Baue stündliche Prognose-Frames für die nächsten 24 bis 36 Stunden
+      // Baue stündliche Prognose-Frames für bis zu 48 Stunden in die Zukunft (h = 0 bis 48)
       const forecastFrames = [];
-      const hoursCount = Math.min(36, times.length - curIdx);
+      const hoursCount = Math.min(49, times.length - curIdx);
 
       for (let h = 0; h < hoursCount; h++) {
         const idx = curIdx + h;
@@ -1806,6 +1806,13 @@ export const MicroEngine = {
       console.warn('Zukunfts-Radar Prognose konnte nicht geladen werden:', err);
       return null;
     }
+  },
+
+  /**
+   * Alias für Rückwärtskompatibilität
+   */
+  async fetch24hRadarForecast(stations) {
+    return this.fetch48hRadarForecast(stations);
   },
 
   /**
