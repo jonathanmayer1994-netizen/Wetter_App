@@ -1457,7 +1457,8 @@ function openDayDetailModal(dayIndex, daily, hourly) {
     const sunHours = (daily.sunshine_duration[dayIndex] / 3600).toFixed(1);
     document.getElementById('modal-sunshine-dur').innerText = `${sunHours} h`;
   } else {
-    document.getElementById('modal-sunshine-dur').innerText = code <= 1 ? '~8 h' : (code <= 3 ? '~4 h' : '< 1 h');
+    const wCode = (daily.weather_code && daily.weather_code[dayIndex] !== undefined) ? daily.weather_code[dayIndex] : 0;
+    document.getElementById('modal-sunshine-dur').innerText = wCode <= 1 ? '~8 h' : (wCode <= 3 ? '~4 h' : '< 1 h');
   }
 
   if (daily.daylight_duration && daily.daylight_duration[dayIndex] !== undefined) {
@@ -1785,15 +1786,42 @@ function renderAdaptiveTab2() {
   const mPanel = document.getElementById('mountain-view-panel');
   const cPanel = document.getElementById('city-view-panel');
 
+  const desktopTab = document.getElementById('tab-btn-mountain');
+  const mobileTab = document.querySelector('.mbn-btn[data-tab="tab-mountain"]');
+
   if (isMountain) {
     if (mPanel) mPanel.style.display = 'flex';
     if (cPanel) cPanel.style.display = 'none';
+    if (desktopTab) {
+      const icon = desktopTab.querySelector('.tab-icon');
+      const label = desktopTab.querySelector('.tab-label');
+      if (icon) icon.innerText = '🏔️';
+      if (label) label.innerText = 'Berg & 3D-Alpin';
+    }
+    if (mobileTab) {
+      const icon = mobileTab.querySelector('.mbn-icon');
+      const label = mobileTab.querySelector('.mbn-label');
+      if (icon) icon.innerText = '🏔️';
+      if (label) label.innerText = 'Berg & 3D';
+    }
     renderMountainPanel();
     renderAltitudeHoursScroller();
     selectAltitudeHour(state.selectedAltitudeHour || 0, false);
   } else {
     if (mPanel) mPanel.style.display = 'none';
     if (cPanel) cPanel.style.display = 'flex';
+    if (desktopTab) {
+      const icon = desktopTab.querySelector('.tab-icon');
+      const label = desktopTab.querySelector('.tab-label');
+      if (icon) icon.innerText = '🏙️';
+      if (label) label.innerText = 'Stadtklima & Umwelt';
+    }
+    if (mobileTab) {
+      const icon = mobileTab.querySelector('.mbn-icon');
+      const label = mobileTab.querySelector('.mbn-label');
+      if (icon) icon.innerText = '🏙️';
+      if (label) label.innerText = 'Stadtklima';
+    }
     renderCityPanel();
   }
 }
@@ -4124,6 +4152,16 @@ function setupUnifiedRadarControls() {
     });
   }
 
+  const toggleBtn = document.getElementById('radar-player-toggle-btn');
+  const player = document.getElementById('radar-floating-controls');
+  if (toggleBtn && player) {
+    toggleBtn.addEventListener('click', () => {
+      const isCol = player.classList.toggle('is-collapsed');
+      toggleBtn.innerText = isCol ? '▴' : '▾';
+      toggleBtn.title = isCol ? 'Player vergrößern' : 'Player minimieren';
+    });
+  }
+
   const playBtn = document.getElementById('radar-play-btn');
   if (playBtn) {
     playBtn.onclick = () => toggleRadarPlay();
@@ -4331,6 +4369,23 @@ function renderFavoritesTab() {
   if (!grid) return;
 
   grid.innerHTML = '';
+  if (!state.favorites || state.favorites.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-favorites-box">
+        <span class="empty-fav-icon">⭐</span>
+        <div class="empty-fav-title">Noch keine Favoriten gespeichert</div>
+        <p class="empty-fav-desc">Speichere deine Lieblings-Alpengipfel oder Heimatorte per Klick auf den Stern oben rechts oder wähle einen alpinen Klassiker:</p>
+        <div class="empty-fav-presets">
+          <button class="preset-fav-chip" type="button" onclick="window.loadNamedMountain('Zugspitze')">🏔️ Zugspitze (2.962 m)</button>
+          <button class="preset-fav-chip" type="button" onclick="window.loadNamedMountain('Matterhorn')">🏔️ Matterhorn (4.478 m)</button>
+          <button class="preset-fav-chip" type="button" onclick="window.loadNamedMountain('Großglockner')">🏔️ Großglockner (3.798 m)</button>
+          <button class="preset-fav-chip" type="button" onclick="window.loadNamedMountain('Nebelhorn')">🏔️ Nebelhorn (2.224 m)</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   state.favorites.forEach((fav, i) => {
     const card = document.createElement('div');
     card.className = 'favorite-card';
