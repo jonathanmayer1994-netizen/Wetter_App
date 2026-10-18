@@ -1155,7 +1155,8 @@ function renderAdaptiveTab2() {
     if (mPanel) mPanel.style.display = 'block';
     if (cPanel) cPanel.style.display = 'none';
     renderMountainPanel();
-    renderAltitudeChart();
+    renderAltitudeHoursScroller();
+    selectAltitudeHour(state.selectedAltitudeHour || 0, false);
   } else {
     if (mPanel) mPanel.style.display = 'none';
     if (cPanel) cPanel.style.display = 'block';
@@ -1240,7 +1241,10 @@ function setupWallSelector() {
   });
 }
 
-// Vertical Altitude Profile (Tal vs. Berg)
+// =============================================================================
+// VERTIKALES HÖHENPROFIL (TAL VS. BERG: 4 HÖHENSTUFEN + SMARTE ZEITSTEUERUNG)
+// =============================================================================
+
 function renderAltitudeChart() {
   const container = document.getElementById('altitude-levels-container');
   if (!container || !state.microData || !state.microData.altitudeProfile) return;
@@ -1252,70 +1256,243 @@ function renderAltitudeChart() {
 
   currentProfile.levels.forEach(level => {
     const card = document.createElement('div');
-    card.className = 'altitude-tier-card';
+    const isFreezing = !level.isAboveFreezing;
+    card.className = `altitude-tier-card ${isFreezing ? 'tier-freezing' : 'tier-thawing'}`;
 
     const t = Math.round(convertTemp(level.temp));
     const tFormatted = t > 0 ? `+${t}°` : `${t}°`;
 
-    let tempColor = '#30d158';
-    if (level.temp < 0) tempColor = '#64d2ff';
-    else if (level.temp > 18) tempColor = '#ff9f0a';
+    const feltT = Math.round(convertTemp(level.feltTemp));
+    const feltFormatted = feltT > 0 ? `+${feltT}°` : `${feltT}°`;
 
-    // Proportionale Skala: -20°C bis +30°C
-    const tempPct = Math.max(10, Math.min(100, Math.round(((level.temp - (-20)) / 48) * 100)));
-    const precipIcon = level.isAboveFreezing ? '💧 Regen' : '❄️ Schnee';
+    // Harmonische Temperatur-Farben
+    let tempColor = '#30d158'; // Grün (angenehm / mild)
+    if (level.temp < -5) tempColor = '#5ac8fa'; // Tiefkaltes Eisblau
+    else if (level.temp < 0) tempColor = '#64d2ff'; // Frostiges Cyan
+    else if (level.temp > 20) tempColor = '#ff453a'; // Sehr warm
+    else if (level.temp > 14) tempColor = '#ff9f0a'; // Warm / Sommerlich
+
+    let feltColor = '#30d158';
+    if (level.feltTemp < -5) feltColor = '#5ac8fa';
+    else if (level.feltTemp < 0) feltColor = '#64d2ff';
+    else if (level.feltTemp > 20) feltColor = '#ff453a';
+    else if (level.feltTemp > 14) feltColor = '#ff9f0a';
+
+    // 0°C-Niveau Distanz
+    let freezingDiffText = '';
+    let freezingDiffClass = '';
+    if (level.freezingDiff > 0) {
+      freezingDiffText = `+${level.freezingDiff.toLocaleString('de-DE')} m über 0°C`;
+      freezingDiffClass = 'f-above-frost';
+    } else if (level.freezingDiff < 0) {
+      freezingDiffText = `${Math.abs(level.freezingDiff).toLocaleString('de-DE')} m unter 0°C`;
+      freezingDiffClass = 'f-below-frost';
+    } else {
+      freezingDiffText = 'Exakt an der 0°C-Grenze';
+      freezingDiffClass = 'f-exact-frost';
+    }
+
+    const precipIcon = level.isAboveFreezing ? '💧' : '❄️';
+    const precipType = level.precipType || (level.isAboveFreezing ? 'Regen' : 'Schnee');
 
     card.innerHTML = `
-      <div class="tier-left">
-        <span class="tier-icon">${level.icon}</span>
-        <span class="tier-name">${level.name}</span>
-        <span class="tier-elevation-badge">${level.z.toLocaleString('de-DE')} m</span>
-      </div>
-
-      <div class="tier-center">
-        <span class="tier-temp-val" style="color:${tempColor}">${tFormatted}</span>
-        <div class="tier-gauge-track">
-          <div class="tier-gauge-fill" style="background:${tempColor}; width: ${tempPct}%;"></div>
+      <!-- 1. IDENTITÄT & HÖHE -->
+      <div class="tier-cell-identity">
+        <div class="tier-icon-box">${level.icon}</div>
+        <div class="tier-identity-info">
+          <div class="tier-name-row">
+            <span class="tier-name">${level.name}</span>
+            <span class="tier-elevation-badge">${level.z.toLocaleString('de-DE')} m</span>
+          </div>
+          <div class="tier-meta-sub">
+            <span class="tier-pressure-chip">${level.pressureHpa || Math.round(1013 * Math.exp(-level.z/8000))} hPa</span>
+            <span class="tier-zone-pill ${level.isAboveFreezing ? 'zone-thaw' : 'zone-frost'}">
+              ${level.isAboveFreezing ? 'Tauwetter' : 'Frostgrenze'}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div class="tier-right">
-        <span class="tier-wind-chip">💨 ${level.wind} km/h</span>
-        <span class="tier-precip-chip ${level.isAboveFreezing ? 'precip-rain' : 'precip-snow'}">${precipIcon}</span>
+      <!-- 2. TEMPERATUR & WINDCHILL -->
+      <div class="tier-cell-temp">
+        <div class="tier-main-temp" style="color: ${tempColor}">
+          <span class="t-val">${tFormatted}</span>
+          <span class="t-sublabel">Luft</span>
+        </div>
+        <div class="tier-felt-block">
+          <span class="tf-label">Gefühlt</span>
+          <span class="tf-val" style="color: ${feltColor}">${feltFormatted}</span>
+        </div>
+      </div>
+
+      <!-- 3. WIND & BÖEN -->
+      <div class="tier-cell-wind">
+        <div class="tier-wind-row">
+          <span class="tw-icon">💨</span>
+          <span class="tw-val">${level.wind} <small>km/h</small></span>
+        </div>
+        <div class="tw-gusts">Böen: <strong>${level.gusts || Math.round(level.wind * 1.35)} km/h</strong></div>
+      </div>
+
+      <!-- 4. NIEDERSCHLAG & NULLGRADGRENZE -->
+      <div class="tier-cell-precip">
+        <div class="tier-precip-pill ${level.isAboveFreezing ? 'precip-rain' : 'precip-snow'}">
+          <span class="p-icon">${precipIcon}</span>
+          <span class="p-text">${precipType}</span>
+        </div>
+        <div class="tier-freezing-info">
+          <span class="tfi-label">0°C-Niveau</span>
+          <span class="tfi-diff ${freezingDiffClass}">${freezingDiffText}</span>
+        </div>
       </div>
     `;
+
     container.appendChild(card);
   });
 }
 
-function setupAltitudeSlider() {
-  const slider = document.getElementById('profile-hour-slider');
-  if (slider) {
-    slider.addEventListener('input', (e) => {
-      state.selectedAltitudeHour = parseInt(e.target.value);
-      updateAltitudeSliderLabel();
-      renderAltitudeChart();
+// 24h Interaktiver Mini-Stundenstreifen
+function renderAltitudeHoursScroller() {
+  const scroller = document.getElementById('profile-hours-scroller');
+  if (!scroller || !state.microData || !state.microData.altitudeProfile) return;
+
+  const profiles = state.microData.altitudeProfile;
+  const hRaw = state.weatherData ? state.weatherData.hourly : null;
+
+  scroller.innerHTML = '';
+
+  profiles.forEach((p, idx) => {
+    const pill = document.createElement('button');
+    pill.className = `profile-hour-pill ${idx === state.selectedAltitudeHour ? 'active' : ''}`;
+    pill.type = 'button';
+    pill.dataset.hour = idx;
+
+    const timeDate = new Date(p.time);
+    const hourNum = timeDate.getHours();
+    const timeStr = idx === 0 ? 'Jetzt' : `${String(hourNum).padStart(2, '0')}:00`;
+
+    // Wetter-Icon für die jeweilige Stunde
+    let icon = '⛅';
+    if (hRaw && hRaw.weather_code && hRaw.weather_code[idx] !== undefined) {
+      const codeInfo = WMO_CODES[hRaw.weather_code[idx]];
+      if (codeInfo) icon = codeInfo.icon;
+    }
+
+    // Gipfeltemperatur für diese Stunde
+    const summitLevel = p.levels.find(l => l.name.includes('Gipfel')) || p.levels[p.levels.length - 2] || p.levels[0];
+    const peakT = Math.round(convertTemp(summitLevel.temp));
+    const peakFormatted = peakT > 0 ? `+${peakT}°` : `${peakT}°`;
+
+    pill.innerHTML = `
+      <span class="php-time">${timeStr}</span>
+      <span class="php-icon">${icon}</span>
+      <span class="php-peak-temp">${peakFormatted}</span>
+    `;
+
+    pill.addEventListener('click', () => {
+      selectAltitudeHour(idx, true);
+    });
+
+    scroller.appendChild(pill);
+  });
+}
+
+// Zentrale Stundenauswahl-Funktion
+function selectAltitudeHour(hourIndex, shouldScroll = true) {
+  if (!state.microData || !state.microData.altitudeProfile) return;
+  const profiles = state.microData.altitudeProfile;
+  const maxHour = Math.max(0, profiles.length - 1);
+
+  // Clampen zwischen 0 und maxHour
+  state.selectedAltitudeHour = Math.max(0, Math.min(maxHour, hourIndex));
+  const h = state.selectedAltitudeHour;
+
+  // 1. Badge & Stepper Buttons aktualisieren
+  const timeLabel = document.getElementById('profile-time-label');
+  const prevBtn = document.getElementById('time-step-prev');
+  const nextBtn = document.getElementById('time-step-next');
+
+  if (prevBtn) prevBtn.disabled = (h <= 0);
+  if (nextBtn) nextBtn.disabled = (h >= maxHour);
+
+  const curProfile = profiles[h] || profiles[0];
+  if (curProfile && curProfile.time) {
+    const t = new Date(curProfile.time);
+    const timeStr = `${String(t.getHours()).padStart(2, '0')}:00 Uhr`;
+    if (timeLabel) {
+      timeLabel.innerText = h === 0 ? `Jetzt (${timeStr})` : `+${h} Std. (${timeStr})`;
+    }
+  } else if (timeLabel) {
+    timeLabel.innerText = h === 0 ? 'Jetzt' : `+${h} Stunden`;
+  }
+
+  // 2. Schnellauswahl-Pills synchronisieren
+  const quickPills = document.querySelectorAll('#profile-quick-times-bar .quick-time-pill');
+  quickPills.forEach(pill => {
+    const pillHour = parseInt(pill.dataset.hour);
+    if (pillHour === h) {
+      pill.classList.add('active');
+    } else {
+      pill.classList.remove('active');
+    }
+  });
+
+  // 3. Stundenscroller synchronisieren & ins Sichtfeld scrollen
+  const hourPills = document.querySelectorAll('#profile-hours-scroller .profile-hour-pill');
+  hourPills.forEach(pill => {
+    const pillHour = parseInt(pill.dataset.hour);
+    if (pillHour === h) {
+      pill.classList.add('active');
+      if (shouldScroll) {
+        pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    } else {
+      pill.classList.remove('active');
+    }
+  });
+
+  // 4. Höhenstufen-Karten rendern
+  renderAltitudeChart();
+}
+
+// Event-Listener für Stepper und Schnellauswahl
+function setupAltitudeTimeControls() {
+  const prevBtn = document.getElementById('time-step-prev');
+  const nextBtn = document.getElementById('time-step-next');
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      selectAltitudeHour(state.selectedAltitudeHour - 1, true);
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      selectAltitudeHour(state.selectedAltitudeHour + 1, true);
+    });
+  }
+
+  // Quick Preset Bar Delegierung
+  const quickBar = document.getElementById('profile-quick-times-bar');
+  if (quickBar) {
+    quickBar.addEventListener('click', (e) => {
+      const pill = e.target.closest('.quick-time-pill');
+      if (!pill) return;
+      const targetHour = parseInt(pill.dataset.hour);
+      if (!isNaN(targetHour)) {
+        selectAltitudeHour(targetHour, true);
+      }
     });
   }
 }
 
+// Alias für Abwärtskompatibilität
+function setupAltitudeSlider() {
+  setupAltitudeTimeControls();
+}
+
 function updateAltitudeSliderLabel() {
-  const label = document.getElementById('profile-time-label');
-  if (!label) return;
-  const h = state.selectedAltitudeHour;
-  if (!state.microData || !state.microData.altitudeProfile) {
-    label.innerText = h === 0 ? 'Jetzt' : `+${h} Stunden`;
-    return;
-  }
-  const profiles = state.microData.altitudeProfile;
-  const cur = profiles[h] || profiles[0];
-  if (cur && cur.time) {
-    const t = new Date(cur.time);
-    const timeStr = `${String(t.getHours()).padStart(2, '0')}:00`;
-    label.innerText = h === 0 ? `Jetzt (${timeStr} Uhr)` : `+${h}h (${timeStr} Uhr)`;
-  } else {
-    label.innerText = h === 0 ? 'Jetzt' : `+${h} Stunden`;
-  }
+  selectAltitudeHour(state.selectedAltitudeHour, false);
 }
 
 // =============================================================================

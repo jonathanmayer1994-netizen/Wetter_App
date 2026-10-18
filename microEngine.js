@@ -465,12 +465,30 @@ export const MicroEngine = {
         }
 
         const isSnow = step.z >= hourObj.freezingLevel;
+        
+        // Windchill-Berechnung
+        let felt = t;
+        if (t <= 10 && w >= 5) {
+          felt = 13.12 + (0.6215 * t) - (11.37 * Math.pow(w, 0.16)) + (0.3965 * t * Math.pow(w, 0.16));
+        } else if (t > 10) {
+          felt = t - (w * 0.04);
+        }
+
+        // Barometrischer Druck in dieser Höhe (hPa)
+        const pressHpa = Math.round(1013.25 * Math.pow(1 - (0.0065 * step.z) / 288.15, 5.255));
+        const gusts = Math.round(w * 1.35);
+        const freezingDiff = Math.round(step.z - hourObj.freezingLevel);
+
         hourObj.levels.push({
           name: step.name,
           icon: step.icon,
           z: step.z,
           temp: Math.round(t * 10) / 10,
+          feltTemp: Math.round(felt),
           wind: Math.round(w),
+          gusts: gusts,
+          pressureHpa: pressHpa,
+          freezingDiff: freezingDiff,
           precipType: isSnow ? 'Schnee' : 'Regen',
           isAboveFreezing: !isSnow
         });

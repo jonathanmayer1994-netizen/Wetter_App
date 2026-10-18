@@ -300,19 +300,41 @@
             </div>
           </section>
 
-          <!-- HÖHENPROFIL-GRAFIK: TAL VS. MITTELSTATION VS. GIPFEL ÜBER DEN TAG -->
+          <!-- VERTIKALES HÖHENPROFIL (TAL VS. MITTELSTATION VS. GIPFEL) -->
           <section class="glass-card altitude-chart-card">
             <div class="card-header">
               <div class="card-title">
-                <span class="card-icon">📊</span>
+                <span class="card-icon">🏔️</span>
                 <span>VERTIKALES HÖHENPROFIL (TAL VS. BERG)</span>
               </div>
-              <div class="chart-time-control">
-                <span class="time-label">Uhrzeit: <strong id="profile-time-label">Jetzt</strong></span>
-                <input type="range" id="profile-hour-slider" min="0" max="23" value="0" step="1">
+              
+              <!-- Smarte Zeitnavigation: Stepper & Badge -->
+              <div class="smart-time-nav">
+                <button class="time-step-btn" id="time-step-prev" title="1 Stunde zurück">‹</button>
+                <div class="time-badge" id="profile-time-badge">
+                  <span class="tb-icon">⏱️</span>
+                  <span class="tb-text" id="profile-time-label">Jetzt</span>
+                </div>
+                <button class="time-step-btn" id="time-step-next" title="1 Stunde vor">›</button>
               </div>
             </div>
 
+            <!-- Schnellauswahl-Pills für Tageszeiten -->
+            <div class="profile-quick-times-bar" id="profile-quick-times-bar">
+              <button class="quick-time-pill active" data-hour="0">Jetzt</button>
+              <button class="quick-time-pill" data-hour="3">+3 Std.</button>
+              <button class="quick-time-pill" data-hour="6">+6 Std.</button>
+              <button class="quick-time-pill" data-hour="12">+12 Std.</button>
+              <button class="quick-time-pill" data-hour="18">+18 Std.</button>
+              <button class="quick-time-pill" data-hour="23">Morgen</button>
+            </div>
+
+            <!-- Interaktiver 24h Stunden-Scroller -->
+            <div class="profile-hours-scroller" id="profile-hours-scroller">
+              <!-- Dynamisch 24h Stunden-Pills mit Wetter-Icon -->
+            </div>
+
+            <!-- Die 4 Höhenstufen als detailreiche Dashboard-Karten (KEINE LEEREN RIESEN-BALKEN!) -->
             <div class="altitude-levels-container" id="altitude-levels-container">
               <!-- Dynamisch generiert: Talboden, Mittelstation, Gipfel, Freie Atmosphäre -->
             </div>

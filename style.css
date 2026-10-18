@@ -1143,67 +1143,264 @@ html, body {
   color: var(--ios-cyan);
 }
 
-/* Vertical Altitude Chart (Tal vs. Berg Profil) */
-.chart-time-control {
+/* Vertical Altitude Chart (Tal vs. Berg Profil: Smarte Steuerung & High-Density Metriken) */
+
+/* 1. Smart Time Navigation (Stepper & Badge) */
+.smart-time-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-step-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.time-step-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.32);
+  transform: scale(1.05);
+}
+
+.time-step-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(100, 210, 255, 0.12);
+  border: 1px solid rgba(100, 210, 255, 0.3);
+  color: var(--ios-cyan);
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 150px;
+  justify-content: center;
+  letter-spacing: -0.2px;
+}
+
+.time-badge .tb-icon {
+  font-size: 13px;
+}
+
+/* 2. Quick Preset Time Bar */
+.profile-quick-times-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 2px 10px 2px;
+  scrollbar-width: none;
+}
+
+.profile-quick-times-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-time-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.quick-time-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.quick-time-pill.active {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.85), rgba(0, 122, 255, 1));
+  color: #ffffff;
+  border-color: rgba(100, 210, 255, 0.7);
+  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.4);
+  font-weight: 700;
+}
+
+/* 3. 24h Interactive Hours Scroller */
+.profile-hours-scroller {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 12px 2px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.profile-hours-scroller::-webkit-scrollbar {
+  height: 4px;
+}
+.profile-hours-scroller::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+
+.profile-hour-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 60px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.profile-hour-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-2px);
+}
+
+.profile-hour-pill.active {
+  background: rgba(10, 132, 255, 0.25);
+  border-color: var(--ios-blue);
+  box-shadow: 0 0 14px rgba(10, 132, 255, 0.45);
+}
+
+.profile-hour-pill .php-time {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.profile-hour-pill.active .php-time {
+  color: #ffffff;
+}
+
+.profile-hour-pill .php-icon {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.profile-hour-pill .php-peak-temp {
+  font-size: 12px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: #64d2ff;
+}
+
+/* 4. Altitude Levels Container & Cards */
+.altitude-levels-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.altitude-tier-card {
+  display: grid;
+  grid-template-columns: 280px 145px 165px 1fr;
+  align-items: center;
+  gap: 16px;
+  background: rgba(16, 24, 38, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  padding: 12px 18px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.altitude-tier-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 4px 0 0 4px;
+}
+
+.altitude-tier-card.tier-thawing::before {
+  background: linear-gradient(180deg, #30d158, #34c759);
+}
+
+.altitude-tier-card.tier-freezing::before {
+  background: linear-gradient(180deg, #64d2ff, #5ac8fa);
+  box-shadow: 0 0 10px rgba(100, 210, 255, 0.6);
+}
+
+.altitude-tier-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Tier Cell 1: Identity & Elevation */
+.tier-cell-identity {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.time-label {
-  font-size: 12px;
-  color: var(--text-secondary);
+.tier-icon-box {
+  font-size: 24px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
 }
 
-#profile-hour-slider {
-  width: 140px;
-  accent-color: var(--ios-cyan);
-  cursor: pointer;
-}
-
-.altitude-levels-container {
+.tier-identity-info {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tier-name-row {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  margin: 12px 0;
-}
-
-.altitude-tier-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 10px 16px;
-  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-}
-
-.altitude-tier-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.16);
-  transform: translateY(-1px);
-}
-
-.tier-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 250px;
-  flex: 0 0 auto;
-}
-
-.tier-icon {
-  font-size: 18px;
-  flex-shrink: 0;
 }
 
 .tier-name {
-  font-weight: 700;
   font-size: 14px;
+  font-weight: 700;
   color: #ffffff;
-  min-width: 120px;
+  white-space: nowrap;
 }
 
 .tier-elevation-badge {
@@ -1212,85 +1409,202 @@ html, body {
   font-weight: 700;
   color: var(--ios-cyan);
   background: rgba(100, 210, 255, 0.14);
-  border: 1px solid rgba(100, 210, 255, 0.25);
+  border: 1px solid rgba(100, 210, 255, 0.3);
   padding: 2px 8px;
-  border-radius: 8px;
-  text-align: center;
-  flex-shrink: 0;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
-.tier-center {
+.tier-meta-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tier-pressure-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.tier-zone-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 4px;
+}
+
+.tier-zone-pill.zone-thaw {
+  color: #30d158;
+  background: rgba(48, 209, 88, 0.12);
+  border: 1px solid rgba(48, 209, 88, 0.25);
+}
+
+.tier-zone-pill.zone-frost {
+  color: #64d2ff;
+  background: rgba(100, 210, 255, 0.12);
+  border: 1px solid rgba(100, 210, 255, 0.25);
+}
+
+/* Tier Cell 2: Temperature & Windchill */
+.tier-cell-temp {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
-  max-width: 300px;
-  justify-content: center;
-}
-
-.tier-temp-val {
-  font-size: 16px;
-  font-weight: 800;
-  font-family: var(--font-mono);
-  min-width: 44px;
-  text-align: right;
-}
-
-.tier-gauge-track {
-  width: 140px;
-  height: 7px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.45);
-  overflow: hidden;
-  position: relative;
+  background: rgba(0, 0, 0, 0.24);
+  padding: 6px 12px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.tier-gauge-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
+.tier-main-temp {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
 }
 
-.tier-right {
+.tier-main-temp .t-val {
+  font-size: 19px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.tier-main-temp .t-sublabel {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tier-felt-block {
+  display: flex;
+  flex-direction: column;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  line-height: 1.1;
+}
+
+.tier-felt-block .tf-label {
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tier-felt-block .tf-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  margin-top: 1px;
+}
+
+/* Tier Cell 3: Wind & Peak Gusts */
+.tier-cell-wind {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.24);
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tier-wind-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 200px;
-  justify-content: flex-end;
-  flex: 0 0 auto;
+  gap: 6px;
 }
 
-.tier-wind-chip {
-  font-size: 12px;
+.tw-icon {
+  font-size: 13px;
+}
+
+.tw-val {
+  font-size: 13px;
   font-weight: 700;
   color: #ffd166;
-  background: rgba(255, 209, 102, 0.1);
-  border: 1px solid rgba(255, 209, 102, 0.2);
-  padding: 3px 8px;
-  border-radius: 8px;
-  white-space: nowrap;
 }
 
-.tier-precip-chip {
+.tw-val small {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.tw-gusts {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.tw-gusts strong {
+  color: #ffffff;
+}
+
+/* Tier Cell 4: Precipitation & Freezing Level Offset */
+.tier-cell-precip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.24);
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tier-precip-pill {
   font-size: 12px;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 3px 10px;
   border-radius: 8px;
   white-space: nowrap;
 }
 
-.tier-precip-chip.precip-rain {
+.tier-precip-pill.precip-rain {
   color: #78d6ff;
-  background: rgba(10, 132, 255, 0.14);
-  border: 1px solid rgba(10, 132, 255, 0.25);
+  background: rgba(10, 132, 255, 0.16);
+  border: 1px solid rgba(10, 132, 255, 0.3);
 }
 
-.tier-precip-chip.precip-snow {
-  color: #fdf4ff;
-  background: rgba(217, 70, 239, 0.2);
-  border: 1px solid rgba(217, 70, 239, 0.35);
-  box-shadow: 0 0 8px rgba(217, 70, 239, 0.3);
+.tier-precip-pill.precip-snow {
+  color: #ffffff;
+  background: rgba(217, 70, 239, 0.22);
+  border: 1px solid rgba(217, 70, 239, 0.45);
+  box-shadow: 0 0 10px rgba(217, 70, 239, 0.35);
+}
+
+.tier-freezing-info {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  line-height: 1.2;
+}
+
+.tfi-label {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tfi-diff {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  margin-top: 1px;
+}
+
+.tfi-diff.f-above-frost {
+  color: #64d2ff;
+}
+
+.tfi-diff.f-below-frost {
+  color: #30d158;
+}
+
+.tfi-diff.f-exact-frost {
+  color: #ffd166;
 }
 
 .altitude-legend {
@@ -2204,20 +2518,10 @@ html, body {
     gap: 12px;
   }
 
-  .tier-left {
-    min-width: 210px;
-  }
-
-  .tier-center {
-    max-width: 240px;
-  }
-
-  .tier-gauge-track {
-    width: 110px;
-  }
-
-  .tier-right {
-    min-width: 180px;
+  .altitude-tier-card {
+    grid-template-columns: 220px 130px 140px 1fr;
+    gap: 12px;
+    padding: 10px 14px;
   }
 
   .bento-grid {
@@ -2297,36 +2601,32 @@ html, body {
     font-size: 14px;
   }
 
+  .smart-time-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .time-badge {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
   .altitude-tier-card {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
     gap: 8px;
     padding: 10px 12px;
   }
 
-  .tier-left {
-    min-width: 0;
-    width: 100%;
+  .tier-cell-identity {
     justify-content: space-between;
   }
 
-  .tier-center {
-    max-width: 100%;
+  .tier-cell-temp,
+  .tier-cell-wind,
+  .tier-cell-precip {
     width: 100%;
-    justify-content: space-between;
-  }
-
-  .tier-gauge-track {
-    flex: 1;
-    width: auto;
-    margin-left: 10px;
-  }
-
-  .tier-right {
-    min-width: 0;
-    width: 100%;
-    justify-content: flex-end;
-    gap: 8px;
   }
 
   .aspect-result-grid {
