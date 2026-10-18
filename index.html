@@ -71,9 +71,9 @@
         <span class="tab-icon">🌤️</span>
         <span class="tab-label">Übersicht</span>
       </button>
-      <button class="tab-btn" data-tab="tab-mountain">
-        <span class="tab-icon">🏔️</span>
-        <span class="tab-label">Berg & Höhe</span>
+      <button class="tab-btn" id="tab-btn-mountain" data-tab="tab-mountain">
+        <span class="tab-icon" id="tab-2-icon">🏔️</span>
+        <span class="tab-label" id="tab-2-label">Berg & Höhe</span>
       </button>
       <button class="tab-btn" data-tab="tab-map">
         <span class="tab-icon">🗺️</span>
@@ -252,109 +252,189 @@
       </div>
 
       <!-- =================================================================== -->
-      <!-- TAB 2: BERG & HÖHE (Höhenprofil Tal vs Berg, Wand-Wahl & Mikroklima) -->
+      <!-- TAB 2: ADAPTIVE ANSICHT: STADTKLIMA (STADT) ODER ALPIN-ENGINE (BERG) -->
       <!-- =================================================================== -->
       <div class="tab-pane" id="tab-mountain">
         
-        <!-- Mountain Overview Card -->
-        <section class="glass-card mountain-header-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="card-icon">🏔️</span>
-              <span id="mountain-title">ALPINE GELÄNDE- & HÖHEN-ANALYSE</span>
+        <!-- BEREICH A: NUR FÜR BERGE & GIPFEL (z. B. Matterhorn, Zugspitze) -->
+        <div id="mountain-view-panel">
+          <!-- Mountain Overview Card -->
+          <section class="glass-card mountain-header-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">🏔️</span>
+                <span id="mountain-title">ALPINE GELÄNDE- & HÖHEN-ANALYSE</span>
+              </div>
+              <span class="card-tag mountain-badge" id="mountain-badge">10m DEM + Druckflächen</span>
             </div>
-            <span class="card-tag mountain-badge" id="mountain-badge">10m DEM + Druckflächen</span>
+
+            <div class="mountain-stats-row">
+              <div class="m-stat">
+                <span class="m-label">Offizielle Gipfelhöhe</span>
+                <span class="m-val text-accent" id="m-peak-elev">-- m</span>
+              </div>
+              <div class="m-stat">
+                <span class="m-label">Geländeform</span>
+                <span class="m-val" id="m-landform">Wird analysiert...</span>
+              </div>
+              <div class="m-stat">
+                <span class="m-label">0°C Schneefallgrenze</span>
+                <span class="m-val text-cyan" id="m-freezing-level">-- m</span>
+              </div>
+              <div class="m-stat">
+                <span class="m-label">Inversion</span>
+                <span class="m-val" id="m-inversion-status">Prüfe Schichten...</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- HÖHENPROFIL-GRAFIK: TAL VS. MITTELSTATION VS. GIPFEL ÜBER DEN TAG -->
+          <section class="glass-card altitude-chart-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">📊</span>
+                <span>VERTIKALES HÖHENPROFIL (TAL VS. BERG)</span>
+              </div>
+              <div class="chart-time-control">
+                <span class="time-label">Uhrzeit: <strong id="profile-time-label">Jetzt</strong></span>
+                <input type="range" id="profile-hour-slider" min="0" max="23" value="0" step="1">
+              </div>
+            </div>
+
+            <div class="altitude-levels-container" id="altitude-levels-container">
+              <!-- Dynamisch generiert: Talboden, Mittelstation, Gipfel, Freie Atmosphäre -->
+            </div>
+
+            <div class="altitude-legend">
+              <span class="legend-chip blue">❄️ Schneefall- / Frostbereich</span>
+              <span class="legend-chip green">💧 Regen- / Tauwetterbereich</span>
+              <span class="legend-chip orange">💨 Wind & Böenspitzen auf Höhe</span>
+            </div>
+          </section>
+
+          <!-- WAND-AUSRICHTUNG (PRO BERG ANPASSBAR: NORDWAND, SÜDGRAT, ETC.) -->
+          <section class="glass-card mountain-aspect-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">🧭</span>
+                <span>WAND-EXPOSITION & HANGNEIGUNG ANPASSEN</span>
+              </div>
+              <span class="card-tag">Mikroklima pro Wand</span>
+            </div>
+
+            <div class="aspect-selector-row">
+              <button class="aspect-pill active" data-tilt="45" data-azimuth="0">☀️ Südwand (45°)</button>
+              <button class="aspect-pill" data-tilt="75" data-azimuth="180">❄️ Nordwand (75°)</button>
+              <button class="aspect-pill" data-tilt="50" data-azimuth="-90">🌅 Ostwand (50°)</button>
+              <button class="aspect-pill" data-tilt="50" data-azimuth="90">🌇 Westwand (50°)</button>
+              <button class="aspect-pill" id="auto-aspect-pill" data-auto="true">📍 Automatisch (10m DEM)</button>
+            </div>
+
+            <div class="aspect-result-grid">
+              <div class="aspect-result-box">
+                <div class="ar-label">Aktive Wand</div>
+                <div class="ar-val" id="active-wall-name">Südwand (45° Neigung)</div>
+                <div class="ar-sub" id="active-wall-radiation">Sonneneinstrahlung: -- W/m² (GTI)</div>
+              </div>
+
+              <div class="aspect-result-box">
+                <div class="ar-label">Gefühlte Wand-Temperatur</div>
+                <div class="ar-val text-accent" id="active-wall-temp">--°C</div>
+                <div class="ar-sub" id="active-wall-temp-sub">vs. Schattwand: --</div>
+              </div>
+
+              <div class="aspect-result-box">
+                <div class="ar-label">Schneebeschaffenheit</div>
+                <div class="ar-val" id="active-wall-snow">Wird berechnet...</div>
+                <div class="ar-sub" id="active-wall-snow-sub">Vereisung / Firn / Pulver</div>
+              </div>
+
+              <div class="aspect-result-box">
+                <div class="ar-label">Windanströmung an der Wand</div>
+                <div class="ar-val" id="active-wall-wind">Luv / Lee Analyse</div>
+                <div class="ar-sub" id="active-wall-wind-sub">Windgeschw.: -- km/h</div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- BEREICH B: NUR FÜR STÄDTE & FLACHLAND (z. B. München, Berlin, Wien) -->
+        <div id="city-view-panel" style="display:none;">
+          <section class="glass-card city-header-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">🏙️</span>
+                <span id="city-title">STADTKLIMA & URBANER KOMFORT</span>
+              </div>
+              <span class="card-tag">Stadtanalyse</span>
+            </div>
+
+            <div class="mountain-stats-row">
+              <div class="m-stat">
+                <span class="m-label">Offizielle Stadthöhe</span>
+                <span class="m-val text-accent" id="city-elev-val">520 m</span>
+              </div>
+              <div class="m-stat">
+                <span class="m-label">Urbaner Wärmeinseleffekt</span>
+                <span class="m-val text-orange" id="city-heat-island">+1.6 °C vs. Umland</span>
+              </div>
+              <div class="m-stat">
+                <span class="m-label">Bodenwind (Straßenschluchten)</span>
+                <span class="m-val" id="city-street-wind">-- km/h (Mäßig)</span>
+              </div>
+              <div class="m-stat">
+                <span class="m-label">Thermischer Komfort</span>
+                <span class="m-val text-green" id="city-comfort-label">Angenehm</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Urban Comfort & Air Quality Grid -->
+          <div class="bento-grid" style="margin-top:14px;">
+            <div class="glass-card bento-item">
+              <div class="card-header">
+                <div class="card-title"><span class="card-icon">🌡️</span> WÄRMEINSEL & MIKROKLIMA</div>
+              </div>
+              <div class="bento-body">
+                <div class="bento-main-val" id="city-urban-temp">--°C</div>
+                <div class="bento-sub-title">Temperatur Innenstadt</div>
+                <p class="bento-hint">Durch dichte Bebauung und Asphalt kühlt die Innenstadt nachts 1 bis 3 °C langsamer ab als grüne Vororte.</p>
+              </div>
+            </div>
+
+            <div class="glass-card bento-item">
+              <div class="card-header">
+                <div class="card-title"><span class="card-icon">🌬️</span> WIND IN STRASSENSCHLUCHTEN</div>
+              </div>
+              <div class="bento-body">
+                <div class="bento-main-val" id="city-canyon-wind">-- km/h</div>
+                <div class="bento-sub-title">Gemilderte Bodenströmung</div>
+                <p class="bento-hint">Gebäude bremsen den freien Wind ab. An Straßenkreuzungen können lokale Düseneffekte auftreten.</p>
+              </div>
+            </div>
+
+            <div class="glass-card bento-item">
+              <div class="card-header">
+                <div class="card-title"><span class="card-icon">🌿</span> LUFTQUALITÄT & FREIZEIT</div>
+              </div>
+              <div class="bento-body">
+                <div class="bento-main-val text-green" id="city-aqi-val">Gut (AQI 22)</div>
+                <div class="bento-sub-title">Geringe Schadstoffbelastung</div>
+                <p class="bento-hint">Optimale Bedingungen für Sport im Freien, Spaziergänge und Außengastronomie.</p>
+              </div>
+            </div>
+
+            <div class="glass-card bento-item">
+              <div class="card-header">
+                <div class="card-title"><span class="card-icon">💡</span> HINWEIS ZUR ALPIN-ENGINE</div>
+              </div>
+              <div class="bento-body">
+                <div class="bento-main-val" style="font-size:16px;">Flachland-Erkennung</div>
+                <p class="bento-hint" style="margin-top:4px;">Wand-Expositionen (Nordwand/Südwand) und vertikale Bergprofile existieren nur im Gebirge. Suche z. B. nach <strong>Zugspitze</strong> oder <strong>Matterhorn</strong>, um die Alpin-Engine live zu erleben!</p>
+              </div>
+            </div>
           </div>
-
-          <div class="mountain-stats-row">
-            <div class="m-stat">
-              <span class="m-label">Standort-Höhe</span>
-              <span class="m-val" id="m-peak-elev">-- m</span>
-            </div>
-            <div class="m-stat">
-              <span class="m-label">Geländeform</span>
-              <span class="m-val" id="m-landform">Wird analysiert...</span>
-            </div>
-            <div class="m-stat">
-              <span class="m-label">Schneefallgrenze</span>
-              <span class="m-val text-cyan" id="m-freezing-level">-- m</span>
-            </div>
-            <div class="m-stat">
-              <span class="m-label">Inversion</span>
-              <span class="m-val" id="m-inversion-status">Prüfe Schichten...</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- HÖHENPROFIL-GRAFIK: TAL VS. MITTELSTATION VS. GIPFEL ÜBER DEN TAG -->
-        <section class="glass-card altitude-chart-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="card-icon">📊</span>
-              <span>VERTIKALES HÖHENPROFIL (TAL VS. BERG)</span>
-            </div>
-            <div class="chart-time-control">
-              <span class="time-label">Uhrzeit: <strong id="profile-time-label">Jetzt</strong></span>
-              <input type="range" id="profile-hour-slider" min="0" max="23" value="0" step="1">
-            </div>
-          </div>
-
-          <!-- Interactive Vertical Altitude Breakdown Graphic -->
-          <div class="altitude-levels-container" id="altitude-levels-container">
-            <!-- Dynamisch generiert: Talboden, Mittelstation, Gipfel, Freie Atmosphäre -->
-          </div>
-
-          <div class="altitude-legend">
-            <span class="legend-chip blue">❄️ Schneefall- / Frostbereich</span>
-            <span class="legend-chip green">💧 Regen- / Tauwetterbereich</span>
-            <span class="legend-chip orange">💨 Wind & Böenspitzen auf Höhe</span>
-          </div>
-        </section>
-
-        <!-- WAND-AUSRICHTUNG (PRO BERG ANPASSBAR: NORDWAND, SÜDGRAT, ETC.) -->
-        <section class="glass-card mountain-aspect-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="card-icon">🧭</span>
-              <span>WAND-EXPOSITION & HANGNEIGUNG ANPASSEN</span>
-            </div>
-            <span class="card-tag">Mikroklima pro Wand</span>
-          </div>
-
-          <div class="aspect-selector-row">
-            <button class="aspect-pill active" data-tilt="45" data-azimuth="0">☀️ Südwand (45°)</button>
-            <button class="aspect-pill" data-tilt="75" data-azimuth="180">❄️ Nordwand (75°)</button>
-            <button class="aspect-pill" data-tilt="50" data-azimuth="-90">🌅 Ostwand (50°)</button>
-            <button class="aspect-pill" data-tilt="50" data-azimuth="90">🌇 Westwand (50°)</button>
-            <button class="aspect-pill" id="auto-aspect-pill" data-auto="true">📍 Automatisch (10m DEM)</button>
-          </div>
-
-          <div class="aspect-result-grid">
-            <div class="aspect-result-box">
-              <div class="ar-label">Aktive Wand</div>
-              <div class="ar-val" id="active-wall-name">Südwand (45° Neigung)</div>
-              <div class="ar-sub" id="active-wall-radiation">Sonneneinstrahlung: -- W/m² (GTI)</div>
-            </div>
-
-            <div class="aspect-result-box">
-              <div class="ar-label">Gefühlte Wand-Temperatur</div>
-              <div class="ar-val text-accent" id="active-wall-temp">--°C</div>
-              <div class="ar-sub" id="active-wall-temp-sub">vs. Schattwand: --</div>
-            </div>
-
-            <div class="aspect-result-box">
-              <div class="ar-label">Schneebeschaffenheit</div>
-              <div class="ar-val" id="active-wall-snow">Wird berechnet...</div>
-              <div class="ar-sub" id="active-wall-snow-sub">Vereisung / Firn / Pulver</div>
-            </div>
-
-            <div class="aspect-result-box">
-              <div class="ar-label">Windanströmung an der Wand</div>
-              <div class="ar-val" id="active-wall-wind">Luv / Lee Analyse</div>
-              <div class="ar-sub" id="active-wall-wind-sub">Windgeschw.: -- km/h</div>
-            </div>
-          </div>
-        </section>
+        </div>
 
       </div>
 

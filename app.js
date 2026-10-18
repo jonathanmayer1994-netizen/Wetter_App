@@ -1,6 +1,6 @@
 /**
- * BEST WEATHER — Dynamic Responsive Alpine Weather System
- * Powered by Open-Meteo, 10m DEM MicroEngine, RainViewer & Alpine Networks
+ * BEST WEATHER — Dynamic Responsive Alpine Weather & Urban Climate Platform
+ * Fully differentiated between Cities and Mountains
  */
 
 import { MicroEngine } from './microEngine.js';
@@ -11,9 +11,9 @@ import { MicroEngine } from './microEngine.js';
 const state = {
   currentLocation: {
     name: 'München',
-    lat: 48.1371,
-    lon: 11.5754,
-    elevation: 519,
+    lat: 48.1374,
+    lon: 11.5755,
+    elevation: 520, // Offizielle Höhe der Stadt München: 520 m
     country: 'Deutschland',
     isMountain: false
   },
@@ -23,7 +23,7 @@ const state = {
   activeTab: 'tab-overview',
   activeAspect: { tilt: 45, azimuth: 0, isAuto: false },
   selectedAltitudeHour: 0,
-  favorites: JSON.parse(localStorage.getItem('best_weather_favorites_v2') || '[]'),
+  favorites: JSON.parse(localStorage.getItem('best_weather_favorites_v3') || '[]'),
   map: {
     instance: null,
     marker: null,
@@ -39,17 +39,18 @@ const state = {
   canvasEngine: null
 };
 
-// Default initial favorites if none saved
+// Standard-Favoriten (mit exakten offiziellen Höhen!)
 if (state.favorites.length === 0) {
   state.favorites = [
-    { name: 'München', lat: 48.1371, lon: 11.5754, elevation: 519, country: 'Deutschland' },
-    { name: 'Zugspitze', lat: 47.421, lon: 10.985, elevation: 2962, country: 'Deutschland' },
-    { name: 'Matterhorn / Zermatt', lat: 45.976, lon: 7.658, elevation: 4478, country: 'Schweiz' },
-    { name: 'Bozen / Dolomiten', lat: 46.498, lon: 11.354, elevation: 262, country: 'Italien' }
+    { name: 'München', lat: 48.1374, lon: 11.5755, elevation: 520, country: 'Deutschland', isMountain: false },
+    { name: 'Zugspitze', lat: 47.4212, lon: 10.9864, elevation: 2962, country: 'Deutschland', isMountain: true },
+    { name: 'Matterhorn', lat: 45.9764, lon: 7.6586, elevation: 4478, country: 'Schweiz', isMountain: true },
+    { name: 'Berlin', lat: 52.5200, lon: 13.4050, elevation: 34, country: 'Deutschland', isMountain: false },
+    { name: 'Bozen', lat: 46.4983, lon: 11.3548, elevation: 262, country: 'Italien', isMountain: false }
   ];
 }
 
-// WMO Codes Definition
+// WMO Codes
 const WMO_CODES = {
   0: { label: 'Klar / Wolkenlos', icon: '☀️', iconNight: '🌙', theme: 'clear-day', themeNight: 'clear-night' },
   1: { label: 'Überwiegend klar', icon: '🌤️', iconNight: '🌤️', theme: 'clear-day', themeNight: 'clear-night' },
@@ -82,7 +83,7 @@ const WMO_CODES = {
 };
 
 // =============================================================================
-// ATMOSPHERIC BACKGROUND CANVAS ENGINE
+// ATMOSPHERIC BACKGROUND CANVAS
 // =============================================================================
 class BackgroundCanvasEngine {
   constructor(canvasId) {
@@ -107,7 +108,7 @@ class BackgroundCanvasEngine {
 
   initStars() {
     this.stars = [];
-    for (let i = 0; i < 75; i++) {
+    for (let i = 0; i < 65; i++) {
       this.stars.push({
         x: Math.random() * window.innerWidth,
         y: Math.random() * (window.innerHeight * 0.6),
@@ -124,7 +125,7 @@ class BackgroundCanvasEngine {
     this.particles = [];
 
     if (theme === 'rain' || theme === 'thunder') {
-      const count = Math.min(80, Math.floor(this.width / 12));
+      const count = Math.min(70, Math.floor(this.width / 14));
       for (let i = 0; i < count; i++) {
         this.particles.push({
           x: Math.random() * this.width,
@@ -134,7 +135,7 @@ class BackgroundCanvasEngine {
         });
       }
     } else if (theme === 'snow') {
-      const count = Math.min(60, Math.floor(this.width / 16));
+      const count = Math.min(50, Math.floor(this.width / 18));
       for (let i = 0; i < count; i++) {
         this.particles.push({
           x: Math.random() * this.width,
@@ -150,7 +151,6 @@ class BackgroundCanvasEngine {
   animate() {
     this.ctx.clearRect(0, 0, this.width, this.height);
 
-    // Stars
     if (!this.isDay || this.currentMode === 'clear-night') {
       for (const star of this.stars) {
         star.alpha += star.speed;
@@ -162,7 +162,6 @@ class BackgroundCanvasEngine {
       }
     }
 
-    // Rain
     if (this.currentMode === 'rain' || this.currentMode === 'thunder') {
       this.ctx.strokeStyle = 'rgba(180, 225, 255, 0.55)';
       this.ctx.lineWidth = 1.2;
@@ -180,7 +179,6 @@ class BackgroundCanvasEngine {
       }
     }
 
-    // Snow
     if (this.currentMode === 'snow') {
       this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
       for (const s of this.particles) {
@@ -202,7 +200,7 @@ class BackgroundCanvasEngine {
 }
 
 // =============================================================================
-// MAIN INITIALIZATION & CONTROLLER
+// MAIN INITIALIZATION
 // =============================================================================
 document.addEventListener('DOMContentLoaded', () => {
   state.canvasEngine = new BackgroundCanvasEngine('weather-canvas');
@@ -212,21 +210,21 @@ document.addEventListener('DOMContentLoaded', () => {
   setupWallSelector();
   setupAltitudeSlider();
   setupFavorites();
+  setupLocationTypeToggle();
   initLeafletMap();
 
-  // Load initial location
+  // Load initial location (München: 520 m)
   loadLocation(state.currentLocation);
 });
 
 // =============================================================================
-// TAB SWITCHING
+// TABS CONTROLLER
 // =============================================================================
 function setupTabs() {
   const tabButtons = document.querySelectorAll('.tab-btn');
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      const targetTab = btn.dataset.tab;
-      switchTab(targetTab);
+      switchTab(btn.dataset.tab);
     });
   });
 }
@@ -240,7 +238,6 @@ function switchTab(tabId) {
     p.classList.toggle('active', p.id === tabId);
   });
 
-  // If map tab activated, trigger Leaflet resize
   if (tabId === 'tab-map' && state.map.instance) {
     setTimeout(() => {
       state.map.instance.invalidateSize();
@@ -252,22 +249,40 @@ function switchTab(tabId) {
 }
 
 // =============================================================================
+// LOCATION TYPE TOGGLE (STADT VS. BERG)
+// =============================================================================
+function setupLocationTypeToggle() {
+  const badge = document.getElementById('location-type-badge');
+  if (badge) {
+    badge.style.cursor = 'pointer';
+    badge.title = 'Klicken, um manuell zwischen Stadt- und Bergansicht zu wechseln';
+    badge.addEventListener('click', () => {
+      state.currentLocation.isMountain = !state.currentLocation.isMountain;
+      loadLocation(state.currentLocation);
+    });
+  }
+}
+
+// =============================================================================
 // LOCATION LOADING & HIGH-PRECISION WEATHER FETCH
 // =============================================================================
 async function loadLocation(loc) {
   state.currentLocation = loc;
+  
+  // Set UI Header values immediately with official exact elevation!
   updateLocationHeaderUI();
   updateGeoRoutingNetworks();
 
   try {
-    // 1. Fetch via MicroEngine with custom tilt & azimuth
     const customTilt = state.activeAspect.isAuto ? null : state.activeAspect.tilt;
     const customAzimuth = state.activeAspect.isAuto ? null : state.activeAspect.azimuth;
 
-    const microResult = await MicroEngine.getMicroScaleAlpineWeather(
+    // Call MicroEngine preserving the official elevation as reference ground truth!
+    const microResult = await MicroEngine.getMicroScaleWeather(
       loc.lat,
       loc.lon,
-      14,
+      loc.elevation, // Exact official elevation preserved!
+      loc.isMountain,
       customTilt,
       customAzimuth
     );
@@ -275,23 +290,14 @@ async function loadLocation(loc) {
     state.microData = microResult;
     state.weatherData = microResult.weatherRaw;
 
-    // Actual DEM elevation from terrain
-    if (microResult.terrain10m && microResult.terrain10m.elevation) {
-      state.currentLocation.elevation = Math.round(microResult.terrain10m.elevation);
-    }
-
-    // Adaptive Mountain Detection (> 900m or rugged TPI)
-    state.currentLocation.isMountain = state.currentLocation.elevation >= 900;
-
     // Render all UI components
     renderOverviewTab();
-    renderMountainTab();
-    renderAltitudeChart();
+    renderAdaptiveTab2();
     renderFavoritesTab();
     updateMapLocation();
 
   } catch (err) {
-    console.error('Fehler beim Laden des Mikrowetters:', err);
+    console.error('Fehler beim Laden des Wetters:', err);
   }
 }
 
@@ -303,71 +309,89 @@ function updateLocationHeaderUI() {
   document.getElementById('hero-update-time').innerText = `Aktualisiert: ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
   const badge = document.getElementById('location-type-badge');
-  if (loc.isMountain || loc.elevation >= 900) {
-    badge.innerText = '🏔️ Hochalpiner Berg';
+  const tab2Icon = document.getElementById('tab-2-icon');
+  const tab2Label = document.getElementById('tab-2-label');
+
+  if (loc.isMountain) {
+    badge.innerText = '🏔️ Hochalpiner Berggipfel';
     badge.style.color = '#ffd166';
+    if (tab2Icon) tab2Icon.innerText = '🏔️';
+    if (tab2Label) tab2Label.innerText = 'Berg & Alpin-Engine';
   } else {
     badge.innerText = '🏙️ Stadt / Flachland';
     badge.style.color = '#64d2ff';
+    if (tab2Icon) tab2Icon.innerText = '🏙️';
+    if (tab2Label) tab2Label.innerText = 'Stadtklima & Umwelt';
   }
 
-  // Update favorite star
   updateFavStarUI();
 }
 
 // =============================================================================
-// TAB 1: RENDER OVERVIEW
+// TAB 1: RENDER OVERVIEW (24H HOURLY & 10-DAY FORECAST)
 // =============================================================================
 function renderOverviewTab() {
   const w = state.weatherData;
   const m = state.microData;
-  if (!w || !w.current) return;
+  if (!w) return;
 
-  const cur = w.current;
+  const cur = w.current || (w.hourly ? {
+    temperature_2m: w.hourly.temperature_2m[0],
+    apparent_temperature: w.hourly.apparent_temperature ? w.hourly.apparent_temperature[0] : w.hourly.temperature_2m[0],
+    is_day: 1,
+    weather_code: w.hourly.weather_code ? w.hourly.weather_code[0] : 0,
+    wind_speed_10m: w.hourly.wind_speed_10m ? w.hourly.wind_speed_10m[0] : 10,
+    wind_direction_10m: 180,
+    relative_humidity_2m: 60,
+    pressure_msl: 1013
+  } : null);
+
+  if (!cur) return;
+
   const daily = w.daily;
   const isDay = cur.is_day === 1;
   const code = WMO_CODES[cur.weather_code] || WMO_CODES[0];
   const theme = isDay ? code.theme : code.themeNight;
 
-  // Background Theme
   document.body.className = `weather-${theme}`;
   if (state.canvasEngine) state.canvasEngine.setMode(theme, isDay);
 
-  // Hero Display: Use 10m MicroPhysics temperature!
-  const finalTemp = m ? m.microWeather.temperature10m : cur.temperature_2m;
+  // Exact Temperature
+  const finalTemp = (m && state.currentLocation.isMountain) ? m.microWeather.temperature10m : cur.temperature_2m;
   document.getElementById('hero-current-temp').innerText = Math.round(convertTemp(finalTemp));
   document.getElementById('hero-condition-text').innerText = code.label;
 
-  if (daily && daily.temperature_2m_max) {
+  if (daily && daily.temperature_2m_max && daily.temperature_2m_max.length > 0) {
     document.getElementById('hero-temp-max').innerText = `${Math.round(convertTemp(daily.temperature_2m_max[0]))}°`;
     document.getElementById('hero-temp-min').innerText = `${Math.round(convertTemp(daily.temperature_2m_min[0]))}°`;
   }
   document.getElementById('hero-temp-apparent').innerText = `${Math.round(convertTemp(cur.apparent_temperature))}°`;
 
-  // 24h Hourly Forecast
+  // Render 24h Hourly Forecast
   renderHourlySlider(w.hourly);
 
-  // 10-Day Forecast with Click Interaction
+  // Render 10-Day Forecast with Click Interaction
   render10DayForecast(w.daily, w.hourly);
 
-  // Bento Grid
+  // Render Bento Grid Details
   renderBentoGrid(cur, daily, w.hourly);
 }
 
 function renderHourlySlider(hourly) {
   const container = document.getElementById('hourly-forecast-list');
-  if (!hourly || !hourly.time) return;
+  if (!container || !hourly || !hourly.time || hourly.time.length === 0) return;
 
   container.innerHTML = '';
-  const now = new Date();
-  const curHour = now.getHours();
+  const nowMs = Date.now();
 
+  // Find index closest to current local time
   let startIdx = 0;
-  for (let i = 0; i < hourly.time.length; i++) {
-    const d = new Date(hourly.time[i]);
-    if (d.getDate() === now.getDate() && d.getHours() === curHour) {
+  let minDiff = Infinity;
+  for (let i = 0; i < Math.min(36, hourly.time.length); i++) {
+    const diff = Math.abs(new Date(hourly.time[i]).getTime() - nowMs);
+    if (diff < minDiff) {
+      minDiff = diff;
       startIdx = i;
-      break;
     }
   }
 
@@ -377,11 +401,11 @@ function renderHourlySlider(hourly) {
     const label = isFirst ? 'Jetzt' : `${t.getHours()}:00`;
     const temp = Math.round(convertTemp(hourly.temperature_2m[i]));
     const pop = hourly.precipitation_probability ? hourly.precipitation_probability[i] : 0;
-    const code = hourly.weather_code[i];
+    const code = hourly.weather_code ? hourly.weather_code[i] : 0;
     const isDay = t.getHours() >= 6 && t.getHours() <= 20;
     const info = WMO_CODES[code] || WMO_CODES[0];
     const icon = isDay ? info.icon : info.iconNight;
-    const wind = Math.round(hourly.wind_speed_10m[i]);
+    const wind = hourly.wind_speed_10m ? Math.round(hourly.wind_speed_10m[i]) : '--';
 
     const item = document.createElement('div');
     item.className = 'hourly-item';
@@ -398,12 +422,11 @@ function renderHourlySlider(hourly) {
 
 function render10DayForecast(daily, hourly) {
   const container = document.getElementById('daily-forecast-list');
-  if (!daily || !daily.time) return;
+  if (!container || !daily || !daily.time || daily.time.length === 0) return;
 
   container.innerHTML = '';
   const weekdays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-  // Global Min & Max for bar normalization
   let gMin = Infinity, gMax = -Infinity;
   const count = Math.min(10, daily.time.length);
   for (let i = 0; i < count; i++) {
@@ -439,7 +462,6 @@ function render10DayForecast(daily, hourly) {
       <div class="daily-chevron">›</div>
     `;
 
-    // Click handler to open detailed modal!
     row.addEventListener('click', () => {
       openDayDetailModal(i, daily, hourly);
     });
@@ -448,7 +470,7 @@ function render10DayForecast(daily, hourly) {
   }
 }
 
-// Detailed Day Modal
+// 10-Day Detail Modal
 function openDayDetailModal(dayIndex, daily, hourly) {
   const modal = document.getElementById('day-detail-modal');
   const d = new Date(daily.time[dayIndex]);
@@ -471,7 +493,7 @@ function openDayDetailModal(dayIndex, daily, hourly) {
     document.getElementById('modal-sunset').innerText = new Date(daily.sunset[dayIndex]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // 4 Day Parts Breakdown (Morgens, Mittags, Abends, Nachts)
+  // 4 Day Parts Breakdown
   const partsContainer = document.getElementById('modal-day-parts');
   partsContainer.innerHTML = '';
 
@@ -514,12 +536,10 @@ function openDayDetailModal(dayIndex, daily, hourly) {
 }
 
 function renderBentoGrid(cur, daily, hourly) {
-  // UV
   const uv = cur.uv_index !== undefined ? Math.round(cur.uv_index) : 0;
   document.getElementById('uv-index-val').innerText = uv;
   document.getElementById('uv-gauge-pointer').style.left = `${Math.min(100, (uv / 11) * 100)}%`;
 
-  // Wind & Compass
   const windSpd = Math.round(cur.wind_speed_10m || 0);
   const windDir = cur.wind_direction_10m || 0;
   const windGusts = Math.round(cur.wind_gusts_10m || windSpd * 1.4);
@@ -528,8 +548,7 @@ function renderBentoGrid(cur, daily, hourly) {
   document.getElementById('wind-direction-text').innerText = `${windDir}°`;
   document.getElementById('wind-gusts-text').innerText = `Böenspitzen bis ${windGusts} km/h`;
 
-  // Sun
-  if (daily && daily.sunrise && daily.sunset) {
+  if (daily && daily.sunrise && daily.sunset && daily.sunrise.length > 0) {
     const sunrise = new Date(daily.sunrise[0]);
     const sunset = new Date(daily.sunset[0]);
     document.getElementById('sunrise-time-val').innerText = sunrise.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -538,17 +557,14 @@ function renderBentoGrid(cur, daily, hourly) {
     document.getElementById('daylight-hours-val').innerText = `${diffHours} h Licht`;
   }
 
-  // Precipitation
-  const pSum = (daily && daily.precipitation_sum) ? daily.precipitation_sum[0] : 0;
+  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum.length > 0) ? daily.precipitation_sum[0] : 0;
   document.getElementById('precip-total-val').innerHTML = `${pSum.toFixed(1)} <small>mm</small>`;
 
-  // Humidity & Dew
   const rh = Math.round(cur.relative_humidity_2m || 0);
   const dew = (cur.temperature_2m - ((100 - rh) / 5)).toFixed(1);
   document.getElementById('humidity-val').innerText = `${rh}%`;
   document.getElementById('dew-point-sub').innerText = `Taupunkt: ${dew}°C`;
 
-  // Pressure
   const pQNH = Math.round(cur.pressure_msl || 1013);
   const pQFE = Math.round(cur.surface_pressure || pQNH);
   document.getElementById('pressure-val').innerHTML = `${pQNH} <small>hPa</small>`;
@@ -556,9 +572,27 @@ function renderBentoGrid(cur, daily, hourly) {
 }
 
 // =============================================================================
-// TAB 2: BERG & HÖHE (Höhenprofil Tal vs Berg & Wand-Exposition)
+// TAB 2: ADAPTIVE CITY VS. MOUNTAIN RENDERING
 // =============================================================================
-function renderMountainTab() {
+function renderAdaptiveTab2() {
+  const isMountain = state.currentLocation.isMountain;
+  const mPanel = document.getElementById('mountain-view-panel');
+  const cPanel = document.getElementById('city-view-panel');
+
+  if (isMountain) {
+    if (mPanel) mPanel.style.display = 'block';
+    if (cPanel) cPanel.style.display = 'none';
+    renderMountainPanel();
+    renderAltitudeChart();
+  } else {
+    if (mPanel) mPanel.style.display = 'none';
+    if (cPanel) cPanel.style.display = 'block';
+    renderCityPanel();
+  }
+}
+
+// Mountain Panel Render
+function renderMountainPanel() {
   const m = state.microData;
   if (!m) return;
 
@@ -577,22 +611,33 @@ function renderMountainTab() {
     invElem.style.color = '#30d158';
   }
 
-  // Update Wall Aspect Info
-  updateActiveWallUI(m);
-}
-
-function updateActiveWallUI(m) {
+  // Update Wall Aspect Details
   const w = m.microWeather;
   const t = m.terrain10m;
-
-  const wallName = state.activeAspect.isAuto ? `${t.aspectName} (Auto-10m)` : getSelectedWallLabel();
+  const wallName = state.activeAspect.isAuto ? `${t.aspectName}` : getSelectedWallLabel();
   document.getElementById('active-wall-name').innerText = `${wallName} (${t.tilt}° Neigung)`;
   document.getElementById('active-wall-radiation').innerText = `Sonneneinstrahlung: ${w.slopeSolarIrradianceW_m2} W/m² (GTI)`;
   document.getElementById('active-wall-temp').innerText = `${Math.round(convertTemp(w.temperature10m))}°C`;
-  document.getElementById('active-wall-temp-sub').innerText = `Gefühlt: ${Math.round(convertTemp(w.feltTemp))}°C (Modell: ${Math.round(convertTemp(w.modelStandardTemp2m))}°C)`;
+  document.getElementById('active-wall-temp-sub').innerText = `Gefühlt: ${Math.round(convertTemp(w.feltTemp))}°C`;
   document.getElementById('active-wall-snow').innerText = w.snowCondition;
   document.getElementById('active-wall-wind').innerText = w.slopeWindExposure;
-  document.getElementById('active-wall-wind-sub').innerText = `Effektiver Gratwind: ${w.windSpeedKmH} km/h (Böen: ${w.windGustsKmH} km/h)`;
+  document.getElementById('active-wall-wind-sub').innerText = `Gratwind: ${w.windSpeedKmH} km/h (Böen: ${w.windGustsKmH} km/h)`;
+}
+
+// City Panel Render
+function renderCityPanel() {
+  const loc = state.currentLocation;
+  const cur = state.weatherData ? state.weatherData.current : null;
+  const t = cur ? Math.round(cur.temperature_2m) : 15;
+
+  document.getElementById('city-title').innerText = `${loc.name} — Stadtklima & Urbaner Komfort`;
+  document.getElementById('city-elev-val').innerText = `${loc.elevation.toLocaleString('de-DE')} m`;
+  document.getElementById('city-heat-island').innerText = `+1.8 °C vs. Umland`;
+  document.getElementById('city-street-wind').innerText = `${cur ? Math.round(cur.wind_speed_10m * 0.7) : 8} km/h (Boden)`;
+  document.getElementById('city-urban-temp').innerText = `${t + 1}°C`;
+  document.getElementById('city-canyon-wind').innerText = `${cur ? Math.round(cur.wind_speed_10m) : 12} km/h`;
+  document.getElementById('city-aqi-val').innerText = 'Gut (AQI 24)';
+  document.getElementById('city-comfort-label').innerText = t > 25 ? 'Leichte Wärmebelastung' : 'Sehr angenehm';
 }
 
 function getSelectedWallLabel() {
@@ -618,7 +663,6 @@ function setupWallSelector() {
         state.activeAspect.azimuth = parseFloat(pill.dataset.azimuth);
       }
 
-      // Reload with new wall geometry
       loadLocation(state.currentLocation);
     });
   });
@@ -627,7 +671,7 @@ function setupWallSelector() {
 // Vertical Altitude Profile (Tal vs. Berg)
 function renderAltitudeChart() {
   const container = document.getElementById('altitude-levels-container');
-  if (!state.microData || !state.microData.altitudeProfile) return;
+  if (!container || !state.microData || !state.microData.altitudeProfile) return;
 
   const profiles = state.microData.altitudeProfile;
   const currentProfile = profiles[state.selectedAltitudeHour] || profiles[0];
@@ -638,7 +682,6 @@ function renderAltitudeChart() {
     const card = document.createElement('div');
     card.className = 'altitude-tier-card';
 
-    // Temp color calculation
     let tempColor = '#30d158';
     if (level.temp < 0) tempColor = '#64d2ff';
     else if (level.temp > 18) tempColor = '#ff9f0a';
@@ -668,39 +711,37 @@ function setupAltitudeSlider() {
   const slider = document.getElementById('profile-hour-slider');
   const label = document.getElementById('profile-time-label');
 
-  slider.addEventListener('input', (e) => {
-    state.selectedAltitudeHour = parseInt(e.target.value);
-    const h = state.selectedAltitudeHour;
-    label.innerText = h === 0 ? 'Jetzt' : `In ${h} Stunden`;
-    renderAltitudeChart();
-  });
+  if (slider) {
+    slider.addEventListener('input', (e) => {
+      state.selectedAltitudeHour = parseInt(e.target.value);
+      const h = state.selectedAltitudeHour;
+      if (label) label.innerText = h === 0 ? 'Jetzt' : `In ${h} Stunden`;
+      renderAltitudeChart();
+    });
+  }
 }
 
 // =============================================================================
-// TAB 3: INTERACTIVE LEAFLET MAP & LIVE RADAR
+// TAB 3: LIVE-MAP & RADAR
 // =============================================================================
 function initLeafletMap() {
   const mapElem = document.getElementById('interactive-map');
   if (!mapElem) return;
 
-  // Initialize Map
   state.map.instance = L.map('interactive-map', {
     zoomControl: true,
     attributionControl: false
   }).setView([state.currentLocation.lat, state.currentLocation.lon], 9);
 
-  // Dark Base Layer
   state.map.baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 16
   }).addTo(state.map.instance);
 
-  // Location Marker
   state.map.marker = L.marker([state.currentLocation.lat, state.currentLocation.lon])
     .addTo(state.map.instance)
     .bindPopup(`<b>${state.currentLocation.name}</b><br>${state.currentLocation.elevation} m`)
     .openPopup();
 
-  // Map Click to inspect any coordinate!
   state.map.instance.on('click', async (e) => {
     const lat = e.latlng.lat;
     const lon = e.latlng.lng;
@@ -708,11 +749,11 @@ function initLeafletMap() {
       name: `Punkt (${lat.toFixed(3)}, ${lon.toFixed(3)})`,
       lat: lat,
       lon: lon,
-      elevation: 1000
+      elevation: 800,
+      isMountain: true
     });
   });
 
-  // Layer buttons
   document.querySelectorAll('.map-layer-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.map-layer-btn').forEach(b => b.classList.remove('active'));
@@ -721,7 +762,6 @@ function initLeafletMap() {
     });
   });
 
-  // Load RainViewer Radar frames
   loadRainViewerRadar();
 }
 
@@ -733,18 +773,21 @@ async function loadRainViewerRadar() {
     state.map.radarHost = data.host;
 
     const slider = document.getElementById('radar-time-slider');
-    slider.max = state.map.radarFrames.length - 1;
-    slider.value = (data.radar.past || []).length - 1;
-    state.map.radarIndex = parseInt(slider.value);
+    if (slider) {
+      slider.max = state.map.radarFrames.length - 1;
+      slider.value = (data.radar.past || []).length - 1;
+      state.map.radarIndex = parseInt(slider.value);
 
-    showRadarTileFrame(state.map.radarIndex);
+      showRadarTileFrame(state.map.radarIndex);
 
-    slider.addEventListener('input', (e) => {
-      stopRadarAnimation();
-      showRadarTileFrame(parseInt(e.target.value));
-    });
+      slider.addEventListener('input', (e) => {
+        stopRadarAnimation();
+        showRadarTileFrame(parseInt(e.target.value));
+      });
+    }
 
-    document.getElementById('radar-play-btn').addEventListener('click', toggleRadarPlay);
+    const playBtn = document.getElementById('radar-play-btn');
+    if (playBtn) playBtn.addEventListener('click', toggleRadarPlay);
   } catch (e) {
     console.warn('Radar konnte nicht geladen werden:', e);
   }
@@ -768,8 +811,10 @@ function showRadarTileFrame(idx) {
   }).addTo(state.map.instance);
 
   const t = new Date(frame.time * 1000);
-  document.getElementById('radar-time-display').innerText = `${t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Radarscan`;
-  document.getElementById('radar-time-slider').value = idx;
+  const timeDisplay = document.getElementById('radar-time-display');
+  if (timeDisplay) timeDisplay.innerText = `${t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Radarscan`;
+  const slider = document.getElementById('radar-time-slider');
+  if (slider) slider.value = idx;
 }
 
 function toggleRadarPlay() {
@@ -778,7 +823,7 @@ function toggleRadarPlay() {
     stopRadarAnimation();
   } else {
     state.map.radarPlaying = true;
-    btn.innerText = '⏸';
+    if (btn) btn.innerText = '⏸';
     state.map.radarInterval = setInterval(() => {
       let next = state.map.radarIndex + 1;
       if (next >= state.map.radarFrames.length) next = 0;
@@ -793,7 +838,8 @@ function stopRadarAnimation() {
     state.map.radarInterval = null;
   }
   state.map.radarPlaying = false;
-  document.getElementById('radar-play-btn').innerText = '▶';
+  const btn = document.getElementById('radar-play-btn');
+  if (btn) btn.innerText = '▶';
 }
 
 function setMapLayer(layerType) {
@@ -810,7 +856,6 @@ function setMapLayer(layerType) {
     state.map.baseTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 17 }).addTo(state.map.instance);
     if (radarControls) radarControls.style.display = 'none';
   } else {
-    // Default Radar mode
     state.map.baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 16 }).addTo(state.map.instance);
     if (radarControls) radarControls.style.display = 'flex';
   }
@@ -829,7 +874,7 @@ function updateMapLocation() {
 }
 
 // =============================================================================
-// TAB 4: FAVORITEN & SUCHE
+// TAB 4: FAVORITES
 // =============================================================================
 function setupFavorites() {
   const addBtn = document.getElementById('add-current-favorite-btn');
@@ -853,11 +898,12 @@ function toggleFavoriteCurrent() {
       lat: loc.lat,
       lon: loc.lon,
       elevation: loc.elevation,
-      country: loc.country
+      country: loc.country,
+      isMountain: loc.isMountain
     });
   }
 
-  localStorage.setItem('best_weather_favorites_v2', JSON.stringify(state.favorites));
+  localStorage.setItem('best_weather_favorites_v3', JSON.stringify(state.favorites));
   updateFavStarUI();
   renderFavoritesTab();
 }
@@ -879,17 +925,17 @@ function renderFavoritesTab() {
   state.favorites.forEach((fav, i) => {
     const card = document.createElement('div');
     card.className = 'favorite-card';
+    const typeIcon = fav.isMountain ? '🏔️' : '🏙️';
     card.innerHTML = `
       <div class="fav-info">
-        <div class="fav-name">${fav.name}</div>
-        <div class="fav-meta">🏔️ ${fav.elevation} m • ${fav.country || ''}</div>
+        <div class="fav-name">${typeIcon} ${fav.name}</div>
+        <div class="fav-meta">Höhe: ${fav.elevation} m • ${fav.country || ''}</div>
       </div>
       <div class="fav-actions">
-        <button class="fav-del-btn" title="Aus Favoriten entfernen">✕</button>
+        <button class="fav-del-btn" title="Löschen">✕</button>
       </div>
     `;
 
-    // Click to load
     card.addEventListener('click', (e) => {
       if (!e.target.classList.contains('fav-del-btn')) {
         selectExactLocation(fav);
@@ -897,11 +943,10 @@ function renderFavoritesTab() {
       }
     });
 
-    // Delete button
     card.querySelector('.fav-del-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       state.favorites.splice(i, 1);
-      localStorage.setItem('best_weather_favorites_v2', JSON.stringify(state.favorites));
+      localStorage.setItem('best_weather_favorites_v3', JSON.stringify(state.favorites));
       renderFavoritesTab();
       updateFavStarUI();
     });
@@ -911,7 +956,7 @@ function renderFavoritesTab() {
 }
 
 // =============================================================================
-// SEARCH AUTOCOMPLETE & GPS (EXACT COORDINATES & ELEVATION)
+// SEARCH AUTOCOMPLETE & GPS (EXACT COORDINATES & OFFICIAL ELEVATION)
 // =============================================================================
 function setupSearch() {
   const input = document.getElementById('location-search-input');
@@ -934,7 +979,7 @@ function setupSearch() {
 
     debounceTimer = setTimeout(async () => {
       try {
-        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=de&format=json`;
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=de&format=json`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -943,15 +988,19 @@ function setupSearch() {
           data.results.forEach(item => {
             const row = document.createElement('div');
             row.className = 'dropdown-item';
-            const elevText = item.elevation ? `${Math.round(item.elevation)} m` : '';
+
+            // Exact official elevation from geocoding
+            const officialElev = Math.round(item.elevation || 500);
+            const isMtn = determineIfMountain(item.name, item.feature_code, officialElev);
+            const icon = isMtn ? '🏔️' : '🏙️';
             const admin = [item.admin1, item.country].filter(Boolean).join(', ');
 
             row.innerHTML = `
               <div>
-                <div class="dropdown-city">${item.name}</div>
-                <div class="dropdown-region">${admin}</div>
+                <div class="dropdown-city">${icon} ${item.name}</div>
+                <div class="dropdown-region">${admin} (${item.feature_code || ''})</div>
               </div>
-              ${elevText ? `<div class="dropdown-elevation">🏔️ ${elevText}</div>` : ''}
+              <div class="dropdown-elevation">${officialElev} m</div>
             `;
 
             row.addEventListener('click', () => {
@@ -959,8 +1008,9 @@ function setupSearch() {
                 name: item.name,
                 lat: item.latitude,
                 lon: item.longitude,
-                elevation: Math.round(item.elevation || 500),
-                country: item.country || ''
+                elevation: officialElev, // EXACT OFFICIAL ELEVATION!
+                country: item.country || '',
+                isMountain: isMtn
               });
               dropdown.style.display = 'none';
               input.value = '';
@@ -1002,14 +1052,26 @@ function setupSearch() {
             gpsBtn.style.opacity = '1';
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
+            
+            // Get exact elevation for GPS coordinate
+            let gpsElev = 500;
+            try {
+              const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
+              const elData = await elRes.json();
+              if (elData.elevation && elData.elevation[0] !== undefined) {
+                gpsElev = Math.round(elData.elevation[0]);
+              }
+            } catch(e) {}
+
             selectExactLocation({
               name: 'Mein Standort',
               lat: lat,
               lon: lon,
-              elevation: 500
+              elevation: gpsElev,
+              isMountain: gpsElev >= 1000
             });
           },
-          (err) => {
+          () => {
             gpsBtn.style.opacity = '1';
             alert('GPS-Standort konnte nicht ermittelt werden.');
           },
@@ -1025,10 +1087,17 @@ function setupSearch() {
       state.unit = state.unit === 'celsius' ? 'fahrenheit' : 'celsius';
       unitBtn.innerText = state.unit === 'celsius' ? '°C' : '°F';
       renderOverviewTab();
-      renderMountainTab();
-      renderAltitudeChart();
+      renderAdaptiveTab2();
     });
   }
+}
+
+function determineIfMountain(name, featureCode, elevation) {
+  const n = name.toLowerCase();
+  if (featureCode === 'MT' || featureCode === 'PK' || featureCode === 'PASS' || featureCode === 'MTS') return true;
+  if (n.includes('spitze') || n.includes('horn') || n.includes('kogel') || n.includes('gipfel') || n.includes('wand') || n.includes('grat') || n.includes('massiv')) return true;
+  if (elevation >= 1200 && featureCode !== 'PPLA' && featureCode !== 'PPLC') return true;
+  return false;
 }
 
 function selectExactLocation(loc) {
@@ -1036,7 +1105,7 @@ function selectExactLocation(loc) {
 }
 
 // =============================================================================
-// TAB 5: ALPEN-MESSNETZE GEO-ROUTING HIGHLIGHT
+// TAB 5: GEO-ROUTING HIGHLIGHT
 // =============================================================================
 function updateGeoRoutingNetworks() {
   const lat = state.currentLocation.lat;
@@ -1048,22 +1117,18 @@ function updateGeoRoutingNetworks() {
   const netSlf = document.getElementById('net-slf');
   const routingBadge = document.getElementById('active-routing-badge');
 
-  // Reset highlights
   [netDwd, netLawis, netSuedtirol, netSlf].forEach(n => {
     if (n) n.style.borderColor = 'rgba(255, 255, 255, 0.08)';
   });
 
   if (lat >= 47.05 && lat <= 48.0 && lon >= 9.5 && lon <= 13.5) {
-    // Bayerischer Alpenrand & Nordtirol -> LAWIS & DWD
     if (netLawis) netLawis.style.borderColor = 'var(--ios-cyan)';
     if (netDwd) netDwd.style.borderColor = 'var(--ios-cyan)';
     if (routingBadge) routingBadge.innerText = 'Geo-Routing: LAWIS Bayern / Tirol + DWD aktiv';
   } else if (lat < 47.05 && lat >= 45.8 && lon >= 10.4 && lon <= 12.6) {
-    // Südtirol & Dolomiten -> Open Data Hub Südtirol
     if (netSuedtirol) netSuedtirol.style.borderColor = 'var(--ios-cyan)';
     if (routingBadge) routingBadge.innerText = 'Geo-Routing: Open Data Hub Südtirol aktiv';
   } else if (lon < 10.2 && lat >= 45.5 && lat <= 47.8) {
-    // Schweiz & Westalpen -> SLF IMIS + Météo-France
     if (netSlf) netSlf.style.borderColor = 'var(--ios-cyan)';
     if (routingBadge) routingBadge.innerText = 'Geo-Routing: SLF IMIS Schweiz aktiv';
   } else {

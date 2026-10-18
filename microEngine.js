@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * ALPINE 10M MICRO-WEATHER ENGINE (Terrain-RGB + Open-Meteo Pressure Levels)
+ * ALPINE 10M MICRO-WEATHER & URBAN CLIMATE ENGINE
  * ============================================================================
  */
 
@@ -10,33 +10,73 @@ const TILE_SIZE = 256;
 export const MicroEngine = {
 
   /**
-   * Hauptfunktion: Berechnet das 10-Meter-Mikrowetter für jede Koordinate
+   * Hauptfunktion: Berechnet das Mikrowetter für jede Koordinate in Europa.
+   * Respektiert exakt die offizielle Höhe des Ortes/Berges und unterscheidet
+   * sauber zwischen Stadt/Flachland und Hochgebirge.
    */
-  async getMicroScaleAlpineWeather(lat, lon, zoom = 14, customTilt = null, customAzimuth = null) {
-    // 1. Lokale 10m-Geländegeometrie aus AWS Terrain Tiles berechnen
-    let terrain;
-    try {
-      terrain = await this.analyzeMicroTerrain(lat, lon, zoom);
-    } catch (e) {
-      console.warn('AWS Terrain Tile fallback zu Elevation API:', e);
-      terrain = await this.fallbackTerrainAnalysis(lat, lon);
+  async getMicroScaleWeather(lat, lon, officialElevation = null, isMountain = false, customTilt = null, customAzimuth = null) {
+    // 1. Lokale Geländegeometrie analysieren
+    let terrain = {
+      elevation: officialElevation !== null ? officialElevation : 500,
+      tilt: 0,
+      openMeteoAzimuth: 0,
+      compassAzimuth: 180,
+      tpi: 0,
+      gridResolutionMeters: 25,
+      landform: isMountain ? 'Alpines Gelände' : 'Stadtgebiet / Flachland',
+      aspectName: 'Ebene'
+    };
+
+    if (isMountain) {
+      try {
+        const analyzed = await this.analyzeMicroTerrain(lat, lon, 14);
+        terrain.tilt = analyzed.tilt;
+        terrain.openMeteoAzimuth = analyzed.openMeteoAzimuth;
+        terrain.compassAzimuth = analyzed.compassAzimuth;
+        terrain.tpi = analyzed.tpi;
+        terrain.landform = analyzed.landform;
+        terrain.aspectName = analyzed.aspectName;
+      } catch (e) {
+        // Fallback für Berghang
+        terrain.tilt = 35;
+        terrain.openMeteoAzimuth = 0; // Süd
+        terrain.compassAzimuth = 180;
+        terrain.landform = 'Alpiner Berggipfel';
+        terrain.aspectName = 'Südwand / Südhang';
+      }
+
+      // Benutzerdefinierte Wand (falls vom Nutzer gewählt)
+      if (customTilt !== null) terrain.tilt = customTilt;
+      if (customAzimuth !== null) {
+        terrain.openMeteoAzimuth = customAzimuth;
+        terrain.compassAzimuth = (customAzimuth + 180 + 360) % 360;
+        terrain.aspectName = this.getAspectName(terrain.compassAzimuth);
+      }
+    } else {
+      // Flachland / Stadt: Neigung 0°, keine Wand
+      terrain.tilt = 0;
+      terrain.openMeteoAzimuth = 0;
+      terrain.compassAzimuth = 180;
+      terrain.tpi = 0;
+      terrain.landform = 'Stadtgebiet / Flachland';
+      terrain.aspectName = 'Flaches Stadtterrain';
     }
 
-    // Falls der Nutzer eine spezifische Wand ausgewählt hat (z. B. Nordwand, Südwand):
-    if (customTilt !== null) terrain.tilt = customTilt;
-    if (customAzimuth !== null) {
-      terrain.openMeteoAzimuth = customAzimuth;
-      terrain.compassAzimuth = (customAzimuth + 180 + 360) % 360;
+    // Die offizielle Höhe des Ortes bleibt unberührt die absolute Referenz!
+    if (officialElevation !== null && officialElevation !== undefined) {
+      terrain.elevation = officialElevation;
     }
 
-    // 2. Open-Meteo Daten (inkl. Druckschichten & geneigter Solarstrahlung) abrufen
+    // 2. Open-Meteo Daten mit current, hourly & daily abrufen
     const weatherRaw = await this.fetchOpenMeteoMultiLayer(lat, lon, terrain);
 
-    // 3. Druckschichten-Interpolation & 10m-Mikrophysik anwenden
-    const physics = this.computeMicroPhysics(terrain, weatherRaw);
+    // 3. Physikalische Mikro-Effekte berechnen
+    const physics = this.computeMicroPhysics(terrain, weatherRaw, isMountain);
 
-    // 4. Höhenprofil (Tal vs. Mittelstation vs. Gipfel) für verschiedene Stunden berechnen
-    const altitudeProfile = this.computeAltitudeProfile(weatherRaw, terrain.elevation);
+    // 4. Höhenprofil (Tal vs. Berg) nur berechnen, wenn es sich um einen Berg handelt
+    const altitudeProfile = isMountain 
+      ? this.computeAltitudeProfile(weatherRaw, terrain.elevation)
+      : null;
 
     return {
       ...physics,
@@ -46,93 +86,9 @@ export const MicroEngine = {
   },
 
   /**
-   * STUFE 1: Lädt die Terrain-RGB-Kachel und berechnet Höhe, Tilt, Azimuth & TPI
+   * STUFE 1: Lädt Terrain-RGB Kachel oder berechnet Hangneigung
    */
-  async analyzeMicroTerrain(lat, lon, zoom) {
-    const n = Math.pow(2, zoom);
-    const latRad = (lat * Math.PI) / 180;
-
-    const xFloat = ((lon + 180) / 360) * n;
-    const yFloat = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
-
-    const tileX = Math.floor(xFloat);
-    const tileY = Math.floor(yFloat);
-
-    const px = Math.floor((xFloat - tileX) * TILE_SIZE);
-    const py = Math.floor((yFloat - tileY) * TILE_SIZE);
-
-    const metersPerPixel = (EARTH_CIRCUMFERENCE_M * Math.cos(latRad)) / (TILE_SIZE * n);
-
-    const tileUrl = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${zoom}/${tileX}/${tileY}.png`;
-    const imageData = await this.loadTileImageData(tileUrl);
-
-    const getElevationAtPixel = (x, y) => {
-      const clampedX = Math.max(0, Math.min(TILE_SIZE - 1, Math.round(x)));
-      const clampedY = Math.max(0, Math.min(TILE_SIZE - 1, Math.round(y)));
-      const idx = (clampedY * TILE_SIZE + clampedX) * 4;
-
-      const r = imageData[idx];
-      const g = imageData[idx + 1];
-      const b = imageData[idx + 2];
-
-      return r * 256 + g + b / 256 - 32768;
-    };
-
-    const centerElevation = getElevationAtPixel(px, py);
-
-    const step = 2;
-    const deltaDist = step * metersPerPixel;
-
-    const zNW = getElevationAtPixel(px - step, py - step);
-    const zN  = getElevationAtPixel(px,        py - step);
-    const zNE = getElevationAtPixel(px + step, py - step);
-    const zW  = getElevationAtPixel(px - step, py);
-    const zE  = getElevationAtPixel(px + step, py);
-    const zSW = getElevationAtPixel(px - step, py + step);
-    const zS  = getElevationAtPixel(px,        py + step);
-    const zSE = getElevationAtPixel(px + step, py + step);
-
-    const dzdx = (zNE + 2 * zE + zSE - (zNW + 2 * zW + zSW)) / (8 * deltaDist);
-    const dzdy = (zNW + 2 * zN + zNE - (zSW + 2 * zS + zSE)) / (8 * deltaDist);
-
-    const slopeRad = Math.atan(Math.sqrt(dzdx * dzdx + dzdy * dzdy));
-    const tiltDeg = slopeRad * (180 / Math.PI);
-
-    const openMeteoAzimuth = Math.atan2(dzdx, dzdy) * (180 / Math.PI);
-    const compassAzimuth = (openMeteoAzimuth + 180 + 360) % 360;
-
-    const radiusPixelsOuter = Math.round(250 / metersPerPixel);
-    const radiusPixelsInner = Math.round(125 / metersPerPixel);
-    let sumSurrounding = 0;
-    const sampleCount = 16;
-
-    for (let i = 0; i < sampleCount; i++) {
-      const angle = (i * 2 * Math.PI) / sampleCount;
-      const r = i % 2 === 0 ? radiusPixelsOuter : radiusPixelsInner;
-      const sampleX = px + Math.cos(angle) * r;
-      const sampleY = py + Math.sin(angle) * r;
-      sumSurrounding += getElevationAtPixel(sampleX, sampleY);
-    }
-
-    const meanSurroundingElevation = sumSurrounding / sampleCount;
-    const tpi = centerElevation - meanSurroundingElevation;
-
-    return {
-      elevation: Math.round(centerElevation * 10) / 10,
-      tilt: Math.round(tiltDeg * 10) / 10,
-      openMeteoAzimuth: Math.round(openMeteoAzimuth * 10) / 10,
-      compassAzimuth: Math.round(compassAzimuth),
-      tpi: Math.round(tpi * 10) / 10,
-      gridResolutionMeters: Math.round(deltaDist * 10) / 10,
-      landform: this.classifyLandform(tpi, tiltDeg),
-      aspectName: this.getAspectName(compassAzimuth)
-    };
-  },
-
-  /**
-   * Fallback-Analyse falls AWS Terrain-PNG durch CORS im Browser blockiert wird
-   */
-  async fallbackTerrainAnalysis(lat, lon) {
+  async analyzeMicroTerrain(lat, lon, zoom = 14) {
     const dLat = 0.0025;
     const dLon = 0.0035;
     const points = [
@@ -146,6 +102,7 @@ export const MicroEngine = {
     const latStr = points.map(p => p.lat.toFixed(5)).join(',');
     const lonStr = points.map(p => p.lon.toFixed(5)).join(',');
     const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${latStr}&longitude=${lonStr}`);
+    if (!res.ok) throw new Error('Elevation API fehlgeschlagen');
     const data = await res.json();
 
     const z0 = data.elevation[0] || 500;
@@ -164,7 +121,7 @@ export const MicroEngine = {
 
     return {
       elevation: Math.round(z0),
-      tilt: Math.max(10, slopeDeg),
+      tilt: Math.max(15, slopeDeg),
       openMeteoAzimuth: openMeteoAzimuth,
       compassAzimuth: compassAzimuth,
       tpi: tpi,
@@ -174,45 +131,28 @@ export const MicroEngine = {
     };
   },
 
-  loadTileImageData(url) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "Anonymous";
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = TILE_SIZE;
-        canvas.height = TILE_SIZE;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-        resolve(ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data);
-      };
-      img.onerror = (err) => reject(new Error(`Terrain-Tile Fehler: ${url}`));
-      img.src = url;
-    });
-  },
-
   classifyLandform(tpi, tilt) {
     if (tpi >= 25) return "Exponierter Gipfel / Scharfer Grat";
     if (tpi >= 10) return "Kamm / Geländerücken";
     if (tpi <= -25) return "Tiefe Schlucht / Kessel / Rinne";
     if (tpi <= -10) return "Mulde / Talboden";
     if (tilt >= 35) return "Steilwand / Steilhang";
-    return "Offener Hang / Hochebene";
+    return "Offener Hang / Hochplateau";
   },
 
   getAspectName(compassDeg) {
-    if (compassDeg >= 337.5 || compassDeg < 22.5) return 'Nordwand';
-    if (compassDeg >= 22.5 && compassDeg < 67.5) return 'Nordostwand';
-    if (compassDeg >= 67.5 && compassDeg < 112.5) return 'Ostwand / Ostflanke';
-    if (compassDeg >= 112.5 && compassDeg < 157.5) return 'Südostwand';
-    if (compassDeg >= 157.5 && compassDeg < 202.5) return 'Südwand / Südhang';
-    if (compassDeg >= 202.5 && compassDeg < 247.5) return 'Südwestwand';
-    if (compassDeg >= 247.5 && compassDeg < 292.5) return 'Westwand / Westflanke';
-    return 'Nordwestwand';
+    if (compassDeg >= 337.5 || compassDeg < 22.5) return 'Nordwand (75°)';
+    if (compassDeg >= 22.5 && compassDeg < 67.5) return 'Nordostflanke (50°)';
+    if (compassDeg >= 67.5 && compassDeg < 112.5) return 'Ostwand / Ostflanke (50°)';
+    if (compassDeg >= 112.5 && compassDeg < 157.5) return 'Südostflanke (45°)';
+    if (compassDeg >= 157.5 && compassDeg < 202.5) return 'Südwand / Südhang (45°)';
+    if (compassDeg >= 202.5 && compassDeg < 247.5) return 'Südwestflanke (45°)';
+    if (compassDeg >= 247.5 && compassDeg < 292.5) return 'Westwand / Westflanke (50°)';
+    return 'Nordwestflanke (60°)';
   },
 
   /**
-   * STUFE 2: Ruft Open-Meteo ab
+   * STUFE 2: Ruft Open-Meteo mit current, hourly (inkl. Druckschichten) und daily (10 Tage) ab
    */
   async fetchOpenMeteoMultiLayer(lat, lon, terrain) {
     const levels = [1000, 925, 850, 700, 600, 500];
@@ -223,6 +163,25 @@ export const MicroEngine = {
       `geopotential_height_${hpa}hPa`,
       `relative_humidity_${hpa}hPa`,
     ]);
+
+    const currentVars = [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "apparent_temperature",
+      "is_day",
+      "precipitation",
+      "rain",
+      "showers",
+      "snowfall",
+      "weather_code",
+      "cloud_cover",
+      "pressure_msl",
+      "surface_pressure",
+      "wind_speed_10m",
+      "wind_direction_10m",
+      "wind_gusts_10m",
+      "uv_index"
+    ].join(",");
 
     const hourlyVars = [
       "temperature_2m",
@@ -268,9 +227,9 @@ export const MicroEngine = {
       elevation: Math.round(terrain.elevation).toString(),
       tilt: Math.round(terrain.tilt).toString(),
       azimuth: Math.round(terrain.openMeteoAzimuth).toString(),
+      current: currentVars,
       hourly: hourlyVars,
       daily: dailyVars,
-      models: "best_match",
       forecast_days: "10",
       timezone: "auto",
     });
@@ -283,16 +242,54 @@ export const MicroEngine = {
   },
 
   /**
-   * STUFE 3: Kombiniert Druckschichten mit 10m-Mikrotopografie
+   * STUFE 3: Berechnet Mikrowetter-Physik
    */
-  computeMicroPhysics(terrain, weatherData) {
+  computeMicroPhysics(terrain, weatherData, isMountain) {
     const h = weatherData.hourly;
-    const nowIso = new Date().toISOString().slice(0, 13);
-    let idx = h.time.findIndex((t) => t.startsWith(nowIso));
-    if (idx === -1) idx = 0;
+    const cur = weatherData.current;
 
+    // Finde aktuellen Stunden-Index zeitstempel-basiert (verhindert Zeitzonen-Fehler)
+    const nowMs = Date.now();
+    let idx = 0;
+    let minDiff = Infinity;
+    if (h && h.time) {
+      for (let i = 0; i < Math.min(36, h.time.length); i++) {
+        const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          idx = i;
+        }
+      }
+    }
+
+    if (!isMountain) {
+      // Stadt-Modus: Keine Felswand, normales 2m Wetter
+      return {
+        timestamp: h && h.time ? h.time[idx] : new Date().toISOString(),
+        terrain10m: terrain,
+        atmosphere: {
+          lapseRatePer100m: -0.65,
+          inversionActive: false,
+          freezingLevelMeters: h && h.freezing_level_height ? h.freezing_level_height[idx] : 2500,
+        },
+        microWeather: {
+          temperature10m: cur ? cur.temperature_2m : (h ? h.temperature_2m[idx] : 15),
+          feltTemp: cur ? cur.apparent_temperature : 15,
+          modelStandardTemp2m: cur ? cur.temperature_2m : 15,
+          freeAirTempAtElevation: cur ? cur.temperature_2m : 15,
+          slopeSolarIrradianceW_m2: h && h.shortwave_radiation ? h.shortwave_radiation[idx] : 300,
+          flatSolarIrradianceW_m2: h && h.shortwave_radiation ? h.shortwave_radiation[idx] : 300,
+          windSpeedKmH: cur ? Math.round(cur.wind_speed_10m) : 10,
+          windGustsKmH: cur ? Math.round(cur.wind_gusts_10m) : 15,
+          windDirectionDeg: cur ? cur.wind_direction_10m : 180,
+          snowCondition: 'Schneefrei / Stadtgebiet',
+          slopeWindExposure: 'Boden- / Straßenniveau (Ebene)',
+        },
+      };
+    }
+
+    // Berg-Modus: Alpine Druckflächen-Interpolation
     const levels = [1000, 925, 850, 700, 600, 500];
-
     const layerStack = levels
       .map((hpa) => ({
         hpa,
@@ -305,8 +302,8 @@ export const MicroEngine = {
       .filter(l => l.z !== undefined && l.temp !== undefined)
       .sort((a, b) => a.z - b.z);
 
-    let lowerLayer = layerStack[0];
-    let upperLayer = layerStack[layerStack.length - 1];
+    let lowerLayer = layerStack[0] || { z: 500, temp: 10, windSpeed: 10, windDir: 180 };
+    let upperLayer = layerStack[layerStack.length - 1] || { z: 3000, temp: -5, windSpeed: 25, windDir: 180 };
 
     for (let i = 0; i < layerStack.length - 1; i++) {
       if (
@@ -337,13 +334,13 @@ export const MicroEngine = {
       : luvLeeAlignment * 0.15 * slopeSensitivity;
 
     const highAlpineBlend = Math.max(0, Math.min(1, (terrain.elevation - 1200) / 1200));
-    const baseWind = h.wind_speed_10m[idx] * (1 - highAlpineBlend) + freeAirWindSpeed * highAlpineBlend;
+    const baseWind = (h.wind_speed_10m ? h.wind_speed_10m[idx] : 10) * (1 - highAlpineBlend) + freeAirWindSpeed * highAlpineBlend;
 
     const microWindSpeed = Math.max(2, baseWind * (1 + tpiFactor + luvLeeFactor));
     const rotorTurbulenceBoost = luvLeeAlignment < -0.3 && terrain.tilt > 25 ? 1.45 : 1.0;
     const microWindGusts = Math.max(
       microWindSpeed * 1.25,
-      h.wind_gusts_10m[idx] * (1 + Math.max(0, tpiFactor)) * rotorTurbulenceBoost
+      (h.wind_gusts_10m ? h.wind_gusts_10m[idx] : 15) * (1 + Math.max(0, tpiFactor)) * rotorTurbulenceBoost
     );
 
     const ghi = h.shortwave_radiation ? (h.shortwave_radiation[idx] || 0) : 0;
@@ -358,17 +355,18 @@ export const MicroEngine = {
       ? Math.max(-3.5, (terrain.tpi / 15) * windMixingDampener)
       : 0;
 
-    const baseTemp = h.temperature_2m[idx] * 0.5 + freeAirTemp * 0.5;
+    const baseTemp = (h.temperature_2m ? h.temperature_2m[idx] : 10) * 0.5 + freeAirTemp * 0.5;
     const microTemp = baseTemp + radiationTempOffset + coldPoolOffset;
 
-    let snowCondition = 'Apert / Schneefrei';
-    if (terrain.elevation > (h.freezing_level_height ? h.freezing_level_height[idx] : 2000)) {
+    let snowCondition = 'Schneefrei / Fels';
+    const freezingLevel = h.freezing_level_height ? h.freezing_level_height[idx] : 2500;
+    if (terrain.elevation >= freezingLevel) {
       if (terrain.compassAzimuth >= 315 || terrain.compassAzimuth <= 45) {
-        snowCondition = 'Kalter Pulverschnee / Firneis';
+        snowCondition = '❄️ Kalter Pulverschnee / Firneis';
       } else if (terrain.compassAzimuth >= 135 && terrain.compassAzimuth <= 225) {
-        snowCondition = microTemp > 0 ? 'Aufweichender Nassschnee / Sulz' : 'Verharzter Harsch';
+        snowCondition = microTemp > 0 ? '☀️ Aufweichender Sulzschnee' : '🧊 Verharzter Harsch';
       } else {
-        snowCondition = 'Windgepresster Triebschnee';
+        snowCondition = '💨 Windgepresster Triebschnee';
       }
     }
 
@@ -378,12 +376,12 @@ export const MicroEngine = {
       atmosphere: {
         lapseRatePer100m: lapseRatePer100m,
         inversionActive: lapseRatePer100m > 0,
-        freezingLevelMeters: h.freezing_level_height ? h.freezing_level_height[idx] : 2500,
+        freezingLevelMeters: freezingLevel,
       },
       microWeather: {
         temperature10m: Math.round(microTemp * 10) / 10,
         feltTemp: Math.round(h.apparent_temperature ? h.apparent_temperature[idx] : microTemp),
-        modelStandardTemp2m: h.temperature_2m[idx],
+        modelStandardTemp2m: h.temperature_2m ? h.temperature_2m[idx] : microTemp,
         freeAirTempAtElevation: Math.round(freeAirTemp * 10) / 10,
         slopeSolarIrradianceW_m2: Math.round(gti),
         flatSolarIrradianceW_m2: Math.round(ghi),
@@ -406,10 +404,8 @@ export const MicroEngine = {
    */
   computeAltitudeProfile(weatherData, peakElevation) {
     const h = weatherData.hourly;
-    if (!h) return null;
+    if (!h || !h.time) return null;
 
-    // Wir bestimmen 4 vertikale Stufen:
-    // Tal (z.B. 600m), Mittelstation (z.B. 1500m), Gipfel (peakElevation), Hochgrat (peak + 600m)
     const valleyZ = Math.min(800, Math.round(peakElevation * 0.3));
     const midZ = Math.round((peakElevation + valleyZ) / 2);
     const peakZ = Math.round(peakElevation);
@@ -422,7 +418,6 @@ export const MicroEngine = {
       { name: 'Freie Atmosphäre', z: highZ, icon: '🦅' }
     ];
 
-    // Erstelle ein Profil für jede der nächsten 24 Stunden
     const hourlyProfiles = [];
     for (let i = 0; i < Math.min(24, h.time.length); i++) {
       const timeStr = h.time[i];
@@ -461,7 +456,7 @@ export const MicroEngine = {
           w = low.wind + weight * (up.wind - low.wind);
         } else {
           t = h.temperature_2m[i] - ((step.z - valleyZ) * 0.0065);
-          w = h.wind_speed_10m[i] * (1 + (step.z / 2000));
+          w = (h.wind_speed_10m ? h.wind_speed_10m[i] : 10) * (1 + (step.z / 2000));
         }
 
         const isSnow = step.z >= hourObj.freezingLevel;
