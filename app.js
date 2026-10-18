@@ -1547,14 +1547,14 @@ function renderAdaptiveTab2() {
   const cPanel = document.getElementById('city-view-panel');
 
   if (isMountain) {
-    if (mPanel) mPanel.style.display = 'block';
+    if (mPanel) mPanel.style.display = 'flex';
     if (cPanel) cPanel.style.display = 'none';
     renderMountainPanel();
     renderAltitudeHoursScroller();
     selectAltitudeHour(state.selectedAltitudeHour || 0, false);
   } else {
     if (mPanel) mPanel.style.display = 'none';
-    if (cPanel) cPanel.style.display = 'block';
+    if (cPanel) cPanel.style.display = 'flex';
     renderCityPanel();
   }
 }
