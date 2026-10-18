@@ -1312,29 +1312,102 @@ function updateAltitudeSliderLabel() {
 // =============================================================================
 // TAB 3: LIVE-MAP & RADAR
 // =============================================================================
+// =============================================================================
+// TAB 3: LIVE-MAP & RADAR (OSM BASISKARTE & METEOROLOGISCHE OVERLAYS)
+// =============================================================================
+
+const BASE_LAYERS = {
+  'osm-standard': {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    options: {
+      maxNativeZoom: 19,
+      maxZoom: 20,
+      attribution: '© OpenStreetMap contributors'
+    },
+    isDark: false
+  },
+  'osm-outdoor': {
+    url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+    options: {
+      maxNativeZoom: 19,
+      maxZoom: 20,
+      attribution: '© OpenStreetMap contributors, Humanitarian Relief Style'
+    },
+    isDark: false
+  },
+  'osm-dark': {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    options: {
+      maxNativeZoom: 19,
+      maxZoom: 20,
+      attribution: '© OpenStreetMap contributors'
+    },
+    isDark: true
+  },
+  'satellite': {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    options: {
+      maxNativeZoom: 18,
+      maxZoom: 20,
+      attribution: '© Esri World Imagery'
+    },
+    isDark: false
+  }
+};
+
+const REGIONAL_STATIONS = [
+  { name: 'München', lat: 48.137, lon: 11.581, elevation: 520, isMountain: false },
+  { name: 'Zugspitze', lat: 47.421, lon: 10.985, elevation: 2962, isMountain: true },
+  { name: 'Garmisch-Partenk.', lat: 47.491, lon: 11.095, elevation: 708, isMountain: false },
+  { name: 'Innsbruck', lat: 47.269, lon: 11.404, elevation: 574, isMountain: false },
+  { name: 'Kitzbühel', lat: 47.446, lon: 12.392, elevation: 762, isMountain: false },
+  { name: 'Großglockner', lat: 47.074, lon: 12.694, elevation: 3798, isMountain: true },
+  { name: 'Salzburg', lat: 47.809, lon: 13.055, elevation: 424, isMountain: false },
+  { name: 'Nebelhorn', lat: 47.421, lon: 10.345, elevation: 2224, isMountain: true },
+  { name: 'Oberstdorf', lat: 47.408, lon: 10.279, elevation: 813, isMountain: false },
+  { name: 'Matterhorn', lat: 45.976, lon: 7.749, elevation: 4478, isMountain: true },
+  { name: 'Zermatt', lat: 46.020, lon: 7.749, elevation: 1620, isMountain: false },
+  { name: 'Mont Blanc', lat: 45.832, lon: 6.865, elevation: 4808, isMountain: true },
+  { name: 'Feldberg', lat: 47.874, lon: 8.004, elevation: 1493, isMountain: true },
+  { name: 'Zürich', lat: 47.376, lon: 8.541, elevation: 408, isMountain: false },
+  { name: 'St. Moritz', lat: 46.498, lon: 9.839, elevation: 1822, isMountain: true },
+  { name: 'Bozen', lat: 46.498, lon: 11.354, elevation: 262, isMountain: false },
+  { name: 'Watzmann', lat: 47.554, lon: 12.921, elevation: 2713, isMountain: true },
+  { name: 'Stuttgart', lat: 48.775, lon: 9.182, elevation: 245, isMountain: false },
+  { name: 'Nürnberg', lat: 49.452, lon: 11.076, elevation: 309, isMountain: false },
+  { name: 'Frankfurt', lat: 50.110, lon: 8.682, elevation: 112, isMountain: false },
+  { name: 'Wien', lat: 48.208, lon: 16.373, elevation: 171, isMountain: false }
+];
+
 function initLeafletMap() {
   const mapElem = document.getElementById('interactive-map');
   if (!mapElem) return;
 
+  // 1. Initialisiere Leaflet mit voller Zoomunterstützung (bis Stufe 20)
   state.map.instance = L.map('interactive-map', {
     zoomControl: true,
-    attributionControl: false
+    attributionControl: false,
+    maxZoom: 20
   }).setView([state.currentLocation.lat, state.currentLocation.lon], 9);
 
-  state.map.baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 16
-  }).addTo(state.map.instance);
+  // 2. Erstelle Layer-Gruppe für dynamische Wetter-Marker
+  state.map.weatherLayerGroup = L.layerGroup().addTo(state.map.instance);
 
-  state.map.marker = L.marker([state.currentLocation.lat, state.currentLocation.lon])
+  // 3. Setze Standard-OSM-Basiskarte
+  state.map.activeBase = 'osm-standard';
+  setMapBaseLayer('osm-standard');
+
+  // 4. Eigener Standort-Marker (blau/hervorgehoben)
+  state.map.marker = L.marker([state.currentLocation.lat, state.currentLocation.lon], { zIndexOffset: 2000 })
     .addTo(state.map.instance)
     .bindPopup(`<b>${state.currentLocation.name}</b><br>${state.currentLocation.elevation} m`)
     .openPopup();
 
+  // 5. Klick auf beliebigen Punkt auf der Karte berechnet exakte Geländehöhe & lädt Standort
   state.map.instance.on('click', async (e) => {
     const lat = e.latlng.lat;
     const lon = e.latlng.lng;
     
-    // Exakte Höhe live für diesen Klick-Punkt über Elevation-API laden
     let elev = 500;
     try {
       const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
@@ -1357,15 +1430,415 @@ function initLeafletMap() {
     });
   });
 
-  document.querySelectorAll('.map-layer-btn').forEach(btn => {
+  // 6. Event-Listener für Basiskarten-Buttons (OSM)
+  document.querySelectorAll('.map-base-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.map-layer-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.map-base-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      setMapLayer(btn.dataset.layer);
+      setMapBaseLayer(btn.dataset.base);
     });
   });
 
+  // 7. Event-Listener für Wetter-Overlay-Buttons
+  document.querySelectorAll('.map-overlay-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.map-overlay-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setMapOverlay(btn.dataset.overlay);
+    });
+  });
+
+  // 8. Lade Wetterdaten für Stationen & initialisiere Niederschlags-Radar
+  state.map.activeOverlay = 'precip';
   loadRainViewerRadar();
+  updateWeatherOverlay();
+
+  // Fenster-Resize-Handling für Wind-Canvas
+  window.addEventListener('resize', () => {
+    if (state.map.activeOverlay === 'wind') {
+      const wDir = state.currentWeather ? state.currentWeather.wind_direction_10m : 240;
+      const wSpd = state.currentWeather ? state.currentWeather.wind_speed_10m : 20;
+      startWindCanvas(wDir, wSpd);
+    }
+  });
+}
+
+/**
+ * Wechselt die Basiskarte (OSM Standard, OSM Topo/Outdoor, OSM Dunkel, Satellit)
+ * Garantiert maxZoom 20 ohne 'Zoom level not supported' Kacheln
+ */
+function setMapBaseLayer(baseKey) {
+  const conf = BASE_LAYERS[baseKey] || BASE_LAYERS['osm-standard'];
+  state.map.activeBase = baseKey;
+
+  if (state.map.baseTileLayer) {
+    state.map.instance.removeLayer(state.map.baseTileLayer);
+  }
+
+  const mapElem = document.getElementById('interactive-map');
+  if (mapElem) {
+    if (conf.isDark) {
+      mapElem.classList.add('osm-dark-tiles');
+    } else {
+      mapElem.classList.remove('osm-dark-tiles');
+    }
+  }
+
+  state.map.baseTileLayer = L.tileLayer(conf.url, conf.options).addTo(state.map.instance);
+}
+
+/**
+ * Schaltet das aktive meteorologische Overlay um (Niederschlag/Schnee, Wind, Bewölkung, Temp, Druck)
+ */
+function setMapOverlay(overlayKey) {
+  state.map.activeOverlay = overlayKey;
+  updateWeatherOverlay();
+}
+
+/**
+ * Lädt regionale Wetterstationen in einem einzigen Batch-Aufruf von Open-Meteo
+ */
+async function loadRegionalStationWeather() {
+  if (state.map.regionalStationsData) return state.map.regionalStationsData;
+
+  const lats = REGIONAL_STATIONS.map(s => s.lat.toFixed(3)).join(',');
+  const lons = REGIONAL_STATIONS.map(s => s.lon.toFixed(3)).join(',');
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const stationResults = Array.isArray(data) ? data : [data];
+
+    state.map.regionalStationsData = REGIONAL_STATIONS.map((station, i) => {
+      const weather = stationResults[i] ? (stationResults[i].current || {}) : {};
+      return {
+        ...station,
+        weather
+      };
+    });
+    return state.map.regionalStationsData;
+  } catch (err) {
+    console.warn('Regional weather batch fetch failed:', err);
+    return [];
+  }
+}
+
+/**
+ * Rendert das aktive Wetter-Overlay über der OSM-Karte
+ */
+async function updateWeatherOverlay() {
+  if (!state.map.instance || !state.map.weatherLayerGroup) return;
+
+  const overlay = state.map.activeOverlay;
+  const stations = await loadRegionalStationWeather();
+  state.map.weatherLayerGroup.clearLayers();
+
+  const radarControls = document.getElementById('radar-floating-controls');
+  const legendTitle = document.getElementById('map-legend-title');
+  const legendBar = document.getElementById('map-legend-bar');
+  const legendLabels = document.getElementById('map-legend-labels');
+
+  // 1. NIEDERSCHLAG & SCHNEE (Unterscheidung nach Temperatur)
+  if (overlay === 'precip') {
+    stopWindCanvas();
+    if (radarControls) radarControls.style.display = 'flex';
+    if (state.map.radarFrames && state.map.radarFrames.length && state.map.radarTileLayer) {
+      if (!state.map.instance.hasLayer(state.map.radarTileLayer)) {
+        state.map.instance.addLayer(state.map.radarTileLayer);
+      }
+    }
+
+    if (legendTitle) legendTitle.innerText = '🌧️ Regen & ❄️ Schnee (Typ-Erkennung):';
+    if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #0099ff, #00e600, #ffcc00, #ff3300, #d946ef, #ffffff)';
+    if (legendLabels) {
+      legendLabels.innerHTML = `
+        <span style="color:#78d6ff;">Leichter Regen</span>
+        <span style="color:#ffd166;">Starkregen</span>
+        <span style="color:#f5d0fe;">Schneefall (Alpin)</span>
+      `;
+    }
+
+    // Erzeuge Station-Badges mit Regen- vs. Schnee-Klassifikation
+    for (const st of stations) {
+      const w = st.weather || {};
+      const t = w.temperature_2m !== undefined ? w.temperature_2m : 8;
+      const precip = w.precipitation !== undefined ? w.precipitation : 0;
+      const snow = w.snowfall !== undefined ? w.snowfall : 0;
+      const isFreezing = t <= 1.0;
+
+      let badgeHtml = '';
+      if (isFreezing && (snow > 0 || (w.weather_code >= 71 && w.weather_code <= 86))) {
+        badgeHtml = `<div class="weather-station-marker wsm-snow"><span class="wsm-name">${st.name}:</span> ❄️ Schnee ${snow > 0 ? `${snow.toFixed(1)} cm` : 'Aktiv'}</div>`;
+      } else if (isFreezing) {
+        badgeHtml = `<div class="weather-station-marker wsm-snow"><span class="wsm-name">${st.name}:</span> ❄️ 0°C Frostgrenze</div>`;
+      } else if (precip > 0) {
+        badgeHtml = `<div class="weather-station-marker wsm-rain"><span class="wsm-name">${st.name}:</span> 🌧️ ${precip.toFixed(1)} mm</div>`;
+      } else {
+        badgeHtml = `<div class="weather-station-marker"><span class="wsm-name">${st.name}:</span> <span style="color:var(--text-tertiary);">💧 Trocken</span></div>`;
+      }
+
+      const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [45, 12] });
+      const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
+      m.on('click', () => selectExactLocation(st));
+    }
+  }
+
+  // 2. WIND & STRÖMUNGSFELD
+  else if (overlay === 'wind') {
+    if (radarControls) radarControls.style.display = 'none';
+    if (state.map.radarTileLayer && state.map.instance.hasLayer(state.map.radarTileLayer)) {
+      state.map.instance.removeLayer(state.map.radarTileLayer);
+    }
+
+    if (legendTitle) legendTitle.innerText = '💨 Windströmung & Spitzenböen:';
+    if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #30d158, #ffd166, #ff9f0a, #ff453a, #bf5af2)';
+    if (legendLabels) {
+      legendLabels.innerHTML = `
+        <span style="color:#30d158;">< 15 km/h</span>
+        <span style="color:#ffd166;">30 km/h</span>
+        <span style="color:#ff9f0a;">55 km/h</span>
+        <span style="color:#ff453a;">> 75 km/h Sturm</span>
+      `;
+    }
+
+    // Starte Canvas-Strömungsanimation basierend auf aktuellem Wind
+    const curWDir = state.currentWeather ? (state.currentWeather.wind_direction_10m || 240) : 240;
+    const curWSpd = state.currentWeather ? (state.currentWeather.wind_speed_10m || 20) : 20;
+    startWindCanvas(curWDir, curWSpd);
+
+    for (const st of stations) {
+      const w = st.weather || {};
+      const spd = Math.round(w.wind_speed_10m || 0);
+      const gust = Math.round(w.wind_gusts_10m || spd * 1.35);
+      const dir = Math.round(w.wind_direction_10m || 0);
+
+      let color = '#30d158';
+      if (gust >= 65) color = '#ff453a';
+      else if (gust >= 45) color = '#ff9f0a';
+      else if (gust >= 25) color = '#ffd166';
+
+      const badgeHtml = `
+        <div class="weather-station-marker" style="border-color:${color};">
+          <span class="wsm-wind-arrow" style="transform: rotate(${dir}deg); color:${color}; font-weight:800;">↑</span>
+          <span class="wsm-name">${st.name}:</span>
+          <strong style="color:${color};">${spd} km/h</strong>
+          <small style="color:var(--text-tertiary);">(${gust})</small>
+        </div>
+      `;
+
+      const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [55, 12] });
+      const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
+      m.on('click', () => selectExactLocation(st));
+    }
+  }
+
+  // 3. BEWÖLKUNGSGRAD & WOLKENBEDECKUNG
+  else if (overlay === 'clouds') {
+    stopWindCanvas();
+    if (radarControls) radarControls.style.display = 'none';
+    if (state.map.radarTileLayer && state.map.instance.hasLayer(state.map.radarTileLayer)) {
+      state.map.instance.removeLayer(state.map.radarTileLayer);
+    }
+
+    if (legendTitle) legendTitle.innerText = '☁️ Bewölkungsgrad (Wolkenbedeckung):';
+    if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #ffd166, #94a3b8, #475569, #1e293b)';
+    if (legendLabels) {
+      legendLabels.innerHTML = `
+        <span style="color:#ffd166;">0% Wolkenlos</span>
+        <span style="color:#cbd5e1;">50% Heiter</span>
+        <span style="color:#94a3b8;">100% Bedeckt</span>
+      `;
+    }
+
+    for (const st of stations) {
+      const w = st.weather || {};
+      const cloud = w.cloud_cover !== undefined ? Math.round(w.cloud_cover) : 50;
+      const cIcon = cloud <= 15 ? '☀️' : (cloud <= 65 ? '⛅' : '☁️');
+
+      // Zeichne weiche Wolkenschatten-Zonen
+      L.circle([st.lat, st.lon], {
+        radius: 35000,
+        fillColor: '#ffffff',
+        fillOpacity: (cloud / 100) * 0.35,
+        stroke: false
+      }).addTo(state.map.weatherLayerGroup);
+
+      const badgeHtml = `
+        <div class="weather-station-marker">
+          <span>${cIcon}</span>
+          <span class="wsm-name">${st.name}:</span>
+          <strong>${cloud}%</strong>
+        </div>
+      `;
+
+      const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [45, 12] });
+      const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
+      m.on('click', () => selectExactLocation(st));
+    }
+  }
+
+  // 4. TEMPERATUR-FELD & FROSTGRENZE
+  else if (overlay === 'temp') {
+    stopWindCanvas();
+    if (radarControls) radarControls.style.display = 'none';
+    if (state.map.radarTileLayer && state.map.instance.hasLayer(state.map.radarTileLayer)) {
+      state.map.instance.removeLayer(state.map.radarTileLayer);
+    }
+
+    if (legendTitle) legendTitle.innerText = '🌡️ Temperatur-Feld (Höhe vs. Tal):';
+    if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #64d2ff, #30d158, #ffd166, #ff9f0a, #ff453a)';
+    if (legendLabels) {
+      legendLabels.innerHTML = `
+        <span style="color:#64d2ff;">< 0°C Frost</span>
+        <span style="color:#30d158;">8°C</span>
+        <span style="color:#ffd166;">15°C</span>
+        <span style="color:#ff453a;">> 20°C Warm</span>
+      `;
+    }
+
+    for (const st of stations) {
+      const w = st.weather || {};
+      const t = w.temperature_2m !== undefined ? Math.round(convertTemp(w.temperature_2m)) : '--';
+
+      let tColor = '#ffd166';
+      if (t < 0) tColor = '#64d2ff';
+      else if (t < 10) tColor = '#30d158';
+      else if (t >= 20) tColor = '#ff453a';
+
+      const badgeHtml = `
+        <div class="weather-station-marker" style="border-color:${tColor};">
+          <span class="wsm-name">${st.name} <small style="color:var(--text-tertiary);">(${st.elevation}m)</small>:</span>
+          <strong style="color:${tColor}; font-size:12px;">${t > 0 ? `+${t}` : t}°C</strong>
+        </div>
+      `;
+
+      const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [55, 12] });
+      const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
+      m.on('click', () => selectExactLocation(st));
+    }
+  }
+
+  // 5. LUFTDRUCK QNH & ISOBAREN
+  else if (overlay === 'pressure') {
+    stopWindCanvas();
+    if (radarControls) radarControls.style.display = 'none';
+    if (state.map.radarTileLayer && state.map.instance.hasLayer(state.map.radarTileLayer)) {
+      state.map.instance.removeLayer(state.map.radarTileLayer);
+    }
+
+    if (legendTitle) legendTitle.innerText = '⏲️ Luftdruck QNH (Meereshöhe):';
+    if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #93c5fd, #a78bfa, #c084fc)';
+    if (legendLabels) {
+      legendLabels.innerHTML = `
+        <span style="color:#93c5fd;">< 1010 hPa Tief (T)</span>
+        <span style="color:#a78bfa;">1015 hPa</span>
+        <span style="color:#30d158;">> 1020 hPa Hoch (H)</span>
+      `;
+    }
+
+    for (const st of stations) {
+      const w = st.weather || {};
+      const p = Math.round(w.pressure_msl || 1013);
+      const isHigh = p >= 1018;
+
+      const badgeHtml = `
+        <div class="weather-station-marker">
+          <span class="wsm-name">${st.name}:</span>
+          <strong>${p} hPa</strong>
+          <span style="color:${isHigh ? '#30d158' : '#93c5fd'}; font-weight:800; font-size:10px; margin-left:2px;">${isHigh ? 'H' : 'T'}</span>
+        </div>
+      `;
+
+      const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [50, 12] });
+      const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
+      m.on('click', () => selectExactLocation(st));
+    }
+  }
+}
+
+/**
+ * Animiertes Windströmungs-Canvas für die Leaflet-Karte
+ */
+function startWindCanvas(windDirDeg, windSpeedKm) {
+  const canvas = document.getElementById('wind-flow-canvas');
+  if (!canvas) return;
+  canvas.style.display = 'block';
+
+  const mapElem = document.getElementById('interactive-map');
+  const width = mapElem.clientWidth || 800;
+  const height = mapElem.clientHeight || 580;
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  
+  // Windrichtung: Richtung, in die der Wind bläst
+  const angleRad = ((windDirDeg + 180) % 360) * (Math.PI / 180);
+  const speed = Math.max(1.2, Math.min(7.0, (windSpeedKm || 20) / 10));
+  const vx = Math.cos(angleRad) * speed;
+  const vy = Math.sin(angleRad) * speed;
+
+  const numParticles = 65;
+  const particles = [];
+  for (let i = 0; i < numParticles; i++) {
+    particles.push({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      len: 14 + Math.random() * 20,
+      age: Math.random() * 80,
+      maxAge: 60 + Math.random() * 60,
+      opacity: 0.15 + Math.random() * 0.45
+    });
+  }
+
+  function renderWind() {
+    ctx.clearRect(0, 0, width, height);
+    ctx.lineWidth = 2.2;
+
+    for (let p of particles) {
+      p.x += vx;
+      p.y += vy;
+      p.age++;
+
+      if (p.x < -30) p.x = width + 30;
+      if (p.x > width + 30) p.x = -30;
+      if (p.y < -30) p.y = height + 30;
+      if (p.y > height + 30) p.y = -30;
+      if (p.age > p.maxAge) {
+        p.x = Math.random() * width;
+        p.y = Math.random() * height;
+        p.age = 0;
+      }
+
+      const lifeRatio = p.age / p.maxAge;
+      const alpha = Math.sin(lifeRatio * Math.PI) * p.opacity;
+
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(100, 210, 255, ${Math.max(0, alpha).toFixed(2)})`;
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - vx * (p.len / speed), p.y - vy * (p.len / speed));
+      ctx.stroke();
+    }
+
+    state.map.windAnimFrame = requestAnimationFrame(renderWind);
+  }
+
+  if (state.map.windAnimFrame) cancelAnimationFrame(state.map.windAnimFrame);
+  renderWind();
+}
+
+function stopWindCanvas() {
+  if (state.map.windAnimFrame) {
+    cancelAnimationFrame(state.map.windAnimFrame);
+    state.map.windAnimFrame = null;
+  }
+  const canvas = document.getElementById('wind-flow-canvas');
+  if (canvas) {
+    canvas.style.display = 'none';
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 async function loadRainViewerRadar() {
@@ -1407,10 +1880,13 @@ function showRadarTileFrame(idx) {
     state.map.instance.removeLayer(state.map.radarTileLayer);
   }
 
-  const url = `${state.map.radarHost}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+  // Palette 8 = Differenzierung von Regen (Blau/Grün) und Schnee (Cyan/Magenta/Weiß)
+  const url = `${state.map.radarHost}${frame.path}/256/{z}/{x}/{y}/8/1_1.png`;
   state.map.radarTileLayer = L.tileLayer(url, {
-    opacity: 0.75,
-    zIndex: 200
+    opacity: 0.78,
+    zIndex: 200,
+    maxNativeZoom: 18,
+    maxZoom: 20
   }).addTo(state.map.instance);
 
   const t = new Date(frame.time * 1000);
@@ -1445,25 +1921,6 @@ function stopRadarAnimation() {
   if (btn) btn.innerText = '▶';
 }
 
-function setMapLayer(layerType) {
-  if (state.map.baseTileLayer) {
-    state.map.instance.removeLayer(state.map.baseTileLayer);
-  }
-
-  const radarControls = document.getElementById('radar-floating-controls');
-
-  if (layerType === 'topo') {
-    state.map.baseTileLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 16 }).addTo(state.map.instance);
-    if (radarControls) radarControls.style.display = 'none';
-  } else if (layerType === 'satellite') {
-    state.map.baseTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 17 }).addTo(state.map.instance);
-    if (radarControls) radarControls.style.display = 'none';
-  } else {
-    state.map.baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 16 }).addTo(state.map.instance);
-    if (radarControls) radarControls.style.display = 'flex';
-  }
-}
-
 function updateMapLocation() {
   if (!state.map.instance) return;
   const loc = state.currentLocation;
@@ -1474,6 +1931,7 @@ function updateMapLocation() {
   }
   const chip = document.getElementById('map-location-chip');
   if (chip) chip.innerHTML = `<span>📍 ${loc.name}</span>`;
+  updateWeatherOverlay();
 }
 
 // =============================================================================

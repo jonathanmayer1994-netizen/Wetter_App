@@ -451,26 +451,47 @@
       </div>
 
       <!-- =================================================================== -->
-      <!-- TAB 3: LIVE-KARTE & RADAR (Vollwertige Karte mit Standort & Layern) -->
+      <!-- TAB 3: LIVE-KARTE & RADAR (Vollwertige OSM-Karte mit Wetter-Overlays) -->
       <!-- =================================================================== -->
       <div class="tab-pane" id="tab-map">
         
         <section class="glass-card map-view-card">
+          <!-- 1. DUAL TOOLBAR: BASISKARTE (OSM) & WETTER-OVERLAYS -->
           <div class="map-toolbar">
-            <div class="map-layer-toggles">
-              <button class="map-layer-btn active" data-layer="radar">🌧️ Niederschlag (Live-Radar)</button>
-              <button class="map-layer-btn" data-layer="topo">🏔️ Topografie (Gelände)</button>
-              <button class="map-layer-btn" data-layer="satellite">🛰️ Satellit</button>
+            <div class="map-controls-row">
+              <div class="map-toolbar-group">
+                <span class="mtg-label">🗺️ BASISKARTE:</span>
+                <div class="map-btn-pills">
+                  <button class="map-base-btn active" data-base="osm-standard" title="OpenStreetMap Standard (Original)">🗺️ OSM Standard</button>
+                  <button class="map-base-btn" data-base="osm-outdoor" title="OSM Topo & Outdoor Relief">🏔️ OSM Outdoor</button>
+                  <button class="map-base-btn" data-base="osm-dark" title="OSM Dunkelmodus (High-Contrast)">🌙 OSM Dunkel</button>
+                  <button class="map-base-btn" data-base="satellite" title="Satelliten-Luftbild">🛰️ Satellit</button>
+                </div>
+              </div>
+
+              <div class="map-location-chip" id="map-location-chip">
+                <span>📍 München</span>
+              </div>
             </div>
-            
-            <div class="map-location-chip" id="map-location-chip">
-              <span>📍 München</span>
+
+            <div class="map-controls-row" style="margin-top: 6px;">
+              <div class="map-toolbar-group">
+                <span class="mtg-label">🌦️ WETTER-EBENEN:</span>
+                <div class="map-btn-pills">
+                  <button class="map-overlay-btn active" data-overlay="precip" title="Niederschlags-Radar mit Regen & Schnee-Unterscheidung">🌧️❄️ Regen & Schnee</button>
+                  <button class="map-overlay-btn" data-overlay="wind" title="Windströmung, Vektoren & Böen">💨 Wind & Strömung</button>
+                  <button class="map-overlay-btn" data-overlay="clouds" title="Bewölkungsgrad & Wolkenbedeckung">☁️ Bewölkungsgrad</button>
+                  <button class="map-overlay-btn" data-overlay="temp" title="Temperatur-Feld & Frostgrenze">🌡️ Temperatur</button>
+                  <button class="map-overlay-btn" data-overlay="pressure" title="Luftdruck QNH & Isobaren">⏲️ Luftdruck</button>
+                </div>
+              </div>
             </div>
           </div>
 
           <!-- Fullscreen-capable Leaflet Map View -->
           <div class="fullscreen-map-wrapper">
             <div id="interactive-map"></div>
+            <canvas id="wind-flow-canvas" class="wind-flow-canvas" style="display:none;"></canvas>
 
             <!-- Radar Zeitleiste & Play-Button Overlay -->
             <div class="radar-floating-controls" id="radar-floating-controls">
@@ -481,15 +502,15 @@
               </div>
             </div>
 
-            <!-- Precipitation Color Legend -->
-            <div class="map-legend-card">
-              <div class="legend-title">Niederschlagsintensität:</div>
-              <div class="legend-gradient-bar"></div>
-              <div class="legend-scale-labels">
-                <span>Leicht</span>
+            <!-- Precipitation & Weather Color Legend -->
+            <div class="map-legend-card" id="map-legend-card">
+              <div class="legend-title" id="map-legend-title">Niederschlagsintensität & Typ:</div>
+              <div class="legend-gradient-bar" id="map-legend-bar"></div>
+              <div class="legend-scale-labels" id="map-legend-labels">
+                <span>Leichter Regen</span>
                 <span>Mäßig</span>
                 <span>Stark</span>
-                <span>Hagel / Schnee</span>
+                <span>Schnee / Graupel</span>
               </div>
             </div>
           </div>
