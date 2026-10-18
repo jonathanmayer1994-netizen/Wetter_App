@@ -60,6 +60,11 @@ const state = {
     weatherParticles: [],
     windParticles: [],
     cloudDrift: 0,
+    rotationAngle: 0,
+    pitchAngle: 0,
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
     initialized: false
   },
   canvasEngine: null,
@@ -537,6 +542,7 @@ async function loadLocation(loc) {
     renderAdaptiveTab2();
     renderFavoritesTab();
     updateMapLocation();
+    updateNavigationWarningBadges();
 
   } catch (err) {
     console.error('Fehler beim Laden des Wetters:', err);
@@ -549,6 +555,7 @@ async function loadLocation(loc) {
       renderOverviewTab();
       renderAdaptiveTab2();
       renderFavoritesTab();
+      updateNavigationWarningBadges();
       const heroTime = document.getElementById('hero-update-time');
       if (heroTime) heroTime.innerText = `Offline-Modus (Gespeichert: ${new Date(cached.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })})`;
     } else {
@@ -597,7 +604,7 @@ function updateAlpineSkyIllumination(weatherData, elevation) {
   const glow = document.getElementById('ambient-glow');
   if (!glow) return;
 
-  glow.classList.remove('dawn', 'sunrise', 'golden-hour', 'alpenglow', 'dusk', 'night');
+  glow.classList.remove('dawn', 'sunrise', 'golden-hour', 'alpenglow', 'dusk', 'night', 'overcast');
 
   if (!weatherData || !weatherData.daily || !weatherData.daily.sunrise || !weatherData.daily.sunset) {
     return;
@@ -636,6 +643,15 @@ function updateAlpineSkyIllumination(weatherData, elevation) {
   } else if (diffSunsetMin > 90 || diffSunriseMin < -60) {
     // Dunkle Nacht / Sternenhimmel
     glow.classList.add('night');
+  }
+
+  // Feature 10A: Bewölkungs-Dämpfung bei Hochnebel/Regen (Dämpft Licht sanft ab)
+  const cur = weatherData.current || (weatherData.hourly ? {
+    cloud_cover: weatherData.hourly.cloud_cover ? weatherData.hourly.cloud_cover[0] : 0
+  } : null);
+  const cloudCover = cur && cur.cloud_cover !== undefined ? cur.cloud_cover : 0;
+  if (cloudCover >= 75) {
+    glow.classList.add('overcast');
   }
 }
 
@@ -699,21 +715,25 @@ function renderHourlySlider(hourly) {
   container.innerHTML = '';
   const nowMs = Date.now();
 
-  // Find index closest to current local time
-  let startIdx = 0;
+  // Finde den Index der aktuellen Stunde
+  let currentClosestIdx = 0;
   let minDiff = Infinity;
-  for (let i = 0; i < Math.min(36, hourly.time.length); i++) {
+  for (let i = 0; i < Math.min(48, hourly.time.length); i++) {
     const diff = Math.abs(new Date(hourly.time[i]).getTime() - nowMs);
     if (diff < minDiff) {
       minDiff = diff;
-      startIdx = i;
+      currentClosestIdx = i;
     }
   }
 
-  for (let i = startIdx; i < startIdx + 25 && i < hourly.time.length; i++) {
+  // Zeige Kontext (auch frühere Stunden des heutigen Tages)
+  const startIdx = Math.max(0, currentClosestIdx - 6);
+  const endIdx = Math.min(hourly.time.length, startIdx + 30);
+
+  for (let i = startIdx; i < endIdx; i++) {
     const t = new Date(hourly.time[i]);
-    const isFirst = i === startIdx;
-    const label = isFirst ? 'Jetzt' : `${String(t.getHours()).padStart(2, '0')}:00`;
+    const isNow = i === currentClosestIdx;
+    const label = isNow ? 'Jetzt' : `${String(t.getHours()).padStart(2, '0')}:00`;
     const temp = Math.round(convertTemp(hourly.temperature_2m[i]));
     const pop = hourly.precipitation_probability ? hourly.precipitation_probability[i] : 0;
     const code = hourly.weather_code ? hourly.weather_code[i] : 0;
@@ -725,7 +745,7 @@ function renderHourlySlider(hourly) {
     const wind = hourly.wind_speed_10m ? Math.round(hourly.wind_speed_10m[i]) : '--';
 
     const item = document.createElement('div');
-    item.className = 'hourly-item';
+    item.className = `hourly-item ${isNow ? 'current-now' : ''}`;
     item.innerHTML = `
       <div class="hourly-time">${label}</div>
       <div class="hourly-icon">${icon}</div>
@@ -734,6 +754,14 @@ function renderHourlySlider(hourly) {
       <div class="hourly-wind">💨 ${wind}</div>
     `;
     container.appendChild(item);
+  }
+
+  // Feature 7A: Auto-Scroll sanft zur aktuellen Stunde
+  const activeNowItem = container.querySelector('.hourly-item.current-now');
+  if (activeNowItem) {
+    setTimeout(() => {
+      activeNowItem.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }, 80);
   }
 }
 
@@ -1833,6 +1861,17 @@ function renderAvalancheReport() {
     'rose-sec-nw': 'NW'
   };
 
+  const aspectDetails = {
+    'N': { name: 'Nordhang', icon: '❄️', steep: '> 30°', text: 'Kritisch im Triebschnee. Geringe Zusatzbelastung reicht oft zur Schneebrettauslösung.' },
+    'NO': { name: 'Nordosthang', icon: '❄️', steep: '> 32°', text: 'Kammnahe Rinnen und Mulden stark mit Einwehungen verfüllt.' },
+    'O': { name: 'Osthang', icon: '💨', steep: '> 30°', text: 'Leehang mit frischen Triebschneepaketen. Geländekanten meiden.' },
+    'SO': { name: 'Südosthang', icon: '☀️', steep: '> 35°', text: 'Tageserwärmung schwächt die Schneedecke ab dem Vormittag.' },
+    'S': { name: 'Südhang', icon: '☀️', steep: '> 35°', text: 'Nassschnee- und Gleitschneerutsche an steilen Sonnenhängen.' },
+    'SW': { name: 'Südwesthang', icon: '🌤️', steep: '> 34°', text: 'Windverblasene Rücken oft hart gefroren, Rinnen triebschneebelastet.' },
+    'W': { name: 'Westhang', icon: '💨', steep: '> 30°', text: 'Windseitige Grate abgeblasen (Harsch/Eis), Rinnen heikel.' },
+    'NW': { name: 'Nordwesthang', icon: '❄️', steep: '> 30°', text: 'Schattig und kalt. Ungünstiger Altschneeaufbau in Hochlagen.' }
+  };
+
   Object.entries(aspectMapping).forEach(([secId, asp]) => {
     const path = document.getElementById(secId);
     if (path) {
@@ -1843,6 +1882,20 @@ function renderAvalancheReport() {
       } else {
         path.classList.add('danger-low');
       }
+
+      // Feature 6A: Interaktiver Klick auf Gefahrenrose-Sektor
+      path.onclick = () => {
+        document.querySelectorAll('.rose-sec').forEach(p => p.classList.remove('selected-sector'));
+        path.classList.add('selected-sector');
+        const det = aspectDetails[asp];
+        const infoBox = document.getElementById('rose-sector-info');
+        const infoText = document.getElementById('rsi-text');
+        if (infoBox && infoText && det) {
+          infoBox.classList.add('highlight');
+          const dangerBadge = isCritical ? `⚠️ Kritisch (Stufe ${av.dangerLevel})` : `✅ Günstiger (Stufe 1–2)`;
+          infoText.innerHTML = `<strong>${det.icon} ${det.name} (${asp}):</strong> ${dangerBadge} • Kritische Steilheit: <strong>${det.steep}</strong><br>${det.text}`;
+        }
+      };
     }
   });
 
@@ -1876,6 +1929,9 @@ function renderAvalancheReport() {
   if (valleySnow) valleySnow.innerText = `${av.snowDepthValleyCm} cm`;
   if (stationName) stationName.innerText = `${av.stationAgency} (${av.stationName})`;
   if (stationTime) stationTime.innerText = av.stationTime;
+
+  // Feature 9A: Badges aktualisieren (Lawinen-/Bergwarnung)
+  updateNavigationWarningBadges();
 }
 
 // =============================================================================
@@ -2359,14 +2415,19 @@ function drawMountain3DCanvas() {
  * sowie dynamischer Niederschlags-Phasenumwandlung (Schnee oben vs. Regen unten)
  */
 function render3DMassifMode(ctx, w, h, valL, midL, peakL, freezingLevel, yValley, yPeak, getYForZ, yFrost, precip) {
-  const px = w * 0.48; // Peak X
-  const py = yPeak;    // Peak Y
-  const lx = w * 0.12; // Left ridge X
-  const ly = yValley;  // Left ridge Y
-  const rx = w * 0.88; // Right ridge X
-  const ry = yValley;  // Right ridge Y
-  const cx = w * 0.45; // Center-front arête X
-  const cy = yValley + h * 0.05; // Center-front arête Y
+  const rotRad = ((state.mountain3D.rotationAngle || 0) * Math.PI) / 180;
+  const pitchRad = ((state.mountain3D.pitchAngle || 0) * Math.PI) / 180;
+  const rotShiftX = Math.sin(rotRad) * (w * 0.18);
+  const pitchShiftY = Math.sin(pitchRad) * (h * 0.08);
+
+  const px = w * 0.48 + rotShiftX; // Peak X mit 360°-Perspektive
+  const py = yPeak + pitchShiftY;    // Peak Y mit Neigungs-Pitch
+  const lx = w * 0.12 + Math.sin(rotRad - 0.6) * (w * 0.06); // Linker Grat X
+  const ly = yValley;  // Linker Grat Y
+  const rx = w * 0.88 + Math.sin(rotRad + 0.6) * (w * 0.06); // Rechter Grat X
+  const ry = yValley;  // Rechter Grat Y
+  const cx = w * 0.45 + rotShiftX * 0.6; // Zentraler Vordersporn X
+  const cy = yValley + h * 0.05 - pitchShiftY * 0.5; // Zentraler Vordersporn Y
 
   // 1. Linke Wand (Luv / Sonnenhang - Südwand)
   const leftRockGrad = ctx.createLinearGradient(lx, ly, px, py);
@@ -2846,6 +2907,41 @@ function setupMountain3DControls() {
       loadLocation(state.currentLocation);
       switchTab('tab-mountain');
     });
+  }
+
+  // 5. Interaktives 360° Touch & Drag Drehen (Feature 1A)
+  const canvas = document.getElementById('mountain-3d-canvas');
+  if (canvas) {
+    canvas.addEventListener('pointerdown', (e) => {
+      state.mountain3D.isDragging = true;
+      state.mountain3D.dragStartX = e.clientX;
+      state.mountain3D.dragStartY = e.clientY;
+      canvas.classList.add('is-dragging');
+      try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!state.mountain3D.isDragging) return;
+      const dx = e.clientX - state.mountain3D.dragStartX;
+      const dy = e.clientY - state.mountain3D.dragStartY;
+      state.mountain3D.dragStartX = e.clientX;
+      state.mountain3D.dragStartY = e.clientY;
+
+      state.mountain3D.rotationAngle = (state.mountain3D.rotationAngle + dx * 0.6) % 360;
+      state.mountain3D.pitchAngle = Math.max(-20, Math.min(20, state.mountain3D.pitchAngle - dy * 0.35));
+      drawMountain3DCanvas();
+    });
+
+    const stopDrag = (e) => {
+      if (state.mountain3D.isDragging) {
+        state.mountain3D.isDragging = false;
+        canvas.classList.remove('is-dragging');
+        try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+      }
+    };
+
+    canvas.addEventListener('pointerup', stopDrag);
+    canvas.addEventListener('pointercancel', stopDrag);
   }
 
   // Resize-Listener
@@ -3921,6 +4017,14 @@ function showUnifiedRadarFrame(idx) {
 
   updateJumpButtonsActive(idx);
 
+  // Feature 4B: Kontrast-Modus der Basiskarte bei Niederschlag / Doppler-Aktivität
+  const mapElem = document.getElementById('interactive-map');
+  if (mapElem) {
+    const isPrecipActive = (frame.type === 'future' && (frame.hasPrecipitation || frame.maxPrecipMm > 0.4)) ||
+                           (frame.type === 'past' && !!frame.path);
+    mapElem.classList.toggle('radar-contrast-mode', isPrecipActive);
+  }
+
   const modeChip = document.getElementById('radar-mode-chip');
   const timeDisplay = document.getElementById('radar-time-display');
 
@@ -4496,6 +4600,63 @@ function triggerExactGps() {
 }
 
 // =============================================================================
+// FEATURE 8A: ZULETZT GESUCHTE ORTE (RECENT SEARCHES IN LOCALSTORAGE)
+// =============================================================================
+function getSpotlightRecents() {
+  try {
+    const raw = localStorage.getItem('alpine_recent_searches');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function addSpotlightRecent(loc) {
+  if (!loc || !loc.name) return;
+  try {
+    let list = getSpotlightRecents();
+    list = list.filter(item => item.name.toLowerCase() !== loc.name.toLowerCase());
+    list.unshift({
+      name: loc.name,
+      lat: loc.lat,
+      lon: loc.lon,
+      elevation: loc.elevation,
+      isMountain: !!loc.isMountain,
+      country: loc.country || ''
+    });
+    localStorage.setItem('alpine_recent_searches', JSON.stringify(list.slice(0, 3)));
+  } catch (e) {}
+}
+
+function renderSpotlightRecentsUI() {
+  const box = document.getElementById('spotlight-recent-chips');
+  const listElem = document.getElementById('spotlight-recent-list');
+  if (!box || !listElem) return;
+  const recents = getSpotlightRecents();
+  if (recents.length === 0) {
+    box.style.display = 'none';
+    return;
+  }
+  listElem.innerHTML = recents.map(r => `
+    <button type="button" class="recent-chip" data-recent="${r.name}">
+      <span>${r.isMountain ? '🏔️' : '🏙️'}</span>
+      <span>${r.name}</span>
+      <span style="opacity:0.65; font-size:10px;">${r.elevation.toLocaleString('de-DE')}m</span>
+    </button>
+  `).join('');
+  box.style.display = 'flex';
+
+  listElem.querySelectorAll('.recent-chip').forEach((btn, idx) => {
+    btn.onclick = () => {
+      const targetLoc = recents[idx];
+      if (targetLoc) {
+        selectExactLocation(targetLoc);
+        const modal = document.getElementById('spotlight-modal-overlay');
+        if (modal) modal.style.display = 'none';
+      }
+    };
+  });
+}
+
+// =============================================================================
 // FEATURE 2A: APPLE SPOTLIGHT SCHNELLSUCHE (CMD+K / STRG+K & SCHNELLWAHL)
 // =============================================================================
 function setupSpotlightAndQuickGps() {
@@ -4516,6 +4677,7 @@ function setupSpotlightAndQuickGps() {
     modal.style.display = 'flex';
     input.value = '';
     selectedIndex = -1;
+    renderSpotlightRecentsUI();
     renderSpotlightInitial();
     setTimeout(() => input.focus(), 60);
   }
@@ -4768,7 +4930,42 @@ function determineIfMountain(name, featureCode, elevation) {
 }
 
 function selectExactLocation(loc) {
+  addSpotlightRecent(loc);
   loadLocation(loc);
+}
+
+// =============================================================================
+// FEATURE 9A: STATUS-BADGES AUF TABS (MOBILE BOTTOM BAR & DESKTOP)
+// =============================================================================
+function updateNavigationWarningBadges() {
+  const mtnDotMobile = document.getElementById('mbn-dot-mountain');
+  const mtnDotDesktop = document.getElementById('tab-dot-mountain');
+  const sportsDotMobile = document.getElementById('mbn-dot-sports');
+  const sportsDotDesktop = document.getElementById('tab-dot-sports');
+
+  // 1. Berg & Lawinen-Status (Warn-Badge ab EAWS Stufe 3 Erheblich/Groß)
+  const loc = state.currentLocation;
+  const av = (loc && state.weatherData)
+    ? MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, state.microData ? state.microData.terrain10m : null)
+    : null;
+
+  const hasMountainWarning = av && av.dangerLevel >= 3;
+  [mtnDotMobile, mtnDotDesktop].forEach(dot => {
+    if (dot) {
+      dot.style.display = hasMountainWarning ? 'block' : 'none';
+      dot.classList.toggle('dot-orange', !!(av && av.dangerLevel === 3));
+    }
+  });
+
+  // 2. Sport & GPX-Status (Warn-Badge bei Sturm/Gewitter auf Route)
+  const hasSportsWarning = state.sports.hazards && (state.sports.hazards.level === 'yellow' || state.sports.hazards.level === 'red');
+  const isSportsRed = state.sports.hazards && state.sports.hazards.level === 'red';
+  [sportsDotMobile, sportsDotDesktop].forEach(dot => {
+    if (dot) {
+      dot.style.display = hasSportsWarning ? 'block' : 'none';
+      dot.classList.toggle('dot-orange', !isSportsRed);
+    }
+  });
 }
 
 // =============================================================================
@@ -5467,6 +5664,7 @@ function recomputeSportsTimeline() {
   updateSportPaceBadges();
   renderSportsMetrics(timeline);
   renderSportsHazards(timeline.hazards);
+  updateNavigationWarningBadges();
   renderSportsElevationProfile(timeline);
   renderSportsWaypointsTable(timeline);
   renderSportsMap(timeline);

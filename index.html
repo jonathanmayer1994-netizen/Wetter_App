@@ -80,13 +80,15 @@
         <span class="tab-icon">🌤️</span>
         <span class="tab-label">Übersicht</span>
       </button>
-      <button class="tab-btn" id="tab-btn-mountain" data-tab="tab-mountain">
+      <button class="tab-btn" id="tab-btn-mountain" data-tab="tab-mountain" style="position:relative;">
         <span class="tab-icon" id="tab-2-icon">🏔️</span>
         <span class="tab-label" id="tab-2-label">Berg & Höhe</span>
+        <span class="nav-warning-dot" id="tab-dot-mountain"></span>
       </button>
-      <button class="tab-btn" id="tab-btn-sports" data-tab="tab-sports">
+      <button class="tab-btn" id="tab-btn-sports" data-tab="tab-sports" style="position:relative;">
         <span class="tab-icon">🚴</span>
         <span class="tab-label">Sport & Route</span>
+        <span class="nav-warning-dot" id="tab-dot-sports"></span>
       </button>
       <button class="tab-btn" data-tab="tab-map">
         <span class="tab-icon">🗺️</span>
@@ -709,6 +711,11 @@
                   </svg>
                 </div>
                 <div class="rose-crit-elev" id="rose-crit-elev">Gefahr vor allem über <strong>2.200 m</strong></div>
+                <!-- 6A: Interaktive Hangneigungs- & Sektor-Details -->
+                <div class="rose-sector-info" id="rose-sector-info">
+                  <span class="rsi-icon">👆</span>
+                  <span class="rsi-text" id="rsi-text">Tippe auf eine Hangrichtung für Steilheits-Details</span>
+                </div>
               </div>
 
               <!-- Hauptprobleme & Kennzahlen -->
@@ -1634,6 +1641,12 @@
         <button class="spotlight-close-btn" id="spotlight-modal-close" type="button">✕ ESC</button>
       </div>
 
+      <!-- 8A: Zuletzt gesuchte Orte (Recent History) -->
+      <div class="spotlight-recent-chips" id="spotlight-recent-chips" style="display:none;">
+        <span class="sqc-label">Zuletzt:</span>
+        <div class="src-list" id="spotlight-recent-list"></div>
+      </div>
+
       <!-- Quick Category Chips -->
       <div class="spotlight-quick-chips">
         <span class="sqc-label">Schnellwahl:</span>
@@ -1668,13 +1681,15 @@
       <span class="mbn-icon">🌤️</span>
       <span class="mbn-label">Wetter</span>
     </button>
-    <button class="mbn-btn" data-tab="tab-mountain" type="button">
+    <button class="mbn-btn" data-tab="tab-mountain" type="button" style="position:relative;">
       <span class="mbn-icon">🏔️</span>
       <span class="mbn-label">Berg & 3D</span>
+      <span class="nav-warning-dot" id="mbn-dot-mountain"></span>
     </button>
-    <button class="mbn-btn" data-tab="tab-sports" type="button">
+    <button class="mbn-btn" data-tab="tab-sports" type="button" style="position:relative;">
       <span class="mbn-icon">🚴</span>
       <span class="mbn-label">Sport & GPX</span>
+      <span class="nav-warning-dot" id="mbn-dot-sports"></span>
     </button>
     <button class="mbn-btn" data-tab="tab-map" type="button">
       <span class="mbn-icon">🗺️</span>

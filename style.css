@@ -5659,5 +5659,179 @@ html, body {
   background: radial-gradient(circle at 50% 10%, rgba(30, 45, 90, 0.4) 0%, rgba(10, 15, 35, 0.6) 50%, transparent 80%);
 }
 
+/* ==========================================================================
+   OPTIMIZATION 1A: 3D MOUNTAIN TOUCH DRAG-TO-ROTATE
+   ========================================================================== */
+#mountain-3d-canvas {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+#mountain-3d-canvas:active, #mountain-3d-canvas.is-dragging {
+  cursor: grabbing;
+}
+.m3d-touch-hint {
+  position: absolute;
+  bottom: 12px;
+  right: 14px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+}
+
+/* ==========================================================================
+   OPTIMIZATION 4B: RADAR CONTRAST-MODE BEI NIEDERSCHLAG
+   ========================================================================== */
+.radar-contrast-mode .leaflet-tile-pane .leaflet-layer:first-child .leaflet-tile {
+  filter: brightness(0.65) contrast(1.35) saturate(0.85);
+  transition: filter 0.35s ease;
+}
+
+/* ==========================================================================
+   OPTIMIZATION 6A: INTERAKTIVE GEFAHRENROSE & SEKTOREN-DETAILS
+   ========================================================================== */
+.rose-sec {
+  cursor: pointer;
+  transition: opacity 0.2s, stroke 0.2s, stroke-width 0.2s, filter 0.2s;
+}
+.rose-sec:hover {
+  filter: brightness(1.25);
+  stroke: #ffffff !important;
+  stroke-width: 2px !important;
+}
+.rose-sec.selected-sector {
+  stroke: #00e5ff !important;
+  stroke-width: 2.5px !important;
+  filter: brightness(1.35) drop-shadow(0 0 6px rgba(0, 229, 255, 0.7));
+}
+.rose-sector-info {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #ffffff;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  transition: all 0.25s ease;
+}
+.rose-sector-info.highlight {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.4);
+}
+.rsi-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.rsi-text strong {
+  color: var(--ios-cyan);
+}
+
+/* ==========================================================================
+   OPTIMIZATION 7A: 24H-SLIDER JETZT-MARKER & AUTO-SCROLL
+   ========================================================================== */
+.hourly-item.current-now {
+  background: rgba(0, 122, 255, 0.24);
+  border: 1px solid rgba(0, 229, 255, 0.55);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
+  position: relative;
+}
+.hourly-item.current-now .hourly-time {
+  color: var(--ios-cyan);
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   OPTIMIZATION 8A: SPOTLIGHT RECENT HISTORY CHIPS
+   ========================================================================== */
+.spotlight-recent-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.spotlight-recent-chips::-webkit-scrollbar { display: none; }
+.src-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.recent-chip {
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.recent-chip:hover {
+  background: rgba(0, 229, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   OPTIMIZATION 9A: NAV-WARNING-DOT (MOBILE & DESKTOP TAB BADGES)
+   ========================================================================== */
+.nav-warning-dot {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ios-red);
+  box-shadow: 0 0 8px rgba(255, 69, 58, 0.85);
+  animation: pulseDot 2s infinite ease-in-out;
+  pointer-events: none;
+}
+.mbn-btn .nav-warning-dot {
+  top: 4px;
+  right: calc(50% - 16px);
+}
+.nav-warning-dot.dot-orange {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.85);
+}
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.65; }
+}
+
+/* ==========================================================================
+   OPTIMIZATION 10A: BEWÖLKUNGS-DÄMPFUNG FÜR ALPENGLÜHEN & AMBIENT GLOW
+   ========================================================================== */
+.ambient-glow.overcast {
+  filter: saturate(0.35) brightness(0.6);
+  opacity: 0.55;
+}
+.ambient-glow.alpenglow.overcast {
+  background: radial-gradient(circle at 50% 20%, rgba(130, 70, 100, 0.28) 0%, rgba(80, 50, 90, 0.18) 35%, transparent 75%) !important;
+}
+
 
 
