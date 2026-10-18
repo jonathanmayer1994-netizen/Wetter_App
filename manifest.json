@@ -1,0 +1,18 @@
+{
+  "name": "Best Weather",
+  "short_name": "Best Weather",
+  "description": "Ultra-präzise iPhone Wetter App mit 90m DEM Downscaling & Live Radar",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a1128",
+  "theme_color": "#0a1128",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
