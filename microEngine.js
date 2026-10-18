@@ -836,11 +836,44 @@ export const MicroEngine = {
    */
   parseGPXData(xmlString) {
     try {
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(xmlString, "text/xml");
-      const trkpts = xml.querySelectorAll("trkpt");
+      const trkpts = [];
 
-      if (!trkpts || trkpts.length === 0) {
+      // 1. Browser DOMParser versuchen
+      if (typeof DOMParser !== 'undefined') {
+        try {
+          const parser = new DOMParser();
+          const xml = parser.parseFromString(xmlString, "text/xml");
+          const nodes = xml.querySelectorAll("trkpt");
+          if (nodes && nodes.length > 0) {
+            for (let i = 0; i < nodes.length; i++) {
+              const pt = nodes[i];
+              const lat = parseFloat(pt.getAttribute("lat"));
+              const lon = parseFloat(pt.getAttribute("lon"));
+              const eleNode = pt.querySelector("ele");
+              const ele = eleNode ? parseFloat(eleNode.textContent) : 1000;
+              trkpts.push({ lat, lon, ele });
+            }
+          }
+        } catch (domErr) {
+          console.warn("DOMParser failed, trying regex fallback:", domErr);
+        }
+      }
+
+      // 2. Regex-Fallback für Node.js oder stark unformatierte XML-Strings
+      if (trkpts.length === 0) {
+        const trkptRegex = /<trkpt\s+[^>]*lat=["']([^"']+)["'][^>]*lon=["']([^"']+)["'][^>]*>([\s\S]*?)<\/trkpt>/gi;
+        const eleRegex = /<ele>([^<]+)<\/ele>/i;
+        let match;
+        while ((match = trkptRegex.exec(xmlString)) !== null) {
+          const lat = parseFloat(match[1]);
+          const lon = parseFloat(match[2]);
+          const eleMatch = eleRegex.exec(match[3]);
+          const ele = eleMatch ? parseFloat(eleMatch[1]) : 1000;
+          trkpts.push({ lat, lon, ele });
+        }
+      }
+
+      if (trkpts.length === 0) {
         throw new Error("Keine Trackpunkte im GPX gefunden.");
       }
 
@@ -853,10 +886,9 @@ export const MicroEngine = {
 
       for (let i = 0; i < trkpts.length; i++) {
         const pt = trkpts[i];
-        const lat = parseFloat(pt.getAttribute("lat"));
-        const lon = parseFloat(pt.getAttribute("lon"));
-        const eleNode = pt.querySelector("ele");
-        const ele = eleNode ? parseFloat(eleNode.textContent) : 1000;
+        const lat = pt.lat;
+        const lon = pt.lon;
+        const ele = pt.ele;
 
         if (i > 0) {
           const prev = points[i - 1];
@@ -890,8 +922,15 @@ export const MicroEngine = {
       const hFormatted = Math.floor(totalHours);
       const mFormatted = Math.round((totalHours - hFormatted) * 60);
 
+      let trackName = 'GPX-Route';
+      const nameMatch = /<name>([^<]+)<\/name>/i.exec(xmlString);
+      if (nameMatch && nameMatch[1]) {
+        trackName = nameMatch[1].trim();
+      }
+
       return {
         success: true,
+        name: trackName,
         pointCount: points.length,
         totalDistanceKm: Math.round((totalDistanceM / 1000) * 10) / 10,
         totalAscentM: Math.round(totalAscentM),
@@ -960,6 +999,21 @@ export const MicroEngine = {
           { lat: 47.5460, lon: 12.9210, ele: 2712 }, // Südspitze
           { lat: 47.5350, lon: 12.8980, ele: 1320 }  // Wimbachgries
         ]
+      },
+      'grossglockner-bike': {
+        name: 'Großglockner Hochalpenstraße (Rennrad)',
+        region: 'Hohe Tauern / Salzburg & Kärnten',
+        points: [
+          { lat: 47.1680, lon: 12.8250, ele: 805 },  // Fusch an der Glocknerstraße
+          { lat: 47.1420, lon: 12.8200, ele: 1145 }, // Ferleiten (Mautstelle)
+          { lat: 47.1180, lon: 12.8270, ele: 1540 }, // Piffkar
+          { lat: 47.1020, lon: 12.8310, ele: 1890 }, // Hexenküche
+          { lat: 47.0860, lon: 12.8270, ele: 2260 }, // Fuschertörl
+          { lat: 47.0780, lon: 12.8420, ele: 2428 }, // Fuscher Lacke
+          { lat: 47.0720, lon: 12.8440, ele: 2504 }, // Hochtor Pass (Scheitelpunkt)
+          { lat: 47.0610, lon: 12.8380, ele: 2135 }, // Schöneck
+          { lat: 47.0420, lon: 12.8430, ele: 1301 }  // Heiligenblut (Ziel)
+        ]
       }
     };
 
@@ -974,6 +1028,350 @@ export const MicroEngine = {
       name: s.name,
       region: s.region,
       xml
+    };
+  },
+
+  /**
+   * STUFE 9b: Sportarten-Geschwindigkeitsprofile & Marschzeit-Berechnung
+   */
+  getSportSpeedInfo(sportType) {
+    const table = {
+      'hiking': {
+        name: 'Wandern & Bergsteigen',
+        icon: '🥾',
+        baseFlatSpeedKmH: 4.0,
+        ascentMPerHour: 400,
+        descentMPerHour: 800,
+        desc: 'SAC-Norm: 4 km/h flach, 400 Hm/h Aufstieg, 800 Hm/h Abstieg'
+      },
+      'road_bike': {
+        name: 'Rennrad & Asphalt',
+        icon: '🚴',
+        baseFlatSpeedKmH: 25.0,
+        desc: '25 km/h Schnitt mit watt-äquivalenter Steigungsanpassung'
+      },
+      'gravel_mtb': {
+        name: 'Gravel & Mountainbike',
+        icon: '🚵',
+        baseFlatSpeedKmH: 16.0,
+        desc: '16 km/h Schnitt auf Schotter, Trails und Forstwegen'
+      },
+      'trailrun': {
+        name: 'Trailrunning',
+        icon: '🏃',
+        baseFlatSpeedKmH: 8.5,
+        desc: '8.5 km/h Schnitt mit Berglauf-Gradient'
+      }
+    };
+    return table[sportType] || table['hiking'];
+  },
+
+  /**
+   * STUFE 9c: Dynamischer Strecken-Wetterverlauf über die gesamte Dauer der Route
+   */
+  computeRouteWeatherTimeline(parsedGPX, startTimeMs, sportType, hourlyForecast, baseElevation = 500) {
+    if (!parsedGPX || !parsedGPX.points || parsedGPX.points.length === 0) {
+      return null;
+    }
+
+    const points = parsedGPX.points;
+    const speedInfo = this.getSportSpeedInfo(sportType);
+    let cumulativeHours = 0;
+    const timedPoints = [];
+
+    for (let i = 0; i < points.length; i++) {
+      const pt = points[i];
+      if (i > 0) {
+        const prev = points[i - 1];
+        const distKm = Math.max(0.001, (pt.distFromStartKm || 0) - (prev.distFromStartKm || 0));
+        const dzM = pt.ele - prev.ele;
+
+        let segHours = 0;
+        if (sportType === 'hiking') {
+          // SAC Bergwander-Formel: T = max(tH, tV) + min(tH, tV) / 2
+          const tH = distKm / 4.0;
+          const tV = (dzM > 0 ? dzM / 400 : Math.abs(dzM) / 800);
+          segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
+        } else if (sportType === 'road_bike') {
+          const grad = (dzM / (distKm * 1000)) * 100;
+          const v = Math.max(9, Math.min(55, 25 - grad * 1.4));
+          segHours = distKm / v;
+        } else if (sportType === 'gravel_mtb') {
+          const grad = (dzM / (distKm * 1000)) * 100;
+          const v = Math.max(6, Math.min(38, 16 - grad * 1.1));
+          segHours = distKm / v;
+        } else {
+          // Trailrun
+          const grad = (dzM / (distKm * 1000)) * 100;
+          const v = Math.max(4.5, Math.min(14, 8.5 - (grad > 0 ? grad * 0.35 : grad * 0.15)));
+          segHours = distKm / v;
+        }
+        cumulativeHours += Math.max(0.005, segHours);
+      }
+
+      const arrivalMs = startTimeMs + Math.round(cumulativeHours * 3600000);
+      timedPoints.push({
+        ...pt,
+        cumulativeHours,
+        arrivalMs,
+        arrivalDate: new Date(arrivalMs)
+      });
+    }
+
+    // Wähle 6 bis 12 markante Meilensteine / Wegpunkte entlang der Route
+    const totalKm = parsedGPX.totalDistanceKm || (timedPoints[timedPoints.length - 1].distFromStartKm) || 1;
+    const targetSteps = Math.max(6, Math.min(12, Math.round(totalKm / 2.5)));
+    const stepKm = totalKm / (targetSteps - 1);
+
+    const milestones = [];
+    let currentTargetKm = 0;
+
+    for (let s = 0; s < targetSteps; s++) {
+      currentTargetKm = s * stepKm;
+      let closestPt = timedPoints[0];
+      let minDiff = Infinity;
+      for (const p of timedPoints) {
+        const diff = Math.abs(p.distFromStartKm - currentTargetKm);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestPt = p;
+        }
+      }
+      if (!milestones.some(m => m.index === closestPt.index)) {
+        milestones.push(closestPt);
+      }
+    }
+
+    // Stelle sicher, dass Start und Ziel immer exakt enthalten sind
+    if (milestones[0].index !== timedPoints[0].index) {
+      milestones.unshift(timedPoints[0]);
+    }
+    if (milestones[milestones.length - 1].index !== timedPoints[timedPoints.length - 1].index) {
+      milestones.push(timedPoints[timedPoints.length - 1]);
+    }
+
+    // Wetterdaten für jeden Meilenstein zur genauen Ankunftszeit interpolieren
+    const h = hourlyForecast || {};
+    const hTimes = h.time || [];
+
+    const enrichedMilestones = milestones.map((m, idx) => {
+      const arrMs = m.arrivalMs;
+      let hIdx = 0;
+      let minDiffMs = Infinity;
+
+      for (let i = 0; i < hTimes.length; i++) {
+        const tMs = new Date(hTimes[i]).getTime();
+        const diff = Math.abs(tMs - arrMs);
+        if (diff < minDiffMs) {
+          minDiffMs = diff;
+          hIdx = i;
+        }
+      }
+
+      // Barometrischer Höhenabgleich: -0.65°C pro 100 Höhenmeter
+      const baseT = (h.temperature_2m && h.temperature_2m[hIdx] !== undefined) ? h.temperature_2m[hIdx] : 12;
+      const dElev = m.ele - baseElevation;
+      const pointTemp = Math.round((baseT - (dElev * 0.0065)) * 10) / 10;
+
+      // Wind nach Höhenlage
+      const baseW = (h.wind_speed_10m && h.wind_speed_10m[hIdx] !== undefined) ? h.wind_speed_10m[hIdx] : 15;
+      const baseG = (h.wind_gusts_10m && h.wind_gusts_10m[hIdx] !== undefined) ? h.wind_gusts_10m[hIdx] : baseW * 1.35;
+      const altitudeWindFactor = 1 + Math.max(0, dElev / 2000) * 0.5;
+      const pointWind = Math.round(baseW * altitudeWindFactor);
+      const pointGusts = Math.round(baseG * altitudeWindFactor);
+      const pointDir = (h.wind_direction_10m && h.wind_direction_10m[hIdx] !== undefined) ? h.wind_direction_10m[hIdx] : 220;
+
+      // Niederschlag & Frost
+      const precip = (h.precipitation && h.precipitation[hIdx] !== undefined) ? h.precipitation[hIdx] : 0;
+      const pop = (h.precipitation_probability && h.precipitation_probability[hIdx] !== undefined) ? h.precipitation_probability[hIdx] : 0;
+      const freezingLevel = (h.freezing_level_height && h.freezing_level_height[hIdx] !== undefined) ? h.freezing_level_height[hIdx] : 2600;
+      const code = (h.weather_code && h.weather_code[hIdx] !== undefined) ? h.weather_code[hIdx] : 1;
+
+      const isSnow = m.ele >= freezingLevel || pointTemp <= 0.5;
+      let weatherCondition = 'Trocken';
+      let weatherIcon = '☀️';
+
+      if (code >= 95) {
+        weatherIcon = '⚡';
+        weatherCondition = 'Gewitter';
+      } else if (isSnow && precip > 0) {
+        weatherIcon = '❄️';
+        weatherCondition = precip > 2 ? 'Kräftiger Schneefall' : 'Leichter Schneefall';
+      } else if (precip >= 3) {
+        weatherIcon = '🌧️';
+        weatherCondition = 'Starkregen';
+      } else if (precip > 0.3) {
+        weatherIcon = '🌦️';
+        weatherCondition = 'Regenschauer';
+      } else if (code >= 3) {
+        weatherIcon = '☁️';
+        weatherCondition = 'Bedeckt';
+      } else if (code >= 1) {
+        weatherIcon = '⛅';
+        weatherCondition = 'Heiter';
+      }
+
+      // Windchill
+      let felt = pointTemp;
+      if (pointTemp <= 10 && pointWind >= 5) {
+        felt = 13.12 + (0.6215 * pointTemp) - (11.37 * Math.pow(pointWind, 0.16)) + (0.3965 * pointTemp * Math.pow(pointWind, 0.16));
+      }
+
+      const arrHoursStr = m.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const arrivalDateStr = m.arrivalDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+
+      let label = `km ${m.distFromStartKm.toFixed(1)}`;
+      if (idx === 0) label = 'Startpunkt';
+      else if (idx === milestones.length - 1) label = 'Zielankunft';
+      else if (m.ele === parsedGPX.maxElevationM) label = 'Scheitelpunkt / Pass';
+
+      return {
+        ...m,
+        label,
+        arrivalTimeStr: `${arrHoursStr} Uhr`,
+        arrivalDateStr,
+        tempC: pointTemp,
+        feltTempC: Math.round(felt),
+        windKmH: pointWind,
+        gustsKmH: pointGusts,
+        windDirDeg: pointDir,
+        precipMm: precip,
+        popPercent: pop,
+        freezingLevelM: freezingLevel,
+        weatherCode: code,
+        weatherIcon,
+        weatherCondition,
+        isSnow
+      };
+    });
+
+    const hazards = this.analyzeRouteHazards(enrichedMilestones);
+
+    const totalDurationHours = cumulativeHours;
+    const durH = Math.floor(totalDurationHours);
+    const durM = Math.round((totalDurationHours - durH) * 60);
+
+    return {
+      sportType,
+      sportName: speedInfo.name,
+      sportIcon: speedInfo.icon,
+      startTimeMs,
+      startTimeStr: new Date(startTimeMs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+      startDateStr: new Date(startTimeMs).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }),
+      endTimeMs: timedPoints[timedPoints.length - 1].arrivalMs,
+      endTimeStr: timedPoints[timedPoints.length - 1].arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+      totalDurationStr: `${durH} h ${durM} min`,
+      totalDistanceKm: parsedGPX.totalDistanceKm,
+      totalAscentM: parsedGPX.totalAscentM,
+      totalDescentM: parsedGPX.totalDescentM,
+      minElevationM: parsedGPX.minElevationM,
+      maxElevationM: parsedGPX.maxElevationM,
+      timedPoints,
+      milestones: enrichedMilestones,
+      hazards
+    };
+  },
+
+  /**
+   * STUFE 9d: Routen-Gefahrenanalyse & Passwarnung
+   */
+  analyzeRouteHazards(milestones) {
+    const alerts = [];
+    let worstSeverity = 'green';
+
+    milestones.forEach(m => {
+      // 1. Gewitter
+      if (m.weatherCode >= 95 || m.weatherCondition.includes('Gewitter')) {
+        alerts.push({
+          severity: 'red',
+          icon: '⚡',
+          type: 'Gewitter & Blitzgefahr',
+          km: m.distFromStartKm,
+          ele: m.ele,
+          time: m.arrivalTimeStr,
+          title: `Gewittergefahr bei ${m.label} (${m.arrivalTimeStr})`,
+          desc: `Auf ${m.ele} m Höhe akute Blitzschlaggefahr! Grate und exponierte Steige vor ${m.arrivalTimeStr} verlassen oder Tourstart vorverlegen.`
+        });
+        worstSeverity = 'red';
+      }
+
+      // 2. Sturmböen
+      if (m.gustsKmH >= 60) {
+        alerts.push({
+          severity: 'red',
+          icon: '💨',
+          type: 'Schwere Sturmböen',
+          km: m.distFromStartKm,
+          ele: m.ele,
+          time: m.arrivalTimeStr,
+          title: `Sturmböen bis ${m.gustsKmH} km/h auf ${m.ele} m`,
+          desc: `Gefahr von Gleichgewichtsverlust auf Graten oder starke Böen beim Radfahren bei km ${m.distFromStartKm.toFixed(1)}.`
+        });
+        worstSeverity = 'red';
+      } else if (m.gustsKmH >= 45 && worstSeverity !== 'red') {
+        alerts.push({
+          severity: 'yellow',
+          icon: '💨',
+          type: 'Frischer bis starker Wind',
+          km: m.distFromStartKm,
+          ele: m.ele,
+          time: m.arrivalTimeStr,
+          title: `Böenspitzen ${m.gustsKmH} km/h bei km ${m.distFromStartKm.toFixed(1)}`,
+          desc: `Windweste / winddichte Bekleidung empfohlen.`
+        });
+        if (worstSeverity === 'green') worstSeverity = 'yellow';
+      }
+
+      // 3. Frost / Schneefall
+      if (m.isSnow && m.precipMm > 0) {
+        alerts.push({
+          severity: 'yellow',
+          icon: '❄️',
+          type: 'Schnee- & Glättegefahr',
+          km: m.distFromStartKm,
+          ele: m.ele,
+          time: m.arrivalTimeStr,
+          title: `Schnee- & Glättegefahr auf ${m.ele} m um ${m.arrivalTimeStr}`,
+          desc: `Temperatur liegt bei ${m.tempC}°C unter der Frostgrenze (${m.freezingLevelM} m). Rutschgefahr auf Steinen & Wurzeln.`
+        });
+        if (worstSeverity === 'green') worstSeverity = 'yellow';
+      }
+
+      // 4. Starkregen
+      if (m.precipMm >= 3.0 && !m.isSnow) {
+        alerts.push({
+          severity: 'yellow',
+          icon: '🌧️',
+          type: 'Kräftiger Regen',
+          km: m.distFromStartKm,
+          ele: m.ele,
+          time: m.arrivalTimeStr,
+          title: `Starker Regen (${m.precipMm} mm/h) um ${m.arrivalTimeStr}`,
+          desc: `Gute Regenbekleidung und Schutz vor Auskühlung erforderlich.`
+        });
+        if (worstSeverity === 'green') worstSeverity = 'yellow';
+      }
+    });
+
+    let overallVerdict = '🟢 Ausgezeichnetes Tourenwetter';
+    let overallSummary = 'Keine signifikanten Wetterrisiken entlang der Route prognostiziert. Optimale Bedingungen für dein gewähltes Startzeitfenster.';
+
+    if (worstSeverity === 'red') {
+      overallVerdict = '🚨 Akute Wetterwarnungen auf der Route!';
+      overallSummary = 'Auf einzelnen Streckenabschnitten drohen schwere Wettergefahren (Gewitter / Sturm). Passe deine Startzeit an oder wähle eine wettergeschützte Alternativroute!';
+    } else if (worstSeverity === 'yellow') {
+      overallVerdict = '🟡 Erhöhte Vorsicht & wechselhaftes Wetter';
+      overallSummary = 'Auf exponierten Höhenabschnitten sind Windböen, Schauer oder Kälte möglich. Passende Bekleidung (Regenschutz, Zwiebelprinzip) einpacken.';
+    }
+
+    return {
+      severity: worstSeverity,
+      level: worstSeverity,
+      verdict: overallVerdict,
+      badge: overallVerdict,
+      summary: overallSummary,
+      advice: overallSummary,
+      alerts
     };
   },
 

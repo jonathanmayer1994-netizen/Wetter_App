@@ -76,6 +76,10 @@
         <span class="tab-icon" id="tab-2-icon">🏔️</span>
         <span class="tab-label" id="tab-2-label">Berg & Höhe</span>
       </button>
+      <button class="tab-btn" id="tab-btn-sports" data-tab="tab-sports">
+        <span class="tab-icon">🚴</span>
+        <span class="tab-label">Sport & Route</span>
+      </button>
       <button class="tab-btn" data-tab="tab-map">
         <span class="tab-icon">🗺️</span>
         <span class="tab-label">Live-Karte & Radar</span>
@@ -839,6 +843,208 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- TAB: SPORT & TOUREN-WETTER (Wandern, Radfahren & Streckenverlauf) -->
+      <!-- =================================================================== -->
+      <div class="tab-pane" id="tab-sports">
+        <div class="view-panel" id="sports-view-panel">
+          
+          <!-- 1. SPORTART-, STARTZEIT- & GPX-SETUP -->
+          <section class="glass-card sports-setup-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">🚴</span>
+                <span>SPORT- & ROUTENWETTER-STUDIO (WANDERN & RADFAHREN)</span>
+              </div>
+              <span class="card-tag">Echtzeit-Streckenverlauf</span>
+            </div>
+
+            <!-- Sportart-Auswahl -->
+            <div class="sports-type-bar" id="sports-type-bar">
+              <button class="sport-pill active" data-sport="hiking" type="button">
+                <span class="sp-icon">🥾</span>
+                <span class="sp-label">Wandern & Bergsteigen</span>
+              </button>
+              <button class="sport-pill" data-sport="road_bike" type="button">
+                <span class="sp-icon">🚴</span>
+                <span class="sp-label">Rennrad & Asphalt</span>
+              </button>
+              <button class="sport-pill" data-sport="gravel_mtb" type="button">
+                <span class="sp-icon">🚵</span>
+                <span class="sp-label">Gravel & MTB</span>
+              </button>
+              <button class="sport-pill" data-sport="trailrun" type="button">
+                <span class="sp-icon">🏃</span>
+                <span class="sp-label">Trailrunning</span>
+              </button>
+            </div>
+
+            <!-- Startzeit-Steuerung -->
+            <div class="sports-start-row">
+              <div class="sports-time-group">
+                <label for="sports-start-time" class="sports-input-label">⏱️ Geplanter Tourstart:</label>
+                <input type="datetime-local" id="sports-start-time" class="sports-datetime-input">
+              </div>
+              <div class="sports-presets-pills" id="sports-time-presets">
+                <button type="button" class="sport-time-btn active" data-preset="now">🔴 Jetzt</button>
+                <button type="button" class="sport-time-btn" data-preset="today-early">Früh (07:00)</button>
+                <button type="button" class="sport-time-btn" data-preset="today-noon">Mittag (12:00)</button>
+                <button type="button" class="sport-time-btn" data-preset="tomorrow-early">Morgen (08:00)</button>
+              </div>
+            </div>
+
+            <!-- GPX Track Picker & Upload -->
+            <div class="sports-gpx-section">
+              <div class="sports-presets-row">
+                <span class="sp-preset-label">Alpine Referenz-Routen:</span>
+                <button type="button" class="sports-route-preset active" data-tour="matterhorn-hoernli">🏔️ Matterhorn Hörnligrat (4.478 m)</button>
+                <button type="button" class="sports-route-preset" data-tour="zugspitze-hoellental">🧗 Zugspitze Höllental (2.962 m)</button>
+                <button type="button" class="sports-route-preset" data-tour="watzmann-crossing">🥾 Watzmann Überschreitung (2.713 m)</button>
+                <button type="button" class="sports-route-preset" data-tour="grossglockner-bike">🚴 Großglockner Hochalpenstraße (48 km)</button>
+              </div>
+
+              <div class="sports-drop-zone" id="sports-drop-zone">
+                <div class="sdz-content">
+                  <span class="sdz-icon">📂</span>
+                  <div class="sdz-text">
+                    <strong>Eigene GPX-Route hier ablegen</strong> oder <button type="button" id="sports-browse-btn" class="sdz-browse-btn">Datei auswählen</button>
+                    <span class="sdz-sub">Unterstützt Komoot, Strava, Garmin, Outdooractive (.gpx)</span>
+                  </div>
+                  <input type="file" id="sports-file-input" accept=".gpx" style="display:none;">
+                </div>
+              </div>
+            </div>
+
+            <!-- Route Metrics Summary -->
+            <div class="sports-metrics-grid" id="sports-metrics-grid">
+              <div class="sm-card">
+                <span class="sm-label">Streckenlänge</span>
+                <span class="sm-val text-accent" id="sm-val-dist">-- km</span>
+              </div>
+              <div class="sm-card">
+                <span class="sm-label">Höhenmeter Aufstieg</span>
+                <span class="sm-val text-cyan" id="sm-val-ascent">+-- m</span>
+              </div>
+              <div class="sm-card">
+                <span class="sm-label">Kalkulierte Dauer</span>
+                <span class="sm-val" id="sm-val-dur">-- h -- min</span>
+              </div>
+              <div class="sm-card">
+                <span class="sm-label">Zielankunft</span>
+                <span class="sm-val text-yellow" id="sm-val-finish">--:-- Uhr</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. ROUTEN-GEFAHRENANALYSE & PASSWARNUNG -->
+          <section class="glass-card sports-hazards-card" id="sports-hazards-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">⚠️</span>
+                <span>ROUTEN-GEFAHRENANALYSE & EXPOSITIONSSCHUTZ</span>
+              </div>
+              <span class="card-tag" id="sports-hazard-status-tag">Wird geprüft...</span>
+            </div>
+
+            <div class="hazard-summary-banner" id="hazard-summary-banner">
+              <div class="hsb-icon" id="hsb-icon">🟢</div>
+              <div class="hsb-text">
+                <div class="hsb-title" id="hsb-title">Strecke wird analysiert...</div>
+                <div class="hsb-desc" id="hsb-desc">Wettervorhersage für jeden Streckenkilometer wird mit deiner Marschzeit abgeglichen.</div>
+              </div>
+            </div>
+
+            <div class="hazard-alerts-list" id="hazard-alerts-list">
+              <!-- Dynamisch befüllt mit Warnungen vor Gewitter, Sturmböen, Frost etc. -->
+            </div>
+          </section>
+
+          <!-- 3. INTERAKTIVE STRECKEN-TIMELINE & HÖHENPROFIL -->
+          <section class="glass-card sports-timeline-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">📈</span>
+                <span>INTERAKTIVES HÖHENPROFIL & ZEITVERLAUF ENTLANG DER ROUTE</span>
+              </div>
+              <span class="card-tag">Scrubber ziehen / berühren</span>
+            </div>
+
+            <!-- Interaktiver Strecken-Slider (Scrubber) -->
+            <div class="sports-scrubber-wrapper">
+              <div class="ss-info-row">
+                <span id="ss-current-point-label">📍 Startpunkt (km 0.0)</span>
+                <span id="ss-current-time-badge" class="ss-badge">⏱️ 08:00 Uhr</span>
+              </div>
+              <input type="range" id="sports-route-slider" min="0" max="100" value="0" step="1" class="sports-route-slider">
+            </div>
+
+            <!-- SVG Höhenprofil-Canvas mit Wetter-Farbverlauf -->
+            <div class="sports-chart-wrapper" id="sports-chart-wrapper">
+              <svg id="sports-elevation-svg" class="sports-elevation-svg" viewBox="0 0 900 240" preserveAspectRatio="none">
+                <!-- Dynamisch gerendertes Höhenprofil mit Wetterkurve -->
+              </svg>
+
+              <!-- Schwebendes Wegpunkt-Wetter-HUD -->
+              <div class="sports-hud-badge" id="sports-hud-badge" style="display:none;">
+                <div class="shb-top">
+                  <span id="shb-icon">⛅</span>
+                  <strong id="shb-title">km 0.0</strong>
+                  <span id="shb-time">08:00</span>
+                </div>
+                <div class="shb-metrics">
+                  <span id="shb-temp">--°C</span> • 
+                  <span id="shb-wind">-- km/h</span> • 
+                  <span id="shb-cond">Trocken</span>
+                </div>
+                <div class="shb-sub" id="shb-ele">Höhe: -- m</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4. WEGPUNKT-WETTERTABELLE & ETAPPEN-INSPEKTOR -->
+          <section class="glass-card sports-waypoints-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">🧭</span>
+                <span>ETAPPEN-WETTERBERICHT ZUR GENAUEN DURCHGANGSZEIT</span>
+              </div>
+              <span class="card-tag">Stundengenaue Prognose</span>
+            </div>
+
+            <div class="sports-waypoints-table-wrap">
+              <div class="swt-header">
+                <span class="swt-col swt-col-pos">Streckenabschnitt</span>
+                <span class="swt-col swt-col-time">Uhrzeit</span>
+                <span class="swt-col swt-col-ele">Höhe</span>
+                <span class="swt-col swt-col-cond">Wetterlage</span>
+                <span class="swt-col swt-col-temp">Temp (Gefühlt)</span>
+                <span class="swt-col swt-col-wind">Wind / Böen</span>
+                <span class="swt-col swt-col-precip">Niederschlag</span>
+              </div>
+              <div class="swt-body" id="sports-waypoints-list">
+                <!-- Dynamisch generierte Wegpunkt-Zeilen -->
+              </div>
+            </div>
+          </section>
+
+          <!-- 5. INTERAKTIVE STRECKENKARTE -->
+          <section class="glass-card sports-map-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">🗺️</span>
+                <span>ROUTENVERLAUF & GEFAHRENZONEN AUF DER KARTE</span>
+              </div>
+              <span class="card-tag">OSM Outdoor Relief</span>
+            </div>
+
+            <div class="sports-map-wrapper">
+              <div id="sports-map-container" class="sports-map-container"></div>
+            </div>
+          </section>
+
+        </div>
       </div>
 
       <!-- =================================================================== -->

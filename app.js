@@ -60,7 +60,28 @@ const state = {
     cloudDrift: 0,
     initialized: false
   },
-  canvasEngine: null
+  canvasEngine: null,
+  sports: {
+    initialized: false,
+    sportType: 'hiking',
+    activeTour: 'grossglockner-bike',
+    startTimeMs: Date.now(),
+    gpxText: null,
+    gpxName: 'Großglockner Hochalpenstraße (48 km)',
+    parsedGPX: null,
+    timeline: null,
+    hazards: null,
+    scrubberKm: 0,
+    map: null,
+    routeLine: null,
+    routeBgLine: null,
+    startMarker: null,
+    endMarker: null,
+    milestoneMarkers: [],
+    scrubberMarker: null,
+    cachedForecasts: {},
+    cachedForecast: null
+  }
 };
 
 // =============================================================================
@@ -319,6 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupMeteogramControls();
   setupGPXInspector();
   setupWebcamModal();
+  setupSportsTab();
   initLeafletMap();
 
   // Load initial location (München: 520 m)
@@ -350,6 +372,21 @@ function switchTab(tabId) {
     setTimeout(() => {
       renderMountain3DModel();
     }, 80);
+  }
+
+  if (tabId === 'tab-sports') {
+    setTimeout(() => {
+      if (!state.sports.initialized) {
+        initSportsTour();
+      } else {
+        if (state.sports.map) {
+          state.sports.map.invalidateSize();
+          if (state.sports.routeLine) {
+            state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [30, 30] });
+          }
+        }
+      }
+    }, 100);
   }
 
   if (tabId === 'tab-map' && state.map.instance) {
@@ -4626,4 +4663,756 @@ function renderGPXElevationSVG(parsed) {
     <text x="${xEnd - 6}" y="${yEnd - 6}" fill="#64d2ff" font-size="11" font-weight="700" text-anchor="end">Ziel: ${pEnd.ele}m (${tEnd}°C)</text>
   `;
 }
+
+// =============================================================================
+// SPORT & TOUREN-WETTER CONTROLLER (GPX ROUTEN-WETTER ÜBER DIE GESAMTE DAUER)
+// =============================================================================
+
+function formatLocalDatetime(date) {
+  const d = new Date(date);
+  const pad = n => String(n).padStart(2, '0');
+  const y = d.getFullYear();
+  const m = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const h = pad(d.getHours());
+  const min = pad(d.getMinutes());
+  return `${y}-${m}-${day}T${h}:${min}`;
+}
+
+function setupSportsTab() {
+  const startTimeInput = document.getElementById('sports-start-time');
+  if (startTimeInput) {
+    startTimeInput.value = formatLocalDatetime(new Date());
+    startTimeInput.addEventListener('change', () => {
+      if (startTimeInput.value) {
+        state.sports.startTimeMs = new Date(startTimeInput.value).getTime();
+        document.querySelectorAll('.sport-time-btn').forEach(b => b.classList.remove('active'));
+        recomputeSportsTimeline();
+      }
+    });
+  }
+
+  // Quick Time Presets
+  const timePresets = document.querySelectorAll('.sport-time-btn');
+  timePresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      timePresets.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const preset = btn.dataset.preset;
+      const targetDate = new Date();
+
+      if (preset === 'now') {
+        // Jetzt
+      } else if (preset === 'today-early') {
+        targetDate.setHours(7, 0, 0, 0);
+      } else if (preset === 'today-noon') {
+        targetDate.setHours(12, 0, 0, 0);
+      } else if (preset === 'tomorrow-early') {
+        targetDate.setDate(targetDate.getDate() + 1);
+        targetDate.setHours(8, 0, 0, 0);
+      }
+
+      state.sports.startTimeMs = targetDate.getTime();
+      if (startTimeInput) {
+        startTimeInput.value = formatLocalDatetime(targetDate);
+      }
+      recomputeSportsTimeline();
+    });
+  });
+
+  // Sportarten-Pills (Wandern, Rennrad, Gravel/MTB, Trailrunning)
+  const sportButtons = document.querySelectorAll('.sport-type-btn');
+  sportButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      sportButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.sports.sportType = btn.dataset.sport;
+      recomputeSportsTimeline();
+    });
+  });
+
+  // Alpine Referenz-Routen (Presets)
+  const routePresets = document.querySelectorAll('.sports-route-preset');
+  routePresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      routePresets.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadSportsPresetTour(btn.dataset.tour);
+    });
+  });
+
+  // GPX File Upload & Drag'n'Drop
+  const browseBtn = document.getElementById('sports-browse-btn');
+  const fileInput = document.getElementById('sports-file-input');
+  const dropZone = document.getElementById('sports-drop-zone');
+
+  if (browseBtn && fileInput) {
+    browseBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          routePresets.forEach(b => b.classList.remove('active'));
+          loadSportsCustomGPX(ev.target.result, file.name);
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
+  if (dropZone) {
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          routePresets.forEach(b => b.classList.remove('active'));
+          loadSportsCustomGPX(ev.target.result, file.name);
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
+  // Interaktiver Strecken-Slider (Scrubber)
+  const routeSlider = document.getElementById('sports-route-slider');
+  if (routeSlider) {
+    routeSlider.addEventListener('input', () => {
+      const pct = parseFloat(routeSlider.value) || 0;
+      const totalDist = state.sports.timeline ? state.sports.timeline.totalDistanceKm : 0;
+      const km = (pct / 100) * totalDist;
+      updateSportsScrubber(km);
+    });
+  }
+
+  // Interaktiver Klick auf SVG-Höhenprofil
+  const chartWrapper = document.getElementById('sports-chart-wrapper');
+  if (chartWrapper) {
+    chartWrapper.addEventListener('click', e => {
+      if (!state.sports.timeline) return;
+      const rect = chartWrapper.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, clickX / rect.width));
+      const km = pct * state.sports.timeline.totalDistanceKm;
+      if (routeSlider) {
+        routeSlider.value = Math.round(pct * 100);
+      }
+      updateSportsScrubber(km);
+    });
+  }
+}
+
+function initSportsTour() {
+  state.sports.initialized = true;
+  // Standard-Tour: Großglockner Hochalpenstraße (optimal für Rad & Bergsteiger)
+  const defaultTour = 'grossglockner-bike';
+  loadSportsPresetTour(defaultTour);
+}
+
+async function loadSportsPresetTour(tourId) {
+  const sample = MicroEngine.getSampleGPXTrack(tourId);
+  if (!sample) return;
+  state.sports.activeTour = tourId;
+  state.sports.gpxName = sample.name;
+  await loadAndComputeSportsTour(sample.xml, sample.name);
+}
+
+async function loadSportsCustomGPX(gpxXml, fileName) {
+  state.sports.activeTour = null;
+  state.sports.gpxName = fileName ? fileName.replace(/\.gpx$/i, '') : 'Eigene GPX-Route';
+  await loadAndComputeSportsTour(gpxXml, state.sports.gpxName);
+}
+
+async function fetchHourlyForRoute(lat, lon) {
+  const cacheKey = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+  if (state.sports.cachedForecasts[cacheKey]) {
+    return state.sports.cachedForecasts[cacheKey];
+  }
+
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height&forecast_days=7&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.hourly && data.hourly.time && data.hourly.time.length > 0) {
+      state.sports.cachedForecasts[cacheKey] = data.hourly;
+      return data.hourly;
+    }
+  } catch (err) {
+    console.warn('Live route forecast fetch failed, using state fallback:', err);
+  }
+
+  if (state.weatherData && state.weatherData.hourly) {
+    return state.weatherData.hourly;
+  }
+
+  return generateSyntheticSportsHourly();
+}
+
+function generateSyntheticSportsHourly() {
+  const times = [];
+  const temps = [];
+  const precips = [];
+  const pops = [];
+  const codes = [];
+  const winds = [];
+  const gusts = [];
+  const freezing = [];
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+
+  for (let i = 0; i < 168; i++) {
+    const t = new Date(now.getTime() + i * 3600000);
+    times.push(t.toISOString());
+    const hr = t.getHours();
+    const temp = 14 + Math.sin((hr - 8) / 24 * Math.PI * 2) * 6;
+    temps.push(Math.round(temp * 10) / 10);
+    precips.push(hr >= 14 && hr <= 17 ? 0.8 : 0);
+    pops.push(hr >= 14 && hr <= 17 ? 40 : 10);
+    codes.push(hr >= 14 && hr <= 17 ? 80 : 1);
+    winds.push(12 + Math.random() * 8);
+    gusts.push(22 + Math.random() * 15);
+    freezing.push(2800);
+  }
+
+  return {
+    time: times,
+    temperature_2m: temps,
+    precipitation: precips,
+    precipitation_probability: pops,
+    weather_code: codes,
+    wind_speed_10m: winds,
+    wind_gusts_10m: gusts,
+    freezing_level_height: freezing
+  };
+}
+
+async function loadAndComputeSportsTour(gpxXml, tourName) {
+  state.sports.gpxText = gpxXml;
+  const parsed = MicroEngine.parseGPXData(gpxXml);
+  if (!parsed || !parsed.points || parsed.points.length === 0) {
+    const bannerTitle = document.getElementById('hsb-title');
+    const bannerDesc = document.getElementById('hsb-desc');
+    if (bannerTitle) bannerTitle.innerText = 'GPX-Fehler: Ungültiger Track';
+    if (bannerDesc) bannerDesc.innerText = 'Die hochgeladene GPX-Datei enthält keine verwertbaren GPS-Trackpunkte.';
+    return;
+  }
+
+  state.sports.parsedGPX = parsed;
+  const startPt = parsed.points[0];
+  const hourly = await fetchHourlyForRoute(startPt.lat, startPt.lon);
+  state.sports.cachedForecast = hourly;
+
+  recomputeSportsTimeline();
+}
+
+function recomputeSportsTimeline() {
+  if (!state.sports.parsedGPX || !state.sports.cachedForecast) return;
+  const parsed = state.sports.parsedGPX;
+  const startPt = parsed.points[0];
+  const hourly = state.sports.cachedForecast;
+
+  const timeline = MicroEngine.computeRouteWeatherTimeline(
+    parsed,
+    state.sports.startTimeMs,
+    state.sports.sportType,
+    hourly,
+    startPt.ele
+  );
+
+  state.sports.timeline = timeline;
+  state.sports.hazards = timeline.hazards;
+
+  renderSportsMetrics(timeline);
+  renderSportsHazards(timeline.hazards);
+  renderSportsElevationProfile(timeline);
+  renderSportsWaypointsTable(timeline);
+  renderSportsMap(timeline);
+
+  const slider = document.getElementById('sports-route-slider');
+  const pct = slider ? parseFloat(slider.value) || 0 : 0;
+  const targetKm = (pct / 100) * timeline.totalDistanceKm;
+  updateSportsScrubber(targetKm);
+}
+
+function renderSportsMetrics(timeline) {
+  const dDist = document.getElementById('sm-val-dist');
+  const dAsc = document.getElementById('sm-val-ascent');
+  const dDur = document.getElementById('sm-val-dur');
+  const dFin = document.getElementById('sm-val-finish');
+
+  if (dDist) dDist.innerText = `${timeline.totalDistanceKm.toFixed(1)} km`;
+  if (dAsc) dAsc.innerText = `+${Math.round(timeline.totalAscentM)} m / -${Math.round(timeline.totalDescentM)} m`;
+  if (dDur) dDur.innerText = timeline.totalDurationStr;
+  if (dFin) {
+    const finishDate = new Date(timeline.endTimeMs);
+    const dayName = finishDate.toLocaleDateString('de-DE', { weekday: 'short' });
+    dFin.innerText = `${timeline.endTimeStr} Uhr (${dayName})`;
+  }
+}
+
+function renderSportsHazards(hazards) {
+  const statusTag = document.getElementById('sports-hazard-status-tag');
+  const banner = document.getElementById('hazard-summary-banner');
+  const iconElem = document.getElementById('hsb-icon');
+  const titleElem = document.getElementById('hsb-title');
+  const descElem = document.getElementById('hsb-desc');
+  const listElem = document.getElementById('hazard-alerts-list');
+
+  if (!banner || !hazards) return;
+
+  banner.classList.remove('hsb-green', 'hsb-yellow', 'hsb-red');
+  banner.classList.add(`hsb-${hazards.level}`);
+
+  if (statusTag) {
+    statusTag.className = 'card-tag';
+    if (hazards.level === 'red') {
+      statusTag.innerText = '🔴 Hohe Alpine Gefahr';
+      statusTag.style.color = 'var(--ios-red)';
+      statusTag.style.borderColor = 'rgba(255, 69, 58, 0.4)';
+    } else if (hazards.level === 'yellow') {
+      statusTag.innerText = '🟡 Wetterwarnungen aktiv';
+      statusTag.style.color = 'var(--ios-yellow)';
+      statusTag.style.borderColor = 'rgba(255, 209, 102, 0.4)';
+    } else {
+      statusTag.innerText = '🟢 Optimale Bedingungen';
+      statusTag.style.color = 'var(--ios-green)';
+      statusTag.style.borderColor = 'rgba(48, 209, 88, 0.4)';
+    }
+  }
+
+  if (iconElem) {
+    iconElem.innerText = hazards.level === 'red' ? '⚡' : (hazards.level === 'yellow' ? '⚠️' : '✅');
+  }
+
+  if (titleElem) {
+    if (hazards.level === 'red') {
+      titleElem.innerText = 'Kritische Wettergefahren auf deiner Route erkannt!';
+    } else if (hazards.level === 'yellow') {
+      titleElem.innerText = 'Wetterwarnungen für exponierte Streckenabschnitte';
+    } else {
+      titleElem.innerText = 'Sichere Verhältnisse für deine gewählte Route';
+    }
+  }
+
+  if (descElem) {
+    descElem.innerText = hazards.advice || 'Wetterlage auf allen Wegpunkten im grünen Bereich.';
+  }
+
+  if (listElem) {
+    listElem.innerHTML = '';
+    if (!hazards.alerts || hazards.alerts.length === 0) {
+      listElem.innerHTML = `
+        <div class="hazard-alert-item alert-green">
+          <div class="hai-icon">🌤️</div>
+          <div class="hai-body">
+            <div class="hai-top">
+              <strong>Keine Wetterwarnungen entlang der Route</strong>
+              <span class="hai-meta">Gesamte Streckenlänge</span>
+            </div>
+            <p>Für deine berechnete Durchgangszeit sind weder Gewitter, Sturmböen noch Kälteeinbrüche prognostiziert. Ideale Bedingungen für deine Tour!</p>
+          </div>
+        </div>
+      `;
+    } else {
+      hazards.alerts.forEach(a => {
+        const item = document.createElement('div');
+        item.className = `hazard-alert-item alert-${a.severity}`;
+        item.innerHTML = `
+          <div class="hai-icon">${a.icon}</div>
+          <div class="hai-body">
+            <div class="hai-top">
+              <strong>${a.title}</strong>
+              <span class="hai-meta">${a.time} • km ${a.km.toFixed(1)} (${Math.round(a.ele)} m)</span>
+            </div>
+            <p>${a.desc}</p>
+          </div>
+        `;
+        listElem.appendChild(item);
+      });
+    }
+  }
+}
+
+function renderSportsElevationProfile(timeline) {
+  const svg = document.getElementById('sports-elevation-svg');
+  if (!svg || !timeline) return;
+
+  const W = 900;
+  const H = 240;
+  const padL = 50;
+  const padR = 35;
+  const padT = 35;
+  const padB = 40;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const minZ = Math.max(0, timeline.minElevationM - 80);
+  const maxZ = timeline.maxElevationM + 80;
+  const rangeZ = Math.max(20, maxZ - minZ);
+  const totalDist = Math.max(0.1, timeline.totalDistanceKm);
+
+  const pts = timeline.timedPoints;
+  const count = pts.length;
+  const getX = dKm => padL + (dKm / totalDist) * plotW;
+  const getY = ele => padT + plotH - ((ele - minZ) / rangeZ) * plotH;
+
+  const lineCoords = [];
+  for (let i = 0; i < count; i++) {
+    const x = getX(pts[i].distFromStartKm);
+    const y = getY(pts[i].ele);
+    lineCoords.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+
+  const polyBottomLeft = `${padL},${padT + plotH}`;
+  const polyBottomRight = `${(padL + plotW).toFixed(1)},${padT + plotH}`;
+  const fillPoly = `${polyBottomLeft} ${lineCoords.join(' ')} ${polyBottomRight}`;
+
+  // Milestone Markers on SVG Profile
+  let milestoneSVGElements = '';
+  timeline.milestones.forEach((m, idx) => {
+    const mx = getX(m.distFromStartKm);
+    const my = getY(m.ele);
+    const isPeak = m.ele === timeline.maxElevationM;
+
+    milestoneSVGElements += `
+      <g class="svg-milestone-pin" data-km="${m.distFromStartKm}">
+        <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${isPeak ? 5.5 : 4}" fill="${isPeak ? '#ffd166' : '#00e5ff'}" stroke="#ffffff" stroke-width="1.8" />
+        <text x="${mx.toFixed(1)}" y="${(my - 12).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.8))">
+          ${m.weatherIcon} ${m.tempC}°
+        </text>
+      </g>
+    `;
+  });
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="sports-profile-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.45" />
+        <stop offset="65%" stop-color="#0a84ff" stop-opacity="0.20" />
+        <stop offset="100%" stop-color="#051525" stop-opacity="0.05" />
+      </linearGradient>
+    </defs>
+
+    <!-- Achsenlinien & Höhenraster -->
+    <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.18)" stroke-width="1" />
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.18)" stroke-width="1" />
+    <line x1="${padL}" y1="${padT + plotH / 2}" x2="${W - padR}" y2="${padT + plotH / 2}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 4" />
+
+    <!-- Höhen-Achsenbeschriftung -->
+    <text x="${padL - 8}" y="${padT + 5}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="end" font-family="monospace">${maxZ}m</text>
+    <text x="${padL - 8}" y="${padT + plotH / 2 + 3}" fill="rgba(255,255,255,0.4)" font-size="9" text-anchor="end" font-family="monospace">${Math.round((maxZ + minZ) / 2)}m</text>
+    <text x="${padL - 8}" y="${padT + plotH}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="end" font-family="monospace">${minZ}m</text>
+
+    <!-- Distanz-Achsenbeschriftung -->
+    <text x="${padL}" y="${H - 12}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="start">0 km (Start)</text>
+    <text x="${W - padR}" y="${H - 12}" fill="rgba(255,255,255,0.6)" font-size="10" text-anchor="end">${totalDist.toFixed(1)} km (Ziel)</text>
+
+    <!-- Gefülltes Höhenprofil -->
+    <polygon points="${fillPoly}" fill="url(#sports-profile-grad)" />
+    <polyline points="${lineCoords.join(' ')}" fill="none" stroke="#00e5ff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Meilensteine & Wetter-Symbole -->
+    ${milestoneSVGElements}
+
+    <!-- Dynamischer Scrubber-Positionsstrich & Cursor-Punkt -->
+    <line id="svg-scrubber-line" x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#ffd166" stroke-width="2" stroke-dasharray="3 3" opacity="0.9" />
+    <circle id="svg-scrubber-dot" cx="${padL}" cy="${getY(pts[0].ele)}" r="6" fill="#ffd166" stroke="#ffffff" stroke-width="2" />
+  `;
+}
+
+function renderSportsWaypointsTable(timeline) {
+  const container = document.getElementById('sports-waypoints-list');
+  if (!container || !timeline) return;
+
+  container.innerHTML = '';
+  timeline.milestones.forEach((m, idx) => {
+    const row = document.createElement('div');
+    row.className = 'swt-row';
+    row.dataset.idx = idx;
+    row.dataset.km = m.distFromStartKm;
+
+    const isPeak = m.ele === timeline.maxElevationM;
+    let typeTag = '📍 Wegpunkt';
+    if (idx === 0) typeTag = '🚩 Tourstart';
+    else if (idx === timeline.milestones.length - 1) typeTag = '🏁 Zielankunft';
+    else if (isPeak) typeTag = '🏔️ Scheitelpunkt';
+
+    row.innerHTML = `
+      <div class="swt-cell swt-milestone">
+        <span class="swt-type-tag">${typeTag}</span>
+        <span class="swt-m-name">${m.label}</span>
+        <span class="swt-m-coords">${m.lat.toFixed(4)}°, ${m.lon.toFixed(4)}°</span>
+      </div>
+      <div class="swt-cell swt-dist-ele">
+        <strong class="swt-dist">${m.distFromStartKm.toFixed(1)} km</strong>
+        <span class="swt-ele text-cyan">${Math.round(m.ele)} m</span>
+      </div>
+      <div class="swt-cell swt-time">
+        <strong class="swt-arr-time">${m.arrivalTimeStr}</strong>
+        <span class="swt-arr-date">${m.arrivalDateStr}</span>
+      </div>
+      <div class="swt-cell swt-weather">
+        <div class="swt-w-top">
+          <span class="swt-icon">${m.weatherIcon}</span>
+          <strong class="swt-temp">${m.tempC}°C</strong>
+        </div>
+        <span class="swt-cond">${m.weatherCondition}</span>
+      </div>
+      <div class="swt-cell swt-wind">
+        <strong>${m.windKmH} km/h</strong>
+        <span class="swt-gusts text-orange">Böen ${m.gustsKmH}</span>
+      </div>
+      <div class="swt-cell swt-precip">
+        <strong class="${m.popPercent >= 50 ? 'text-red' : (m.popPercent >= 25 ? 'text-yellow' : '')}">${m.popPercent}%</strong>
+        <span class="swt-precip-mm">${m.precipMm > 0 ? `${m.precipMm.toFixed(1)} mm` : '0 mm'}</span>
+        ${m.isSnow ? '<span class="swt-snow-badge">❄️ Frost</span>' : ''}
+      </div>
+    `;
+
+    row.addEventListener('click', () => {
+      const slider = document.getElementById('sports-route-slider');
+      if (slider) {
+        const pct = (m.distFromStartKm / timeline.totalDistanceKm) * 100;
+        slider.value = Math.round(pct);
+      }
+      updateSportsScrubber(m.distFromStartKm);
+    });
+
+    container.appendChild(row);
+  });
+}
+
+function renderSportsMap(timeline) {
+  const container = document.getElementById('sports-map-container');
+  if (!container || !timeline || !timeline.timedPoints || timeline.timedPoints.length === 0) return;
+
+  if (!state.sports.map) {
+    state.sports.map = L.map('sports-map-container', {
+      zoomControl: true,
+      attributionControl: false,
+      maxZoom: 19
+    }).setView([timeline.timedPoints[0].lat, timeline.timedPoints[0].lon], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors, HOT'
+    }).addTo(state.sports.map);
+  }
+
+  // Bestehende Schichten entfernen
+  if (state.sports.routeBgLine) state.sports.map.removeLayer(state.sports.routeBgLine);
+  if (state.sports.routeLine) state.sports.map.removeLayer(state.sports.routeLine);
+  if (state.sports.startMarker) state.sports.map.removeLayer(state.sports.startMarker);
+  if (state.sports.endMarker) state.sports.map.removeLayer(state.sports.endMarker);
+  if (state.sports.scrubberMarker) state.sports.map.removeLayer(state.sports.scrubberMarker);
+  if (state.sports.milestoneMarkers) {
+    state.sports.milestoneMarkers.forEach(m => state.sports.map.removeLayer(m));
+  }
+  state.sports.milestoneMarkers = [];
+
+  const latLngs = timeline.timedPoints.map(p => [p.lat, p.lon]);
+
+  // Route Hintergrund-Casing (Glow-Effekt)
+  state.sports.routeBgLine = L.polyline(latLngs, {
+    color: '#005577',
+    weight: 8,
+    opacity: 0.7,
+    lineCap: 'round',
+    lineJoin: 'round'
+  }).addTo(state.sports.map);
+
+  // Vordergrund-Route (Leuchtendes Cyan)
+  state.sports.routeLine = L.polyline(latLngs, {
+    color: '#00e5ff',
+    weight: 4.5,
+    opacity: 0.95,
+    lineCap: 'round',
+    lineJoin: 'round'
+  }).addTo(state.sports.map);
+
+  // Start & Ziel Marker
+  const startPt = timeline.timedPoints[0];
+  const endPt = timeline.timedPoints[timeline.timedPoints.length - 1];
+
+  const startIcon = L.divIcon({
+    className: 'sports-custom-pin start-pin',
+    html: '<div class="pin-inner pin-start">🚩 <span>START</span></div>',
+    iconSize: [72, 28],
+    iconAnchor: [36, 14]
+  });
+
+  const endIcon = L.divIcon({
+    className: 'sports-custom-pin end-pin',
+    html: '<div class="pin-inner pin-end">🏁 <span>ZIEL</span></div>',
+    iconSize: [68, 28],
+    iconAnchor: [34, 14]
+  });
+
+  state.sports.startMarker = L.marker([startPt.lat, startPt.lon], { icon: startIcon }).addTo(state.sports.map);
+  state.sports.startMarker.bindPopup(`<b>🚩 Tourstart</b><br>Höhe: ${Math.round(startPt.ele)} m<br>Startzeit: ${timeline.startTimeStr} Uhr`);
+
+  state.sports.endMarker = L.marker([endPt.lat, endPt.lon], { icon: endIcon }).addTo(state.sports.map);
+  state.sports.endMarker.bindPopup(`<b>🏁 Zielankunft</b><br>Strecke: ${timeline.totalDistanceKm.toFixed(1)} km<br>Ankunft: ${timeline.endTimeStr} Uhr`);
+
+  // Zwischen-Meilensteine mit Wetter-Bubbles
+  timeline.milestones.forEach((m, idx) => {
+    if (idx === 0 || idx === timeline.milestones.length - 1) return;
+    const mIcon = L.divIcon({
+      className: 'sports-milestone-marker',
+      html: `<div class="ms-marker-bubble"><span class="ms-icon">${m.weatherIcon}</span> <span class="ms-temp">${m.tempC}°</span></div>`,
+      iconSize: [54, 24],
+      iconAnchor: [27, 12]
+    });
+
+    const marker = L.marker([m.lat, m.lon], { icon: mIcon }).addTo(state.sports.map);
+    marker.bindPopup(`
+      <div style="font-family: -apple-system, sans-serif; min-width: 170px;">
+        <strong style="color: #00e5ff; font-size: 13px;">${m.label} (${m.distFromStartKm.toFixed(1)} km)</strong><br>
+        <span style="font-size: 11px; color: #8e8e93;">⏱️ Durchgang: ${m.arrivalTimeStr} (${m.arrivalDateStr})</span>
+        <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 6px 0;">
+        <div>${m.weatherIcon} <b>${m.weatherCondition}</b></div>
+        <div>🌡️ Temperatur: <b>${m.tempC}°C</b> (Gefühlt ${m.feltTempC}°C)</div>
+        <div>💨 Wind: <b>${m.windKmH} km/h</b> (Böen ${m.gustsKmH} km/h)</div>
+        <div>💧 Niederschlag: <b>${m.precipMm.toFixed(1)} mm</b> (${m.popPercent}%)</div>
+        ${m.isSnow ? '<div style="color: #64d2ff; font-weight: bold;">❄️ Frost / Schneelage möglich</div>' : ''}
+      </div>
+    `);
+    state.sports.milestoneMarkers.push(marker);
+  });
+
+  // Interaktiver Scrubber-Marker (Athleten-Pin)
+  const athleteIcon = timeline.sportType === 'road_bike' ? '🚴' : (timeline.sportType === 'gravel_mtb' ? '🚵' : (timeline.sportType === 'trailrun' ? '🏃' : '🥾'));
+  const scrubberIcon = L.divIcon({
+    className: 'sports-scrubber-map-marker',
+    html: `<div class="scrubber-pin-pulse">${athleteIcon}</div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18]
+  });
+
+  state.sports.scrubberMarker = L.marker([startPt.lat, startPt.lon], { icon: scrubberIcon, zIndexOffset: 3000 }).addTo(state.sports.map);
+
+  setTimeout(() => {
+    state.sports.map.invalidateSize();
+    state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [30, 30] });
+  }, 100);
+}
+
+function updateSportsScrubber(km) {
+  const timeline = state.sports.timeline;
+  if (!timeline || !timeline.timedPoints || timeline.timedPoints.length === 0) return;
+
+  const totalDist = Math.max(0.1, timeline.totalDistanceKm);
+  const clampedKm = Math.max(0, Math.min(totalDist, km));
+  state.sports.scrubberKm = clampedKm;
+
+  // Finde nächsten berechneten Punkt
+  let closestPt = timeline.timedPoints[0];
+  let minDiff = Infinity;
+  for (let i = 0; i < timeline.timedPoints.length; i++) {
+    const diff = Math.abs(timeline.timedPoints[i].distFromStartKm - clampedKm);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestPt = timeline.timedPoints[i];
+    }
+  }
+
+  // Finde nächsten Meilenstein für Wetter-Werte
+  let closestMs = timeline.milestones[0];
+  let minMsDiff = Infinity;
+  let closestMsIdx = 0;
+  for (let i = 0; i < timeline.milestones.length; i++) {
+    const diff = Math.abs(timeline.milestones[i].distFromStartKm - clampedKm);
+    if (diff < minMsDiff) {
+      minMsDiff = diff;
+      closestMs = timeline.milestones[i];
+      closestMsIdx = i;
+    }
+  }
+
+  // Scrubber Label & Badge
+  const pointLabel = document.getElementById('ss-current-point-label');
+  const timeBadge = document.getElementById('ss-current-time-badge');
+  if (pointLabel) {
+    pointLabel.innerText = `📍 km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m`;
+  }
+  if (timeBadge) {
+    const arrStr = closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    timeBadge.innerText = `⏱️ ${arrStr} Uhr`;
+  }
+
+  // HUD-Badge über SVG
+  const hud = document.getElementById('sports-hud-badge');
+  if (hud) {
+    hud.style.display = 'block';
+    const hIcon = document.getElementById('shb-icon');
+    const hTitle = document.getElementById('shb-title');
+    const hTime = document.getElementById('shb-time');
+    const hTemp = document.getElementById('shb-temp');
+    const hWind = document.getElementById('shb-wind');
+    const hCond = document.getElementById('shb-cond');
+    const hEle = document.getElementById('shb-ele');
+
+    if (hIcon) hIcon.innerText = closestMs.weatherIcon;
+    if (hTitle) hTitle.innerText = `km ${closestPt.distFromStartKm.toFixed(1)}`;
+    if (hTime) hTime.innerText = closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    if (hTemp) hTemp.innerText = `${closestMs.tempC}°C (Gefühlt ${closestMs.feltTempC}°C)`;
+    if (hWind) hWind.innerText = `${closestMs.windKmH} km/h (Böen ${closestMs.gustsKmH})`;
+    if (hCond) hCond.innerText = closestMs.weatherCondition;
+    if (hEle) hEle.innerText = `Höhe: ${Math.round(closestPt.ele)} m • Niederschlag: ${closestMs.precipMm} mm (${closestMs.popPercent}%)`;
+
+    // Positionierung entlang des Charts
+    const pct = clampedKm / totalDist;
+    const padL = 50;
+    const plotW = 900 - 50 - 35;
+    const targetSvgX = padL + pct * plotW;
+    const hudPercent = Math.max(4, Math.min(76, (targetSvgX / 900) * 100));
+    hud.style.left = `${hudPercent.toFixed(1)}%`;
+  }
+
+  // SVG Scrubber Strich & Punkt bewegen
+  const svgLine = document.getElementById('svg-scrubber-line');
+  const svgDot = document.getElementById('svg-scrubber-dot');
+  if (svgLine && svgDot) {
+    const padL = 50;
+    const padT = 35;
+    const padB = 40;
+    const plotW = 900 - padL - 35;
+    const plotH = 240 - padT - padB;
+    const minZ = Math.max(0, timeline.minElevationM - 80);
+    const maxZ = timeline.maxElevationM + 80;
+    const rangeZ = Math.max(20, maxZ - minZ);
+
+    const x = padL + (clampedKm / totalDist) * plotW;
+    const y = padT + plotH - ((closestPt.ele - minZ) / rangeZ) * plotH;
+
+    svgLine.setAttribute('x1', x.toFixed(1));
+    svgLine.setAttribute('x2', x.toFixed(1));
+    svgDot.setAttribute('cx', x.toFixed(1));
+    svgDot.setAttribute('cy', y.toFixed(1));
+  }
+
+  // Map Marker synchronisieren
+  if (state.sports.scrubberMarker) {
+    state.sports.scrubberMarker.setLatLng([closestPt.lat, closestPt.lon]);
+  }
+
+  // Wegpunkt-Zeile in Tabelle hervorheben
+  document.querySelectorAll('.swt-row').forEach(row => {
+    const rIdx = parseInt(row.dataset.idx, 10);
+    row.classList.toggle('active-waypoint', rIdx === closestMsIdx);
+  });
+}
+
 
