@@ -618,7 +618,7 @@ html, body {
 
 .daily-interactive-row {
   display: grid;
-  grid-template-columns: 110px 40px 40px 1fr 40px 24px;
+  grid-template-columns: 100px 36px 44px 42px 1fr 42px 20px;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
@@ -1536,7 +1536,9 @@ html, body {
   }
 
   .daily-interactive-row {
-    grid-template-columns: 80px 32px 32px 1fr 34px;
+    grid-template-columns: 74px 30px 34px 36px 1fr 36px;
+    gap: 8px;
+    padding: 9px 10px;
   }
 
   .daily-chevron {

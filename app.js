@@ -23,7 +23,7 @@ const state = {
   activeTab: 'tab-overview',
   activeAspect: { tilt: 45, azimuth: 0, isAuto: false },
   selectedAltitudeHour: 0,
-  favorites: JSON.parse(localStorage.getItem('best_weather_favorites_v3') || '[]'),
+  favorites: [],
   map: {
     instance: null,
     marker: null,
@@ -39,7 +39,84 @@ const state = {
   canvasEngine: null
 };
 
-// Standard-Favoriten (mit exakten offiziellen Höhen!)
+// =============================================================================
+// AMTLICHE GROUND-TRUTH REFERENZTABELLE (EXAKTE VERMESSUNGSHÖHEN)
+// =============================================================================
+export const OFFICIAL_KNOWN_ELEVATIONS = {
+  // Hochalpine Berggipfel (Exakte amtliche Gipfelhöhe)
+  'matterhorn': { elevation: 4478, isMountain: true, country: 'Schweiz' },
+  'zugspitze': { elevation: 2962, isMountain: true, country: 'Deutschland' },
+  'mont blanc': { elevation: 4808, isMountain: true, country: 'Frankreich' },
+  'großglockner': { elevation: 3798, isMountain: true, country: 'Österreich' },
+  'grossglockner': { elevation: 3798, isMountain: true, country: 'Österreich' },
+  'ortler': { elevation: 3905, isMountain: true, country: 'Italien' },
+  'wildspitze': { elevation: 3768, isMountain: true, country: 'Österreich' },
+  'watzmann': { elevation: 2713, isMountain: true, country: 'Deutschland' },
+  'feldberg': { elevation: 1493, isMountain: true, country: 'Deutschland' },
+  'brocken': { elevation: 1141, isMountain: true, country: 'Deutschland' },
+  'nebelhorn': { elevation: 2224, isMountain: true, country: 'Deutschland' },
+
+  // Städte & Flachland (STADT-Modus: keine Bergwand, keine Höhendifferenz)
+  'münchen': { elevation: 520, isMountain: false, country: 'Deutschland' },
+  'munich': { elevation: 520, isMountain: false, country: 'Deutschland' },
+  'berlin': { elevation: 34, isMountain: false, country: 'Deutschland' },
+  'hamburg': { elevation: 6, isMountain: false, country: 'Deutschland' },
+  'köln': { elevation: 53, isMountain: false, country: 'Deutschland' },
+  'frankfurt am main': { elevation: 112, isMountain: false, country: 'Deutschland' },
+  'frankfurt': { elevation: 112, isMountain: false, country: 'Deutschland' },
+  'stuttgart': { elevation: 247, isMountain: false, country: 'Deutschland' },
+  'düsseldorf': { elevation: 38, isMountain: false, country: 'Deutschland' },
+  'leipzig': { elevation: 113, isMountain: false, country: 'Deutschland' },
+  'dresden': { elevation: 113, isMountain: false, country: 'Deutschland' },
+  'nürnberg': { elevation: 309, isMountain: false, country: 'Deutschland' },
+  'wien': { elevation: 171, isMountain: false, country: 'Österreich' },
+  'vienna': { elevation: 171, isMountain: false, country: 'Österreich' },
+  'salzburg': { elevation: 424, isMountain: false, country: 'Österreich' },
+  'innsbruck': { elevation: 574, isMountain: false, country: 'Österreich' },
+  'graz': { elevation: 353, isMountain: false, country: 'Österreich' },
+  'linz': { elevation: 266, isMountain: false, country: 'Österreich' },
+  'klagenfurt': { elevation: 446, isMountain: false, country: 'Österreich' },
+  'zürich': { elevation: 408, isMountain: false, country: 'Schweiz' },
+  'zurich': { elevation: 408, isMountain: false, country: 'Schweiz' },
+  'genf': { elevation: 375, isMountain: false, country: 'Schweiz' },
+  'geneva': { elevation: 375, isMountain: false, country: 'Schweiz' },
+  'bern': { elevation: 542, isMountain: false, country: 'Schweiz' },
+  'basel': { elevation: 260, isMountain: false, country: 'Schweiz' },
+  'luzern': { elevation: 436, isMountain: false, country: 'Schweiz' },
+  'bozen': { elevation: 262, isMountain: false, country: 'Italien' },
+  'meran': { elevation: 325, isMountain: false, country: 'Italien' },
+  'trient': { elevation: 194, isMountain: false, country: 'Italien' },
+  'brixen': { elevation: 560, isMountain: false, country: 'Italien' },
+  'garmisch-partenkirchen': { elevation: 708, isMountain: false, country: 'Deutschland' },
+  'zermatt': { elevation: 1608, isMountain: false, country: 'Schweiz' },
+  'oberstdorf': { elevation: 813, isMountain: false, country: 'Deutschland' },
+  'chamonix': { elevation: 1035, isMountain: false, country: 'Frankreich' }
+};
+
+// Initialisierung der Favoriten mit sauberer v4-Migration
+const STORAGE_KEY = 'best_weather_favorites_v4';
+try {
+  if (typeof localStorage !== 'undefined') {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (Array.isArray(saved) && saved.length > 0) {
+      state.favorites = saved.map(fav => {
+        const lower = fav.name.toLowerCase();
+        if (OFFICIAL_KNOWN_ELEVATIONS[lower]) {
+          return {
+            ...fav,
+            elevation: OFFICIAL_KNOWN_ELEVATIONS[lower].elevation,
+            isMountain: OFFICIAL_KNOWN_ELEVATIONS[lower].isMountain,
+            country: fav.country || OFFICIAL_KNOWN_ELEVATIONS[lower].country
+          };
+        }
+        return fav;
+      });
+    }
+  }
+} catch(e) {
+  state.favorites = [];
+}
+
 if (state.favorites.length === 0) {
   state.favorites = [
     { name: 'München', lat: 48.1374, lon: 11.5755, elevation: 520, country: 'Deutschland', isMountain: false },
@@ -48,6 +125,9 @@ if (state.favorites.length === 0) {
     { name: 'Berlin', lat: 52.5200, lon: 13.4050, elevation: 34, country: 'Deutschland', isMountain: false },
     { name: 'Bozen', lat: 46.4983, lon: 11.3548, elevation: 262, country: 'Italien', isMountain: false }
   ];
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.favorites));
+  }
 }
 
 // WMO Codes
@@ -298,13 +378,15 @@ async function loadLocation(loc) {
 
   } catch (err) {
     console.error('Fehler beim Laden des Wetters:', err);
+    const cond = document.getElementById('hero-condition-text');
+    if (cond) cond.innerText = 'Verbindungsfehler beim Laden der Daten';
   }
 }
 
 function updateLocationHeaderUI() {
   const loc = state.currentLocation;
   document.getElementById('hero-location-name').innerText = loc.name;
-  document.getElementById('hero-elevation-pill').innerText = `🏔️ ${loc.elevation.toLocaleString('de-DE')} m`;
+  document.getElementById('hero-elevation-pill').innerText = `${loc.isMountain ? '🏔️' : '🏙️'} ${loc.elevation.toLocaleString('de-DE')} m`;
   document.getElementById('hero-geo-coords').innerText = `Lat: ${loc.lat.toFixed(4)}, Lon: ${loc.lon.toFixed(4)}`;
   document.getElementById('hero-update-time').innerText = `Aktualisiert: ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
@@ -398,11 +480,13 @@ function renderHourlySlider(hourly) {
   for (let i = startIdx; i < startIdx + 25 && i < hourly.time.length; i++) {
     const t = new Date(hourly.time[i]);
     const isFirst = i === startIdx;
-    const label = isFirst ? 'Jetzt' : `${t.getHours()}:00`;
+    const label = isFirst ? 'Jetzt' : `${String(t.getHours()).padStart(2, '0')}:00`;
     const temp = Math.round(convertTemp(hourly.temperature_2m[i]));
     const pop = hourly.precipitation_probability ? hourly.precipitation_probability[i] : 0;
     const code = hourly.weather_code ? hourly.weather_code[i] : 0;
-    const isDay = t.getHours() >= 6 && t.getHours() <= 20;
+    const isDay = (hourly.is_day && hourly.is_day[i] !== undefined)
+      ? hourly.is_day[i] === 1
+      : (t.getHours() >= 6 && t.getHours() <= 20);
     const info = WMO_CODES[code] || WMO_CODES[0];
     const icon = isDay ? info.icon : info.iconNight;
     const wind = hourly.wind_speed_10m ? Math.round(hourly.wind_speed_10m[i]) : '--';
@@ -709,15 +793,31 @@ function renderAltitudeChart() {
 
 function setupAltitudeSlider() {
   const slider = document.getElementById('profile-hour-slider');
-  const label = document.getElementById('profile-time-label');
-
   if (slider) {
     slider.addEventListener('input', (e) => {
       state.selectedAltitudeHour = parseInt(e.target.value);
-      const h = state.selectedAltitudeHour;
-      if (label) label.innerText = h === 0 ? 'Jetzt' : `In ${h} Stunden`;
+      updateAltitudeSliderLabel();
       renderAltitudeChart();
     });
+  }
+}
+
+function updateAltitudeSliderLabel() {
+  const label = document.getElementById('profile-time-label');
+  if (!label) return;
+  const h = state.selectedAltitudeHour;
+  if (!state.microData || !state.microData.altitudeProfile) {
+    label.innerText = h === 0 ? 'Jetzt' : `+${h} Stunden`;
+    return;
+  }
+  const profiles = state.microData.altitudeProfile;
+  const cur = profiles[h] || profiles[0];
+  if (cur && cur.time) {
+    const t = new Date(cur.time);
+    const timeStr = `${String(t.getHours()).padStart(2, '0')}:00`;
+    label.innerText = h === 0 ? `Jetzt (${timeStr} Uhr)` : `+${h}h (${timeStr} Uhr)`;
+  } else {
+    label.innerText = h === 0 ? 'Jetzt' : `+${h} Stunden`;
   }
 }
 
@@ -745,12 +845,27 @@ function initLeafletMap() {
   state.map.instance.on('click', async (e) => {
     const lat = e.latlng.lat;
     const lon = e.latlng.lng;
+    
+    // Exakte Höhe live für diesen Klick-Punkt über Elevation-API laden
+    let elev = 500;
+    try {
+      const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
+      const elData = await elRes.json();
+      if (elData.elevation && elData.elevation[0] !== undefined) {
+        elev = Math.round(elData.elevation[0]);
+      }
+    } catch(err) {
+      console.warn('Elevation fetch failed for map click', err);
+    }
+
+    const isMtn = elev >= 1100;
     selectExactLocation({
-      name: `Punkt (${lat.toFixed(3)}, ${lon.toFixed(3)})`,
+      name: `${isMtn ? 'Bergpunkt' : 'Kartenpunkt'} (${elev} m)`,
       lat: lat,
       lon: lon,
-      elevation: 800,
-      isMountain: true
+      elevation: elev,
+      country: '',
+      isMountain: isMtn
     });
   });
 
@@ -903,7 +1018,7 @@ function toggleFavoriteCurrent() {
     });
   }
 
-  localStorage.setItem('best_weather_favorites_v3', JSON.stringify(state.favorites));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.favorites));
   updateFavStarUI();
   renderFavoritesTab();
 }
@@ -929,7 +1044,7 @@ function renderFavoritesTab() {
     card.innerHTML = `
       <div class="fav-info">
         <div class="fav-name">${typeIcon} ${fav.name}</div>
-        <div class="fav-meta">Höhe: ${fav.elevation} m • ${fav.country || ''}</div>
+        <div class="fav-meta">Höhe: ${fav.elevation.toLocaleString('de-DE')} m • ${fav.country || ''}</div>
       </div>
       <div class="fav-actions">
         <button class="fav-del-btn" title="Löschen">✕</button>
@@ -946,7 +1061,7 @@ function renderFavoritesTab() {
     card.querySelector('.fav-del-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       state.favorites.splice(i, 1);
-      localStorage.setItem('best_weather_favorites_v3', JSON.stringify(state.favorites));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.favorites));
       renderFavoritesTab();
       updateFavStarUI();
     });
@@ -985,22 +1100,46 @@ function setupSearch() {
 
         dropdown.innerHTML = '';
         if (data.results && data.results.length > 0) {
-          data.results.forEach(item => {
+          // Alpine & European Priority Ranking
+          const scored = data.results.map(item => {
+            let score = 0;
+            const country = (item.country || '').toLowerCase();
+            if (['schweiz', 'österreich', 'deutschland', 'italien', 'liechtenstein', 'frankreich'].includes(country)) {
+              score += 100;
+            }
+            const fc = item.feature_code || '';
+            if (['MT', 'PK'].includes(fc)) score += 30;
+            if (['PPLA', 'PPLC'].includes(fc)) score += 20;
+            if (item.name.toLowerCase() === q.toLowerCase()) score += 50;
+            const pop = item.population || 0;
+            score += Math.min(50, pop / 10000);
+            return { item, score };
+          });
+          scored.sort((a, b) => b.score - a.score);
+
+          scored.forEach(({ item }) => {
             const row = document.createElement('div');
             row.className = 'dropdown-item';
 
-            // Exact official elevation from geocoding
-            const officialElev = Math.round(item.elevation || 500);
-            const isMtn = determineIfMountain(item.name, item.feature_code, officialElev);
+            // Check if known landmark in our official ground-truth database
+            const nLower = item.name.toLowerCase();
+            let officialElev = Math.round(item.elevation || 500);
+            let isMtn = determineIfMountain(item.name, item.feature_code, officialElev);
+
+            if (OFFICIAL_KNOWN_ELEVATIONS[nLower]) {
+              officialElev = OFFICIAL_KNOWN_ELEVATIONS[nLower].elevation;
+              isMtn = OFFICIAL_KNOWN_ELEVATIONS[nLower].isMountain;
+            }
+
             const icon = isMtn ? '🏔️' : '🏙️';
             const admin = [item.admin1, item.country].filter(Boolean).join(', ');
 
             row.innerHTML = `
               <div>
                 <div class="dropdown-city">${icon} ${item.name}</div>
-                <div class="dropdown-region">${admin} (${item.feature_code || ''})</div>
+                <div class="dropdown-region">${admin}</div>
               </div>
-              <div class="dropdown-elevation">${officialElev} m</div>
+              <div class="dropdown-elevation">${officialElev.toLocaleString('de-DE')} m</div>
             `;
 
             row.addEventListener('click', () => {
@@ -1094,9 +1233,22 @@ function setupSearch() {
 
 function determineIfMountain(name, featureCode, elevation) {
   const n = name.toLowerCase();
-  if (featureCode === 'MT' || featureCode === 'PK' || featureCode === 'PASS' || featureCode === 'MTS') return true;
-  if (n.includes('spitze') || n.includes('horn') || n.includes('kogel') || n.includes('gipfel') || n.includes('wand') || n.includes('grat') || n.includes('massiv')) return true;
-  if (elevation >= 1200 && featureCode !== 'PPLA' && featureCode !== 'PPLC') return true;
+  if (OFFICIAL_KNOWN_ELEVATIONS[n] && OFFICIAL_KNOWN_ELEVATIONS[n].isMountain !== undefined) {
+    return OFFICIAL_KNOWN_ELEVATIONS[n].isMountain;
+  }
+  // Städte, Dörfer und Gemeinden (PPL*) sind immer STÄDTE / Siedlungen
+  if (featureCode && featureCode.startsWith('PPL')) {
+    return false;
+  }
+  if (featureCode === 'MT' || featureCode === 'PK' || featureCode === 'PASS' || featureCode === 'MTS' || featureCode === 'HLL' || featureCode === 'RDGE') {
+    return true;
+  }
+  if (n.includes('spitze') || n.includes('horn') || n.includes('kogel') || n.includes('gipfel') || n.includes('wand') || n.includes('grat') || n.includes('massiv') || n.includes('berg')) {
+    return true;
+  }
+  if (elevation >= 1300 && (!featureCode || !featureCode.startsWith('PPL'))) {
+    return true;
+  }
   return false;
 }
 

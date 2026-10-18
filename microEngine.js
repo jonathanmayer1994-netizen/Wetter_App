@@ -188,6 +188,7 @@ export const MicroEngine = {
       "relative_humidity_2m",
       "dew_point_2m",
       "apparent_temperature",
+      "is_day",
       "precipitation_probability",
       "precipitation",
       "weather_code",
@@ -406,7 +407,7 @@ export const MicroEngine = {
     const h = weatherData.hourly;
     if (!h || !h.time) return null;
 
-    const valleyZ = Math.min(800, Math.round(peakElevation * 0.3));
+    const valleyZ = Math.max(500, Math.min(1800, Math.round(peakElevation * 0.38)));
     const midZ = Math.round((peakElevation + valleyZ) / 2);
     const peakZ = Math.round(peakElevation);
     const highZ = Math.round(peakElevation + 800);
