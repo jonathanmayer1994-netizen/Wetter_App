@@ -143,10 +143,10 @@
         <!-- 24-HOUR HOURLY FORECAST SLIDER -->
         <section class="glass-card hourly-card">
           <div class="card-header">
-            <div class="card-title">
+            <h2 class="card-title">
               <span class="card-icon">⏱️</span>
               <span>24-STUNDEN-VORHERSAGE</span>
-            </div>
+            </h2>
             <span class="card-tag">Stündlich</span>
           </div>
           <div class="hourly-scroll-container" id="hourly-forecast-list">
@@ -157,10 +157,10 @@
         <!-- 10-TAGE-VORHERSAGE MIT KLICK-DETAILS -->
         <section class="glass-card daily-card">
           <div class="card-header">
-            <div class="card-title">
+            <h2 class="card-title">
               <span class="card-icon">📅</span>
               <span>10-TAGE-TREND & METEOROLOGISCHE DETAILS</span>
-            </div>
+            </h2>
             <span class="card-tag">Tippe Zeile für Stundendetails</span>
           </div>
 
@@ -1351,7 +1351,7 @@
 
   <!-- INTERAKTIVES TAGES-DETAIL MODAL (Pop-up beim Klick auf einen der 10 Tage) -->
   <!-- INTERAKTIVES TAGES-DETAIL MODAL (Tiefenanalyse beim Klick auf einen der 10 Tage) -->
-  <div class="modal-overlay" id="day-detail-modal" style="display:none;">
+  <div class="modal-overlay" id="day-detail-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modal-day-name">
     <div class="modal-card glass-card">
       
       <!-- 1. Header mit Tag, Datum, Ort und Wetterzustand -->
@@ -1361,7 +1361,7 @@
           <h2 class="modal-day-title" id="modal-day-name">Montag, 19. Oktober 2026</h2>
           <span class="modal-condition" id="modal-day-condition">🌦️ Leichte Regenschauer • Herbstliches Wetter</span>
         </div>
-        <button id="close-modal-btn" class="close-modal-btn" title="Schließen (Esc)">✕</button>
+        <button id="close-modal-btn" class="close-modal-btn" title="Schließen (Esc)" aria-label="Tagesdetails schließen">✕</button>
       </div>
 
       <!-- 2. Bento Hauptmetriken (6 Karten) -->
@@ -1538,14 +1538,14 @@
   <!-- =================================================================== -->
   <!-- MODAL: GPX-ROUTEN-INSPEKTOR & HÖHENPROFIL-MIKROWETTER -->
   <!-- =================================================================== -->
-  <div class="modal-overlay" id="gpx-modal-overlay" style="display:none;">
+  <div class="modal-overlay" id="gpx-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="GPX-Routen-Inspektor">
     <div class="modal-card gpx-modal-card">
       <div class="modal-header">
         <div class="modal-title">
           <span>🥾</span>
           <span>GPX-ROUTEN-INSPEKTOR & HÖHENPROFIL-MIKROWETTER</span>
         </div>
-        <button class="modal-close-btn" id="gpx-modal-close">✕</button>
+        <button class="modal-close-btn" id="gpx-modal-close" aria-label="GPX-Inspektor schließen">✕</button>
       </div>
 
       <div class="modal-body">
@@ -1606,18 +1606,18 @@
   <!-- =================================================================== -->
   <!-- MODAL: WEBCAM HIGH-RES PREVIEW -->
   <!-- =================================================================== -->
-  <div class="modal-overlay" id="webcam-modal-overlay" style="display:none;">
+  <div class="modal-overlay" id="webcam-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="webcam-modal-title">
     <div class="modal-card webcam-modal-card">
       <div class="modal-header">
         <div class="modal-title" id="webcam-modal-title">Live-Webcam</div>
-        <button class="modal-close-btn" id="webcam-modal-close">✕</button>
+        <button class="modal-close-btn" id="webcam-modal-close" aria-label="Webcam-Vorschau schließen">✕</button>
       </div>
       <div class="modal-body webcam-modal-body">
         <img id="webcam-modal-img" src="" alt="Webcam Live View" class="webcam-modal-img">
         <div class="webcam-modal-meta" id="webcam-modal-meta">--</div>
         <div class="webcam-modal-actions">
           <a id="webcam-external-link" href="#" target="_blank" rel="noopener noreferrer" class="action-btn">🔗 Zur offiziellen Livecam-Seite</a>
-          <button type="button" class="action-btn action-btn-secondary" id="webcam-modal-close-action">✕ Schließen</button>
+          <button type="button" class="action-btn action-btn-secondary" id="webcam-modal-close-action" aria-label="Webcam schließen">✕ Schließen</button>
         </div>
       </div>
     </div>
@@ -1626,7 +1626,7 @@
   <!-- =================================================================== -->
   <!-- MODAL: APPLE SPOTLIGHT GLOBAL QUICK-SEARCH (CMD+K) -->
   <!-- =================================================================== -->
-  <div class="spotlight-overlay" id="spotlight-modal-overlay" style="display:none;">
+  <div class="spotlight-overlay" id="spotlight-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Apple Spotlight Schnellsuche">
     <div class="spotlight-modal-card">
       <div class="spotlight-input-wrap">
         <span class="spotlight-icon">🔍</span>
@@ -1637,8 +1637,9 @@
           placeholder="Stadt, Alpengipfel (z.B. Matterhorn) oder Koordinaten eingeben..." 
           autocomplete="off"
           spellcheck="false"
+          aria-label="Ort, Berg oder Koordinaten eingeben"
         >
-        <button class="spotlight-close-btn" id="spotlight-modal-close" type="button">✕ ESC</button>
+        <button class="spotlight-close-btn" id="spotlight-modal-close" type="button" aria-label="Schnellsuche schließen">✕ ESC</button>
       </div>
 
       <!-- 8A: Zuletzt gesuchte Orte (Recent History) -->
@@ -1706,5 +1707,16 @@
   
   <!-- App Core Module -->
   <script type="module" src="app.js"></script>
+
+  <!-- Service Worker Registration für Alpine Offline PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((err) => {
+          console.warn('Service Worker Registrierung:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

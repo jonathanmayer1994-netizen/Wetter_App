@@ -939,6 +939,7 @@ export const MicroEngine = {
       let totalDescentM = 0;
       let minEle = Infinity;
       let maxEle = -Infinity;
+      let lastEleAnchor = trkpts[0] ? trkpts[0].ele : 1000;
 
       for (let i = 0; i < trkpts.length; i++) {
         const pt = trkpts[i];
@@ -952,9 +953,12 @@ export const MicroEngine = {
           const d = this.calculateHaversineDistance(prev.lat, prev.lon, lat, lon);
           totalDistanceM += d;
 
-          const dz = ele - prev.ele;
-          if (dz > 0) totalAscentM += dz;
-          else totalDescentM += Math.abs(dz);
+          const dz = ele - lastEleAnchor;
+          if (Math.abs(dz) >= 3.5) {
+            if (dz > 0) totalAscentM += dz;
+            else totalDescentM += Math.abs(dz);
+            lastEleAnchor = ele;
+          }
         }
 
         if (ele < minEle) minEle = ele;

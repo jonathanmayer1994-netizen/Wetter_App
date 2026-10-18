@@ -4,6 +4,8 @@
  */
 
 import { MicroEngine } from './microEngine.js';
+import { AlpineStorage } from './storage.js';
+import { resilientFetch, escapeHtml } from './httpClient.js';
 
 // =============================================================================
 // GLOBAL STATE & PERSISTENCE
@@ -150,9 +152,8 @@ export const OFFICIAL_KNOWN_ELEVATIONS = {
 // Initialisierung der Favoriten mit sauberer v4-Migration
 const STORAGE_KEY = 'best_weather_favorites_v4';
 try {
-  if (typeof localStorage !== 'undefined') {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    if (Array.isArray(saved) && saved.length > 0) {
+  const saved = AlpineStorage.safeGetItem(STORAGE_KEY, []);
+  if (Array.isArray(saved) && saved.length > 0) {
       state.favorites = saved.map(fav => {
         const lower = fav.name.toLowerCase();
         if (OFFICIAL_KNOWN_ELEVATIONS[lower]) {
@@ -165,7 +166,6 @@ try {
         }
         return fav;
       });
-    }
   }
 } catch(e) {
   state.favorites = [];
@@ -179,9 +179,7 @@ if (state.favorites.length === 0) {
     { name: 'Berlin', lat: 52.5200, lon: 13.4050, elevation: 34, country: 'Deutschland', isMountain: false },
     { name: 'Bozen', lat: 46.4983, lon: 11.3548, elevation: 262, country: 'Italien', isMountain: false }
   ];
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.favorites));
-  }
+  AlpineStorage.safeSetItem(STORAGE_KEY, state.favorites);
 }
 
 // WMO Codes
@@ -228,11 +226,45 @@ class BackgroundCanvasEngine {
     this.stars = [];
     this.currentMode = 'clear-day';
     this.isDay = true;
+    this.isPaused = false;
+    this.rafId = null;
+    this.reducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.resize();
     window.addEventListener('resize', () => this.resize());
     this.initStars();
     this.animate = this.animate.bind(this);
-    this.animate();
+    if (!this.reducedMotion) {
+      this.animate();
+    } else {
+      this.renderStaticFrame();
+    }
+  }
+
+  pause() {
+    this.isPaused = true;
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  resume() {
+    if (this.isPaused && !this.reducedMotion) {
+      this.isPaused = false;
+      this.animate();
+    }
+  }
+
+  renderStaticFrame() {
+    this.ctx.clearRect(0, 0, this.width, this.height);
+    if (!this.isDay || this.currentMode === 'clear-night') {
+      for (const star of this.stars) {
+        this.ctx.fillStyle = `rgba(255, 255, 255, 0.65)`;
+        this.ctx.beginPath();
+        this.ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    }
   }
 
   resize() {
@@ -283,6 +315,7 @@ class BackgroundCanvasEngine {
   }
 
   animate() {
+    if (this.isPaused || this.reducedMotion) return;
     this.ctx.clearRect(0, 0, this.width, this.height);
 
     if (!this.isDay || this.currentMode === 'clear-night') {
@@ -329,7 +362,7 @@ class BackgroundCanvasEngine {
       }
     }
 
-    requestAnimationFrame(this.animate);
+    this.rafId = requestAnimationFrame(this.animate);
   }
 }
 
@@ -367,6 +400,16 @@ function setupTabs() {
       switchTab(btn.dataset.tab);
     });
   });
+
+  // Page Visibility API: Akku- und Ressourcenschonung bei minimiertem Tab / gesperrtem Bildschirm
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (state.canvasEngine) state.canvasEngine.pause();
+      if (state.map && state.map.radarPlaying) stopRadarAnimation();
+    } else {
+      if (state.canvasEngine) state.canvasEngine.resume();
+    }
+  });
 }
 
 function switchTab(tabId) {
@@ -377,6 +420,11 @@ function switchTab(tabId) {
   document.querySelectorAll('.tab-pane').forEach(p => {
     p.classList.toggle('active', p.id === tabId);
   });
+
+  // Radar-Animation sofort stoppen, wenn der Nutzer den Map-Tab verlässt!
+  if (tabId !== 'tab-map' && state.map && state.map.radarPlaying) {
+    stopRadarAnimation();
+  }
 
   if (tabId === 'tab-mountain') {
     setTimeout(() => {
@@ -425,77 +473,44 @@ function setupLocationTypeToggle() {
 }
 
 // =============================================================================
-// FEATURE 3B: OFFLINE CACHING FÜR WETTERDATEN & GPX-TOUREN (LOCALSTORAGE)
+// FEATURE 3B: OFFLINE CACHING FÜR WETTERDATEN & GPX-TOUREN (INDEXEDDB & SAFESTORAGE)
 // =============================================================================
 const WeatherTourCache = {
   LOCATION_KEY: 'alpine_offline_last_location',
   WEATHER_KEY: 'alpine_offline_weather_data',
   SPORTS_TOUR_KEY: 'alpine_offline_sports_tour',
 
-  saveLocationAndWeather(loc, weatherData, microData) {
-    try {
-      if (!loc) return;
-      localStorage.setItem(this.LOCATION_KEY, JSON.stringify(loc));
-      if (weatherData) {
-        const cachePayload = {
-          timestamp: Date.now(),
-          locName: loc.name,
-          weatherData,
-          microData: microData ? {
-            slopeDeg: microData.slopeDeg,
-            aspectDeg: microData.aspectDeg,
-            summitWind10m: microData.summitWind10m,
-            tInversion: microData.tInversion
-          } : null
-        };
-        localStorage.setItem(this.WEATHER_KEY, JSON.stringify(cachePayload));
-      }
-    } catch (e) {
-      console.warn('WeatherTourCache save failed:', e);
+  async saveLocationAndWeather(loc, weatherData, microData) {
+    if (!loc) return;
+    AlpineStorage.safeSetItem(this.LOCATION_KEY, loc);
+    if (weatherData) {
+      await AlpineStorage.saveWeatherCache(loc, weatherData, microData);
     }
   },
 
   getCachedLocation() {
-    try {
-      const raw = localStorage.getItem(this.LOCATION_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
+    return AlpineStorage.safeGetItem(this.LOCATION_KEY, null);
   },
 
-  getCachedWeather() {
-    try {
-      const raw = localStorage.getItem(this.WEATHER_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
+  async getCachedWeather() {
+    return await AlpineStorage.getCachedWeather();
   },
 
-  saveTour(tourName, gpxXml, parsedGPX, timeline, stats) {
-    try {
-      const payload = {
-        timestamp: Date.now(),
-        tourName,
-        gpxXml,
-        parsedGPX,
-        timeline,
-        stats
-      };
-      localStorage.setItem(this.SPORTS_TOUR_KEY, JSON.stringify(payload));
-    } catch (e) {
-      console.warn('WeatherTourCache saveTour failed:', e);
-    }
+  async saveTour(tourName, gpxXml, parsedGPX, timeline, stats) {
+    const payload = {
+      id: 'current_tour',
+      timestamp: Date.now(),
+      tourName,
+      gpxXml,
+      parsedGPX,
+      timeline,
+      stats
+    };
+    await AlpineStorage.saveTour(payload);
   },
 
-  getCachedTour() {
-    try {
-      const raw = localStorage.getItem(this.SPORTS_TOUR_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
+  async getCachedTour() {
+    return await AlpineStorage.getTour('current_tour');
   }
 };
 
@@ -547,7 +562,7 @@ async function loadLocation(loc) {
   } catch (err) {
     console.error('Fehler beim Laden des Wetters:', err);
     // Feature 3B: Offline-Fallback ausführen falls vorhanden
-    const cached = WeatherTourCache.getCachedWeather();
+    const cached = await WeatherTourCache.getCachedWeather();
     if (cached && cached.weatherData) {
       console.info('Offline-Modus: Stelle gespeicherte Wetterdaten für', cached.locName, 'wieder her');
       state.weatherData = cached.weatherData;
@@ -4292,7 +4307,7 @@ function toggleFavoriteCurrent() {
     });
   }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.favorites));
+  AlpineStorage.safeSetItem(STORAGE_KEY, state.favorites);
   updateFavStarUI();
   renderFavoritesTab();
 }
@@ -4317,11 +4332,11 @@ function renderFavoritesTab() {
     const typeIcon = fav.isMountain ? '🏔️' : '🏙️';
     card.innerHTML = `
       <div class="fav-info">
-        <div class="fav-name">${typeIcon} ${fav.name}</div>
-        <div class="fav-meta">Höhe: ${fav.elevation.toLocaleString('de-DE')} m • ${fav.country || ''}</div>
+        <div class="fav-name">${typeIcon} ${escapeHtml(fav.name)}</div>
+        <div class="fav-meta">Höhe: ${fav.elevation.toLocaleString('de-DE')} m • ${escapeHtml(fav.country || '')}</div>
       </div>
       <div class="fav-actions">
-        <button class="fav-del-btn" title="Löschen">✕</button>
+        <button class="fav-del-btn" title="Löschen" aria-label="Favorit löschen">✕</button>
       </div>
     `;
 
@@ -4335,7 +4350,7 @@ function renderFavoritesTab() {
     card.querySelector('.fav-del-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       state.favorites.splice(i, 1);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.favorites));
+      AlpineStorage.safeSetItem(STORAGE_KEY, state.favorites);
       renderFavoritesTab();
       updateFavStarUI();
     });
@@ -4369,8 +4384,7 @@ function setupSearch() {
     debounceTimer = setTimeout(async () => {
       try {
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=de&format=json`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await resilientFetch(url, { cancelCategory: 'main_search', ttlMs: 60000 });
 
         dropdown.innerHTML = '';
         if (data.results && data.results.length > 0) {
@@ -4410,8 +4424,8 @@ function setupSearch() {
 
             row.innerHTML = `
               <div>
-                <div class="dropdown-city">${icon} ${item.name}</div>
-                <div class="dropdown-region">${admin}</div>
+                <div class="dropdown-city">${icon} ${escapeHtml(item.name)}</div>
+                <div class="dropdown-region">${escapeHtml(admin)}</div>
               </div>
               <div class="dropdown-elevation">${officialElev.toLocaleString('de-DE')} m</div>
             `;
@@ -4603,16 +4617,14 @@ function triggerExactGps() {
 // FEATURE 8A: ZULETZT GESUCHTE ORTE (RECENT SEARCHES IN LOCALSTORAGE)
 // =============================================================================
 function getSpotlightRecents() {
-  try {
-    const raw = localStorage.getItem('alpine_recent_searches');
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) { return []; }
+  return AlpineStorage.safeGetItem('alpine_recent_searches', []);
 }
 
 function addSpotlightRecent(loc) {
   if (!loc || !loc.name) return;
   try {
     let list = getSpotlightRecents();
+    if (!Array.isArray(list)) list = [];
     list = list.filter(item => item.name.toLowerCase() !== loc.name.toLowerCase());
     list.unshift({
       name: loc.name,
@@ -4622,7 +4634,7 @@ function addSpotlightRecent(loc) {
       isMountain: !!loc.isMountain,
       country: loc.country || ''
     });
-    localStorage.setItem('alpine_recent_searches', JSON.stringify(list.slice(0, 3)));
+    AlpineStorage.safeSetItem('alpine_recent_searches', list.slice(0, 3));
   } catch (e) {}
 }
 
@@ -4636,9 +4648,9 @@ function renderSpotlightRecentsUI() {
     return;
   }
   listElem.innerHTML = recents.map(r => `
-    <button type="button" class="recent-chip" data-recent="${r.name}">
+    <button type="button" class="recent-chip" data-recent="${escapeHtml(r.name)}">
       <span>${r.isMountain ? '🏔️' : '🏙️'}</span>
-      <span>${r.name}</span>
+      <span>${escapeHtml(r.name)}</span>
       <span style="opacity:0.65; font-size:10px;">${r.elevation.toLocaleString('de-DE')}m</span>
     </button>
   `).join('');
@@ -4673,18 +4685,41 @@ function setupSpotlightAndQuickGps() {
   let selectedIndex = -1;
   let debounceTimer = null;
 
+  function trapModalFocus(e) {
+    if (e.key !== 'Tab') return;
+    const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
   function openSpotlight() {
     modal.style.display = 'flex';
     input.value = '';
     selectedIndex = -1;
     renderSpotlightRecentsUI();
     renderSpotlightInitial();
+    modal.addEventListener('keydown', trapModalFocus);
     setTimeout(() => input.focus(), 60);
   }
 
   function closeSpotlight() {
     modal.style.display = 'none';
+    modal.removeEventListener('keydown', trapModalFocus);
     if (debounceTimer) clearTimeout(debounceTimer);
+    if (triggerBtn) triggerBtn.focus();
   }
 
   function renderSpotlightInitial() {
@@ -4809,8 +4844,7 @@ function setupSpotlightAndQuickGps() {
 
       try {
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=de&format=json`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await resilientFetch(url, { cancelCategory: 'spotlight_search', ttlMs: 60000 });
 
         if (data.results && data.results.length > 0) {
           const scored = data.results.map(item => {
@@ -4847,8 +4881,8 @@ function setupSpotlightAndQuickGps() {
               <div class="si-left">
                 <span class="si-icon">${icon}</span>
                 <div>
-                  <span class="si-name">${item.name}</span>
-                  <span class="si-sub">${admin}</span>
+                  <span class="si-name">${escapeHtml(item.name)}</span>
+                  <span class="si-sub">${escapeHtml(admin)}</span>
                 </div>
               </div>
               <div class="si-right">${officialElev.toLocaleString('de-DE')} m</div>
@@ -4872,13 +4906,15 @@ function setupSpotlightAndQuickGps() {
         } else {
           resultsContainer.innerHTML = `
             <div style="padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px;">
-              Kein Ort oder Berggipfel gefunden für "${q}"
+              Kein Ort oder Berggipfel gefunden für "${escapeHtml(q)}"
             </div>
           `;
           selectedIndex = -1;
         }
       } catch (err) {
-        console.error('Spotlight Suche fehlgeschlagen:', err);
+        if (err.name !== 'AbortError') {
+          console.error('Spotlight Suche fehlgeschlagen:', err);
+        }
       }
     }, 200);
   });
@@ -5522,10 +5558,10 @@ function setupSportsTab() {
   }
 }
 
-function initSportsTour() {
+async function initSportsTour() {
   state.sports.initialized = true;
   // Feature 3B: Prüfe offline zwischengespeicherte Tour
-  const cachedTour = WeatherTourCache.getCachedTour();
+  const cachedTour = await WeatherTourCache.getCachedTour();
   if (cachedTour && cachedTour.gpxXml && cachedTour.tourName) {
     loadAndComputeSportsTour(cachedTour.gpxXml, cachedTour.tourName);
   } else {
@@ -5557,10 +5593,8 @@ async function fetchHourlyForRoute(lat, lon) {
 
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height&forecast_days=7&timezone=auto`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (data.hourly && data.hourly.time && data.hourly.time.length > 0) {
+    const data = await resilientFetch(url, { ttlMs: 5 * 60 * 1000 });
+    if (data && data.hourly && data.hourly.time && data.hourly.time.length > 0) {
       state.sports.cachedForecasts[cacheKey] = data.hourly;
       return data.hourly;
     }
@@ -5613,9 +5647,42 @@ function generateSyntheticSportsHourly() {
   };
 }
 
+async function parseGPXAsync(gpxXml) {
+  if (typeof Worker !== 'undefined') {
+    try {
+      return await new Promise((resolve) => {
+        const worker = new Worker('./gpx.worker.js');
+        const timeout = setTimeout(() => {
+          worker.terminate();
+          resolve(MicroEngine.parseGPXData(gpxXml));
+        }, 2500);
+
+        worker.onmessage = (e) => {
+          clearTimeout(timeout);
+          worker.terminate();
+          if (e.data && e.data.status === 'success') {
+            resolve(e.data.data);
+          } else {
+            resolve(MicroEngine.parseGPXData(gpxXml));
+          }
+        };
+
+        worker.onerror = () => {
+          clearTimeout(timeout);
+          worker.terminate();
+          resolve(MicroEngine.parseGPXData(gpxXml));
+        };
+
+        worker.postMessage({ action: 'parseGPX', payload: { xmlString: gpxXml } });
+      });
+    } catch (e) {}
+  }
+  return MicroEngine.parseGPXData(gpxXml);
+}
+
 async function loadAndComputeSportsTour(gpxXml, tourName) {
   state.sports.gpxText = gpxXml;
-  const parsed = MicroEngine.parseGPXData(gpxXml);
+  const parsed = await parseGPXAsync(gpxXml);
   if (!parsed || !parsed.points || parsed.points.length === 0) {
     const bannerTitle = document.getElementById('hsb-title');
     const bannerDesc = document.getElementById('hsb-desc');
@@ -5924,8 +5991,8 @@ function renderSportsWaypointsTable(timeline) {
 
     row.innerHTML = `
       <div class="swt-cell swt-milestone">
-        <span class="swt-type-tag">${typeTag}</span>
-        <span class="swt-m-name">${m.label}</span>
+        <span class="swt-type-tag">${escapeHtml(typeTag)}</span>
+        <span class="swt-m-name">${escapeHtml(m.label)}</span>
         <span class="swt-m-coords">${m.lat.toFixed(4)}°, ${m.lon.toFixed(4)}°</span>
       </div>
       <div class="swt-cell swt-dist-ele">
@@ -5933,15 +6000,15 @@ function renderSportsWaypointsTable(timeline) {
         <span class="swt-ele text-cyan">${Math.round(m.ele)} m</span>
       </div>
       <div class="swt-cell swt-time">
-        <strong class="swt-arr-time">${m.arrivalTimeStr}</strong>
-        <span class="swt-arr-date">${m.arrivalDateStr}</span>
+        <strong class="swt-arr-time">${escapeHtml(m.arrivalTimeStr)}</strong>
+        <span class="swt-arr-date">${escapeHtml(m.arrivalDateStr)}</span>
       </div>
       <div class="swt-cell swt-weather">
         <div class="swt-w-top">
           <span class="swt-icon">${m.weatherIcon}</span>
           <strong class="swt-temp">${m.tempC}°C</strong>
         </div>
-        <span class="swt-cond">${m.weatherCondition}</span>
+        <span class="swt-cond">${escapeHtml(m.weatherCondition)}</span>
       </div>
       <div class="swt-cell swt-wind">
         <strong>${m.windKmH} km/h</strong>

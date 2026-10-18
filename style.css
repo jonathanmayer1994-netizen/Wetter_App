@@ -147,9 +147,10 @@ html, body {
   max-width: 1220px;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: 20px 24px 60px 24px;
+  padding: max(16px, env(safe-area-inset-top, 16px)) 24px calc(60px + env(safe-area-inset-bottom, 0px)) 24px;
   gap: 20px;
 }
 
@@ -486,6 +487,7 @@ html, body {
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   text-transform: uppercase;
+  margin: 0;
 }
 
 .card-icon {
@@ -2559,6 +2561,7 @@ html, body {
   position: relative;
   width: 100%;
   height: calc(100vh - 210px);
+  height: calc(100dvh - 210px);
   min-height: 640px;
   border-radius: 20px;
   overflow: hidden;
@@ -5516,6 +5519,7 @@ html, body {
   }
 
   .app-layout {
+    padding-top: max(16px, env(safe-area-inset-top, 16px)) !important;
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 16px)) !important;
   }
 
@@ -5831,6 +5835,20 @@ html, body {
 }
 .ambient-glow.alpenglow.overcast {
   background: radial-gradient(circle at 50% 20%, rgba(130, 70, 100, 0.28) 0%, rgba(80, 50, 90, 0.18) 35%, transparent 75%) !important;
+}
+
+/* ==========================================================================
+   A11Y & BATTERY: PREFERS REDUCED MOTION
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  #weather-canvas {
+    opacity: 0.35 !important;
+  }
 }
 
 
