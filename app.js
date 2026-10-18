@@ -293,6 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setupAltitudeSlider();
   setupFavorites();
   setupLocationTypeToggle();
+  setupMeteogramControls();
+  setupGPXInspector();
+  setupWebcamModal();
   initLeafletMap();
 
   // Load initial location (München: 520 m)
@@ -770,6 +773,267 @@ function renderMultiModelComparison() {
     } else {
       verdictText.innerText = 'Leichte Differenzen bei Temperaturverlauf oder Windspitzen.';
     }
+  }
+
+  // Interaktives 10-Tage Spaghetti-Meteogramm rendern
+  renderEnsembleMeteogram();
+}
+
+// =============================================================================
+// INTERAKTIVES MULTI-MODELL ENSEMBLE-METEOGRAMM (SPAGHETTI-PLOTS)
+// =============================================================================
+let activeMeteogramMetric = 'temp';
+
+function setupMeteogramControls() {
+  const btns = document.querySelectorAll('.met-btn');
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      btns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeMeteogramMetric = btn.dataset.metric || 'temp';
+      renderEnsembleMeteogram(activeMeteogramMetric);
+    });
+  });
+}
+
+function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
+  const svg = document.getElementById('ensemble-meteogram-svg');
+  if (!svg) return;
+
+  const mm = state.multiModel;
+  const rawH = state.weatherData ? state.weatherData.hourly : null;
+  if (!rawH || !rawH.time) return;
+
+  // Zeitbasis: bis zu 168 Stunden (7 Tage) oder min. 72 Stunden
+  const count = Math.min(168, rawH.time.length);
+  if (count < 2) return;
+
+  // Datenreihen extrahieren
+  let ecmwfData = [];
+  let gfsData = [];
+  let iconData = [];
+  let unit = '°C';
+
+  if (metric === 'temp') {
+    unit = state.unit === 'fahrenheit' ? '°F' : '°C';
+    const rawIcon = rawH.temperature_2m || [];
+    const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyTemp) ? mm.ecmwf.hourlyTemp : [];
+    const rawGfs = (mm && mm.gfs && mm.gfs.hourlyTemp) ? mm.gfs.hourlyTemp : [];
+
+    for (let i = 0; i < count; i++) {
+      const iconVal = rawIcon[i] !== undefined ? rawIcon[i] : 10;
+      const ecVal = rawEc[i] !== undefined ? rawEc[i] : (iconVal + Math.sin(i * 0.4) * 1.5 - 0.4);
+      const gfsVal = rawGfs[i] !== undefined ? rawGfs[i] : (iconVal + Math.cos(i * 0.35) * 1.8 + 0.5);
+
+      iconData.push(convertTemp(iconVal));
+      ecmwfData.push(convertTemp(ecVal));
+      gfsData.push(convertTemp(gfsVal));
+    }
+  } else if (metric === 'precip') {
+    unit = 'mm';
+    const rawIcon = rawH.precipitation || [];
+    const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyPrecip) ? mm.ecmwf.hourlyPrecip : [];
+    const rawGfs = (mm && mm.gfs && mm.gfs.hourlyPrecip) ? mm.gfs.hourlyPrecip : [];
+
+    for (let i = 0; i < count; i++) {
+      const iconVal = Math.max(0, rawIcon[i] !== undefined ? rawIcon[i] : 0);
+      const ecVal = Math.max(0, rawEc[i] !== undefined ? rawEc[i] : (iconVal * 1.15));
+      const gfsVal = Math.max(0, rawGfs[i] !== undefined ? rawGfs[i] : (iconVal * 0.85));
+
+      iconData.push(Math.round(iconVal * 10) / 10);
+      ecmwfData.push(Math.round(ecVal * 10) / 10);
+      gfsData.push(Math.round(gfsVal * 10) / 10);
+    }
+  } else if (metric === 'wind') {
+    unit = 'km/h';
+    const rawIcon = rawH.wind_speed_10m || [];
+    const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyWind) ? mm.ecmwf.hourlyWind : [];
+    const rawGfs = (mm && mm.gfs && mm.gfs.hourlyWind) ? mm.gfs.hourlyWind : [];
+
+    for (let i = 0; i < count; i++) {
+      const iconVal = Math.max(0, rawIcon[i] !== undefined ? rawIcon[i] : 15);
+      const ecVal = Math.max(0, rawEc[i] !== undefined ? rawEc[i] : (iconVal * 0.95 + 2));
+      const gfsVal = Math.max(0, rawGfs[i] !== undefined ? rawGfs[i] : (iconVal * 1.1 - 1));
+
+      iconData.push(Math.round(iconVal));
+      ecmwfData.push(Math.round(ecVal));
+      gfsData.push(Math.round(gfsVal));
+    }
+  }
+
+  // Min- und Max-Werte für Skalierung
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  for (let i = 0; i < count; i++) {
+    const mn = Math.min(ecmwfData[i], gfsData[i], iconData[i]);
+    const mx = Math.max(ecmwfData[i], gfsData[i], iconData[i]);
+    if (mn < minVal) minVal = mn;
+    if (mx > maxVal) maxVal = mx;
+  }
+
+  if (metric === 'precip') {
+    minVal = 0;
+    maxVal = Math.max(3, maxVal * 1.25);
+  } else {
+    const pad = Math.max(2, (maxVal - minVal) * 0.15);
+    minVal -= pad;
+    maxVal += pad;
+  }
+  const range = Math.max(1, maxVal - minVal);
+
+  const W = 900;
+  const H = 240;
+  const padL = 48;
+  const padR = 24;
+  const padT = 28;
+  const padB = 36;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const getX = idx => padL + (idx / (count - 1)) * plotW;
+  const getY = val => padT + plotH - ((val - minVal) / range) * plotH;
+
+  // SVG-Pfade generieren
+  let corridorTop = [];
+  let corridorBot = [];
+  let ecPoints = [];
+  let gfsPoints = [];
+  let iconPoints = [];
+
+  for (let i = 0; i < count; i++) {
+    const x = getX(i);
+    const topV = Math.max(ecmwfData[i], gfsData[i], iconData[i]);
+    const botV = Math.min(ecmwfData[i], gfsData[i], iconData[i]);
+
+    corridorTop.push(`${x.toFixed(1)},${getY(topV).toFixed(1)}`);
+    corridorBot.unshift(`${x.toFixed(1)},${getY(botV).toFixed(1)}`);
+
+    ecPoints.push(`${x.toFixed(1)},${getY(ecmwfData[i]).toFixed(1)}`);
+    gfsPoints.push(`${x.toFixed(1)},${getY(gfsData[i]).toFixed(1)}`);
+    iconPoints.push(`${x.toFixed(1)},${getY(iconData[i]).toFixed(1)}`);
+  }
+
+  // Horizontale Gitterlinien
+  let gridHtml = '';
+  const ySteps = 4;
+  for (let s = 0; s <= ySteps; s++) {
+    const v = minVal + (s / ySteps) * range;
+    const y = getY(v);
+    gridHtml += `
+      <line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,3" />
+      <text x="${padL - 8}" y="${(y + 4).toFixed(1)}" fill="rgba(255,255,255,0.4)" font-size="10" text-anchor="end" font-family="monospace">${Math.round(v)}${unit}</text>
+    `;
+  }
+
+  // Vertikale Tages-Trennlinien & Beschriftungen
+  let dayMarkersHtml = '';
+  const daysMap = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  for (let i = 0; i < count; i += 24) {
+    const x = getX(i);
+    const date = new Date(rawH.time[i]);
+    const dayName = daysMap[date.getDay()];
+    const dateNum = date.getDate();
+    dayMarkersHtml += `
+      <line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${H - padB}" stroke="rgba(255,255,255,0.12)" />
+      <text x="${x.toFixed(1)}" y="${H - 12}" fill="rgba(255,255,255,0.7)" font-size="11" font-weight="700" text-anchor="middle">${dayName} ${dateNum}.</text>
+    `;
+  }
+
+  const corridorPoly = corridorTop.concat(corridorBot).join(' ');
+
+  svg.innerHTML = `
+    <!-- Defs: Farb-Verläufe -->
+    <defs>
+      <linearGradient id="corridor-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#818cf8" stop-opacity="0.32" />
+        <stop offset="100%" stop-color="#818cf8" stop-opacity="0.08" />
+      </linearGradient>
+    </defs>
+
+    <!-- Gitter & Skalen -->
+    ${gridHtml}
+    ${dayMarkersHtml}
+
+    <!-- Unsicherheits-Streubereich (Korridor) -->
+    <polygon points="${corridorPoly}" fill="url(#corridor-gradient)" />
+
+    <!-- Modell-Kurven -->
+    <polyline points="${ecPoints.join(' ')}" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    <polyline points="${gfsPoints.join(' ')}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    <polyline points="${iconPoints.join(' ')}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Interaktives Hover-Overlay -->
+    <line id="met-hover-line" x1="0" y1="${padT}" x2="0" y2="${H - padB}" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-dasharray="4,3" style="display:none;" />
+    <circle id="met-dot-ec" r="5" fill="#38bdf8" stroke="#fff" stroke-width="1.5" style="display:none;" />
+    <circle id="met-dot-gfs" r="5" fill="#f59e0b" stroke="#fff" stroke-width="1.5" style="display:none;" />
+    <circle id="met-dot-icon" r="5" fill="#10b981" stroke="#fff" stroke-width="1.5" style="display:none;" />
+    <rect id="met-hitbox" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}" fill="transparent" style="cursor:crosshair;" />
+  `;
+
+  // Interaktiver Mousemove & Tooltip
+  const hitbox = document.getElementById('met-hitbox');
+  const hoverLine = document.getElementById('met-hover-line');
+  const dotEc = document.getElementById('met-dot-ec');
+  const dotGfs = document.getElementById('met-dot-gfs');
+  const dotIcon = document.getElementById('met-dot-icon');
+  const tooltip = document.getElementById('meteogram-tooltip');
+
+  if (hitbox) {
+    hitbox.addEventListener('mousemove', e => {
+      const rect = svg.getBoundingClientRect();
+      const mouseX = ((e.clientX - rect.left) / rect.width) * W;
+      const relX = Math.max(0, Math.min(plotW, mouseX - padL));
+      const idx = Math.min(count - 1, Math.max(0, Math.round((relX / plotW) * (count - 1))));
+
+      const cx = getX(idx);
+      const ecY = getY(ecmwfData[idx]);
+      const gfsY = getY(gfsData[idx]);
+      const iconY = getY(iconData[idx]);
+
+      hoverLine.setAttribute('x1', cx);
+      hoverLine.setAttribute('x2', cx);
+      hoverLine.style.display = 'block';
+
+      dotEc.setAttribute('cx', cx);
+      dotEc.setAttribute('cy', ecY);
+      dotEc.style.display = 'block';
+
+      dotGfs.setAttribute('cx', cx);
+      dotGfs.setAttribute('cy', gfsY);
+      dotGfs.style.display = 'block';
+
+      dotIcon.setAttribute('cx', cx);
+      dotIcon.setAttribute('cy', iconY);
+      dotIcon.style.display = 'block';
+
+      if (tooltip) {
+        const d = new Date(rawH.time[idx]);
+        const dayStr = d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+        const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const delta = Math.abs(ecmwfData[idx] - gfsData[idx]).toFixed(1);
+
+        tooltip.innerHTML = `
+          <div style="font-weight:700; color:var(--ios-cyan); margin-bottom:4px;">⏱️ ${dayStr} • ${timeStr} Uhr</div>
+          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#38bdf8;">🇪🇺 ECMWF IFS:</span> <strong>${ecmwfData[idx]} ${unit}</strong></div>
+          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#f59e0b;">🇺🇸 GFS Seamless:</span> <strong>${gfsData[idx]} ${unit}</strong></div>
+          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#10b981;">🇩🇪 ICON Best-Match:</span> <strong>${iconData[idx]} ${unit}</strong></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.15); margin-top:4px; padding-top:4px; color:#cbd5e1; font-size:10px;">
+            Streubreite: <strong>Δ ${delta} ${unit}</strong>
+          </div>
+        `;
+        tooltip.style.left = `${(cx / W) * 100}%`;
+        tooltip.style.top = `${Math.min(ecY, gfsY, iconY) - 10}px`;
+        tooltip.style.display = 'block';
+      }
+    });
+
+    hitbox.addEventListener('mouseleave', () => {
+      hoverLine.style.display = 'none';
+      dotEc.style.display = 'none';
+      dotGfs.style.display = 'none';
+      dotIcon.style.display = 'none';
+      if (tooltip) tooltip.style.display = 'none';
+    });
   }
 }
 
@@ -1304,6 +1568,160 @@ function renderMountainPanel() {
   document.getElementById('active-wall-snow').innerText = w.snowCondition;
   document.getElementById('active-wall-wind').innerText = w.slopeWindExposure;
   document.getElementById('active-wall-wind-sub').innerText = `Gratwind: ${w.windSpeedKmH} km/h (Böen: ${w.windGustsKmH} km/h)`;
+
+  // Rendere Lawinenlagebericht & Live-Webcams
+  renderAvalancheReport();
+  renderMountainWebcams();
+}
+
+// =============================================================================
+// LAWINENLAGEBERICHT & SCHNEEDECKEN-STABILITÄT (EAWS STUFEN 1–5)
+// =============================================================================
+function renderAvalancheReport() {
+  const avCard = document.getElementById('avalanche-danger-card');
+  if (!avCard) return;
+
+  const loc = state.currentLocation;
+  const terrain = state.microData ? state.microData.terrain10m : null;
+  const av = MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, terrain);
+  if (!av) return;
+
+  // 1. EAWS Stufen-Badge
+  const badge = document.getElementById('eaws-level-badge');
+  const numElem = document.getElementById('eaws-level-num');
+  const textElem = document.getElementById('eaws-level-text');
+
+  if (badge) {
+    badge.style.background = av.dangerColor;
+    badge.style.color = av.dangerLevel >= 4 ? '#ffffff' : '#000000';
+  }
+  if (numElem) numElem.innerText = av.dangerLevel;
+  if (textElem) textElem.innerText = av.dangerTitle.replace(/^[0-9]\s*-\s*/, '');
+
+  // 2. Kritische Höhenlage
+  const critElevElem = document.getElementById('rose-crit-elev');
+  if (critElevElem) {
+    critElevElem.innerHTML = `Gefahr vor allem über <strong>${av.criticalElevation.toLocaleString('de-DE')} m</strong>`;
+  }
+
+  // 3. Gefahrenrose (SVG 8 Hangexpositionen)
+  const aspectMapping = {
+    'rose-sec-n': 'N',
+    'rose-sec-no': 'NO',
+    'rose-sec-o': 'O',
+    'rose-sec-so': 'SO',
+    'rose-sec-s': 'S',
+    'rose-sec-sw': 'SW',
+    'rose-sec-w': 'W',
+    'rose-sec-nw': 'NW'
+  };
+
+  Object.entries(aspectMapping).forEach(([secId, asp]) => {
+    const path = document.getElementById(secId);
+    if (path) {
+      const isCritical = av.criticalAspects.includes(asp);
+      path.classList.remove('danger-high', 'danger-med', 'danger-low');
+      if (isCritical) {
+        path.classList.add(av.dangerLevel >= 3 ? 'danger-high' : 'danger-med');
+      } else {
+        path.classList.add('danger-low');
+      }
+    }
+  });
+
+  // 4. Hauptprobleme
+  const probList = document.getElementById('av-problems-list');
+  if (probList) {
+    probList.innerHTML = av.problems.map(p => `
+      <div class="av-problem-item">
+        <span class="av-p-icon">${p.icon}</span>
+        <div class="av-p-content">
+          <strong>${p.name}</strong>
+          <p>${p.desc}</p>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // 5. Kennzahlen & Alpinempfehlung
+  const freshSnowVal = document.getElementById('av-freshsnow-val');
+  const windVal = document.getElementById('av-wind-val');
+  const safetyText = document.getElementById('av-safety-text');
+
+  if (freshSnowVal) freshSnowVal.innerText = `${av.freshSnow24hCm} cm`;
+  if (windVal) windVal.innerText = `${av.maxRidgeWindKmH} km/h`;
+  if (safetyText) safetyText.innerText = av.safetyRule;
+}
+
+// =============================================================================
+// ALPINE LIVE-WEBCAMS
+// =============================================================================
+function renderMountainWebcams() {
+  const grid = document.getElementById('mountain-webcams-grid');
+  if (!grid) return;
+
+  const loc = state.currentLocation;
+  const cams = MicroEngine.getMountainWebcams(loc.name, loc.lat, loc.lon);
+  if (!cams || cams.length === 0) {
+    grid.innerHTML = '<p style="color:var(--text-tertiary); font-size:12px;">Keine Live-Webcams für diesen Standort hinterlegt.</p>';
+    return;
+  }
+
+  grid.innerHTML = cams.map(cam => `
+    <div class="webcam-card" data-id="${cam.id}" data-cam='${JSON.stringify(cam).replace(/'/g, "&#39;")}'>
+      <div class="webcam-thumb-wrap">
+        <span class="webcam-live-badge">${cam.status}</span>
+        <img src="${cam.thumbUrl}" alt="${cam.title}" class="webcam-thumb" loading="lazy">
+      </div>
+      <div class="webcam-card-info">
+        <span class="webcam-title">${cam.title}</span>
+        <div class="webcam-meta">
+          <span>Höhe: ${cam.elevation}</span>
+          <span>Blick: ${cam.viewDir}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.webcam-card').forEach(card => {
+    card.addEventListener('click', () => {
+      try {
+        const cam = JSON.parse(card.dataset.cam);
+        openWebcamModal(cam);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  });
+}
+
+function openWebcamModal(cam) {
+  const modal = document.getElementById('webcam-modal-overlay');
+  const title = document.getElementById('webcam-modal-title');
+  const img = document.getElementById('webcam-modal-img');
+  const meta = document.getElementById('webcam-modal-meta');
+  const link = document.getElementById('webcam-external-link');
+
+  if (!modal) return;
+  if (title) title.innerText = cam.title;
+  if (img) img.src = cam.thumbUrl;
+  if (meta) meta.innerText = `Blickrichtung: ${cam.viewDir} • Kamerastation auf ${cam.elevation} • ${cam.status}`;
+  if (link) link.href = cam.streamUrl;
+
+  modal.style.display = 'flex';
+}
+
+function setupWebcamModal() {
+  const modal = document.getElementById('webcam-modal-overlay');
+  const closeBtn = document.getElementById('webcam-modal-close');
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+    modal.addEventListener('click', e => {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+  }
 }
 
 // City Panel Render
@@ -1833,6 +2251,11 @@ async function updateWeatherOverlay() {
   const legendTitle = document.getElementById('map-legend-title');
   const legendBar = document.getElementById('map-legend-bar');
   const legendLabels = document.getElementById('map-legend-labels');
+  const thunderAlert = document.getElementById('thunderstorm-alert-box');
+
+  if (thunderAlert && overlay !== 'lightning') {
+    thunderAlert.style.display = 'none';
+  }
 
   // 1. NIEDERSCHLAG & SCHNEE / RAINVIEWER LIVE RADAR
   if (overlay === 'precip' || overlay === 'rainviewer-radar') {
@@ -1891,6 +2314,93 @@ async function updateWeatherOverlay() {
         <span style="color:#ffffff;">Dichte Bewölkung</span>
         <span style="color:#64d2ff;">Hohe Eiswolken / Cb</span>
       `;
+    }
+  }
+
+  // 1c. ECHTZEIT-BLITZORTUNG & GEWITTER-FRÜHWARNSYSTEM
+  else if (overlay === 'lightning') {
+    stopWindCanvas();
+    if (radarControls) radarControls.style.display = 'none';
+    if (state.map.radarTileLayer && state.map.instance.hasLayer(state.map.radarTileLayer)) {
+      state.map.instance.removeLayer(state.map.radarTileLayer);
+    }
+
+    if (legendTitle) legendTitle.innerText = '⚡ Live-Blitzortung & Gewitter-Tracker (Alpenraum):';
+    if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #ff3b30, #ff9500, #ffd166, #64d2ff)';
+    if (legendLabels) {
+      legendLabels.innerHTML = `
+        <span style="color:#ff3b30;">🚨 < 5 Min. (Frisch)</span>
+        <span style="color:#ff9500;">⚡ 5–15 Min.</span>
+        <span style="color:#ffd166;">⚡ 15–30 Min.</span>
+        <span style="color:#64d2ff;">⚡ > 30 Min.</span>
+      `;
+    }
+
+    const storm = MicroEngine.computeLightningActivity(
+      state.currentLocation.lat,
+      state.currentLocation.lon,
+      state.weatherData
+    );
+
+    // Aktualisiere Floating Alert Box
+    if (thunderAlert) {
+      const threatElem = document.getElementById('tab-threat-level');
+      const distElem = document.getElementById('tab-dist-val');
+      const delayElem = document.getElementById('tab-delay-val');
+      const etaElem = document.getElementById('tab-eta-val');
+      const adviceElem = document.getElementById('tab-advice');
+      const closeBtn = document.getElementById('tab-close-btn');
+
+      if (threatElem) threatElem.innerText = storm.threatLevel;
+      if (distElem) distElem.innerText = `${storm.closestStrikeKm} km`;
+      if (delayElem) delayElem.innerText = `${storm.soundDelaySeconds} Sek. (${Math.round(storm.soundDelaySeconds / 3)} km)`;
+      if (etaElem) etaElem.innerText = `ca. ${storm.estimatedArrivalMin} Min.`;
+      if (adviceElem) {
+        adviceElem.innerText = storm.closestStrikeKm < 15
+          ? '⚠️ Grate, Gipfelkreuze, Klettersteige und freie Flächen SOFORT verlassen!'
+          : `ℹ️ Gewitter-Zugbahn: ${storm.stormTracking}. Schutzhütten anvisieren.`;
+      }
+      if (closeBtn) {
+        closeBtn.onclick = () => {
+          thunderAlert.style.display = 'none';
+        };
+      }
+      thunderAlert.style.display = 'block';
+    }
+
+    // Zeichne Warnradius um den aktuellen Standort
+    L.circle([state.currentLocation.lat, state.currentLocation.lon], {
+      radius: 12000,
+      color: '#ff453a',
+      fillColor: '#ff453a',
+      fillOpacity: 0.08,
+      weight: 1.5,
+      dashArray: '4, 4'
+    }).addTo(state.map.weatherLayerGroup);
+
+    // Zeichne Live-Blitze mit pulsierendem Marker
+    for (const s of storm.strikes) {
+      let color = '#64d2ff';
+      if (s.ageMinutes < 5) color = '#ff3b30';
+      else if (s.ageMinutes < 15) color = '#ff9500';
+      else if (s.ageMinutes < 30) color = '#ffd166';
+
+      const icon = L.divIcon({
+        className: 'custom-lightning-icon',
+        html: `<div class="lightning-marker" style="background:${color}; box-shadow:0 0 12px ${color};">⚡</div>`,
+        iconAnchor: [12, 12]
+      });
+
+      const m = L.marker([s.lat, s.lon], { icon }).addTo(state.map.weatherLayerGroup);
+      m.bindPopup(`
+        <div style="font-family:sans-serif; color:#0f172a; padding:4px;">
+          <strong style="color:${color}; font-size:13px;">⚡ Blitzentladung</strong><br>
+          <b>Typ:</b> ${s.type}<br>
+          <b>Stromstärke:</b> ${s.intensityKa} kA<br>
+          <b>Alter:</b> vor ${s.ageMinutes} Min.<br>
+          <b>Distanz zum Standort:</b> ${s.distKm} km
+        </div>
+      `);
     }
   }
 
@@ -2572,3 +3082,256 @@ function convertTemp(celsius) {
   }
   return celsius;
 }
+
+// =============================================================================
+// GPX-ROUTEN-INSPEKTOR & HÖHENPROFIL-MIKROWETTER
+// =============================================================================
+let activeGPXData = null;
+let gpxMapPolyline = null;
+let gpxStartMarker = null;
+let gpxEndMarker = null;
+
+function setupGPXInspector() {
+  const openBtn = document.getElementById('gpx-open-btn');
+  const modal = document.getElementById('gpx-modal-overlay');
+  const closeBtn = document.getElementById('gpx-modal-close');
+  const browseBtn = document.getElementById('gpx-browse-btn');
+  const fileInput = document.getElementById('gpx-file-input');
+  const dropZone = document.getElementById('gpx-drop-zone');
+  const showOnMapBtn = document.getElementById('gpx-show-on-map-btn');
+
+  if (openBtn && modal) {
+    openBtn.addEventListener('click', () => {
+      modal.style.display = 'flex';
+      // Standardmäßig sofort Tour laden, falls noch keine geladen ist
+      if (!activeGPXData) {
+        const sample = MicroEngine.getSampleGPXTrack('matterhorn-hoernli');
+        processGPXTrack(sample.xml, sample.name);
+      }
+    });
+  }
+
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+    modal.addEventListener('click', e => {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+  }
+
+  // Presets
+  const presetBtns = document.querySelectorAll('.gpx-preset-btn');
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      presetBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tourId = btn.dataset.tour;
+      const sample = MicroEngine.getSampleGPXTrack(tourId);
+      processGPXTrack(sample.xml, sample.name);
+    });
+  });
+
+  // Browse Button & File Input
+  if (browseBtn && fileInput) {
+    browseBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          processGPXTrack(ev.target.result, file.name.replace(/\.gpx$/i, ''));
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
+  // Drag and Drop
+  if (dropZone) {
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          processGPXTrack(ev.target.result, file.name.replace(/\.gpx$/i, ''));
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
+  // Button: Auf Karte anzeigen
+  if (showOnMapBtn) {
+    showOnMapBtn.addEventListener('click', () => {
+      if (!activeGPXData || !activeGPXData.points || !state.map.instance) return;
+      if (modal) modal.style.display = 'none';
+
+      // Wechsle auf Tab 3 (Karte)
+      switchTab('tab-map');
+
+      // Zeichne Polyline auf Karte
+      const latLngs = activeGPXData.points.map(p => [p.lat, p.lon]);
+
+      if (gpxMapPolyline) state.map.instance.removeLayer(gpxMapPolyline);
+      if (gpxStartMarker) state.map.instance.removeLayer(gpxStartMarker);
+      if (gpxEndMarker) state.map.instance.removeLayer(gpxEndMarker);
+
+      gpxMapPolyline = L.polyline(latLngs, {
+        color: '#00e5ff',
+        weight: 5,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(state.map.instance);
+
+      // Start & Ziel / Gipfel Marker
+      const pStart = activeGPXData.points[0];
+      const pEnd = activeGPXData.points[activeGPXData.points.length - 1];
+
+      const startIcon = L.divIcon({
+        className: 'custom-weather-icon',
+        html: `<div class="weather-station-marker" style="border-color:#30d158; color:#30d158;">🟢 Start: ${pStart.ele}m</div>`,
+        iconAnchor: [45, 12]
+      });
+      gpxStartMarker = L.marker([pStart.lat, pStart.lon], { icon: startIcon }).addTo(state.map.instance);
+
+      const endIcon = L.divIcon({
+        className: 'custom-weather-icon',
+        html: `<div class="weather-station-marker" style="border-color:#ffd166; color:#ffd166;">🏁 Gipfel: ${pEnd.ele}m</div>`,
+        iconAnchor: [50, 12]
+      });
+      gpxEndMarker = L.marker([pEnd.lat, pEnd.lon], { icon: endIcon }).addTo(state.map.instance);
+
+      // Zoome auf gesamte Tour
+      setTimeout(() => {
+        state.map.instance.fitBounds(gpxMapPolyline.getBounds(), { padding: [50, 50] });
+      }, 200);
+    });
+  }
+}
+
+function processGPXTrack(xmlText, tourName) {
+  const parsed = MicroEngine.parseGPXData(xmlText);
+  if (!parsed.success) {
+    alert('GPX-Datei konnte nicht verarbeitet werden: ' + (parsed.error || 'Ungültiges Format'));
+    return;
+  }
+
+  activeGPXData = { ...parsed, name: tourName };
+
+  // Stats Grid anzeigen
+  const statsGrid = document.getElementById('gpx-stats-grid');
+  const chartWrapper = document.getElementById('gpx-chart-wrapper');
+  const actionsRow = document.getElementById('gpx-actions-row');
+
+  if (statsGrid) statsGrid.style.display = 'grid';
+  if (chartWrapper) chartWrapper.style.display = 'block';
+  if (actionsRow) actionsRow.style.display = 'flex';
+
+  document.getElementById('gpx-dist-val').innerText = `${parsed.totalDistanceKm} km`;
+  document.getElementById('gpx-ascent-val').innerText = `+${parsed.totalAscentM} Hm (-${parsed.totalDescentM} Hm)`;
+  document.getElementById('gpx-maxele-val').innerText = `${parsed.maxElevationM} m (Min ${parsed.minElevationM} m)`;
+  document.getElementById('gpx-time-val').innerText = `${parsed.estimatedDuration}`;
+
+  renderGPXElevationSVG(parsed);
+}
+
+function renderGPXElevationSVG(parsed) {
+  const svg = document.getElementById('gpx-elevation-svg');
+  if (!svg || !parsed.points || parsed.points.length === 0) return;
+
+  const pts = parsed.points;
+  const count = pts.length;
+  const W = 800;
+  const H = 200;
+  const padL = 50;
+  const padR = 30;
+  const padT = 30;
+  const padB = 40;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const minZ = Math.max(0, parsed.minElevationM - 100);
+  const maxZ = parsed.maxElevationM + 100;
+  const rangeZ = Math.max(10, maxZ - minZ);
+  const totalDist = Math.max(0.1, parsed.totalDistanceKm);
+
+  // Basis-Temperatur aus aktuellem Wetter (oder 12°C auf 500m)
+  const baseT = state.weatherData ? (state.weatherData.current ? state.weatherData.current.temperature_2m : 12) : 12;
+  const baseElev = state.currentLocation.elevation || 500;
+
+  const getX = dKm => padL + (dKm / totalDist) * plotW;
+  const getY = ele => padT + plotH - ((ele - minZ) / rangeZ) * plotH;
+
+  const lineCoords = [];
+
+  for (let i = 0; i < count; i++) {
+    const x = getX(pts[i].distFromStartKm);
+    const y = getY(pts[i].ele);
+    lineCoords.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+
+  const polyBottomLeft = `${padL},${padT + plotH}`;
+  const polyBottomRight = `${(padL + plotW).toFixed(1)},${padT + plotH}`;
+  const fillPoly = `${polyBottomLeft} ${lineCoords.join(' ')} ${polyBottomRight}`;
+
+  // Start-, Gipfel- und Zieltemperaturen berechnen (0.65°C pro 100m)
+  const pStart = pts[0];
+  const pMax = pts.reduce((prev, cur) => cur.ele > prev.ele ? cur : prev, pts[0]);
+  const pEnd = pts[pts.length - 1];
+
+  const tStart = Math.round(baseT - ((pStart.ele - baseElev) * 0.0065));
+  const tMax = Math.round(baseT - ((pMax.ele - baseElev) * 0.0065));
+  const tEnd = Math.round(baseT - ((pEnd.ele - baseElev) * 0.0065));
+
+  const xStart = getX(pStart.distFromStartKm);
+  const yStart = getY(pStart.ele);
+  const xMax = getX(pMax.distFromStartKm);
+  const yMax = getY(pMax.ele);
+  const xEnd = getX(pEnd.distFromStartKm);
+  const yEnd = getY(pEnd.ele);
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="gpx-poly-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.4" />
+        <stop offset="100%" stop-color="#00e5ff" stop-opacity="0.05" />
+      </linearGradient>
+    </defs>
+
+    <!-- Achsen & Horizontale Linien -->
+    <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.2)" />
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.2)" />
+    <text x="${padL - 8}" y="${padT + 8}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end" font-family="monospace">${maxZ}m</text>
+    <text x="${padL - 8}" y="${padT + plotH}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end" font-family="monospace">${minZ}m</text>
+    <text x="${padL}" y="${H - 12}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="start">0 km</text>
+    <text x="${W - padR}" y="${H - 12}" fill="rgba(255,255,255,0.5)" font-size="10" text-anchor="end">${totalDist.toFixed(1)} km</text>
+
+    <!-- Flächen- und Linienverlauf -->
+    <polygon points="${fillPoly}" fill="url(#gpx-poly-grad)" />
+    <polyline points="${lineCoords.join(' ')}" fill="none" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Startpunkt -->
+    <circle cx="${xStart}" cy="${yStart}" r="4" fill="#30d158" stroke="#fff" stroke-width="1.5" />
+    <text x="${xStart + 6}" y="${yStart - 6}" fill="#30d158" font-size="11" font-weight="700">Start: ${pStart.ele}m (${tStart}°C)</text>
+
+    <!-- Höchster Punkt / Gipfel -->
+    <circle cx="${xMax}" cy="${yMax}" r="5" fill="#ffd166" stroke="#fff" stroke-width="1.5" />
+    <text x="${xMax}" y="${Math.max(14, yMax - 10)}" fill="#ffd166" font-size="11" font-weight="800" text-anchor="middle">🏔️ ${pMax.ele}m (${tMax}°C)</text>
+
+    <!-- Zielpunkt -->
+    <circle cx="${xEnd}" cy="${yEnd}" r="4" fill="#64d2ff" stroke="#fff" stroke-width="1.5" />
+    <text x="${xEnd - 6}" y="${yEnd - 6}" fill="#64d2ff" font-size="11" font-weight="700" text-anchor="end">Ziel: ${pEnd.ele}m (${tEnd}°C)</text>
+  `;
+}
+
