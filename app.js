@@ -41,6 +41,8 @@ const state = {
     radarIndex: 0,
     liveRadarIndex: 0,
     radarInterval: null,
+    radarRafId: null,
+    radarImageBuffer: new Map(),
     radarPlaying: false,
     radarPlaybackSpeed: 1,
     radarHost: '',
@@ -334,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   setupTabs();
   setupSearch();
+  setupSpotlightAndQuickGps();
   setupWallSelector();
   setupAltitudeSlider();
   setupMountain3DControls();
@@ -350,10 +353,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =============================================================================
-// TABS CONTROLLER
+// TABS CONTROLLER (DESKTOP TOP BAR & NATIVE MOBILE BOTTOM NAV)
 // =============================================================================
 function setupTabs() {
-  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabButtons = document.querySelectorAll('.tab-btn, .mbn-btn');
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       switchTab(btn.dataset.tab);
@@ -363,7 +366,7 @@ function setupTabs() {
 
 function switchTab(tabId) {
   state.activeTab = tabId;
-  document.querySelectorAll('.tab-btn').forEach(b => {
+  document.querySelectorAll('.tab-btn, .mbn-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tabId);
   });
   document.querySelectorAll('.tab-pane').forEach(p => {
@@ -417,6 +420,81 @@ function setupLocationTypeToggle() {
 }
 
 // =============================================================================
+// FEATURE 3B: OFFLINE CACHING FÜR WETTERDATEN & GPX-TOUREN (LOCALSTORAGE)
+// =============================================================================
+const WeatherTourCache = {
+  LOCATION_KEY: 'alpine_offline_last_location',
+  WEATHER_KEY: 'alpine_offline_weather_data',
+  SPORTS_TOUR_KEY: 'alpine_offline_sports_tour',
+
+  saveLocationAndWeather(loc, weatherData, microData) {
+    try {
+      if (!loc) return;
+      localStorage.setItem(this.LOCATION_KEY, JSON.stringify(loc));
+      if (weatherData) {
+        const cachePayload = {
+          timestamp: Date.now(),
+          locName: loc.name,
+          weatherData,
+          microData: microData ? {
+            slopeDeg: microData.slopeDeg,
+            aspectDeg: microData.aspectDeg,
+            summitWind10m: microData.summitWind10m,
+            tInversion: microData.tInversion
+          } : null
+        };
+        localStorage.setItem(this.WEATHER_KEY, JSON.stringify(cachePayload));
+      }
+    } catch (e) {
+      console.warn('WeatherTourCache save failed:', e);
+    }
+  },
+
+  getCachedLocation() {
+    try {
+      const raw = localStorage.getItem(this.LOCATION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getCachedWeather() {
+    try {
+      const raw = localStorage.getItem(this.WEATHER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  saveTour(tourName, gpxXml, parsedGPX, timeline, stats) {
+    try {
+      const payload = {
+        timestamp: Date.now(),
+        tourName,
+        gpxXml,
+        parsedGPX,
+        timeline,
+        stats
+      };
+      localStorage.setItem(this.SPORTS_TOUR_KEY, JSON.stringify(payload));
+    } catch (e) {
+      console.warn('WeatherTourCache saveTour failed:', e);
+    }
+  },
+
+  getCachedTour() {
+    try {
+      const raw = localStorage.getItem(this.SPORTS_TOUR_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+};
+
+// =============================================================================
 // LOCATION LOADING & HIGH-PRECISION WEATHER FETCH
 // =============================================================================
 async function loadLocation(loc) {
@@ -449,6 +527,9 @@ async function loadLocation(loc) {
     state.multiModel = multiModel;
     state.airQuality = airQuality;
 
+    // Feature 3B: Offline-Cache abspeichern
+    WeatherTourCache.saveLocationAndWeather(loc, state.weatherData, state.microData);
+
     // Render all UI components
     renderOverviewTab();
     renderMultiModelComparison();
@@ -459,8 +540,21 @@ async function loadLocation(loc) {
 
   } catch (err) {
     console.error('Fehler beim Laden des Wetters:', err);
-    const cond = document.getElementById('hero-condition-text');
-    if (cond) cond.innerText = 'Verbindungsfehler beim Laden der Daten';
+    // Feature 3B: Offline-Fallback ausführen falls vorhanden
+    const cached = WeatherTourCache.getCachedWeather();
+    if (cached && cached.weatherData) {
+      console.info('Offline-Modus: Stelle gespeicherte Wetterdaten für', cached.locName, 'wieder her');
+      state.weatherData = cached.weatherData;
+      if (cached.microData) state.microData = { ...cached.microData, weatherRaw: cached.weatherData };
+      renderOverviewTab();
+      renderAdaptiveTab2();
+      renderFavoritesTab();
+      const heroTime = document.getElementById('hero-update-time');
+      if (heroTime) heroTime.innerText = `Offline-Modus (Gespeichert: ${new Date(cached.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })})`;
+    } else {
+      const cond = document.getElementById('hero-condition-text');
+      if (cond) cond.innerText = 'Verbindungsfehler beim Laden der Daten';
+    }
   }
 }
 
@@ -470,6 +564,12 @@ function updateLocationHeaderUI() {
   document.getElementById('hero-elevation-pill').innerText = `${loc.isMountain ? '🏔️' : '🏙️'} ${loc.elevation.toLocaleString('de-DE')} m`;
   document.getElementById('hero-geo-coords').innerText = `Lat: ${loc.lat.toFixed(4)}, Lon: ${loc.lon.toFixed(4)}`;
   document.getElementById('hero-update-time').innerText = `Aktualisiert: ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+
+  // Feature 2A: Spotlight-Suchleiste Text aktualisieren
+  const spotlightText = document.getElementById('spotlight-trigger-text');
+  if (spotlightText) {
+    spotlightText.innerText = `${loc.isMountain ? '🏔️' : '🏙️'} ${loc.name} (${loc.elevation.toLocaleString('de-DE')} m) • Suchen...`;
+  }
 
   const badge = document.getElementById('location-type-badge');
   const tab2Icon = document.getElementById('tab-2-icon');
@@ -488,6 +588,55 @@ function updateLocationHeaderUI() {
   }
 
   updateFavStarUI();
+}
+
+// =============================================================================
+// FEATURE 10B: DYNAMISCHE HIMMELSFARBEN & ALPENGLÜHEN NACH SONNENSTAND
+// =============================================================================
+function updateAlpineSkyIllumination(weatherData, elevation) {
+  const glow = document.getElementById('ambient-glow');
+  if (!glow) return;
+
+  glow.classList.remove('dawn', 'sunrise', 'golden-hour', 'alpenglow', 'dusk', 'night');
+
+  if (!weatherData || !weatherData.daily || !weatherData.daily.sunrise || !weatherData.daily.sunset) {
+    return;
+  }
+
+  const now = new Date();
+  const sunriseStr = weatherData.daily.sunrise[0];
+  const sunsetStr = weatherData.daily.sunset[0];
+  if (!sunriseStr || !sunsetStr) return;
+
+  const sunrise = new Date(sunriseStr);
+  const sunset = new Date(sunsetStr);
+
+  const diffSunriseMin = (now.getTime() - sunrise.getTime()) / 60000;
+  const diffSunsetMin = (now.getTime() - sunset.getTime()) / 60000;
+
+  if (diffSunriseMin >= -60 && diffSunriseMin < -10) {
+    // Morgendämmerung
+    glow.classList.add('dawn');
+  } else if (diffSunriseMin >= -10 && diffSunriseMin <= 45) {
+    // Sonnenaufgang
+    glow.classList.add('sunrise');
+  } else if (diffSunsetMin >= -60 && diffSunsetMin < -10) {
+    // Goldene Stunde vor Sonnenuntergang
+    glow.classList.add('golden-hour');
+  } else if (diffSunsetMin >= -10 && diffSunsetMin <= 35) {
+    // Alpenglühen auf hohen Gipfeln
+    if (elevation >= 1200) {
+      glow.classList.add('alpenglow');
+    } else {
+      glow.classList.add('golden-hour');
+    }
+  } else if (diffSunsetMin > 35 && diffSunsetMin <= 90) {
+    // Abenddämmerung
+    glow.classList.add('dusk');
+  } else if (diffSunsetMin > 90 || diffSunriseMin < -60) {
+    // Dunkle Nacht / Sternenhimmel
+    glow.classList.add('night');
+  }
 }
 
 // =============================================================================
@@ -518,6 +667,9 @@ function renderOverviewTab() {
 
   document.body.className = `weather-${theme}`;
   if (state.canvasEngine) state.canvasEngine.setMode(theme, isDay);
+
+  // Feature 10B: Dynamische Himmelsfarben & Alpenglühen
+  updateAlpineSkyIllumination(w, state.currentLocation.elevation);
 
   // Exact Temperature
   const finalTemp = (m && state.currentLocation.isMountain) ? m.microWeather.temperature10m : cur.temperature_2m;
@@ -1708,14 +1860,22 @@ function renderAvalancheReport() {
     `).join('');
   }
 
-  // 5. Kennzahlen & Alpinempfehlung
+  // 5. Kennzahlen, Schneehöhen & Alpinempfehlung
   const freshSnowVal = document.getElementById('av-freshsnow-val');
   const windVal = document.getElementById('av-wind-val');
   const safetyText = document.getElementById('av-safety-text');
+  const peakSnow = document.getElementById('av-totalsnow-peak');
+  const valleySnow = document.getElementById('av-totalsnow-valley');
+  const stationName = document.getElementById('av-station-name');
+  const stationTime = document.getElementById('av-station-time');
 
   if (freshSnowVal) freshSnowVal.innerText = `${av.freshSnow24hCm} cm`;
   if (windVal) windVal.innerText = `${av.maxRidgeWindKmH} km/h`;
   if (safetyText) safetyText.innerText = av.safetyRule;
+  if (peakSnow) peakSnow.innerText = `${av.snowDepthPeakCm} cm`;
+  if (valleySnow) valleySnow.innerText = `${av.snowDepthValleyCm} cm`;
+  if (stationName) stationName.innerText = `${av.stationAgency} (${av.stationName})`;
+  if (stationTime) stationTime.innerText = av.stationTime;
 }
 
 // =============================================================================
@@ -3632,9 +3792,36 @@ async function loadUnifiedRadarEngine() {
     // Starte standardmäßig auf Live-Scan
     showUnifiedRadarFrame(liveIdx);
 
+    // Feature 4A: Preload Radar-Frames in Frame-Buffer für verzögerungsfreie 60-FPS Wiedergabe
+    preloadRadarFrames(unifiedFrames, state.map.radarHost);
+
   } catch (err) {
     console.error('Fehler beim Initialisieren der 24h-Radar-Engine:', err);
   }
+}
+
+/**
+ * FEATURE 4A: Hardware-beschleunigter Frame-Buffer (Image Preloader)
+ */
+function preloadRadarFrames(frames, host) {
+  if (!frames || !host) return;
+  frames.forEach(f => {
+    if (f.type === 'past' && f.path) {
+      const colorScheme = 8;
+      const zoom = (state.map.instance && state.map.instance.getZoom()) || 8;
+      const lat = state.currentLocation.lat;
+      const lon = state.currentLocation.lon;
+      const x = Math.floor((lon + 180) / 360 * Math.pow(2, zoom));
+      const latRad = lat * Math.PI / 180;
+      const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * Math.pow(2, zoom));
+      
+      const img = new Image();
+      img.src = `${host}${f.path}/256/${zoom}/${x}/${y}/${colorScheme}/1_1.png`;
+      if (state.map.radarImageBuffer) {
+        state.map.radarImageBuffer.set(f.path, img);
+      }
+    }
+  });
 }
 
 /**
@@ -3900,25 +4087,39 @@ function updateJumpButtonsActive(idx) {
 }
 
 function startRadarAnimation() {
-  if (state.map.radarInterval) clearInterval(state.map.radarInterval);
+  stopRadarAnimation();
   state.map.radarPlaying = true;
   const playBtn = document.getElementById('radar-play-btn');
   if (playBtn) playBtn.innerText = '⏸';
 
   const delays = { 1: 750, 2: 400, 3: 200 };
-  const delay = delays[state.map.radarPlaybackSpeed || 1] || 750;
+  const intervalMs = delays[state.map.radarPlaybackSpeed || 1] || 750;
+  let lastTick = performance.now();
 
-  state.map.radarInterval = setInterval(() => {
-    if (!state.map.unifiedRadarFrames || state.map.unifiedRadarFrames.length === 0) return;
-    let next = state.map.radarIndex + 1;
-    if (next >= state.map.unifiedRadarFrames.length) {
-      next = 0;
+  function radarLoop(currentTime) {
+    if (!state.map.radarPlaying) return;
+    const delta = currentTime - lastTick;
+    if (delta >= intervalMs) {
+      lastTick = currentTime - (delta % intervalMs);
+      if (state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length > 0) {
+        let next = state.map.radarIndex + 1;
+        if (next >= state.map.unifiedRadarFrames.length) {
+          next = 0;
+        }
+        showUnifiedRadarFrame(next);
+      }
     }
-    showUnifiedRadarFrame(next);
-  }, delay);
+    state.map.radarRafId = requestAnimationFrame(radarLoop);
+  }
+
+  state.map.radarRafId = requestAnimationFrame(radarLoop);
 }
 
 function stopRadarAnimation() {
+  if (state.map.radarRafId) {
+    cancelAnimationFrame(state.map.radarRafId);
+    state.map.radarRafId = null;
+  }
   if (state.map.radarInterval) {
     clearInterval(state.map.radarInterval);
     state.map.radarInterval = null;
@@ -4217,41 +4418,7 @@ function setupSearch() {
 
   // GPS Geolocation
   if (gpsBtn) {
-    gpsBtn.addEventListener('click', () => {
-      if ('geolocation' in navigator) {
-        gpsBtn.style.opacity = '0.5';
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            gpsBtn.style.opacity = '1';
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-            
-            // Get exact elevation for GPS coordinate
-            let gpsElev = 500;
-            try {
-              const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
-              const elData = await elRes.json();
-              if (elData.elevation && elData.elevation[0] !== undefined) {
-                gpsElev = Math.round(elData.elevation[0]);
-              }
-            } catch(e) {}
-
-            selectExactLocation({
-              name: 'Mein Standort',
-              lat: lat,
-              lon: lon,
-              elevation: gpsElev,
-              isMountain: gpsElev >= 1000
-            });
-          },
-          () => {
-            gpsBtn.style.opacity = '1';
-            alert('GPS-Standort konnte nicht ermittelt werden.');
-          },
-          { enableHighAccuracy: true, timeout: 8000 }
-        );
-      }
-    });
+    gpsBtn.addEventListener('click', triggerExactGps);
   }
 
   // Unit switch
@@ -4263,6 +4430,320 @@ function setupSearch() {
       renderAdaptiveTab2();
     });
   }
+}
+
+// =============================================================================
+// FEATURE 2A: 1-KLICK GPS-STANDORT & HÖHENERMITTLUNG
+// =============================================================================
+function triggerExactGps() {
+  const quickGpsBtn = document.getElementById('quick-gps-btn');
+  const gpsBtn = document.getElementById('gps-btn');
+
+  if (!('geolocation' in navigator)) {
+    alert('Geolocation wird von diesem Browser nicht unterstützt.');
+    return;
+  }
+
+  if (quickGpsBtn) {
+    quickGpsBtn.style.opacity = '0.6';
+    const txt = quickGpsBtn.querySelector('.hgp-text');
+    if (txt) txt.innerText = 'Ermittle Standort... 🛰️';
+  }
+  if (gpsBtn) gpsBtn.style.opacity = '0.5';
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+
+      if (quickGpsBtn) {
+        quickGpsBtn.style.opacity = '1';
+        const txt = quickGpsBtn.querySelector('.hgp-text');
+        if (txt) txt.innerText = 'Mein Standort';
+      }
+      if (gpsBtn) gpsBtn.style.opacity = '1';
+
+      // Get exact elevation for GPS coordinate
+      let gpsElev = 500;
+      try {
+        const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
+        const elData = await elRes.json();
+        if (elData.elevation && elData.elevation[0] !== undefined) {
+          gpsElev = Math.round(elData.elevation[0]);
+        }
+      } catch(e) {}
+
+      selectExactLocation({
+        name: 'Mein Standort',
+        lat: lat,
+        lon: lon,
+        elevation: gpsElev,
+        isMountain: gpsElev >= 1000
+      });
+    },
+    (err) => {
+      if (quickGpsBtn) {
+        quickGpsBtn.style.opacity = '1';
+        const txt = quickGpsBtn.querySelector('.hgp-text');
+        if (txt) txt.innerText = 'Mein Standort';
+      }
+      if (gpsBtn) gpsBtn.style.opacity = '1';
+      console.warn('GPS location error:', err);
+      alert('GPS-Standort konnte nicht ermittelt werden. Bitte Standortfreigabe prüfen.');
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
+}
+
+// =============================================================================
+// FEATURE 2A: APPLE SPOTLIGHT SCHNELLSUCHE (CMD+K / STRG+K & SCHNELLWAHL)
+// =============================================================================
+function setupSpotlightAndQuickGps() {
+  const triggerBtn = document.getElementById('spotlight-trigger-btn');
+  const quickGpsBtn = document.getElementById('quick-gps-btn');
+  const modal = document.getElementById('spotlight-modal-overlay');
+  const closeBtn = document.getElementById('spotlight-modal-close');
+  const input = document.getElementById('spotlight-search-input');
+  const resultsContainer = document.getElementById('spotlight-results-list');
+  const quickChips = document.querySelectorAll('.spotlight-quick-chips .sq-chip');
+
+  if (!modal || !input) return;
+
+  let selectedIndex = -1;
+  let debounceTimer = null;
+
+  function openSpotlight() {
+    modal.style.display = 'flex';
+    input.value = '';
+    selectedIndex = -1;
+    renderSpotlightInitial();
+    setTimeout(() => input.focus(), 60);
+  }
+
+  function closeSpotlight() {
+    modal.style.display = 'none';
+    if (debounceTimer) clearTimeout(debounceTimer);
+  }
+
+  function renderSpotlightInitial() {
+    resultsContainer.innerHTML = `
+      <div style="padding: 22px 14px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+        💡 Tippe Stadt, Berggipfel oder Koordinaten ein oder klicke oben eine Schnellwahl.
+      </div>
+    `;
+  }
+
+  if (triggerBtn) {
+    triggerBtn.addEventListener('click', openSpotlight);
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeSpotlight);
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeSpotlight();
+    }
+  });
+
+  // Global Keyboard Shortcuts (Cmd+K, Ctrl+K, Escape)
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      if (modal.style.display === 'flex') {
+        closeSpotlight();
+      } else {
+        openSpotlight();
+      }
+    } else if (e.key === 'Escape' && modal.style.display === 'flex') {
+      closeSpotlight();
+    }
+  });
+
+  // Quick Chips
+  quickChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const q = chip.dataset.quick;
+      closeSpotlight();
+      if (q === 'gps') {
+        triggerExactGps();
+      } else if (q === 'matterhorn') {
+        selectExactLocation({ name: 'Matterhorn', lat: 45.9765, lon: 7.6586, elevation: 4478, country: 'Schweiz', isMountain: true });
+      } else if (q === 'zugspitze') {
+        selectExactLocation({ name: 'Zugspitze', lat: 47.4211, lon: 10.9853, elevation: 2962, country: 'Deutschland', isMountain: true });
+      } else if (q === 'grossglockner') {
+        selectExactLocation({ name: 'Großglockner', lat: 47.0742, lon: 12.6947, elevation: 3798, country: 'Österreich', isMountain: true });
+      } else if (q === 'watzmann') {
+        selectExactLocation({ name: 'Watzmann-Mittelspitze', lat: 47.5539, lon: 12.9217, elevation: 2713, country: 'Deutschland', isMountain: true });
+      } else if (q === 'muenchen') {
+        selectExactLocation({ name: 'München', lat: 48.1371, lon: 11.5754, elevation: 519, country: 'Deutschland', isMountain: false });
+      } else if (q === 'innsbruck') {
+        selectExactLocation({ name: 'Innsbruck', lat: 47.2692, lon: 11.4041, elevation: 574, country: 'Österreich', isMountain: false });
+      } else if (q === 'zuerich') {
+        selectExactLocation({ name: 'Zürich', lat: 47.3769, lon: 8.5417, elevation: 408, country: 'Schweiz', isMountain: false });
+      }
+    });
+  });
+
+  // 1-Click GPS button in Header
+  if (quickGpsBtn) {
+    quickGpsBtn.addEventListener('click', triggerExactGps);
+  }
+
+  // Live Search in Spotlight
+  input.addEventListener('input', (e) => {
+    const q = e.target.value.trim();
+    if (debounceTimer) clearTimeout(debounceTimer);
+    selectedIndex = -1;
+
+    if (q.length < 2) {
+      renderSpotlightInitial();
+      return;
+    }
+
+    debounceTimer = setTimeout(async () => {
+      // Check coordinate input e.g. 47.42, 10.98
+      const coordMatch = q.match(/^([-+]?\d{1,2}(?:\.\d+)?)[,\s]+([-+]?\d{1,3}(?:\.\d+)?)$/);
+      if (coordMatch) {
+        const lat = parseFloat(coordMatch[1]);
+        const lon = parseFloat(coordMatch[2]);
+        if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+          let elev = 500;
+          try {
+            const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
+            const elData = await elRes.json();
+            if (elData.elevation && elData.elevation[0] !== undefined) elev = Math.round(elData.elevation[0]);
+          } catch(err) {}
+
+          resultsContainer.innerHTML = '';
+          const row = document.createElement('div');
+          row.className = 'spotlight-item selected';
+          row.innerHTML = `
+            <div class="si-left">
+              <span class="si-icon">📍</span>
+              <div>
+                <span class="si-name">${lat.toFixed(4)}°, ${lon.toFixed(4)}°</span>
+                <span class="si-sub">Koordinaten-Punkt</span>
+              </div>
+            </div>
+            <div class="si-right">${elev.toLocaleString('de-DE')} m</div>
+          `;
+          row.addEventListener('click', () => {
+            selectExactLocation({
+              name: `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`,
+              lat,
+              lon,
+              elevation: elev,
+              isMountain: elev >= 1000
+            });
+            closeSpotlight();
+          });
+          resultsContainer.appendChild(row);
+          selectedIndex = 0;
+          return;
+        }
+      }
+
+      try {
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=de&format=json`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.results && data.results.length > 0) {
+          const scored = data.results.map(item => {
+            let score = 0;
+            const country = (item.country || '').toLowerCase();
+            if (['schweiz', 'österreich', 'deutschland', 'italien', 'liechtenstein', 'frankreich'].includes(country)) {
+              score += 100;
+            }
+            const fc = item.feature_code || '';
+            if (['MT', 'PK'].includes(fc)) score += 35;
+            if (['PPLA', 'PPLC'].includes(fc)) score += 20;
+            if (item.name.toLowerCase() === q.toLowerCase()) score += 50;
+            const pop = item.population || 0;
+            score += Math.min(50, pop / 10000);
+            return { item, score };
+          });
+          scored.sort((a, b) => b.score - a.score);
+
+          resultsContainer.innerHTML = '';
+          scored.forEach(({ item }, idx) => {
+            const nLower = item.name.toLowerCase();
+            let officialElev = Math.round(item.elevation || 500);
+            let isMtn = determineIfMountain(item.name, item.feature_code, officialElev);
+            if (OFFICIAL_KNOWN_ELEVATIONS[nLower]) {
+              officialElev = OFFICIAL_KNOWN_ELEVATIONS[nLower].elevation;
+              isMtn = OFFICIAL_KNOWN_ELEVATIONS[nLower].isMountain;
+            }
+            const icon = isMtn ? '🏔️' : '🏙️';
+            const admin = [item.admin1, item.country].filter(Boolean).join(', ');
+
+            const row = document.createElement('div');
+            row.className = `spotlight-item ${idx === 0 ? 'selected' : ''}`;
+            row.innerHTML = `
+              <div class="si-left">
+                <span class="si-icon">${icon}</span>
+                <div>
+                  <span class="si-name">${item.name}</span>
+                  <span class="si-sub">${admin}</span>
+                </div>
+              </div>
+              <div class="si-right">${officialElev.toLocaleString('de-DE')} m</div>
+            `;
+
+            row.addEventListener('click', () => {
+              selectExactLocation({
+                name: item.name,
+                lat: item.latitude,
+                lon: item.longitude,
+                elevation: officialElev,
+                country: item.country || '',
+                isMountain: isMtn
+              });
+              closeSpotlight();
+            });
+
+            resultsContainer.appendChild(row);
+          });
+          selectedIndex = 0;
+        } else {
+          resultsContainer.innerHTML = `
+            <div style="padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+              Kein Ort oder Berggipfel gefunden für "${q}"
+            </div>
+          `;
+          selectedIndex = -1;
+        }
+      } catch (err) {
+        console.error('Spotlight Suche fehlgeschlagen:', err);
+      }
+    }, 200);
+  });
+
+  // Keyboard navigation inside input (Arrow Up, Arrow Down, Enter)
+  input.addEventListener('keydown', (e) => {
+    const items = resultsContainer.querySelectorAll('.spotlight-item');
+    if (items.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      selectedIndex = (selectedIndex + 1) % items.length;
+      items.forEach((it, i) => it.classList.toggle('selected', i === selectedIndex));
+      items[selectedIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+      items.forEach((it, i) => it.classList.toggle('selected', i === selectedIndex));
+      items[selectedIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const targetItem = selectedIndex >= 0 ? items[selectedIndex] : items[0];
+      if (targetItem) {
+        targetItem.click();
+      }
+    }
+  });
 }
 
 function determineIfMountain(name, featureCode, elevation) {
@@ -4846,9 +5327,15 @@ function setupSportsTab() {
 
 function initSportsTour() {
   state.sports.initialized = true;
-  // Standard-Tour: Großglockner Hochalpenstraße (optimal für Rad & Bergsteiger)
-  const defaultTour = 'grossglockner-bike';
-  loadSportsPresetTour(defaultTour);
+  // Feature 3B: Prüfe offline zwischengespeicherte Tour
+  const cachedTour = WeatherTourCache.getCachedTour();
+  if (cachedTour && cachedTour.gpxXml && cachedTour.tourName) {
+    loadAndComputeSportsTour(cachedTour.gpxXml, cachedTour.tourName);
+  } else {
+    // Standard-Tour: Großglockner Hochalpenstraße (optimal für Rad & Bergsteiger)
+    const defaultTour = 'grossglockner-bike';
+    loadSportsPresetTour(defaultTour);
+  }
 }
 
 async function loadSportsPresetTour(tourId) {
@@ -4988,6 +5475,15 @@ function recomputeSportsTimeline() {
   const pct = slider ? parseFloat(slider.value) || 0 : 0;
   const targetKm = (pct / 100) * timeline.totalDistanceKm;
   updateSportsScrubber(targetKm);
+
+  // Feature 3B: Offline-Cache abspeichern
+  WeatherTourCache.saveTour(
+    state.sports.gpxName || 'Tour',
+    state.sports.gpxText,
+    parsed,
+    timeline,
+    { totalDist: timeline.totalDistanceKm, totalAsc: timeline.totalAscentM, duration: timeline.totalDurationStr }
+  );
 }
 
 function renderSportsMetrics(timeline) {

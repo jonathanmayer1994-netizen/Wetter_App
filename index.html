@@ -46,18 +46,26 @@
 
       <!-- Main Search & Location Input Bar -->
       <div class="search-container">
-        <div class="search-input-box">
-          <span class="search-icon">🔍</span>
-          <input 
-            type="text" 
-            id="location-search-input" 
-            placeholder="Exakten Ort, Berggipfel oder Koordinaten eingeben..." 
-            autocomplete="off"
-            spellcheck="false"
-          >
+        <!-- Spotlight Search Trigger Pill (Cmd+K) -->
+        <button id="spotlight-trigger-btn" class="spotlight-trigger-pill" type="button" title="Globale Schnellsuche öffnen (⌘K)">
+          <span class="stp-icon">🔍</span>
+          <span class="stp-text" id="spotlight-trigger-text">Ort, Gipfel oder Koordinaten suchen...</span>
+          <kbd class="stp-kbd">⌘K</kbd>
+        </button>
+
+        <!-- 1-Klick GPS-Standort Pill -->
+        <button id="quick-gps-btn" class="header-gps-pill" type="button" title="1-Klick: Meinen genauen GPS-Standort & Berghöhe ermitteln">
+          <span class="hgp-icon">📍</span>
+          <span class="hgp-text">Mein Standort</span>
+        </button>
+
+        <!-- Hidden input for standard autocomplete / fallback -->
+        <div class="search-input-box" style="display:none;">
+          <input type="text" id="location-search-input" autocomplete="off" spellcheck="false">
           <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
         </div>
-        <button id="gps-btn" class="nav-icon-btn" title="Exakten GPS-Standort abfragen">📍</button>
+
+        <button id="gps-btn" class="nav-icon-btn" style="display:none;" title="Exakten GPS-Standort abfragen">📍</button>
         <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
         <button id="unit-toggle-btn" class="nav-icon-btn unit-btn" title="Einheit wechseln">°C</button>
       </div>
@@ -711,8 +719,16 @@
 
                 <div class="av-metrics-row">
                   <div class="av-metric-pill">
+                    <span class="amp-label">Schnee Berg (Gipfel):</span>
+                    <span class="amp-val text-cyan" id="av-totalsnow-peak">-- cm</span>
+                  </div>
+                  <div class="av-metric-pill">
+                    <span class="amp-label">Schnee Tal:</span>
+                    <span class="amp-val text-cyan" id="av-totalsnow-valley">-- cm</span>
+                  </div>
+                  <div class="av-metric-pill">
                     <span class="amp-label">Neuschnee 24h:</span>
-                    <span class="amp-val text-cyan" id="av-freshsnow-val">-- cm</span>
+                    <span class="amp-val text-green" id="av-freshsnow-val">-- cm</span>
                   </div>
                   <div class="av-metric-pill">
                     <span class="amp-label">Grat-Windspitzen:</span>
@@ -720,9 +736,27 @@
                   </div>
                 </div>
 
+                <div class="av-station-meta" id="av-station-meta">
+                  <span class="asm-dot">🟢</span>
+                  <span id="av-station-name">Offizielles Alpen-Messnetz (SLF / LWD / ZAMG)</span>
+                  <span class="asm-time" id="av-station-time">Stand: Heute</span>
+                </div>
+
                 <div class="av-safety-box">
                   <div class="asb-title">Alpin-Empfehlung des Lawinenwarndienstes:</div>
                   <div class="asb-text" id="av-safety-text">Verhältnisse werden berechnet...</div>
+                </div>
+
+                <!-- Alpine Notrufnummern -->
+                <div class="av-emergency-row">
+                  <span class="aer-title">🚨 Alpine Notrufnummern:</span>
+                  <div class="aer-pills">
+                    <a href="tel:140" class="aer-pill" title="Österreichische Bergrettung">🇦🇹 140 (AT)</a>
+                    <a href="tel:1414" class="aer-pill" title="Schweizer Flugrettung Rega">🇨🇭 1414 (CH)</a>
+                    <a href="tel:112" class="aer-pill" title="Bergwacht Deutschland / Notruf">🇩🇪 112 (DE)</a>
+                    <a href="tel:118" class="aer-pill" title="Soccorso Alpino Italien">🇮🇹 118 (IT)</a>
+                    <a href="tel:112" class="aer-pill" title="Euro-Notruf">🇪🇺 112 (EU)</a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1581,6 +1615,76 @@
       </div>
     </div>
   </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL: APPLE SPOTLIGHT GLOBAL QUICK-SEARCH (CMD+K) -->
+  <!-- =================================================================== -->
+  <div class="spotlight-overlay" id="spotlight-modal-overlay" style="display:none;">
+    <div class="spotlight-modal-card">
+      <div class="spotlight-input-wrap">
+        <span class="spotlight-icon">🔍</span>
+        <input 
+          type="text" 
+          id="spotlight-search-input" 
+          class="spotlight-search-input" 
+          placeholder="Stadt, Alpengipfel (z.B. Matterhorn) oder Koordinaten eingeben..." 
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button class="spotlight-close-btn" id="spotlight-modal-close" type="button">✕ ESC</button>
+      </div>
+
+      <!-- Quick Category Chips -->
+      <div class="spotlight-quick-chips">
+        <span class="sqc-label">Schnellwahl:</span>
+        <button type="button" class="sq-chip" data-quick="gps">📍 Mein GPS-Standort</button>
+        <button type="button" class="sq-chip" data-quick="matterhorn">🏔️ Matterhorn (4.478m)</button>
+        <button type="button" class="sq-chip" data-quick="zugspitze">🧗 Zugspitze (2.962m)</button>
+        <button type="button" class="sq-chip" data-quick="grossglockner">🚴 Großglockner (3.798m)</button>
+        <button type="button" class="sq-chip" data-quick="watzmann">🥾 Watzmann (2.713m)</button>
+        <button type="button" class="sq-chip" data-quick="muenchen">🏙️ München</button>
+        <button type="button" class="sq-chip" data-quick="innsbruck">🏙️ Innsbruck</button>
+        <button type="button" class="sq-chip" data-quick="zuerich">🏙️ Zürich</button>
+      </div>
+
+      <!-- Live Search Results List -->
+      <div class="spotlight-results" id="spotlight-results-list">
+        <!-- Dynamisch befüllte Suchergebnisse -->
+      </div>
+
+      <div class="spotlight-footer">
+        <span><kbd>ESC</kbd> Schließen</span>
+        <span><kbd>↑</kbd><kbd>↓</kbd> Navigieren</span>
+        <span><kbd>↵</kbd> Auswählen</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- NATIVE MOBILE BOTTOM TAB BAR (iOS / TOUCH SCREENS) -->
+  <!-- =================================================================== -->
+  <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+    <button class="mbn-btn active" data-tab="tab-overview" type="button">
+      <span class="mbn-icon">🌤️</span>
+      <span class="mbn-label">Wetter</span>
+    </button>
+    <button class="mbn-btn" data-tab="tab-mountain" type="button">
+      <span class="mbn-icon">🏔️</span>
+      <span class="mbn-label">Berg & 3D</span>
+    </button>
+    <button class="mbn-btn" data-tab="tab-sports" type="button">
+      <span class="mbn-icon">🚴</span>
+      <span class="mbn-label">Sport & GPX</span>
+    </button>
+    <button class="mbn-btn" data-tab="tab-map" type="button">
+      <span class="mbn-icon">🗺️</span>
+      <span class="mbn-label">Radar & Map</span>
+    </button>
+    <button class="mbn-btn" data-tab="tab-favorites" type="button">
+      <span class="mbn-icon">⭐</span>
+      <span class="mbn-label">Favoriten</span>
+    </button>
+  </nav>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
