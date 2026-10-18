@@ -3041,8 +3041,10 @@ html, body {
 
 .modal-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .modal-location-badge {
@@ -3068,24 +3070,48 @@ html, body {
   color: var(--text-secondary);
 }
 
-.close-modal-btn {
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  color: #fff;
+/* Großer 44x44px Touch-Target Close-Button (Apple HIG Standard) */
+.close-modal-btn,
+.modal-close-btn {
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
   border-radius: 50%;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 20px;
+  font-weight: 700;
   cursor: pointer;
-  transition: var(--transition-smooth);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+  margin-left: 12px;
+  padding: 0;
+  outline: none;
 }
 
-.close-modal-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+.close-modal-btn:hover,
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.32);
+  border-color: rgba(255, 255, 255, 0.55);
   transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
+.close-modal-btn:active,
+.modal-close-btn:active {
+  background: rgba(255, 69, 58, 0.7);
+  border-color: #ff453a;
+  transform: scale(0.92);
 }
 
 /* 2. Bento Hauptmetriken */
@@ -4431,6 +4457,25 @@ html, body {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+.webcam-modal-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.action-btn-secondary {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+
+.action-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
 @media (max-width: 768px) {

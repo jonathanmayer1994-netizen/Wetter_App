@@ -983,86 +983,226 @@ export const MicroEngine = {
     const registry = {
       'matterhorn': [
         {
-          id: 'cam-mh-gornergrat',
-          title: 'Gornergrat (3.135 m) • Matterhorn Panoramablick',
-          elevation: '3.135 m',
+          id: 'cam-mh-live',
+          title: 'Matterhorn (4.478 m) • Live-Blick Zermatt',
+          elevation: '4.478 m',
           viewDir: 'Südwest (SW)',
-          thumbUrl: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=800&auto=format&fit=crop&q=80',
-          streamUrl: 'https://www.zermatt.ch/webcam',
-          status: '🟢 Live'
-        },
-        {
-          id: 'cam-mh-steg',
-          title: 'Trockener Steg (2.939 m) • Theodulgletscher',
-          elevation: '2.939 m',
-          viewDir: 'Süd (S)',
-          thumbUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80',
+          thumbUrl: 'https://www.zermatt.net/graphics/lc/matterhorn.jpg',
           streamUrl: 'https://www.zermatt.ch/webcam',
           status: '🟢 Live'
         },
         {
           id: 'cam-mh-dorf',
-          title: 'Zermatt Talstation (1.620 m) • Talblick',
+          title: 'Zermatt Dorf & Bahnhof (1.620 m)',
           elevation: '1.620 m',
-          viewDir: 'Süd (S)',
-          thumbUrl: 'https://images.unsplash.com/photo-1502784444187-359ac186c5bb?w=800&auto=format&fit=crop&q=80',
+          viewDir: 'Bahnhofstrasse',
+          thumbUrl: 'https://www.zermatt.net/graphics/lc25/bahnhof.jpg',
           streamUrl: 'https://www.zermatt.ch/webcam',
           status: '🟢 Live'
+        },
+        {
+          id: 'cam-mh-alpin',
+          title: 'Walliser Hochalpen & Gletschermeer',
+          elevation: '3.195 m',
+          viewDir: 'Gletscherblick',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/becherhaus/current/720.jpg',
+          streamUrl: 'https://www.zermatt.ch/webcam',
+          status: '🟢 Live HD'
         }
       ],
       'zugspitze': [
         {
           id: 'cam-zs-gipfel',
-          title: 'Zugspitzgipfel (2.962 m) • 4-Länder-Panoramablick',
+          title: 'Zugspitzgipfel (2.962 m) • Panoramablick',
           elevation: '2.962 m',
-          viewDir: '360° Panorama',
-          thumbUrl: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&auto=format&fit=crop&q=80',
-          streamUrl: 'https://zugspitze.de/de/Service-Informationen/Webcams',
-          status: '🟢 Live'
+          viewDir: '360° Rundumblick',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/720.jpg',
+          highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/1200.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/',
+          status: '🟢 Live HD'
         },
         {
           id: 'cam-zs-platt',
-          title: 'Zugspitzplatt (2.600 m) • Schneeferner Gletscher',
+          title: 'Zugspitzplatt & Gletscher (2.600 m)',
           elevation: '2.600 m',
           viewDir: 'Südost (SO)',
-          thumbUrl: 'https://images.unsplash.com/photo-1542332213-9b5a5a3fad35?w=800&auto=format&fit=crop&q=80',
-          streamUrl: 'https://zugspitze.de/de/Service-Informationen/Webcams',
-          status: '🟢 Live'
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-sued/current/720.jpg',
+          highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-sued/current/1200.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-sued/',
+          status: '🟢 Live HD'
         },
         {
           id: 'cam-zs-eibsee',
-          title: 'Eibsee (973 m) • Blick auf Zugspitz-Nordwand',
-          elevation: '973 m',
+          title: 'Zugspitz-Nordwand & Eibseeblick (2.962 m)',
+          elevation: '2.962 m',
+          viewDir: 'Nord (N) auf Eibsee',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-nord/current/720.jpg',
+          highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-nord/current/1200.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-nord/',
+          status: '🟢 Live HD'
+        },
+        {
+          id: 'cam-zs-ost',
+          title: 'Jubiläumsgrat & Höllental (2.962 m)',
+          elevation: '2.962 m',
+          viewDir: 'Ost (O)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-ost/current/720.jpg',
+          highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-ost/current/1200.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-ost/',
+          status: '🟢 Live HD'
+        }
+      ],
+      'watzmann': [
+        {
+          id: 'cam-wm-ostwand',
+          title: 'Watzmann Ostwand & Hocheck (Blick Graflhöhe 950 m)',
+          elevation: '950 m',
+          viewDir: 'Südwest (SW) auf Watzmann',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/windbeutelbaron/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/windbeutelbaron/',
+          status: '🟢 Live HD'
+        },
+        {
+          id: 'cam-wm-jenner',
+          title: 'Jenner Bergstation (1.800 m) • Berchtesgadener Alpen',
+          elevation: '1.800 m',
+          viewDir: 'Nordost (NO)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/jenner-ost/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/jenner-ost/',
+          status: '🟢 Live HD'
+        },
+        {
+          id: 'cam-wm-jenner-sued',
+          title: 'Jenner Süd (1.800 m) • Hagengebirge & Steinernes Meer',
+          elevation: '1.800 m',
           viewDir: 'Süd (S)',
-          thumbUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&auto=format&fit=crop&q=80',
-          streamUrl: 'https://zugspitze.de/de/Service-Informationen/Webcams',
-          status: '🟢 Live'
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/jenner-sued/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/jenner-sued/',
+          status: '🟢 Live HD'
+        }
+      ],
+      'nebelhorn': [
+        {
+          id: 'cam-nh-gipfel',
+          title: 'Nebelhornbahn Gipfel (2.224 m) • Allgäuer Hochalpen',
+          elevation: '2.224 m',
+          viewDir: 'Südost (SO)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/',
+          status: '🟢 Live HD'
+        },
+        {
+          id: 'cam-nh-zugspitze',
+          title: 'Zugspitzgipfel (2.962 m) • Wetterstein-Referenz',
+          elevation: '2.962 m',
+          viewDir: '360° Panorama',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/',
+          status: '🟢 Live HD'
+        }
+      ],
+      'grossglockner': [
+        {
+          id: 'cam-gg-freiwand',
+          title: 'Großglockner (3.798 m) & Pasterzengletscher',
+          elevation: '2.369 m',
+          viewDir: 'Nordwest (NW) auf Glockner',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/freiwandeck/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/freiwandeck/',
+          status: '🟢 Live HD'
+        },
+        {
+          id: 'cam-gg-sued',
+          title: 'Großglockner Südwand (Glocknerwinkel 1.984 m)',
+          elevation: '1.984 m',
+          viewDir: 'Nord (N)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/glocknerwinkel/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/glocknerwinkel/',
+          status: '🟢 Live HD'
+        }
+      ],
+      'wendelstein': [
+        {
+          id: 'cam-ws-ost',
+          title: 'Wendelstein Ostgipfel (1.838 m) • Voralpenland',
+          elevation: '1.838 m',
+          viewDir: 'Ost (O)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-ost/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-ost/',
+          status: '🟢 Live HD'
+        },
+        {
+          id: 'cam-ws-west',
+          title: 'Wendelstein Westblick (1.838 m) • Mangfallgebirge',
+          elevation: '1.838 m',
+          viewDir: 'West (W)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-west/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-west/',
+          status: '🟢 Live HD'
+        }
+      ],
+      'kronplatz': [
+        {
+          id: 'cam-kp-gipfel',
+          title: 'Kronplatz Gipfel (2.275 m) • 360° Dolomiten-Rundblick',
+          elevation: '2.275 m',
+          viewDir: 'Rundumblick',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/kronplatz/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/kronplatz/',
+          status: '🟢 Live HD'
+        },
+        {
+          id: 'cam-rit-rosengarten',
+          title: 'Ritten (2.260 m) • Blick auf Rosengarten & Schlern',
+          elevation: '2.260 m',
+          viewDir: 'Südost (SO)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/ritten/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/ritten/',
+          status: '🟢 Live HD'
+        }
+      ],
+      'innsbruck': [
+        {
+          id: 'cam-ibk-nordkette',
+          title: 'Innsbruck Nordkette & Hafelekar (1.905 m)',
+          elevation: '1.905 m',
+          viewDir: 'Süd (S) auf Stadt & Stubaier Alpen',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/innsbruck/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/innsbruck/',
+          status: '🟢 Live HD'
         }
       ]
     };
 
     const key = (mountainName || '').toLowerCase();
-    if (key.includes('matterhorn')) return registry['matterhorn'];
-    if (key.includes('zugspitze')) return registry['zugspitze'];
+    if (key.includes('matterhorn') || key.includes('zermatt')) return registry['matterhorn'];
+    if (key.includes('zugspitze') || key.includes('garmisch')) return registry['zugspitze'];
+    if (key.includes('watzmann') || key.includes('berchtesgaden')) return registry['watzmann'];
+    if (key.includes('nebelhorn') || key.includes('oberstdorf')) return registry['nebelhorn'];
+    if (key.includes('glockner')) return registry['grossglockner'];
+    if (key.includes('wendelstein')) return registry['wendelstein'];
+    if (key.includes('bozen') || key.includes('meran') || key.includes('dolomit') || key.includes('kronplatz')) return registry['kronplatz'];
+    if (key.includes('innsbruck')) return registry['innsbruck'];
 
-    // Fallback Alpine Universal Webcams
+    // Fallback: Echte alpine Referenz-Webcams (Zugspitze & Nebelhorn)
     return [
       {
-        id: 'cam-univ-1',
-        title: `${mountainName} Gipfelkamera & Rundumblick`,
-        elevation: `${Math.round(lat * 50)} m`,
-        viewDir: 'Südwest (SW)',
-        thumbUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80',
-        streamUrl: 'https://panomax.com',
+        id: 'cam-ref-zs',
+        title: `Alpine Referenz-Livecam (Zugspitze 2.962 m)`,
+        elevation: '2.962 m',
+        viewDir: '360° Panorama',
+        thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/720.jpg',
+        highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/1200.jpg',
+        streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/',
         status: '🟢 Live HD'
       },
       {
-        id: 'cam-univ-2',
-        title: `${mountainName} Mittelstation & Bergkamm`,
-        elevation: '2.150 m',
-        viewDir: 'Nordost (NO)',
-        thumbUrl: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=800&auto=format&fit=crop&q=80',
-        streamUrl: 'https://panomax.com',
+        id: 'cam-ref-nh',
+        title: `Alpine Referenz-Livecam (Nebelhorn 2.224 m)`,
+        elevation: '2.224 m',
+        viewDir: 'Südost (SO)',
+        thumbUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/current/720.jpg',
+        streamUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/',
         status: '🟢 Live HD'
       }
     ];

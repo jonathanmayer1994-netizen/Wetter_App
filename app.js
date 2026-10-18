@@ -1678,6 +1678,8 @@ function renderAvalancheReport() {
 // =============================================================================
 // ALPINE LIVE-WEBCAMS
 // =============================================================================
+// ALPINE LIVE-WEBCAMS (BERGGIPFEL & SKIGEBIETE)
+// =============================================================================
 function renderMountainWebcams() {
   const grid = document.getElementById('mountain-webcams-grid');
   if (!grid) return;
@@ -1689,11 +1691,14 @@ function renderMountainWebcams() {
     return;
   }
 
-  grid.innerHTML = cams.map(cam => `
+  const cacheBuster = Math.floor(Date.now() / 600000); // 10-Minuten-Bucket für frischeste Livecam-Bilder
+  grid.innerHTML = cams.map(cam => {
+    const liveThumb = `${cam.thumbUrl}${cam.thumbUrl.includes('?') ? '&' : '?'}t=${cacheBuster}`;
+    return `
     <div class="webcam-card" data-id="${cam.id}" data-cam='${JSON.stringify(cam).replace(/'/g, "&#39;")}'>
       <div class="webcam-thumb-wrap">
         <span class="webcam-live-badge">${cam.status}</span>
-        <img src="${cam.thumbUrl}" alt="${cam.title}" class="webcam-thumb" loading="lazy">
+        <img src="${liveThumb}" alt="${cam.title}" class="webcam-thumb" loading="lazy" onerror="this.onerror=null;this.src='${cam.thumbUrl}';">
       </div>
       <div class="webcam-card-info">
         <span class="webcam-title">${cam.title}</span>
@@ -1703,7 +1708,8 @@ function renderMountainWebcams() {
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   grid.querySelectorAll('.webcam-card').forEach(card => {
     card.addEventListener('click', () => {
@@ -1726,7 +1732,11 @@ function openWebcamModal(cam) {
 
   if (!modal) return;
   if (title) title.innerText = cam.title;
-  if (img) img.src = cam.thumbUrl;
+  if (img) {
+    const liveSrc = cam.highResUrl || cam.thumbUrl;
+    img.src = `${liveSrc}${liveSrc.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    img.alt = cam.title;
+  }
   if (meta) meta.innerText = `Blickrichtung: ${cam.viewDir} • Kamerastation auf ${cam.elevation} • ${cam.status}`;
   if (link) link.href = cam.streamUrl;
 
@@ -1736,14 +1746,32 @@ function openWebcamModal(cam) {
 function setupWebcamModal() {
   const modal = document.getElementById('webcam-modal-overlay');
   const closeBtn = document.getElementById('webcam-modal-close');
-  if (closeBtn && modal) {
-    closeBtn.addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
+  const closeActionBtn = document.getElementById('webcam-modal-close-action');
+
+  const closeModal = () => {
+    if (modal) modal.style.display = 'none';
+  };
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (closeActionBtn) closeActionBtn.addEventListener('click', closeModal);
+
+  if (modal) {
     modal.addEventListener('click', e => {
-      if (e.target === modal) modal.style.display = 'none';
+      if (e.target === modal) closeModal();
     });
   }
+
+  // Globaler Escape-Key Handler für alle Dialoge & Modals
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      const dModal = document.getElementById('day-detail-modal-overlay');
+      const gModal = document.getElementById('gpx-modal-overlay');
+      const wModal = document.getElementById('webcam-modal-overlay');
+      if (dModal) dModal.style.display = 'none';
+      if (gModal) gModal.style.display = 'none';
+      if (wModal) wModal.style.display = 'none';
+    }
+  });
 }
 
 // City Panel Render
