@@ -356,6 +356,83 @@ html, body {
   border-radius: 8px;
 }
 
+/* Zuletzt gesucht & Schnell-Presets */
+.recent-searches-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+}
+
+.recent-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recent-clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.recent-clear-btn:hover {
+  color: #ff6b6b;
+}
+
+.recent-presets-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.recent-preset-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.recent-preset-chip:hover {
+  background: rgba(10, 132, 255, 0.25);
+  border-color: var(--ios-blue);
+  transform: translateY(-1px);
+}
+
+.recent-item-del {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.recent-item-del:hover {
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.15);
+}
+
 /* ==========================================================================
    NAVIGATION TAB BAR
    ========================================================================== */
@@ -507,6 +584,155 @@ html, body {
 /* ==========================================================================
    TAB 1: HERO & OVERVIEW SECTION
    ========================================================================== */
+/* Akuter Unwetter- & Gefahren-Banner */
+.hero-hazard-alert {
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.28), rgba(245, 158, 11, 0.24));
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  border-radius: 18px;
+  padding: 12px 18px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.25);
+  animation: hazardPulse 3s infinite ease-in-out;
+}
+
+@keyframes hazardPulse {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2); }
+  50% { border-color: rgba(245, 158, 11, 0.9); box-shadow: 0 6px 26px rgba(245, 158, 11, 0.4); }
+}
+
+.hha-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.hha-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.hha-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hha-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #ff6b6b;
+  letter-spacing: 0.5px;
+}
+
+.hha-msg {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.35;
+}
+
+.hha-action-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.hha-action-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  transform: scale(1.05);
+}
+
+/* Kompakt- vs. Experten-Modus */
+.expert-mode-toggle-bar {
+  margin: 18px 0 10px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.expert-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  padding: 12px 20px;
+  color: #ffffff;
+  cursor: pointer;
+  width: 100%;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.expert-mode-btn:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: var(--ios-cyan);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.emb-icon {
+  font-size: 22px;
+}
+
+.emb-text-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  flex: 1;
+}
+
+.emb-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.emb-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.emb-arrow {
+  font-size: 14px;
+  color: var(--ios-cyan);
+  transition: transform 0.25s ease;
+}
+
+.expert-mode-btn.is-expanded .emb-arrow {
+  transform: rotate(180deg);
+}
+
+.expert-details-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.expert-details-container.is-hidden {
+  display: none !important;
+}
+
 .hero-card {
   display: flex;
   flex-direction: column;

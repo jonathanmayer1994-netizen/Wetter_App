@@ -386,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSportsTab();
   initLeafletMap();
   setupSourcesQuickNav();
+  setupExpertModeToggle();
 
   // Load initial location (München: 520 m)
   loadLocation(state.currentLocation);
@@ -722,6 +723,175 @@ function renderOverviewTab() {
 
   // Render Bento Grid Details
   renderBentoGrid(cur, daily, w.hourly);
+
+  // Akuter Unwetter- & Gefahren-Banner (Top Priority Alert)
+  updateHeroHazardAlert(cur, daily, w.hourly, m);
+}
+
+// =============================================================================
+// AKUTER UNWETTER- & GEFAHREN-BANNER (TOP PRIORITY HERO HAZARD ALERT)
+// =============================================================================
+function updateHeroHazardAlert(cur, daily, hourly, microData) {
+  const alertBox = document.getElementById('hero-hazard-alert');
+  if (!alertBox) return;
+
+  const iconElem = document.getElementById('hha-icon');
+  const badgeElem = document.getElementById('hha-badge');
+  const msgElem = document.getElementById('hha-msg');
+  const actionBtn = document.getElementById('hha-action-btn');
+
+  let hazard = null;
+
+  // 1. Akutes Gewitter & Blitzschlag (Priorität 1)
+  const isThunder = [95, 96, 99].includes(cur.weather_code) ||
+    (hourly && hourly.weather_code && [95, 96, 99].includes(hourly.weather_code[0]));
+  if (isThunder) {
+    const isSevere = cur.weather_code === 96 || cur.weather_code === 99;
+    hazard = {
+      icon: '⚡',
+      badge: isSevere ? 'SCHWERES GEWITTER & HAGEL' : 'AKUTE GEWITTERWARNUNG',
+      msg: 'Blitzentladungen & Unwetter in Standortnähe. Grate, Gipfel & offene Flächen sofort meiden.',
+      actionText: 'Live-Radar ➔',
+      action: () => {
+        switchTab('tab-map');
+        const b = document.querySelector('.map-overlay-btn[data-overlay="lightning"]');
+        if (b) b.click();
+        else if (typeof setMapOverlay === 'function') setMapOverlay('lightning');
+      }
+    };
+  }
+
+  // 2. Schwere Sturmböen / Orkan (Priorität 2: >= 75 km/h)
+  if (!hazard) {
+    const curGust = cur.wind_gusts_10m || cur.wind_speed_10m || 0;
+    const maxDailyGust = (daily && daily.wind_gusts_10m_max && daily.wind_gusts_10m_max[0]) || 0;
+    const peakGust = Math.round(Math.max(curGust, maxDailyGust));
+    if (peakGust >= 75) {
+      hazard = {
+        icon: '🌪️',
+        badge: peakGust >= 100 ? 'ORKANWARNUNG' : 'STURMWARNUNG',
+        msg: `Schwere Sturmböen bis zu ${peakGust} km/h gemessen. Achtung vor Astbruch & Absturzgefahr auf Höhenwegen.`,
+        actionText: 'Windströmung ➔',
+        action: () => {
+          switchTab('tab-map');
+          const b = document.querySelector('.map-overlay-btn[data-overlay="wind"]');
+          if (b) b.click();
+          else if (typeof setMapOverlay === 'function') setMapOverlay('wind');
+        }
+      };
+    }
+  }
+
+  // 3. Lawinenwarnstufe >= 3 bei Bergstandorten (Priorität 3)
+  if (!hazard && state.currentLocation && state.currentLocation.isMountain && microData && microData.avalanche) {
+    const avLevel = microData.avalanche.dangerLevel || 1;
+    if (avLevel >= 3) {
+      hazard = {
+        icon: '⚠️',
+        badge: `LAWINENWARNSTUFE ${avLevel} (${avLevel >= 4 ? 'GROSS' : 'ERHEBLICH'})`,
+        msg: `${microData.avalanche.dangerTitle}: Störanfällige Schneedecke & Triebschnee im Steilgelände.`,
+        actionText: 'Lawinenbericht ➔',
+        action: () => {
+          switchTab('tab-mountain');
+          setTimeout(() => {
+            const card = document.getElementById('avalanche-report-card');
+            if (card) card.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+      };
+    }
+  }
+
+  // 4. Starkregen / Flutgefahr (Priorität 4: >= 10 mm/h oder >= 35 mm/d)
+  if (!hazard) {
+    const precipSum = (daily && daily.precipitation_sum && daily.precipitation_sum[0]) || 0;
+    const curPrecip = cur.precipitation || 0;
+    if (curPrecip >= 10 || precipSum >= 35 || [65, 67, 82].includes(cur.weather_code)) {
+      hazard = {
+        icon: '🌧️',
+        badge: 'STARKREGENWARNUNG',
+        msg: `Intensive Niederschlagsmengen (${Math.round(Math.max(curPrecip, precipSum))} mm). Erhöhte Aquaplaning- & Überflutungsgefahr.`,
+        actionText: 'Regenradar ➔',
+        action: () => {
+          switchTab('tab-map');
+          const b = document.querySelector('.map-overlay-btn[data-overlay="precip"]');
+          if (b) b.click();
+          else if (typeof setMapOverlay === 'function') setMapOverlay('precip');
+        }
+      };
+    }
+  }
+
+  // 5. Glatteis & Gefrierender Regen (Priorität 5)
+  if (!hazard) {
+    const isFreezing = [66, 67].includes(cur.weather_code) ||
+      (cur.temperature_2m <= 0.5 && (cur.precipitation > 0 || (hourly && hourly.precipitation && hourly.precipitation[0] > 0)));
+    if (isFreezing) {
+      hazard = {
+        icon: '🧊',
+        badge: 'GLATTEISWARNUNG',
+        msg: 'Gefrierende Nässe / Glatteisbildung auf Fahrbahnen, Brücken und Bergsteigen.',
+        actionText: 'Alpin-Details ➔',
+        action: () => {
+          switchTab(state.currentLocation.isMountain ? 'tab-mountain' : 'tab-overview');
+        }
+      };
+    }
+  }
+
+  // Banner ein- oder ausblenden
+  if (hazard) {
+    if (iconElem) iconElem.innerText = hazard.icon;
+    if (badgeElem) badgeElem.innerText = hazard.badge;
+    if (msgElem) msgElem.innerText = hazard.msg;
+    if (actionBtn) {
+      actionBtn.innerText = hazard.actionText;
+      actionBtn.onclick = hazard.action;
+    }
+    alertBox.style.display = 'flex';
+  } else {
+    alertBox.style.display = 'none';
+  }
+}
+
+// =============================================================================
+// KOMPAKT- VS. EXPERTEN-MODUS TOGGLE (MULTI-MODELL & UMWELT)
+// =============================================================================
+function setupExpertModeToggle() {
+  const btn = document.getElementById('expert-mode-toggle-btn');
+  const container = document.getElementById('expert-details-container');
+  const arrow = document.getElementById('emb-arrow');
+  if (!btn || !container) return;
+
+  const isEnabled = AlpineStorage.safeGetItem('alpine_expert_mode_enabled', false);
+  if (isEnabled) {
+    container.classList.remove('is-hidden');
+    btn.setAttribute('aria-expanded', 'true');
+    if (arrow) arrow.innerText = '▴';
+  } else {
+    container.classList.add('is-hidden');
+    btn.setAttribute('aria-expanded', 'false');
+    if (arrow) arrow.innerText = '▾';
+  }
+
+  btn.addEventListener('click', () => {
+    const isCurrentlyHidden = container.classList.contains('is-hidden');
+    if (isCurrentlyHidden) {
+      container.classList.remove('is-hidden');
+      btn.setAttribute('aria-expanded', 'true');
+      if (arrow) arrow.innerText = '▴';
+      AlpineStorage.safeSetItem('alpine_expert_mode_enabled', true);
+      // Neuzeichnung des Meteogramm-Canvas anstoßen, falls zuvor verborgen
+      if (typeof renderSpaghettiMeteogram === 'function' && state.weatherData) {
+        setTimeout(() => renderSpaghettiMeteogram(state.weatherData), 50);
+      }
+    } else {
+      container.classList.add('is-hidden');
+      btn.setAttribute('aria-expanded', 'false');
+      if (arrow) arrow.innerText = '▾';
+      AlpineStorage.safeSetItem('alpine_expert_mode_enabled', false);
+    }
+  });
 }
 
 function renderHourlySlider(hourly) {
@@ -4420,6 +4590,127 @@ function renderFavoritesTab() {
 }
 
 // =============================================================================
+// ZULETZT GESUCHT & SCHNELL-PRESETS DROPDOWN
+// =============================================================================
+function renderSearchRecentsAndPresetsDropdown() {
+  const dropdown = document.getElementById('search-results-dropdown');
+  const input = document.getElementById('location-search-input');
+  if (!dropdown) return;
+
+  const recents = getSpotlightRecents();
+  const presets = [
+    { name: 'Zugspitze', lat: 47.421, lon: 10.985, elevation: 2962, isMountain: true, country: 'Deutschland' },
+    { name: 'Matterhorn', lat: 45.976, lon: 7.658, elevation: 4478, isMountain: true, country: 'Schweiz' },
+    { name: 'Großglockner', lat: 47.074, lon: 12.695, elevation: 3798, isMountain: true, country: 'Österreich' },
+    { name: 'Nebelhorn', lat: 47.422, lon: 10.342, elevation: 2224, isMountain: true, country: 'Deutschland' },
+    { name: 'München', lat: 48.137, lon: 11.575, elevation: 519, isMountain: false, country: 'Deutschland' }
+  ];
+
+  let html = `<div class="recent-searches-box">`;
+
+  if (recents && recents.length > 0) {
+    html += `
+      <div class="recent-header-row">
+        <span>⏱️ Zuletzt gesucht</span>
+        <button type="button" class="recent-clear-btn" id="search-clear-recents-btn">Verlauf löschen</button>
+      </div>
+      <div class="recent-list-container">
+    `;
+    recents.forEach((item, idx) => {
+      const icon = item.isMountain ? '🏔️' : '🏙️';
+      html += `
+        <div class="dropdown-item recent-search-item" data-idx="${idx}">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:16px;">${icon}</span>
+            <div>
+              <div class="dropdown-city">${escapeHtml(item.name)}</div>
+              <div class="dropdown-region">${escapeHtml(item.country || (item.isMountain ? 'Berg / Gipfel' : 'Ort'))}</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="dropdown-elevation">${item.elevation ? item.elevation.toLocaleString('de-DE') + ' m' : ''}</span>
+            <button type="button" class="recent-item-del" data-del-name="${escapeHtml(item.name)}" title="Aus Verlauf entfernen">✕</button>
+          </div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+  }
+
+  html += `
+    <div class="recent-header-row" style="margin-top:4px;">
+      <span>🏔️ Beliebte Gipfel & Orte</span>
+    </div>
+    <div class="recent-presets-row">
+  `;
+
+  presets.forEach((p, idx) => {
+    html += `
+      <button type="button" class="recent-preset-chip" data-preset-idx="${idx}">
+        ${p.isMountain ? '🏔️' : '🏙️'} ${escapeHtml(p.name)} <span style="opacity:0.65; font-size:10px;">${p.elevation}m</span>
+      </button>
+    `;
+  });
+
+  html += `</div></div>`;
+
+  dropdown.innerHTML = html;
+  dropdown.style.display = 'block';
+
+  // Event handlers for recents
+  if (recents && recents.length > 0) {
+    const clearRecentsBtn = dropdown.querySelector('#search-clear-recents-btn');
+    if (clearRecentsBtn) {
+      clearRecentsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        AlpineStorage.safeSetItem('alpine_recent_searches', []);
+        renderSearchRecentsAndPresetsDropdown();
+        renderSpotlightRecentsUI();
+      });
+    }
+
+    dropdown.querySelectorAll('.recent-search-item').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.recent-item-del')) return;
+        const idx = parseInt(row.dataset.idx, 10);
+        const item = recents[idx];
+        if (item) {
+          selectExactLocation(item);
+          dropdown.style.display = 'none';
+          if (input) input.value = '';
+        }
+      });
+    });
+
+    dropdown.querySelectorAll('.recent-item-del').forEach(delBtn => {
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nameToDel = delBtn.dataset.delName;
+        let list = getSpotlightRecents();
+        list = list.filter(r => r.name !== nameToDel);
+        AlpineStorage.safeSetItem('alpine_recent_searches', list);
+        renderSearchRecentsAndPresetsDropdown();
+        renderSpotlightRecentsUI();
+      });
+    });
+  }
+
+  // Event handlers for presets
+  dropdown.querySelectorAll('.recent-preset-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(chip.dataset.presetIdx, 10);
+      const p = presets[idx];
+      if (p) {
+        selectExactLocation(p);
+        dropdown.style.display = 'none';
+        if (input) input.value = '';
+      }
+    });
+  });
+}
+
+// =============================================================================
 // SEARCH AUTOCOMPLETE & GPS (EXACT COORDINATES & OFFICIAL ELEVATION)
 // =============================================================================
 function setupSearch() {
@@ -4431,13 +4722,25 @@ function setupSearch() {
 
   let debounceTimer = null;
 
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length < 2) {
+      renderSearchRecentsAndPresetsDropdown();
+    }
+  });
+
+  input.addEventListener('click', () => {
+    if (input.value.trim().length < 2) {
+      renderSearchRecentsAndPresetsDropdown();
+    }
+  });
+
   input.addEventListener('input', (e) => {
     const q = e.target.value.trim();
     clearBtn.style.display = q.length > 0 ? 'flex' : 'none';
 
     if (debounceTimer) clearTimeout(debounceTimer);
     if (q.length < 2) {
-      dropdown.style.display = 'none';
+      renderSearchRecentsAndPresetsDropdown();
       return;
     }
 
@@ -4585,7 +4888,8 @@ function setupSearch() {
   clearBtn.addEventListener('click', () => {
     input.value = '';
     clearBtn.style.display = 'none';
-    dropdown.style.display = 'none';
+    renderSearchRecentsAndPresetsDropdown();
+    input.focus();
   });
 
   document.addEventListener('click', (e) => {
@@ -4694,7 +4998,7 @@ function addSpotlightRecent(loc) {
       isMountain: !!loc.isMountain,
       country: loc.country || ''
     });
-    AlpineStorage.safeSetItem('alpine_recent_searches', list.slice(0, 3));
+    AlpineStorage.safeSetItem('alpine_recent_searches', list.slice(0, 5));
   } catch (e) {}
 }
 

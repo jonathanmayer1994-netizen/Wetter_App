@@ -110,8 +110,18 @@
       <!-- =================================================================== -->
       <!-- TAB 1: ÜBERSICHT (Wetterbericht, Hero, 24h & 10-Tage Klick-Details) -->
       <!-- =================================================================== -->
-      <div class="tab-pane active" id="tab-overview">
-        
+        <!-- AKUTER UNWETTER- & GEFAHREN-BANNER (TOP PRIORITY ALERT) -->
+        <div class="hero-hazard-alert" id="hero-hazard-alert" style="display:none;" role="alert">
+          <div class="hha-content">
+            <span class="hha-icon" id="hha-icon">⚡</span>
+            <div class="hha-text-wrap">
+              <span class="hha-badge" id="hha-badge">WETTERWARNUNG</span>
+              <span class="hha-msg" id="hha-msg">Starkes Gewitter im Anzug</span>
+            </div>
+          </div>
+          <button class="hha-action-btn" id="hha-action-btn" type="button">Details ➔</button>
+        </div>
+
         <!-- Hero Section: Current Weather -->
         <section class="hero-card glass-card">
           <div class="hero-location-row">
@@ -276,9 +286,24 @@
         </section>
 
         <!-- =================================================================== -->
-        <!-- MULTI-MODELL-ENSEMBLE: ECMWF IFS (0.25°) VS. GFS SEAMLESS (NOAA) -->
+        <!-- KOMPAKT- VS. EXPERTEN-MODUS TOGGLE -->
         <!-- =================================================================== -->
-        <section class="glass-card multi-model-card" id="multi-model-card">
+        <div class="expert-mode-toggle-bar">
+          <button id="expert-mode-toggle-btn" class="expert-mode-btn" type="button" aria-expanded="false">
+            <span class="emb-icon">🔬</span>
+            <div class="emb-text-wrap">
+              <span class="emb-title">Experten- & Modell-Analyse</span>
+              <span class="emb-desc">ECMWF vs. GFS Multi-Modell, Spaghetti-Meteogramm & Umwelt</span>
+            </div>
+            <span class="emb-arrow" id="emb-arrow">▾</span>
+          </button>
+        </div>
+
+        <div class="expert-details-container is-hidden" id="expert-details-container">
+          <!-- =================================================================== -->
+          <!-- MULTI-MODELL-ENSEMBLE: ECMWF IFS (0.25°) VS. GFS SEAMLESS (NOAA) -->
+          <!-- =================================================================== -->
+          <section class="glass-card multi-model-card" id="multi-model-card">
           <div class="card-header">
             <div class="card-title">
               <span class="card-icon">🌐</span>
@@ -463,6 +488,7 @@
             </div>
           </div>
         </section>
+        </div>
 
       </div>
 
