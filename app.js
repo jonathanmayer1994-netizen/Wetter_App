@@ -1430,8 +1430,12 @@ function openDayDetailModal(dayIndex, daily, hourly) {
   modal.style.display = 'flex';
 
   const closeBtn = document.getElementById('close-modal-btn');
+  const closeActionBtn = document.getElementById('day-modal-close-action');
   if (closeBtn) {
     closeBtn.onclick = () => { modal.style.display = 'none'; };
+  }
+  if (closeActionBtn) {
+    closeActionBtn.onclick = () => { modal.style.display = 'none'; };
   }
   modal.onclick = (e) => {
     if (e.target === modal) modal.style.display = 'none';
@@ -1764,7 +1768,7 @@ function setupWebcamModal() {
   // Globaler Escape-Key Handler für alle Dialoge & Modals
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      const dModal = document.getElementById('day-detail-modal-overlay');
+      const dModal = document.getElementById('day-detail-modal');
       const gModal = document.getElementById('gpx-modal-overlay');
       const wModal = document.getElementById('webcam-modal-overlay');
       if (dModal) dModal.style.display = 'none';
@@ -2957,13 +2961,22 @@ function initLeafletMap() {
   loadUnifiedRadarEngine();
   updateWeatherOverlay();
 
-  // Fenster-Resize-Handling für Wind-Canvas
+  // Fenster-Resize-Handling für responsive Anpassung (Canvas, Map, 3D-Mountain)
+  let resizeDebounce = null;
   window.addEventListener('resize', () => {
     if (state.map.activeOverlay === 'wind') {
       const wDir = state.currentWeather ? state.currentWeather.wind_direction_10m : 240;
       const wSpd = state.currentWeather ? state.currentWeather.wind_speed_10m : 20;
       startWindCanvas(wDir, wSpd);
     }
+    if (resizeDebounce) clearTimeout(resizeDebounce);
+    resizeDebounce = setTimeout(() => {
+      if (state.activeTab === 'tab-mountain') {
+        drawMountain3DCanvas();
+      } else if (state.activeTab === 'tab-map' && state.map.instance) {
+        state.map.instance.invalidateSize();
+      }
+    }, 100);
   });
 }
 
@@ -4086,6 +4099,71 @@ function setupSearch() {
     }, 250);
   });
 
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      const q = input.value.trim();
+      if (!q) return;
+
+      const firstItem = dropdown.querySelector('.dropdown-item');
+      if (firstItem) {
+        firstItem.click();
+        return;
+      }
+
+      const coordMatch = q.match(/^([-+]?\d{1,2}(?:\.\d+)?)[,\s]+([-+]?\d{1,3}(?:\.\d+)?)$/);
+      if (coordMatch) {
+        const lat = parseFloat(coordMatch[1]);
+        const lon = parseFloat(coordMatch[2]);
+        if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+          let elev = 500;
+          try {
+            const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
+            const elData = await elRes.json();
+            if (elData.elevation && elData.elevation[0] !== undefined) elev = Math.round(elData.elevation[0]);
+          } catch(err) {}
+          selectExactLocation({
+            name: `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`,
+            lat,
+            lon,
+            elevation: elev,
+            isMountain: elev >= 1000
+          });
+          dropdown.style.display = 'none';
+          input.value = '';
+          clearBtn.style.display = 'none';
+          return;
+        }
+      }
+
+      try {
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=de&format=json`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          const item = data.results[0];
+          const nLower = item.name.toLowerCase();
+          let officialElev = Math.round(item.elevation || 500);
+          let isMtn = determineIfMountain(item.name, item.feature_code, officialElev);
+          if (OFFICIAL_KNOWN_ELEVATIONS[nLower]) {
+            officialElev = OFFICIAL_KNOWN_ELEVATIONS[nLower].elevation;
+            isMtn = OFFICIAL_KNOWN_ELEVATIONS[nLower].isMountain;
+          }
+          selectExactLocation({
+            name: item.name,
+            lat: item.latitude,
+            lon: item.longitude,
+            elevation: officialElev,
+            country: item.country || '',
+            isMountain: isMtn
+          });
+          dropdown.style.display = 'none';
+          input.value = '';
+          clearBtn.style.display = 'none';
+        }
+      } catch(err) {}
+    }
+  });
+
   clearBtn.addEventListener('click', () => {
     input.value = '';
     clearBtn.style.display = 'none';
@@ -4269,10 +4347,16 @@ function setupGPXInspector() {
     });
   }
 
+  const closeActionBtn = document.getElementById('gpx-modal-close-action');
   if (closeBtn && modal) {
     closeBtn.addEventListener('click', () => {
       modal.style.display = 'none';
     });
+    if (closeActionBtn) {
+      closeActionBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+      });
+    }
     modal.addEventListener('click', e => {
       if (e.target === modal) modal.style.display = 'none';
     });

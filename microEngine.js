@@ -298,11 +298,11 @@ export const MicroEngine = {
     const layerStack = levels
       .map((hpa) => ({
         hpa,
-        z: h[`geopotential_height_${hpa}hPa`][idx],
-        temp: h[`temperature_${hpa}hPa`][idx],
-        windSpeed: h[`wind_speed_${hpa}hPa`][idx],
-        windDir: h[`wind_direction_${hpa}hPa`][idx],
-        rh: h[`relative_humidity_${hpa}hPa`][idx],
+        z: h[`geopotential_height_${hpa}hPa`]?.[idx],
+        temp: h[`temperature_${hpa}hPa`]?.[idx],
+        windSpeed: h[`wind_speed_${hpa}hPa`]?.[idx],
+        windDir: h[`wind_direction_${hpa}hPa`]?.[idx],
+        rh: h[`relative_humidity_${hpa}hPa`]?.[idx],
       }))
       .filter(l => l.z !== undefined && l.temp !== undefined)
       .sort((a, b) => a.z - b.z);
@@ -437,10 +437,10 @@ export const MicroEngine = {
       const levels = [1000, 925, 850, 700, 600, 500];
       const stack = levels.map(hpa => ({
         hpa,
-        z: h[`geopotential_height_${hpa}hPa`][i],
-        temp: h[`temperature_${hpa}hPa`][i],
-        wind: h[`wind_speed_${hpa}hPa`][i],
-        dir: h[`wind_direction_${hpa}hPa`][i]
+        z: h[`geopotential_height_${hpa}hPa`]?.[i],
+        temp: h[`temperature_${hpa}hPa`]?.[i],
+        wind: h[`wind_speed_${hpa}hPa`]?.[i],
+        dir: h[`wind_direction_${hpa}hPa`]?.[i]
       })).filter(l => l.z !== undefined && l.temp !== undefined);
 
       for (const step of steps) {
@@ -460,7 +460,8 @@ export const MicroEngine = {
           t = low.temp + weight * (up.temp - low.temp);
           w = low.wind + weight * (up.wind - low.wind);
         } else {
-          t = h.temperature_2m[i] - ((step.z - valleyZ) * 0.0065);
+          const baseT = (h.temperature_2m && h.temperature_2m[i] !== undefined) ? h.temperature_2m[i] : 10;
+          t = baseT - ((step.z - valleyZ) * 0.0065);
           w = (h.wind_speed_10m ? h.wind_speed_10m[i] : 10) * (1 + (step.z / 2000));
         }
 
