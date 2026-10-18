@@ -861,24 +861,63 @@
               <span class="card-tag">Echtzeit-Streckenverlauf</span>
             </div>
 
-            <!-- Sportart-Auswahl -->
+            <!-- Sportart-Auswahl (Apple Glass-Pills) -->
             <div class="sports-type-bar" id="sports-type-bar">
               <button class="sport-pill active" data-sport="hiking" type="button">
                 <span class="sp-icon">🥾</span>
-                <span class="sp-label">Wandern & Bergsteigen</span>
+                <div class="sp-text">
+                  <span class="sp-label">Wandern & Bergsteigen</span>
+                  <span class="sp-pace-badge" id="sp-pace-hiking">4.0 km/h • 400 Hm/h</span>
+                </div>
               </button>
               <button class="sport-pill" data-sport="road_bike" type="button">
                 <span class="sp-icon">🚴</span>
-                <span class="sp-label">Rennrad & Asphalt</span>
+                <div class="sp-text">
+                  <span class="sp-label">Rennrad & Asphalt</span>
+                  <span class="sp-pace-badge" id="sp-pace-road_bike">25.0 km/h</span>
+                </div>
               </button>
               <button class="sport-pill" data-sport="gravel_mtb" type="button">
                 <span class="sp-icon">🚵</span>
-                <span class="sp-label">Gravel & MTB</span>
+                <div class="sp-text">
+                  <span class="sp-label">Gravel & MTB</span>
+                  <span class="sp-pace-badge" id="sp-pace-gravel_mtb">16.0 km/h</span>
+                </div>
               </button>
               <button class="sport-pill" data-sport="trailrun" type="button">
                 <span class="sp-icon">🏃</span>
-                <span class="sp-label">Trailrunning</span>
+                <div class="sp-text">
+                  <span class="sp-label">Trailrunning</span>
+                  <span class="sp-pace-badge" id="sp-pace-trailrun">8.5 km/h</span>
+                </div>
               </button>
+            </div>
+
+            <!-- 4-stufiger Fitness-Level-Wähler (Gemütlich / Normal / Sportlich / Profi) -->
+            <div class="sports-fitness-bar" id="sports-fitness-bar">
+              <span class="sf-caption">⚡ Fitness & Pace-Profil:</span>
+              <div class="sports-fitness-pills" id="sports-fitness-pills">
+                <button type="button" class="fitness-pill" data-fitness="easy" title="Gemütliches Wandern & Genuss-Fahrt">
+                  <span class="fp-icon">🧘</span>
+                  <span class="fp-name">Gemütlich</span>
+                  <span class="fp-multiplier">0.8× Pace</span>
+                </button>
+                <button type="button" class="fitness-pill active" data-fitness="normal" title="Standard Alpenverein / SAC">
+                  <span class="fp-icon">🚶</span>
+                  <span class="fp-name">Normal</span>
+                  <span class="fp-multiplier">1.0× Pace</span>
+                </button>
+                <button type="button" class="fitness-pill" data-fitness="sporty" title="Zügiges Sportler-Tempo">
+                  <span class="fp-icon">🏃</span>
+                  <span class="fp-name">Sportlich</span>
+                  <span class="fp-multiplier">1.25× Pace</span>
+                </button>
+                <button type="button" class="fitness-pill" data-fitness="pro" title="Wettkampf- / Profi-Tempo">
+                  <span class="fp-icon">🏆</span>
+                  <span class="fp-name">Profi</span>
+                  <span class="fp-multiplier">1.5× Pace</span>
+                </button>
+              </div>
             </div>
 
             <!-- Startzeit-Steuerung -->
@@ -1005,12 +1044,16 @@
 
           <!-- 4. WEGPUNKT-WETTERTABELLE & ETAPPEN-INSPEKTOR -->
           <section class="glass-card sports-waypoints-card">
-            <div class="card-header">
+            <div class="card-header swt-card-header">
               <div class="card-title">
                 <span class="card-icon">🧭</span>
                 <span>ETAPPEN-WETTERBERICHT ZUR GENAUEN DURCHGANGSZEIT</span>
               </div>
-              <span class="card-tag">Stundengenaue Prognose</span>
+              <div class="swt-filter-group" id="swt-filter-group">
+                <button type="button" class="swt-filter-pill active" data-wpt-filter="all">🌐 Alle Wegpunkte</button>
+                <button type="button" class="swt-filter-pill" data-wpt-filter="hazards">⚠️ Nur Warnungen</button>
+                <button type="button" class="swt-filter-pill" data-wpt-filter="peaks">🏔️ Pässe & Gipfel</button>
+              </div>
             </div>
 
             <div class="sports-waypoints-table-wrap">

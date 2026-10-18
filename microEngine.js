@@ -1032,52 +1032,91 @@ export const MicroEngine = {
   },
 
   /**
-   * STUFE 9b: Sportarten-Geschwindigkeitsprofile & Marschzeit-Berechnung
+   * STUFE 9b: Sportarten-Geschwindigkeitsprofile & Marschzeit-Berechnung (inkl. 4-stufigem Fitness-Level)
    */
-  getSportSpeedInfo(sportType) {
-    const table = {
+  getSportSpeedInfo(sportType, fitnessLevel = 'normal') {
+    const fitnessMultipliers = {
+      'easy': { factor: 0.8, label: 'Gemütlich', icon: '🧘', desc: '0.8× Grundtempo' },
+      'normal': { factor: 1.0, label: 'Normal', icon: '🚶', desc: '1.0× Grundtempo (SAC / Standard)' },
+      'sporty': { factor: 1.25, label: 'Sportlich', icon: '🏃', desc: '1.25× Sportler-Pace' },
+      'pro': { factor: 1.5, label: 'Profi', icon: '🏆', desc: '1.5× Wettkampf- / Athleten-Pace' }
+    };
+    const fit = fitnessMultipliers[fitnessLevel] || fitnessMultipliers['normal'];
+
+    const baseTable = {
       'hiking': {
         name: 'Wandern & Bergsteigen',
         icon: '🥾',
         baseFlatSpeedKmH: 4.0,
         ascentMPerHour: 400,
         descentMPerHour: 800,
-        desc: 'SAC-Norm: 4 km/h flach, 400 Hm/h Aufstieg, 800 Hm/h Abstieg'
+        desc: 'SAC-Norm: 4 km/h flach, 400 Hm/h Aufstieg'
       },
       'road_bike': {
         name: 'Rennrad & Asphalt',
         icon: '🚴',
         baseFlatSpeedKmH: 25.0,
-        desc: '25 km/h Schnitt mit watt-äquivalenter Steigungsanpassung'
+        ascentMPerHour: null,
+        descentMPerHour: null,
+        desc: 'Watt-äquivalenter Berggraph'
       },
       'gravel_mtb': {
         name: 'Gravel & Mountainbike',
         icon: '🚵',
         baseFlatSpeedKmH: 16.0,
-        desc: '16 km/h Schnitt auf Schotter, Trails und Forstwegen'
+        ascentMPerHour: null,
+        descentMPerHour: null,
+        desc: 'Schotter & Forstwege'
       },
       'trailrun': {
         name: 'Trailrunning',
         icon: '🏃',
         baseFlatSpeedKmH: 8.5,
-        desc: '8.5 km/h Schnitt mit Berglauf-Gradient'
+        ascentMPerHour: null,
+        descentMPerHour: null,
+        desc: 'Berglauf-Gradient'
       }
     };
-    return table[sportType] || table['hiking'];
+
+    const base = baseTable[sportType] || baseTable['hiking'];
+    const flatSpeed = Math.round((base.baseFlatSpeedKmH * fit.factor) * 10) / 10;
+    const ascentRate = base.ascentMPerHour ? Math.round(base.ascentMPerHour * fit.factor) : null;
+    const descentRate = base.descentMPerHour ? Math.round(base.descentMPerHour * fit.factor) : null;
+
+    let paceLabel = `${flatSpeed} km/h`;
+    if (ascentRate) paceLabel += ` • ${ascentRate} Hm/h`;
+
+    return {
+      ...base,
+      fitnessLevel,
+      fitnessFactor: fit.factor,
+      fitnessName: fit.label,
+      fitnessIcon: fit.icon,
+      baseFlatSpeedKmH: flatSpeed,
+      ascentMPerHour: ascentRate,
+      descentMPerHour: descentRate,
+      paceLabel,
+      desc: `${base.desc} (${fit.label}: ${fit.factor}×)`
+    };
   },
 
   /**
    * STUFE 9c: Dynamischer Strecken-Wetterverlauf über die gesamte Dauer der Route
    */
-  computeRouteWeatherTimeline(parsedGPX, startTimeMs, sportType, hourlyForecast, baseElevation = 500) {
+  computeRouteWeatherTimeline(parsedGPX, startTimeMs, sportType, hourlyForecast, baseElevation = 500, fitnessLevel = 'normal') {
     if (!parsedGPX || !parsedGPX.points || parsedGPX.points.length === 0) {
       return null;
     }
 
     const points = parsedGPX.points;
-    const speedInfo = this.getSportSpeedInfo(sportType);
+    const speedInfo = this.getSportSpeedInfo(sportType, fitnessLevel);
     let cumulativeHours = 0;
     const timedPoints = [];
+
+    const fitFactor = speedInfo.fitnessFactor || 1.0;
+    const flatV = speedInfo.baseFlatSpeedKmH;
+    const ascRate = speedInfo.ascentMPerHour || 400;
+    const descRate = speedInfo.descentMPerHour || 800;
 
     for (let i = 0; i < points.length; i++) {
       const pt = points[i];
@@ -1088,22 +1127,25 @@ export const MicroEngine = {
 
         let segHours = 0;
         if (sportType === 'hiking') {
-          // SAC Bergwander-Formel: T = max(tH, tV) + min(tH, tV) / 2
-          const tH = distKm / 4.0;
-          const tV = (dzM > 0 ? dzM / 400 : Math.abs(dzM) / 800);
+          // SAC Bergwander-Formel mit Fitness-Faktor
+          const tH = distKm / flatV;
+          const tV = (dzM > 0 ? dzM / ascRate : Math.abs(dzM) / descRate);
           segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
         } else if (sportType === 'road_bike') {
           const grad = (dzM / (distKm * 1000)) * 100;
-          const v = Math.max(9, Math.min(55, 25 - grad * 1.4));
+          const baseV = 25 * fitFactor;
+          const v = Math.max(8 * fitFactor, Math.min(60 * fitFactor, baseV - grad * 1.4));
           segHours = distKm / v;
         } else if (sportType === 'gravel_mtb') {
           const grad = (dzM / (distKm * 1000)) * 100;
-          const v = Math.max(6, Math.min(38, 16 - grad * 1.1));
+          const baseV = 16 * fitFactor;
+          const v = Math.max(5 * fitFactor, Math.min(42 * fitFactor, baseV - grad * 1.1));
           segHours = distKm / v;
         } else {
           // Trailrun
           const grad = (dzM / (distKm * 1000)) * 100;
-          const v = Math.max(4.5, Math.min(14, 8.5 - (grad > 0 ? grad * 0.35 : grad * 0.15)));
+          const baseV = 8.5 * fitFactor;
+          const v = Math.max(4 * fitFactor, Math.min(16 * fitFactor, baseV - (grad > 0 ? grad * 0.35 : grad * 0.15)));
           segHours = distKm / v;
         }
         cumulativeHours += Math.max(0.005, segHours);
@@ -1255,6 +1297,11 @@ export const MicroEngine = {
       sportType,
       sportName: speedInfo.name,
       sportIcon: speedInfo.icon,
+      fitnessLevel: speedInfo.fitnessLevel,
+      fitnessName: speedInfo.fitnessName,
+      fitnessFactor: speedInfo.fitnessFactor,
+      fitnessIcon: speedInfo.fitnessIcon,
+      paceLabel: speedInfo.paceLabel,
       startTimeMs,
       startTimeStr: new Date(startTimeMs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
       startDateStr: new Date(startTimeMs).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }),

@@ -64,6 +64,8 @@ const state = {
   sports: {
     initialized: false,
     sportType: 'hiking',
+    fitnessLevel: 'normal',
+    waypointFilter: 'all',
     activeTour: 'grossglockner-bike',
     startTimeMs: Date.now(),
     gpxText: null,
@@ -4722,15 +4724,44 @@ function setupSportsTab() {
   });
 
   // Sportarten-Pills (Wandern, Rennrad, Gravel/MTB, Trailrunning)
-  const sportButtons = document.querySelectorAll('.sport-type-btn');
+  const sportButtons = document.querySelectorAll('.sport-pill, .sport-type-btn');
   sportButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       sportButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.sports.sportType = btn.dataset.sport;
+      updateSportPaceBadges();
       recomputeSportsTimeline();
     });
   });
+
+  // 4-stufiger Fitness-Level-Wähler (Gemütlich, Normal, Sportlich, Profi)
+  const fitnessPills = document.querySelectorAll('.fitness-pill');
+  fitnessPills.forEach(btn => {
+    btn.addEventListener('click', () => {
+      fitnessPills.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.sports.fitnessLevel = btn.dataset.fitness;
+      updateSportPaceBadges();
+      recomputeSportsTimeline();
+    });
+  });
+
+  // Meilenstein / Wegpunkt Filter (Alle, Warnungen, Pässe & Gipfel)
+  const wptFilterPills = document.querySelectorAll('.swt-filter-pill');
+  wptFilterPills.forEach(btn => {
+    btn.addEventListener('click', () => {
+      wptFilterPills.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.sports.waypointFilter = btn.dataset.wptFilter;
+      if (state.sports.timeline) {
+        renderSportsWaypointsTable(state.sports.timeline);
+      }
+    });
+  });
+
+  // Initialisiere Pace-Badges auf den Pills
+  updateSportPaceBadges();
 
   // Alpine Referenz-Routen (Presets)
   const routePresets = document.querySelectorAll('.sports-route-preset');
@@ -4917,6 +4948,17 @@ async function loadAndComputeSportsTour(gpxXml, tourName) {
   recomputeSportsTimeline();
 }
 
+function updateSportPaceBadges() {
+  const sports = ['hiking', 'road_bike', 'gravel_mtb', 'trailrun'];
+  sports.forEach(sp => {
+    const badge = document.getElementById(`sp-pace-${sp}`);
+    if (badge) {
+      const info = MicroEngine.getSportSpeedInfo(sp, state.sports.fitnessLevel);
+      badge.innerText = info.paceLabel;
+    }
+  });
+}
+
 function recomputeSportsTimeline() {
   if (!state.sports.parsedGPX || !state.sports.cachedForecast) return;
   const parsed = state.sports.parsedGPX;
@@ -4928,12 +4970,14 @@ function recomputeSportsTimeline() {
     state.sports.startTimeMs,
     state.sports.sportType,
     hourly,
-    startPt.ele
+    startPt.ele,
+    state.sports.fitnessLevel
   );
 
   state.sports.timeline = timeline;
   state.sports.hazards = timeline.hazards;
 
+  updateSportPaceBadges();
   renderSportsMetrics(timeline);
   renderSportsHazards(timeline.hazards);
   renderSportsElevationProfile(timeline);
@@ -5137,16 +5181,51 @@ function renderSportsWaypointsTable(timeline) {
   if (!container || !timeline) return;
 
   container.innerHTML = '';
-  timeline.milestones.forEach((m, idx) => {
+
+  const filter = state.sports.waypointFilter || 'all';
+  let visibleMilestones = timeline.milestones;
+  if (filter === 'hazards') {
+    visibleMilestones = timeline.milestones.filter((m, idx) => {
+      return (
+        m.precipMm >= 0.5 ||
+        m.gustsKmH >= 45 ||
+        m.weatherCode >= 95 ||
+        m.isSnow ||
+        (m.weatherCondition && m.weatherCondition.includes('Gewitter'))
+      );
+    });
+  } else if (filter === 'peaks') {
+    visibleMilestones = timeline.milestones.filter((m, idx) => {
+      const isStart = idx === 0;
+      const isEnd = idx === timeline.milestones.length - 1;
+      const isPeak = m.ele === timeline.maxElevationM;
+      return isStart || isEnd || isPeak;
+    });
+  }
+
+  if (visibleMilestones.length === 0) {
+    container.innerHTML = `
+      <div class="swt-empty-notice">
+        <span>✅</span>
+        <div>
+          <strong>Keine Streckenabschnitte mit Warnungen</strong>
+          <p>Für deine geplante Tour sind bei aktuellem Wetter keine Gefahren auf den Wegpunkten aktiv.</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  visibleMilestones.forEach((m, idx) => {
     const row = document.createElement('div');
     row.className = 'swt-row';
-    row.dataset.idx = idx;
+    row.dataset.idx = m.index !== undefined ? m.index : idx;
     row.dataset.km = m.distFromStartKm;
 
     const isPeak = m.ele === timeline.maxElevationM;
     let typeTag = '📍 Wegpunkt';
-    if (idx === 0) typeTag = '🚩 Tourstart';
-    else if (idx === timeline.milestones.length - 1) typeTag = '🏁 Zielankunft';
+    if (m.distFromStartKm === 0) typeTag = '🚩 Tourstart';
+    else if (m.distFromStartKm >= timeline.totalDistanceKm - 0.05) typeTag = '🏁 Zielankunft';
     else if (isPeak) typeTag = '🏔️ Scheitelpunkt';
 
     row.innerHTML = `

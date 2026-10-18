@@ -4562,13 +4562,15 @@ html, body {
 /* ==========================================================================
    TAB: SPORT & ROUTENWETTER-STUDIO (WANDERN & RADFAHREN)
    ========================================================================== */
+/* Sportart-Auswahl (Apple-Style Glass Pills) */
 .sports-type-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   overflow-x: auto;
-  padding: 4px 0 10px 0;
+  padding: 4px 2px 10px 2px;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 .sports-type-bar::-webkit-scrollbar {
   display: none;
@@ -4577,31 +4579,159 @@ html, body {
 .sport-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  min-height: 44px;
-  border-radius: var(--radius-pill);
+  gap: 10px;
+  padding: 10px 18px;
+  min-height: 54px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   touch-action: manipulation;
+  flex-shrink: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.sport-pill .sp-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.sport-pill .sp-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+}
+.sport-pill .sp-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.2;
+}
+.sport-pill .sp-pace-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ios-cyan);
+  line-height: 1.2;
 }
 .sport-pill:hover {
   background: rgba(255, 255, 255, 0.12);
-  color: #fff;
   border-color: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 .sport-pill.active {
-  background: linear-gradient(135deg, rgba(10, 132, 255, 0.9), rgba(0, 122, 255, 1));
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.88), rgba(0, 110, 230, 0.96));
   color: #ffffff;
-  border-color: rgba(100, 210, 255, 0.7);
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.45);
+  border-color: rgba(100, 210, 255, 0.8);
+  box-shadow: 0 4px 18px rgba(0, 122, 255, 0.5);
+  transform: translateY(-1px);
+}
+.sport-pill.active .sp-label {
+  color: #ffffff;
+}
+.sport-pill.active .sp-pace-badge {
+  color: #e0f7ff;
+}
+
+/* 4-stufiger Fitness-Level-Wähler */
+.sports-fitness-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  margin: 4px 0 10px 0;
+}
+.sf-caption {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sports-fitness-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fitness-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  touch-action: manipulation;
+}
+.fitness-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+.fitness-pill.active {
+  background: rgba(48, 209, 88, 0.22);
+  border-color: var(--ios-green);
+  color: #30d158;
+  box-shadow: 0 2px 10px rgba(48, 209, 88, 0.25);
+}
+.fitness-pill .fp-multiplier {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  opacity: 0.85;
+}
+
+/* Wegpunkt Filter Chips */
+.swt-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.swt-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.swt-filter-pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.swt-filter-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+.swt-filter-pill.active {
+  background: var(--ios-cyan);
+  border-color: var(--ios-cyan);
+  color: #000;
+  box-shadow: 0 2px 8px rgba(0, 229, 255, 0.35);
 }
 
 .sports-start-row {
@@ -5027,6 +5157,36 @@ html, body {
 .swt-col-ele { font-family: var(--font-mono); color: var(--text-secondary); }
 .swt-col-cond { display: flex; align-items: center; gap: 6px; }
 .swt-col-temp { font-weight: 700; }
+.swt-row.active-waypoint {
+  background: rgba(0, 229, 255, 0.16) !important;
+  border-left: 3px solid var(--ios-cyan) !important;
+}
+
+.swt-empty-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  background: rgba(48, 209, 88, 0.08);
+  border: 1px solid rgba(48, 209, 88, 0.25);
+  border-radius: 12px;
+  color: #fff;
+  margin: 14px;
+}
+.swt-empty-notice span {
+  font-size: 26px;
+}
+.swt-empty-notice strong {
+  display: block;
+  color: #30d158;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+.swt-empty-notice p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+}
 
 /* Sports Map */
 .sports-map-wrapper {
