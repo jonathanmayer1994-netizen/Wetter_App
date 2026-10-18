@@ -2380,6 +2380,130 @@ html, body {
   transition: transform 0.3s ease;
 }
 
+/* ==========================================================================
+   GPX ROUTEN-VERLAUF & START/ZIEL-MARKER (MINIMALISTISCH & EXAKT)
+   ========================================================================== */
+.gpx-leaflet-icon,
+.leaflet-div-icon.gpx-leaflet-icon {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.gpx-endpoint-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  user-select: none;
+  line-height: 1.2;
+}
+
+.gpx-start-badge {
+  border: 2px solid #30d158;
+  color: #30d158;
+}
+
+.gpx-end-badge {
+  border: 2px solid #ffd166;
+  color: #ffd166;
+}
+
+.gpx-pin-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.gpx-pin-text {
+  letter-spacing: 0.3px;
+}
+
+.gpx-pin-ele {
+  color: #ffffff;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+/* Floating Tour Banner on the Map */
+.gpx-active-tour-banner {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: 30px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(0, 229, 255, 0.2);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.gatb-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gatb-name {
+  color: #00e5ff;
+  font-weight: 700;
+}
+
+.gatb-close-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #ffffff;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gatb-close-btn:hover {
+  background: rgba(255, 69, 58, 0.6);
+  transform: scale(1.1);
+}
+
+.gpx-track-tooltip {
+  background: rgba(15, 23, 42, 0.94) !important;
+  border: 1px solid rgba(0, 229, 255, 0.5) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  border-radius: 10px !important;
+  padding: 5px 10px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+}
+
 .map-location-chip {
   font-size: 11px;
   font-weight: 700;

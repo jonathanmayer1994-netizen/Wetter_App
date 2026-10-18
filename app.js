@@ -4191,8 +4191,29 @@ function convertTemp(celsius) {
 // =============================================================================
 let activeGPXData = null;
 let gpxMapPolyline = null;
+let gpxMapPolylineOutline = null;
 let gpxStartMarker = null;
 let gpxEndMarker = null;
+
+function clearGPXFromMap() {
+  if (gpxMapPolyline && state.map.instance) state.map.instance.removeLayer(gpxMapPolyline);
+  if (gpxMapPolylineOutline && state.map.instance) state.map.instance.removeLayer(gpxMapPolylineOutline);
+  if (gpxStartMarker && state.map.instance) state.map.instance.removeLayer(gpxStartMarker);
+  if (gpxEndMarker && state.map.instance) state.map.instance.removeLayer(gpxEndMarker);
+  gpxMapPolyline = null;
+  gpxMapPolylineOutline = null;
+  gpxStartMarker = null;
+  gpxEndMarker = null;
+
+  const tourBanner = document.getElementById('gpx-active-tour-banner');
+  if (tourBanner) tourBanner.style.display = 'none';
+
+  // Standort-Marker wieder einblenden
+  if (state.map.marker && state.map.instance) {
+    state.map.marker.addTo(state.map.instance);
+  }
+  updateWeatherOverlay();
+}
 
 function setupGPXInspector() {
   const openBtn = document.getElementById('gpx-open-btn');
@@ -4202,6 +4223,12 @@ function setupGPXInspector() {
   const fileInput = document.getElementById('gpx-file-input');
   const dropZone = document.getElementById('gpx-drop-zone');
   const showOnMapBtn = document.getElementById('gpx-show-on-map-btn');
+
+  // Floating Banner Close Button
+  const gatbCloseBtn = document.getElementById('gatb-close-btn');
+  if (gatbCloseBtn) {
+    gatbCloseBtn.addEventListener('click', clearGPXFromMap);
+  }
 
   if (openBtn && modal) {
     openBtn.addEventListener('click', () => {
@@ -4286,38 +4313,88 @@ function setupGPXInspector() {
       const latLngs = activeGPXData.points.map(p => [p.lat, p.lon]);
 
       if (gpxMapPolyline) state.map.instance.removeLayer(gpxMapPolyline);
+      if (gpxMapPolylineOutline) state.map.instance.removeLayer(gpxMapPolylineOutline);
       if (gpxStartMarker) state.map.instance.removeLayer(gpxStartMarker);
       if (gpxEndMarker) state.map.instance.removeLayer(gpxEndMarker);
 
-      gpxMapPolyline = L.polyline(latLngs, {
-        color: '#00e5ff',
-        weight: 5,
-        opacity: 0.95,
+      // Verberge Standort-Marker und sonstige Stationen: NUR Start, Ziel und GPX-Strecke anzeigen!
+      if (state.map.marker) {
+        state.map.marker.closePopup();
+        state.map.instance.removeLayer(state.map.marker);
+      }
+      if (state.map.weatherLayerGroup) {
+        state.map.weatherLayerGroup.clearLayers();
+      }
+
+      // 1. Kontrast-Randlinie
+      gpxMapPolylineOutline = L.polyline(latLngs, {
+        color: '#020617',
+        weight: 8,
+        opacity: 0.9,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(state.map.instance);
 
-      // Start & Ziel / Gipfel Marker
+      // 2. Haupt-GPX-Strecke (Leuchtendes Cyan)
+      gpxMapPolyline = L.polyline(latLngs, {
+        color: '#00e5ff',
+        weight: 5,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(state.map.instance);
+
+      // 3. Startpunkt & Endpunkt (Ziel) Marker
       const pStart = activeGPXData.points[0];
       const pEnd = activeGPXData.points[activeGPXData.points.length - 1];
 
       const startIcon = L.divIcon({
-        className: 'custom-weather-icon',
-        html: `<div class="weather-station-marker" style="border-color:#30d158; color:#30d158;">🟢 Start: ${pStart.ele}m</div>`,
-        iconAnchor: [45, 12]
+        className: 'gpx-leaflet-icon',
+        html: `<div class="gpx-endpoint-badge gpx-start-badge"><span class="gpx-pin-icon">🟢</span><span class="gpx-pin-text">Start:</span><span class="gpx-pin-ele">${pStart.ele} m</span></div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
       });
-      gpxStartMarker = L.marker([pStart.lat, pStart.lon], { icon: startIcon }).addTo(state.map.instance);
+      gpxStartMarker = L.marker([pStart.lat, pStart.lon], { icon: startIcon, zIndexOffset: 3000 }).addTo(state.map.instance);
 
+      // Das Ziel ist das ZIEL und nicht der Gipfel!
       const endIcon = L.divIcon({
-        className: 'custom-weather-icon',
-        html: `<div class="weather-station-marker" style="border-color:#ffd166; color:#ffd166;">🏁 Gipfel: ${pEnd.ele}m</div>`,
-        iconAnchor: [50, 12]
+        className: 'gpx-leaflet-icon',
+        html: `<div class="gpx-endpoint-badge gpx-end-badge"><span class="gpx-pin-icon">🏁</span><span class="gpx-pin-text">Ziel:</span><span class="gpx-pin-ele">${pEnd.ele} m</span></div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
       });
-      gpxEndMarker = L.marker([pEnd.lat, pEnd.lon], { icon: endIcon }).addTo(state.map.instance);
+      gpxEndMarker = L.marker([pEnd.lat, pEnd.lon], { icon: endIcon, zIndexOffset: 3000 }).addTo(state.map.instance);
 
-      // Zoome auf gesamte Tour
+      // 4. Interaktives Tooltip entlang der Strecke beim Bewegen über den Track
+      gpxMapPolyline.on('mousemove', (e) => {
+        let closest = activeGPXData.points[0];
+        let minDist = Infinity;
+        for (const pt of activeGPXData.points) {
+          const d = Math.hypot(pt.lat - e.latlng.lat, pt.lon - e.latlng.lng);
+          if (d < minDist) {
+            minDist = d;
+            closest = pt;
+          }
+        }
+        gpxMapPolyline.bindTooltip(`📍 ${closest.ele} m • Distanz: ${closest.distFromStartKm ? closest.distFromStartKm.toFixed(1) + ' km' : ''}`, {
+          sticky: true,
+          className: 'gpx-track-tooltip'
+        }).openTooltip();
+      });
+
+      // 5. Aktives Tour-Banner auf der Karte einblenden
+      const tourBanner = document.getElementById('gpx-active-tour-banner');
+      const gatbName = document.getElementById('gatb-name');
+      const gatbStats = document.getElementById('gatb-stats');
+      if (tourBanner) {
+        tourBanner.style.display = 'flex';
+        if (gatbName) gatbName.innerText = activeGPXData.name;
+        if (gatbStats) gatbStats.innerText = `(${activeGPXData.totalDistanceKm} km, +${activeGPXData.totalAscentM} Hm) • 🟢 Start: ${pStart.ele} m ➔ 🏁 Ziel: ${pEnd.ele} m`;
+      }
+
+      // 6. Zoome auf die gesamte Tour mit sauberem Padding
       setTimeout(() => {
-        state.map.instance.fitBounds(gpxMapPolyline.getBounds(), { padding: [50, 50] });
+        state.map.instance.fitBounds(gpxMapPolyline.getBounds(), { padding: [60, 60] });
       }, 200);
     });
   }
