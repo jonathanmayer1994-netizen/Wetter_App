@@ -1,13 +1,12 @@
 /**
- * BEST WEATHER — Ultra-High Precision iPhone Weather App
- * Powered by Open-Meteo 90m DEM Downscaling & RainViewer Polarimetric Live Radar
- * Featuring 10-Meter Micro-Topography Engine (Copernicus DEM, TPI Venturi, GTI, Horizon Raycast)
+ * BEST WEATHER — Dynamic Responsive Alpine Weather System
+ * Powered by Open-Meteo, 10m DEM MicroEngine, RainViewer & Alpine Networks
  */
 
 import { MicroEngine } from './microEngine.js';
 
 // =============================================================================
-// STATE & CONFIGURATION
+// GLOBAL STATE & PERSISTENCE
 // =============================================================================
 const state = {
   currentLocation: {
@@ -15,24 +14,42 @@ const state = {
     lat: 48.1371,
     lon: 11.5754,
     elevation: 519,
-    country: 'Deutschland'
+    country: 'Deutschland',
+    isMountain: false
   },
   weatherData: null,
-  unit: 'celsius', // 'celsius' or 'fahrenheit'
-  favorites: JSON.parse(localStorage.getItem('best_weather_favorites') || '[]'),
-  radar: {
-    map: null,
-    radarLayers: [],
-    currentFrameIndex: 0,
-    animationInterval: null,
-    isPlaying: false,
-    frames: [],
-    marker: null
+  microData: null,
+  unit: 'celsius',
+  activeTab: 'tab-overview',
+  activeAspect: { tilt: 45, azimuth: 0, isAuto: false },
+  selectedAltitudeHour: 0,
+  favorites: JSON.parse(localStorage.getItem('best_weather_favorites_v2') || '[]'),
+  map: {
+    instance: null,
+    marker: null,
+    activeLayer: 'radar',
+    radarTileLayer: null,
+    baseTileLayer: null,
+    radarFrames: [],
+    radarIndex: 0,
+    radarInterval: null,
+    radarPlaying: false,
+    radarHost: ''
   },
   canvasEngine: null
 };
 
-// Weather Code mapping according to WMO standard
+// Default initial favorites if none saved
+if (state.favorites.length === 0) {
+  state.favorites = [
+    { name: 'München', lat: 48.1371, lon: 11.5754, elevation: 519, country: 'Deutschland' },
+    { name: 'Zugspitze', lat: 47.421, lon: 10.985, elevation: 2962, country: 'Deutschland' },
+    { name: 'Matterhorn / Zermatt', lat: 45.976, lon: 7.658, elevation: 4478, country: 'Schweiz' },
+    { name: 'Bozen / Dolomiten', lat: 46.498, lon: 11.354, elevation: 262, country: 'Italien' }
+  ];
+}
+
+// WMO Codes Definition
 const WMO_CODES = {
   0: { label: 'Klar / Wolkenlos', icon: '☀️', iconNight: '🌙', theme: 'clear-day', themeNight: 'clear-night' },
   1: { label: 'Überwiegend klar', icon: '🌤️', iconNight: '🌤️', theme: 'clear-day', themeNight: 'clear-night' },
@@ -60,30 +77,25 @@ const WMO_CODES = {
   85: { label: 'Leichte Schneeschauer', icon: '🌨️', iconNight: '🌨️', theme: 'snow', themeNight: 'snow' },
   86: { label: 'Starke Schneeschauer', icon: '❄️', iconNight: '❄️', theme: 'snow', themeNight: 'snow' },
   95: { label: 'Gewitter', icon: '⛈️', iconNight: '⛈️', theme: 'thunder', themeNight: 'thunder' },
-  96: { label: 'Gewitter mit leichtem Hagel', icon: '⛈️', iconNight: '⛈️', theme: 'thunder', themeNight: 'thunder' },
+  96: { label: 'Gewitter mit Hagel', icon: '⛈️', iconNight: '⛈️', theme: 'thunder', themeNight: 'thunder' },
   99: { label: 'Schweres Hagelgewitter', icon: '⛈️', iconNight: '⛈️', theme: 'thunder', themeNight: 'thunder' }
 };
 
 // =============================================================================
-// ATMOSPHERIC CANVAS PARTICLE ENGINE (Rain, Snow, Stars, Clouds, Sun Rays)
+// ATMOSPHERIC BACKGROUND CANVAS ENGINE
 // =============================================================================
-class WeatherCanvasEngine {
+class BackgroundCanvasEngine {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
+    if (!this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
     this.particles = [];
-    this.clouds = [];
     this.stars = [];
     this.currentMode = 'clear-day';
     this.isDay = true;
-    this.animationFrameId = null;
-    this.lightningTimer = 0;
-    this.lightningAlpha = 0;
-
     this.resize();
     window.addEventListener('resize', () => this.resize());
     this.initStars();
-    this.initClouds();
     this.animate = this.animate.bind(this);
     this.animate();
   }
@@ -93,764 +105,836 @@ class WeatherCanvasEngine {
     this.height = this.canvas.height = window.innerHeight;
   }
 
-  setMode(theme, isDay) {
-    this.currentMode = theme;
-    this.isDay = isDay;
-    this.particles = [];
-
-    // Initialize particles based on weather
-    if (theme === 'rain') {
-      const count = Math.floor(this.width / 5);
-      for (let i = 0; i < count; i++) {
-        this.particles.push({
-          x: Math.random() * this.width,
-          y: Math.random() * this.height,
-          length: 12 + Math.random() * 16,
-          speed: 12 + Math.random() * 10,
-          opacity: 0.3 + Math.random() * 0.4
-        });
-      }
-    } else if (theme === 'snow') {
-      const count = Math.floor(this.width / 8);
-      for (let i = 0; i < count; i++) {
-        this.particles.push({
-          x: Math.random() * this.width,
-          y: Math.random() * this.height,
-          radius: 1.5 + Math.random() * 3,
-          speed: 1 + Math.random() * 2,
-          wind: -0.5 + Math.random() * 1,
-          sway: Math.random() * Math.PI * 2,
-          opacity: 0.4 + Math.random() * 0.5
-        });
-      }
-    } else if (theme === 'thunder') {
-      const count = Math.floor(this.width / 4);
-      for (let i = 0; i < count; i++) {
-        this.particles.push({
-          x: Math.random() * this.width,
-          y: Math.random() * this.height,
-          length: 18 + Math.random() * 20,
-          speed: 18 + Math.random() * 12,
-          opacity: 0.5 + Math.random() * 0.4
-        });
-      }
-    }
-  }
-
   initStars() {
     this.stars = [];
-    const starCount = 85;
-    for (let i = 0; i < starCount; i++) {
+    for (let i = 0; i < 75; i++) {
       this.stars.push({
         x: Math.random() * window.innerWidth,
         y: Math.random() * (window.innerHeight * 0.6),
         radius: 0.8 + Math.random() * 1.5,
         alpha: Math.random(),
-        twinkleSpeed: 0.01 + Math.random() * 0.02
+        speed: 0.01 + Math.random() * 0.02
       });
     }
   }
 
-  initClouds() {
-    this.clouds = [];
-    for (let i = 0; i < 4; i++) {
-      this.clouds.push({
-        x: Math.random() * window.innerWidth,
-        y: 60 + Math.random() * 180,
-        radius: 120 + Math.random() * 100,
-        speed: 0.2 + Math.random() * 0.3,
-        opacity: 0.08 + Math.random() * 0.08
-      });
+  setMode(theme, isDay) {
+    this.currentMode = theme;
+    this.isDay = isDay;
+    this.particles = [];
+
+    if (theme === 'rain' || theme === 'thunder') {
+      const count = Math.min(80, Math.floor(this.width / 12));
+      for (let i = 0; i < count; i++) {
+        this.particles.push({
+          x: Math.random() * this.width,
+          y: Math.random() * this.height,
+          len: 14 + Math.random() * 14,
+          speed: 14 + Math.random() * 8
+        });
+      }
+    } else if (theme === 'snow') {
+      const count = Math.min(60, Math.floor(this.width / 16));
+      for (let i = 0; i < count; i++) {
+        this.particles.push({
+          x: Math.random() * this.width,
+          y: Math.random() * this.height,
+          r: 1.5 + Math.random() * 2.5,
+          speed: 1 + Math.random() * 1.5,
+          sway: Math.random() * Math.PI * 2
+        });
+      }
     }
   }
 
   animate() {
     this.ctx.clearRect(0, 0, this.width, this.height);
 
-    // 1. Stars at Night
+    // Stars
     if (!this.isDay || this.currentMode === 'clear-night') {
-      this.ctx.save();
       for (const star of this.stars) {
-        star.alpha += star.twinkleSpeed;
-        const opacity = (Math.sin(star.alpha) + 1) / 2 * 0.8 + 0.1;
-        this.ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        star.alpha += star.speed;
+        const op = (Math.sin(star.alpha) + 1) / 2 * 0.7 + 0.1;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${op})`;
         this.ctx.beginPath();
         this.ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
         this.ctx.fill();
       }
-      this.ctx.restore();
     }
 
-    // 2. Sun Rays during Clear Day
-    if (this.isDay && this.currentMode === 'clear-day') {
-      this.ctx.save();
-      const sunGradient = this.ctx.createRadialGradient(
-        this.width * 0.7, 80, 20,
-        this.width * 0.7, 80, this.width * 0.6
-      );
-      sunGradient.addColorStop(0, 'rgba(255, 220, 100, 0.22)');
-      sunGradient.addColorStop(0.5, 'rgba(255, 180, 50, 0.06)');
-      sunGradient.addColorStop(1, 'transparent');
-      this.ctx.fillStyle = sunGradient;
-      this.ctx.fillRect(0, 0, this.width, this.height);
-      this.ctx.restore();
-    }
-
-    // 3. Clouds
-    if (this.currentMode === 'cloudy' || this.currentMode === 'rain' || this.currentMode === 'thunder') {
-      this.ctx.save();
-      for (const cloud of this.clouds) {
-        cloud.x += cloud.speed;
-        if (cloud.x - cloud.radius > this.width) {
-          cloud.x = -cloud.radius;
-        }
-        const grad = this.ctx.createRadialGradient(cloud.x, cloud.y, cloud.radius * 0.2, cloud.x, cloud.y, cloud.radius);
-        grad.addColorStop(0, `rgba(255, 255, 255, ${cloud.opacity})`);
-        grad.addColorStop(1, 'transparent');
-        this.ctx.fillStyle = grad;
-        this.ctx.beginPath();
-        this.ctx.arc(cloud.x, cloud.y, cloud.radius, 0, Math.PI * 2);
-        this.ctx.fill();
-      }
-      this.ctx.restore();
-    }
-
-    // 4. Rain Particles
+    // Rain
     if (this.currentMode === 'rain' || this.currentMode === 'thunder') {
-      this.ctx.save();
-      this.ctx.strokeStyle = 'rgba(180, 225, 255, 0.65)';
-      this.ctx.lineWidth = 1.3;
+      this.ctx.strokeStyle = 'rgba(180, 225, 255, 0.55)';
+      this.ctx.lineWidth = 1.2;
       for (const p of this.particles) {
         p.y += p.speed;
-        p.x -= 2; // slight wind angle
+        p.x -= 2;
         if (p.y > this.height) {
-          p.y = -p.length;
+          p.y = -p.len;
           p.x = Math.random() * (this.width + 100);
         }
         this.ctx.beginPath();
         this.ctx.moveTo(p.x, p.y);
-        this.ctx.lineTo(p.x - 2, p.y + p.length);
+        this.ctx.lineTo(p.x - 2, p.y + p.len);
         this.ctx.stroke();
       }
-      this.ctx.restore();
     }
 
-    // 5. Snow Particles
+    // Snow
     if (this.currentMode === 'snow') {
-      this.ctx.save();
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
       for (const s of this.particles) {
         s.sway += 0.02;
         s.y += s.speed;
-        s.x += Math.sin(s.sway) * 1.2 + s.wind;
+        s.x += Math.sin(s.sway) * 1;
         if (s.y > this.height) {
           s.y = -5;
           s.x = Math.random() * this.width;
         }
         this.ctx.beginPath();
-        this.ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        this.ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
         this.ctx.fill();
       }
-      this.ctx.restore();
     }
 
-    // 6. Thunder Flash
-    if (this.currentMode === 'thunder') {
-      this.lightningTimer++;
-      if (this.lightningTimer > 200 && Math.random() < 0.03) {
-        this.lightningAlpha = 0.55;
-        this.lightningTimer = 0;
-      }
-      if (this.lightningAlpha > 0) {
-        this.ctx.save();
-        this.ctx.fillStyle = `rgba(220, 200, 255, ${this.lightningAlpha})`;
-        this.ctx.fillRect(0, 0, this.width, this.height);
-        this.ctx.restore();
-        this.lightningAlpha *= 0.85;
-      }
-    }
-
-    this.animationFrameId = requestAnimationFrame(this.animate);
+    requestAnimationFrame(this.animate);
   }
 }
 
 // =============================================================================
-// API DATA FETCHING (Open-Meteo with 90m DEM NASA/Copernicus Downscaling)
+// MAIN INITIALIZATION & CONTROLLER
 // =============================================================================
-async function fetchWeatherData(lat, lon) {
+document.addEventListener('DOMContentLoaded', () => {
+  state.canvasEngine = new BackgroundCanvasEngine('weather-canvas');
+
+  setupTabs();
+  setupSearch();
+  setupWallSelector();
+  setupAltitudeSlider();
+  setupFavorites();
+  initLeafletMap();
+
+  // Load initial location
+  loadLocation(state.currentLocation);
+});
+
+// =============================================================================
+// TAB SWITCHING
+// =============================================================================
+function setupTabs() {
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.dataset.tab;
+      switchTab(targetTab);
+    });
+  });
+}
+
+function switchTab(tabId) {
+  state.activeTab = tabId;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tabId);
+  });
+  document.querySelectorAll('.tab-pane').forEach(p => {
+    p.classList.toggle('active', p.id === tabId);
+  });
+
+  // If map tab activated, trigger Leaflet resize
+  if (tabId === 'tab-map' && state.map.instance) {
+    setTimeout(() => {
+      state.map.instance.invalidateSize();
+      if (state.currentLocation) {
+        state.map.instance.setView([state.currentLocation.lat, state.currentLocation.lon], 9);
+      }
+    }, 150);
+  }
+}
+
+// =============================================================================
+// LOCATION LOADING & HIGH-PRECISION WEATHER FETCH
+// =============================================================================
+async function loadLocation(loc) {
+  state.currentLocation = loc;
+  updateLocationHeaderUI();
+  updateGeoRoutingNetworks();
+
   try {
-    // Open-Meteo with DEM-Downscaling, pressure layers (925-500hPa), and tilted solar irradiance (GTI)
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&elevation=nan&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,surface_pressure,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,freezing_level_height,temperature_925hPa,temperature_850hPa,temperature_700hPa,temperature_600hPa,temperature_500hPa,geopotential_height_925hPa,geopotential_height_850hPa,geopotential_height_700hPa,geopotential_height_600hPa,geopotential_height_500hPa,wind_speed_700hPa,wind_speed_600hPa,global_tilted_irradiance,direct_normal_irradiance,diffuse_radiation,direct_radiation&tilt=45&azimuth=0&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max&timezone=auto`;
+    // 1. Fetch via MicroEngine with custom tilt & azimuth
+    const customTilt = state.activeAspect.isAuto ? null : state.activeAspect.tilt;
+    const customAzimuth = state.activeAspect.isAuto ? null : state.activeAspect.azimuth;
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    state.weatherData = data;
-    
-    // Exact DEM Elevation returned by Copernicus/NASA model
-    if (data.elevation !== undefined) {
-      state.currentLocation.elevation = Math.round(data.elevation);
+    const microResult = await MicroEngine.getMicroScaleAlpineWeather(
+      loc.lat,
+      loc.lon,
+      14,
+      customTilt,
+      customAzimuth
+    );
+
+    state.microData = microResult;
+    state.weatherData = microResult.weatherRaw;
+
+    // Actual DEM elevation from terrain
+    if (microResult.terrain10m && microResult.terrain10m.elevation) {
+      state.currentLocation.elevation = Math.round(microResult.terrain10m.elevation);
     }
-    
-    renderApp();
-    updateLiveRadarLocation(lat, lon);
+
+    // Adaptive Mountain Detection (> 900m or rugged TPI)
+    state.currentLocation.isMountain = state.currentLocation.elevation >= 900;
+
+    // Render all UI components
+    renderOverviewTab();
+    renderMountainTab();
+    renderAltitudeChart();
+    renderFavoritesTab();
+    updateMapLocation();
+
   } catch (err) {
-    console.error('Fehler beim Abrufen der Wetterdaten:', err);
-    document.getElementById('current-condition').innerText = 'Verbindung fehlgeschlagen';
+    console.error('Fehler beim Laden des Mikrowetters:', err);
   }
 }
 
-// =============================================================================
-// RENDER WEATHER UI
-// =============================================================================
-function renderApp() {
-  const data = state.weatherData;
-  if (!data || !data.current) return;
+function updateLocationHeaderUI() {
+  const loc = state.currentLocation;
+  document.getElementById('hero-location-name').innerText = loc.name;
+  document.getElementById('hero-elevation-pill').innerText = `🏔️ ${loc.elevation.toLocaleString('de-DE')} m`;
+  document.getElementById('hero-geo-coords').innerText = `Lat: ${loc.lat.toFixed(4)}, Lon: ${loc.lon.toFixed(4)}`;
+  document.getElementById('hero-update-time').innerText = `Aktualisiert: ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
-  const cur = data.current;
-  const hourly = data.hourly;
-  const daily = data.daily;
+  const badge = document.getElementById('location-type-badge');
+  if (loc.isMountain || loc.elevation >= 900) {
+    badge.innerText = '🏔️ Hochalpiner Berg';
+    badge.style.color = '#ffd166';
+  } else {
+    badge.innerText = '🏙️ Stadt / Flachland';
+    badge.style.color = '#64d2ff';
+  }
+
+  // Update favorite star
+  updateFavStarUI();
+}
+
+// =============================================================================
+// TAB 1: RENDER OVERVIEW
+// =============================================================================
+function renderOverviewTab() {
+  const w = state.weatherData;
+  const m = state.microData;
+  if (!w || !w.current) return;
+
+  const cur = w.current;
+  const daily = w.daily;
   const isDay = cur.is_day === 1;
-  const codeInfo = WMO_CODES[cur.weather_code] || WMO_CODES[0];
-  const theme = isDay ? codeInfo.theme : codeInfo.themeNight;
+  const code = WMO_CODES[cur.weather_code] || WMO_CODES[0];
+  const theme = isDay ? code.theme : code.themeNight;
 
-  // Apply Atmospheric Theme to Document Body
+  // Background Theme
   document.body.className = `weather-${theme}`;
-  if (state.canvasEngine) {
-    state.canvasEngine.setMode(theme, isDay);
+  if (state.canvasEngine) state.canvasEngine.setMode(theme, isDay);
+
+  // Hero Display: Use 10m MicroPhysics temperature!
+  const finalTemp = m ? m.microWeather.temperature10m : cur.temperature_2m;
+  document.getElementById('hero-current-temp').innerText = Math.round(convertTemp(finalTemp));
+  document.getElementById('hero-condition-text').innerText = code.label;
+
+  if (daily && daily.temperature_2m_max) {
+    document.getElementById('hero-temp-max').innerText = `${Math.round(convertTemp(daily.temperature_2m_max[0]))}°`;
+    document.getElementById('hero-temp-min').innerText = `${Math.round(convertTemp(daily.temperature_2m_min[0]))}°`;
   }
+  document.getElementById('hero-temp-apparent').innerText = `${Math.round(convertTemp(cur.apparent_temperature))}°`;
 
-  // Dynamic Island
-  document.getElementById('island-icon').innerText = isDay ? codeInfo.icon : codeInfo.iconNight;
-  document.getElementById('island-text').innerText = `${state.currentLocation.name} • ${formatTemp(cur.temperature_2m)}`;
+  // 24h Hourly Forecast
+  renderHourlySlider(w.hourly);
 
-  // Header / Hero
-  document.getElementById('location-name').innerText = state.currentLocation.name;
-  document.getElementById('dem-elevation-text').innerText = `${state.currentLocation.elevation.toLocaleString('de-DE')} m ü. M.`;
-  document.getElementById('current-temp').innerText = Math.round(convertTemp(cur.temperature_2m));
-  document.getElementById('display-temp-unit').innerText = state.unit === 'celsius' ? '°' : '°F';
-  document.getElementById('current-condition').innerText = codeInfo.label;
+  // 10-Day Forecast with Click Interaction
+  render10DayForecast(w.daily, w.hourly);
 
-  // High / Low / Apparent
-  const todayMax = daily && daily.temperature_2m_max ? Math.round(convertTemp(daily.temperature_2m_max[0])) : '--';
-  const todayMin = daily && daily.temperature_2m_min ? Math.round(convertTemp(daily.temperature_2m_min[0])) : '--';
-  const apparent = Math.round(convertTemp(cur.apparent_temperature));
-  document.getElementById('temp-max').innerText = `${todayMax}°`;
-  document.getElementById('temp-min').innerText = `${todayMin}°`;
-  document.getElementById('temp-apparent').innerText = `${apparent}°`;
-  document.getElementById('last-updated-text').innerText = `Zuletzt aktualisiert: ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
-
-  // Render 10-Meter Micro-Topography Engine Section
-  renderMicroclimate(cur, hourly, daily);
-
-  // Render 24h Hourly Forecast Slider
-  renderHourlyForecast(hourly, cur);
-
-  // Render 10-Day Forecast List with Range Bars
-  renderDailyForecast(daily);
-
-  // Render Bento Grid Details
-  renderBentoGrid(cur, daily, hourly);
-
-  // Update Favorite Star status
-  updateFavoriteStarUI();
+  // Bento Grid
+  renderBentoGrid(cur, daily, w.hourly);
 }
 
-// =============================================================================
-// 10-METER MIKRO-TOPOGRAFIE ENGINE LOGIK
-// =============================================================================
-async function renderMicroclimate(cur, hourly, daily) {
-  const elev = state.currentLocation.elevation;
-  const lat = state.currentLocation.lat;
-  const lon = state.currentLocation.lon;
-
-  // 1. Dynamischer Vertikaler Temperaturgradient (Gamma) & Inversion
-  const grad = MicroEngine.calculateDynamicLapseRate(elev, hourly, 0);
-  if (grad) {
-    const formulaElem = document.querySelector('.formula-line');
-    if (formulaElem) {
-      const lName = grad.lowerLayer ? grad.lowerLayer.level : '700hPa';
-      const uName = grad.upperLayer ? grad.upperLayer.level : '600hPa';
-      formulaElem.innerHTML = `$$\\Gamma = \\frac{T_{${uName}} - T_{${lName}}}{z_{${uName}} - z_{${lName}}} = \\mathbf{${grad.gammaPer100m > 0 ? '+' : ''}${grad.gammaPer100m}\\text{ °C / 100m}}$$`;
-    }
-    const gradTempElem = document.getElementById('grad-temp-val');
-    if (gradTempElem) {
-      gradTempElem.innerText = `${grad.interpolatedTemp}°C (10m Fels)`;
-    }
-    const invTag = document.getElementById('inversion-status-tag');
-    const invText = document.getElementById('inversion-text');
-    if (invTag && invText) {
-      if (grad.isInversion) {
-        invTag.innerText = `🟡 Inversion aktiv (+${grad.inversionDelta}°C)`;
-        invTag.style.background = 'rgba(255, 214, 10, 0.25)';
-        invTag.style.color = '#ffd60a';
-        invText.innerText = `⚠️ Kaltluftsee im Tal! Warme Luftschicht am Berg.`;
-      } else {
-        invTag.innerText = `🟢 Normaler Gradient`;
-        invTag.style.background = 'rgba(48, 209, 88, 0.2)';
-        invTag.style.color = '#30d158';
-        invText.innerText = `Standard Troposphäre (${grad.gammaPer100m}°C/100m)`;
-      }
-    }
-  }
-
-  // 2. Nordwand vs. Südhang (10-Meter Sonneneinstrahlung via Tilt & Azimuth)
-  const sunPos = MicroEngine.getSunPosition(lat, lon, new Date());
-  const aspectData = MicroEngine.calculateAspectComparison(
-    cur.temperature_2m,
-    cur.apparent_temperature,
-    sunPos,
-    cur.cloud_cover > 80
-  );
-  const sFelt = document.getElementById('south-felt-temp');
-  const sIrr = document.getElementById('south-irradiance');
-  const nFelt = document.getElementById('north-felt-temp');
-  const nIrr = document.getElementById('north-irradiance');
-  const diffBadge = document.getElementById('aspect-diff-badge');
-
-  if (sFelt) sFelt.innerText = `${aspectData.southSlope.feltTemp}°C`;
-  if (sIrr) sIrr.innerText = `${aspectData.southSlope.irradiance} W/m² (GTI)`;
-  if (nFelt) nFelt.innerText = `${aspectData.northFace.feltTemp}°C`;
-  if (nIrr) nIrr.innerText = `${aspectData.northFace.irradiance} W/m² (Diffus)`;
-  if (diffBadge) diffBadge.innerText = `ΔT: ${aspectData.deltaTemp}°C Unterschied auf 30m`;
-
-  // 3. Wind-Beschleunigung am Grat (30m Venturi & Lee-Effekt via TPI)
-  const terrain = await MicroEngine.sampleTerrainGrid(lat, lon, elev);
-  const altWind = hourly && hourly.wind_speed_700hPa ? hourly.wind_speed_700hPa[0] : (cur.wind_speed_10m * 1.5);
-  const venturi = MicroEngine.calculateVenturiWind(cur.wind_speed_10m, altWind, terrain.tpi, cur.wind_direction_10m);
-
-  const tpiBadge = document.getElementById('tpi-badge');
-  const vClass = document.getElementById('venturi-class');
-  const vFactor = document.getElementById('venturi-factor');
-  const vWind = document.getElementById('venturi-effective-wind');
-  const vGusts = document.getElementById('venturi-gusts');
-  const vBar = document.getElementById('venturi-warning-bar');
-
-  if (tpiBadge) tpiBadge.innerText = `TPI: ${terrain.tpi > 0 ? '+' : ''}${terrain.tpi} m`;
-  if (vClass) vClass.innerText = venturi.classification;
-  if (vFactor) vFactor.innerText = `x${venturi.speedUpFactor}`;
-  if (vWind) vWind.innerText = `${venturi.effectiveWind} km/h`;
-  if (vGusts) vGusts.innerText = `bis ${venturi.gustPotential} km/h`;
-  if (vBar) vBar.innerText = venturi.warning || 'Stabile Strömung ohne signifikanten Grat-Venturi-Effekt.';
-
-  // 4. Bergschatten auf die Minute genau (Horizon Raycasting)
-  const shadow = await MicroEngine.checkHorizonShadow(lat, lon, elev, sunPos);
-  const shadowTag = document.getElementById('shadow-status-tag');
-  const shadowIcon = document.getElementById('shadow-icon');
-  const shadowText = document.getElementById('shadow-status-text');
-  const shadowDetail = document.getElementById('shadow-detail-text');
-  const sunElevElem = document.getElementById('sun-elevation-val');
-  const obsAngleElem = document.getElementById('obstacle-angle-val');
-  const shadowDropElem = document.getElementById('shadow-temp-drop');
-
-  if (shadowTag) {
-    if (shadow.inShadow) {
-      shadowTag.innerText = '🏔️ Bergschatten aktiv';
-      shadowTag.style.background = 'rgba(100, 210, 255, 0.25)';
-      shadowTag.style.color = '#64d2ff';
-      if (shadowIcon) shadowIcon.innerText = '🏔️';
-    } else {
-      shadowTag.innerText = '☀️ Direkte Sonne';
-      shadowTag.style.background = 'rgba(255, 214, 10, 0.25)';
-      shadowTag.style.color = '#ffd60a';
-      if (shadowIcon) shadowIcon.innerText = '☀️';
-    }
-  }
-  if (shadowText) shadowText.innerText = shadow.statusText;
-  if (shadowDetail) shadowDetail.innerText = `Sonnenstand: ${sunPos.elevation}° (Azimut: ${sunPos.azimuth}°)`;
-  if (sunElevElem) sunElevElem.innerText = `${sunPos.elevation}°`;
-  if (obsAngleElem) obsAngleElem.innerText = `${shadow.obstacleAngle}°`;
-  if (shadowDropElem) shadowDropElem.innerText = shadow.tempDrop > 0 ? `-${shadow.tempDrop}°C` : '0°C';
-
-  // 5. Freezing Level Visual Gauge
-  let freezingLevel = 0;
-  if (hourly && hourly.freezing_level_height && hourly.freezing_level_height.length > 0) {
-    freezingLevel = Math.round(hourly.freezing_level_height[0]);
-    const maxGauge = 3500;
-    const currentPercent = Math.min(100, Math.max(5, (elev / maxGauge) * 100));
-    const freezingPercent = Math.min(100, Math.max(5, (freezingLevel / maxGauge) * 100));
-    
-    const curMarker = document.getElementById('marker-current');
-    const curVal = document.getElementById('marker-current-val');
-    const freezMarker = document.getElementById('marker-freezing');
-    const freezVal = document.getElementById('marker-freezing-val');
-    
-    if (curMarker) curMarker.style.left = `${currentPercent}%`;
-    if (curVal) curVal.innerText = `${elev}m`;
-    if (freezMarker) freezMarker.style.left = `${freezingPercent}%`;
-    if (freezVal) freezVal.innerText = `${freezingLevel}m`;
-  }
-}
-
-// =============================================================================
-// HOURLY FORECAST (Horizontal 24h Slider)
-// =============================================================================
-function renderHourlyForecast(hourly, cur) {
+function renderHourlySlider(hourly) {
   const container = document.getElementById('hourly-forecast-list');
   if (!hourly || !hourly.time) return;
 
   container.innerHTML = '';
   const now = new Date();
-  const currentHour = now.getHours();
+  const curHour = now.getHours();
 
-  // Find index of current hour
-  let startIndex = 0;
+  let startIdx = 0;
   for (let i = 0; i < hourly.time.length; i++) {
-    const t = new Date(hourly.time[i]);
-    if (t.getDate() === now.getDate() && t.getHours() === currentHour) {
-      startIndex = i;
+    const d = new Date(hourly.time[i]);
+    if (d.getDate() === now.getDate() && d.getHours() === curHour) {
+      startIdx = i;
       break;
     }
   }
 
-  // Show next 24 hours
-  for (let i = startIndex; i < startIndex + 25 && i < hourly.time.length; i++) {
-    const timeObj = new Date(hourly.time[i]);
-    const isFirst = i === startIndex;
-    const hourLabel = isFirst ? 'Jetzt' : `${timeObj.getHours()}:00`;
+  for (let i = startIdx; i < startIdx + 25 && i < hourly.time.length; i++) {
+    const t = new Date(hourly.time[i]);
+    const isFirst = i === startIdx;
+    const label = isFirst ? 'Jetzt' : `${t.getHours()}:00`;
     const temp = Math.round(convertTemp(hourly.temperature_2m[i]));
     const pop = hourly.precipitation_probability ? hourly.precipitation_probability[i] : 0;
     const code = hourly.weather_code[i];
-    const isDayTime = timeObj.getHours() >= 6 && timeObj.getHours() <= 20;
+    const isDay = t.getHours() >= 6 && t.getHours() <= 20;
     const info = WMO_CODES[code] || WMO_CODES[0];
-    const icon = isDayTime ? info.icon : info.iconNight;
-    const windSpeed = Math.round(hourly.wind_speed_10m[i]);
+    const icon = isDay ? info.icon : info.iconNight;
+    const wind = Math.round(hourly.wind_speed_10m[i]);
 
     const item = document.createElement('div');
     item.className = 'hourly-item';
     item.innerHTML = `
-      <div class="hourly-time">${hourLabel}</div>
+      <div class="hourly-time">${label}</div>
       <div class="hourly-icon">${icon}</div>
       <div class="hourly-pop">${pop > 10 ? `${pop}%` : ''}</div>
       <div class="hourly-temp">${temp}°</div>
-      <div class="hourly-wind">💨 ${windSpeed}</div>
+      <div class="hourly-wind">💨 ${wind}</div>
     `;
     container.appendChild(item);
   }
 }
 
-// =============================================================================
-// 10-DAY FORECAST (Apple Weather Style with Normalized Range Bars)
-// =============================================================================
-function renderDailyForecast(daily) {
+function render10DayForecast(daily, hourly) {
   const container = document.getElementById('daily-forecast-list');
   if (!daily || !daily.time) return;
 
   container.innerHTML = '';
-
-  // Determine global min and max temperature across all 10 days for bar normalization
-  let globalMin = Infinity;
-  let globalMax = -Infinity;
-  const count = Math.min(10, daily.time.length);
-
-  for (let i = 0; i < count; i++) {
-    const min = daily.temperature_2m_min[i];
-    const max = daily.temperature_2m_max[i];
-    if (min < globalMin) globalMin = min;
-    if (max > globalMax) globalMax = max;
-  }
-  const totalRange = (globalMax - globalMin) || 1;
-
   const weekdays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
+  // Global Min & Max for bar normalization
+  let gMin = Infinity, gMax = -Infinity;
+  const count = Math.min(10, daily.time.length);
   for (let i = 0; i < count; i++) {
-    const dateObj = new Date(daily.time[i]);
-    const isToday = i === 0;
-    const dayName = isToday ? 'Heute' : weekdays[dateObj.getDay()];
+    if (daily.temperature_2m_min[i] < gMin) gMin = daily.temperature_2m_min[i];
+    if (daily.temperature_2m_max[i] > gMax) gMax = daily.temperature_2m_max[i];
+  }
+  const totalRange = (gMax - gMin) || 1;
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(daily.time[i]);
+    const dayName = i === 0 ? 'Heute' : weekdays[d.getDay()];
     const code = daily.weather_code[i];
     const info = WMO_CODES[code] || WMO_CODES[0];
     const pop = daily.precipitation_probability_max ? daily.precipitation_probability_max[i] : 0;
     const minVal = daily.temperature_2m_min[i];
     const maxVal = daily.temperature_2m_max[i];
 
-    // Compute left offset and width percentage for Apple Weather Range Bar
-    const leftPercent = Math.max(0, ((minVal - globalMin) / totalRange) * 100);
-    const widthPercent = Math.max(10, (((maxVal - minVal) / totalRange) * 100));
+    const leftPct = Math.max(0, ((minVal - gMin) / totalRange) * 100);
+    const widthPct = Math.max(12, (((maxVal - minVal) / totalRange) * 100));
 
     const row = document.createElement('div');
-    row.className = 'daily-row';
+    row.className = 'daily-interactive-row';
+    row.title = 'Klicken für detaillierte Tagesabschnitte, Wind & Niederschlag';
     row.innerHTML = `
-      <div class="daily-day">${dayName}</div>
-      <div class="daily-icon">${info.icon}</div>
-      <div class="daily-pop">${pop > 15 ? `${pop}%` : ''}</div>
-      <div class="daily-temp-min">${Math.round(convertTemp(minVal))}°</div>
-      <div class="daily-bar-wrapper">
-        <div class="daily-bar-range" style="left: ${leftPercent}%; width: ${widthPercent}%;"></div>
+      <div class="daily-day-label">${dayName}</div>
+      <div class="daily-icon-box">${info.icon}</div>
+      <div class="daily-pop-label">${pop > 15 ? `${pop}%` : ''}</div>
+      <div class="daily-min-label">${Math.round(convertTemp(minVal))}°</div>
+      <div class="daily-bar-container">
+        <div class="daily-bar-fill" style="left:${leftPct}%; width:${widthPct}%;"></div>
       </div>
-      <div class="daily-temp-max">${Math.round(convertTemp(maxVal))}°</div>
+      <div class="daily-max-label">${Math.round(convertTemp(maxVal))}°</div>
+      <div class="daily-chevron">›</div>
     `;
+
+    // Click handler to open detailed modal!
+    row.addEventListener('click', () => {
+      openDayDetailModal(i, daily, hourly);
+    });
+
     container.appendChild(row);
   }
 }
 
-// =============================================================================
-// BENTO DETAIL GRID
-// =============================================================================
+// Detailed Day Modal
+function openDayDetailModal(dayIndex, daily, hourly) {
+  const modal = document.getElementById('day-detail-modal');
+  const d = new Date(daily.time[dayIndex]);
+  const dateStr = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  const code = daily.weather_code[dayIndex];
+  const info = WMO_CODES[code] || WMO_CODES[0];
+
+  document.getElementById('modal-day-name').innerText = dateStr;
+  document.getElementById('modal-day-condition').innerText = `${info.icon} ${info.label}`;
+  document.getElementById('modal-max-temp').innerText = `${Math.round(convertTemp(daily.temperature_2m_max[dayIndex]))}°C`;
+  document.getElementById('modal-min-temp').innerText = `${Math.round(convertTemp(daily.temperature_2m_min[dayIndex]))}°C`;
+  document.getElementById('modal-pop').innerText = `${daily.precipitation_probability_max ? daily.precipitation_probability_max[dayIndex] : 0}%`;
+  document.getElementById('modal-precip-sum').innerText = `${(daily.precipitation_sum ? daily.precipitation_sum[dayIndex] : 0).toFixed(1)} mm`;
+
+  document.getElementById('modal-wind-gusts').innerText = `${Math.round(daily.wind_gusts_10m_max ? daily.wind_gusts_10m_max[dayIndex] : 0)} km/h`;
+  document.getElementById('modal-uv-max').innerText = daily.uv_index_max ? Math.round(daily.uv_index_max[dayIndex]) : '--';
+
+  if (daily.sunrise && daily.sunrise[dayIndex]) {
+    document.getElementById('modal-sunrise').innerText = new Date(daily.sunrise[dayIndex]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('modal-sunset').innerText = new Date(daily.sunset[dayIndex]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // 4 Day Parts Breakdown (Morgens, Mittags, Abends, Nachts)
+  const partsContainer = document.getElementById('modal-day-parts');
+  partsContainer.innerHTML = '';
+
+  const dayStartHourIdx = dayIndex * 24;
+  const parts = [
+    { name: 'Morgens', hourOffset: 8, icon: '🌅' },
+    { name: 'Mittags', hourOffset: 13, icon: '☀️' },
+    { name: 'Abends', hourOffset: 19, icon: '🌇' },
+    { name: 'Nachts', hourOffset: 23, icon: '🌙' }
+  ];
+
+  for (const part of parts) {
+    const idx = dayStartHourIdx + part.hourOffset;
+    let t = '--';
+    let pop = 0;
+    if (hourly && hourly.temperature_2m && hourly.temperature_2m[idx] !== undefined) {
+      t = Math.round(convertTemp(hourly.temperature_2m[idx]));
+      pop = hourly.precipitation_probability ? hourly.precipitation_probability[idx] : 0;
+    }
+
+    const box = document.createElement('div');
+    box.className = 'day-part-box';
+    box.innerHTML = `
+      <div class="dp-name">${part.name}</div>
+      <div class="dp-icon">${part.icon}</div>
+      <div class="dp-temp">${t}°</div>
+      <div class="dp-rain">${pop > 10 ? `${pop}%` : 'Trocken'}</div>
+    `;
+    partsContainer.appendChild(box);
+  }
+
+  modal.style.display = 'flex';
+
+  document.getElementById('close-modal-btn').onclick = () => {
+    modal.style.display = 'none';
+  };
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.style.display = 'none';
+  };
+}
+
 function renderBentoGrid(cur, daily, hourly) {
-  // 1. UV-Index
+  // UV
   const uv = cur.uv_index !== undefined ? Math.round(cur.uv_index) : 0;
   document.getElementById('uv-index-val').innerText = uv;
-  let uvDesc = 'Niedrig';
-  let uvHint = 'Kein besonderer Sonnenschutz erforderlich.';
-  if (uv >= 8) { uvDesc = 'Sehr hoch'; uvHint = 'Intensive Schutzmaßnahmen: Schatten & Sonnencreme!'; }
-  else if (uv >= 6) { uvDesc = 'Hoch'; uvHint = 'Sonnencreme, Sonnenbrille & Kopfbedeckung ratsam.'; }
-  else if (uv >= 3) { uvDesc = 'Mittel'; uvHint = 'Mittags Schatten aufsuchen.'; }
-  document.getElementById('uv-index-desc').innerText = uvDesc;
-  document.getElementById('uv-index-hint').innerText = uvHint;
-  document.getElementById('uv-gauge-pointer').style.left = `${Math.min(100, Math.max(5, (uv / 11) * 100))}%`;
+  document.getElementById('uv-gauge-pointer').style.left = `${Math.min(100, (uv / 11) * 100)}%`;
 
-  // 2. Wind & Gusts with Compass
+  // Wind & Compass
   const windSpd = Math.round(cur.wind_speed_10m || 0);
   const windDir = cur.wind_direction_10m || 0;
   const windGusts = Math.round(cur.wind_gusts_10m || windSpd * 1.4);
   document.getElementById('wind-speed-val').innerHTML = `${windSpd} <small>km/h</small>`;
   document.getElementById('compass-arrow').style.transform = `rotate(${windDir}deg)`;
-  document.getElementById('wind-direction-text').innerText = `${getDirectionName(windDir)} (${windDir}°)`;
-  document.getElementById('wind-gusts-text').innerText = `Spitzenböen bis zu ${windGusts} km/h`;
+  document.getElementById('wind-direction-text').innerText = `${windDir}°`;
+  document.getElementById('wind-gusts-text').innerText = `Böenspitzen bis ${windGusts} km/h`;
 
-  // 3. Sunrise & Sunset
+  // Sun
   if (daily && daily.sunrise && daily.sunset) {
     const sunrise = new Date(daily.sunrise[0]);
     const sunset = new Date(daily.sunset[0]);
     document.getElementById('sunrise-time-val').innerText = sunrise.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     document.getElementById('sunset-time-val').innerText = sunset.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    
     const diffHours = ((sunset - sunrise) / (1000 * 60 * 60)).toFixed(1);
-    document.getElementById('daylight-hours-val').innerText = `${diffHours} h Tageslicht`;
+    document.getElementById('daylight-hours-val').innerText = `${diffHours} h Licht`;
   }
 
-  // 4. Precipitation
-  let precipSum = 0;
-  if (daily && daily.precipitation_sum) {
-    precipSum = daily.precipitation_sum[0] || 0;
-  }
-  document.getElementById('precip-total-val').innerHTML = `${precipSum.toFixed(1)} <small>mm</small>`;
-  if (cur.precipitation > 0) {
-    document.getElementById('precip-forecast-hint').innerText = `Aktuelle Niederschlagsrate: ${cur.precipitation.toFixed(1)} mm/h.`;
-  } else {
-    document.getElementById('precip-forecast-hint').innerText = 'In den nächsten Stunden wird überwiegend trockene Witterung erwartet.';
-  }
+  // Precipitation
+  const pSum = (daily && daily.precipitation_sum) ? daily.precipitation_sum[0] : 0;
+  document.getElementById('precip-total-val').innerHTML = `${pSum.toFixed(1)} <small>mm</small>`;
 
-  // 5. Humidity & Dew Point
-  const humidity = Math.round(cur.relative_humidity_2m || 0);
-  document.getElementById('humidity-val').innerText = `${humidity}%`;
-  const dew = (cur.temperature_2m - ((100 - humidity) / 5)).toFixed(1);
-  document.getElementById('dew-point-hint').innerText = `Der Taupunkt liegt aktuell bei ${dew}°C.`;
+  // Humidity & Dew
+  const rh = Math.round(cur.relative_humidity_2m || 0);
+  const dew = (cur.temperature_2m - ((100 - rh) / 5)).toFixed(1);
+  document.getElementById('humidity-val').innerText = `${rh}%`;
+  document.getElementById('dew-point-sub').innerText = `Taupunkt: ${dew}°C`;
 
-  // 6. Air Pressure QNH & QFE
-  const pressureQNH = Math.round(cur.pressure_msl || 1013);
-  const pressureQFE = Math.round(cur.surface_pressure || pressureQNH);
-  document.getElementById('pressure-val').innerHTML = `${pressureQNH} <small>hPa</small>`;
-  document.getElementById('surface-pressure-val').innerText = `Stationsdruck (QFE): ${pressureQFE} hPa`;
-  document.getElementById('pressure-trend').innerText = pressureQNH > 1015 ? 'Tendenz: Stabiles Hochdruckwetter' : (pressureQNH < 1005 ? 'Tendenz: Tiefdruckeinfluss' : 'Tendenz: Normaler Luftdruck');
-
-  // 7. Visibility
-  let visKm = 25;
-  if (hourly && hourly.visibility && hourly.visibility.length > 0) {
-    visKm = Math.round(hourly.visibility[0] / 1000);
-  }
-  document.getElementById('visibility-val').innerHTML = `${visKm} <small>km</small>`;
-  document.getElementById('visibility-desc').innerText = visKm > 20 ? 'Ausgezeichnete Fernsicht' : (visKm > 10 ? 'Gute Sicht' : 'Eingeschränkte Sicht');
-
-  // 8. Moon Phase calculation
-  const moon = calculateMoonPhase(new Date());
-  document.getElementById('moon-phase-name').innerText = moon.name;
-  document.getElementById('moon-illumination').innerText = `Beleuchtung: ${Math.round(moon.fraction * 100)}%`;
-  document.getElementById('moon-illustration').innerText = moon.icon;
-  document.getElementById('moon-rise-hint').innerText = `Tage bis zum nächsten Vollmond: ${moon.daysToFull}`;
-}
-
-// Direction Name from degrees
-function getDirectionName(deg) {
-  const directions = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-  const idx = Math.round(deg / 22.5) % 16;
-  return directions[idx];
-}
-
-// Moon Phase algorithm
-function calculateMoonPhase(date) {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-
-  let c = 0, e = 0, jd = 0, b = 0;
-  if (month < 3) {
-    c = year - 1;
-    e = month + 12;
-  } else {
-    c = year;
-    e = month;
-  }
-  b = Math.floor(c / 400) - Math.floor(c / 100) + Math.floor(c / 4);
-  jd = 365.25 * c + 30.6 * (e + 1) + day - 694039.09;
-  jd /= 29.5305882; // Synodic month
-  const phase = jd - Math.floor(jd);
-
-  const daysToFull = Math.max(0, Math.round((0.5 - (phase > 0.5 ? phase - 1 : phase)) * 29.53));
-
-  let name = 'Neumond';
-  let icon = '🌑';
-  if (phase < 0.03 || phase > 0.97) { name = 'Neumond'; icon = '🌑'; }
-  else if (phase < 0.22) { name = 'Zunehmende Sichel'; icon = '🌒'; }
-  else if (phase < 0.28) { name = 'Erstes Viertel'; icon = '🌓'; }
-  else if (phase < 0.47) { name = 'Zunehmender Mond'; icon = '🌔'; }
-  else if (phase < 0.53) { name = 'Vollmond'; icon = '🌕'; }
-  else if (phase < 0.72) { name = 'Abnehmender Mond'; icon = '🌖'; }
-  else if (phase < 0.78) { name = 'Letztes Viertel'; icon = '🌗'; }
-  else { name = 'Abnehmende Sichel'; icon = '🌘'; }
-
-  const fraction = 0.5 * (1 - Math.cos(phase * 2 * Math.PI));
-  return { name, icon, fraction, daysToFull };
+  // Pressure
+  const pQNH = Math.round(cur.pressure_msl || 1013);
+  const pQFE = Math.round(cur.surface_pressure || pQNH);
+  document.getElementById('pressure-val').innerHTML = `${pQNH} <small>hPa</small>`;
+  document.getElementById('pressure-qfe').innerText = `Stationsdruck (QFE): ${pQFE} hPa`;
 }
 
 // =============================================================================
-// POLARIMETRISCHES LIVE-RADAR (RainViewer HD API & Leaflet)
+// TAB 2: BERG & HÖHE (Höhenprofil Tal vs Berg & Wand-Exposition)
 // =============================================================================
-async function initLiveRadar() {
-  const mapElem = document.getElementById('radar-map');
+function renderMountainTab() {
+  const m = state.microData;
+  if (!m) return;
+
+  const loc = state.currentLocation;
+  document.getElementById('mountain-title').innerText = `${loc.name} (${loc.elevation.toLocaleString('de-DE')} m)`;
+  document.getElementById('m-peak-elev').innerText = `${loc.elevation.toLocaleString('de-DE')} m`;
+  document.getElementById('m-landform').innerText = m.terrain10m.landform;
+  document.getElementById('m-freezing-level').innerText = `${Math.round(m.atmosphere.freezingLevelMeters)} m`;
+
+  const invElem = document.getElementById('m-inversion-status');
+  if (m.atmosphere.inversionActive) {
+    invElem.innerText = '⚠️ Inversion aktiv (Oben wärmer)';
+    invElem.style.color = '#ffd166';
+  } else {
+    invElem.innerText = '🟢 Normaler Berg-Gradient';
+    invElem.style.color = '#30d158';
+  }
+
+  // Update Wall Aspect Info
+  updateActiveWallUI(m);
+}
+
+function updateActiveWallUI(m) {
+  const w = m.microWeather;
+  const t = m.terrain10m;
+
+  const wallName = state.activeAspect.isAuto ? `${t.aspectName} (Auto-10m)` : getSelectedWallLabel();
+  document.getElementById('active-wall-name').innerText = `${wallName} (${t.tilt}° Neigung)`;
+  document.getElementById('active-wall-radiation').innerText = `Sonneneinstrahlung: ${w.slopeSolarIrradianceW_m2} W/m² (GTI)`;
+  document.getElementById('active-wall-temp').innerText = `${Math.round(convertTemp(w.temperature10m))}°C`;
+  document.getElementById('active-wall-temp-sub').innerText = `Gefühlt: ${Math.round(convertTemp(w.feltTemp))}°C (Modell: ${Math.round(convertTemp(w.modelStandardTemp2m))}°C)`;
+  document.getElementById('active-wall-snow').innerText = w.snowCondition;
+  document.getElementById('active-wall-wind').innerText = w.slopeWindExposure;
+  document.getElementById('active-wall-wind-sub').innerText = `Effektiver Gratwind: ${w.windSpeedKmH} km/h (Böen: ${w.windGustsKmH} km/h)`;
+}
+
+function getSelectedWallLabel() {
+  if (state.activeAspect.azimuth === 0) return 'Südwand (45°)';
+  if (state.activeAspect.azimuth === 180) return 'Nordwand (75°)';
+  if (state.activeAspect.azimuth === -90) return 'Ostwand (50°)';
+  if (state.activeAspect.azimuth === 90) return 'Westwand (50°)';
+  return 'Benutzerdefinierte Wand';
+}
+
+function setupWallSelector() {
+  const pills = document.querySelectorAll('.aspect-pill');
+  pills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      pills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+
+      if (pill.dataset.auto) {
+        state.activeAspect.isAuto = true;
+      } else {
+        state.activeAspect.isAuto = false;
+        state.activeAspect.tilt = parseFloat(pill.dataset.tilt);
+        state.activeAspect.azimuth = parseFloat(pill.dataset.azimuth);
+      }
+
+      // Reload with new wall geometry
+      loadLocation(state.currentLocation);
+    });
+  });
+}
+
+// Vertical Altitude Profile (Tal vs. Berg)
+function renderAltitudeChart() {
+  const container = document.getElementById('altitude-levels-container');
+  if (!state.microData || !state.microData.altitudeProfile) return;
+
+  const profiles = state.microData.altitudeProfile;
+  const currentProfile = profiles[state.selectedAltitudeHour] || profiles[0];
+
+  container.innerHTML = '';
+
+  currentProfile.levels.forEach(level => {
+    const card = document.createElement('div');
+    card.className = 'altitude-tier-card';
+
+    // Temp color calculation
+    let tempColor = '#30d158';
+    if (level.temp < 0) tempColor = '#64d2ff';
+    else if (level.temp > 18) tempColor = '#ff9f0a';
+
+    const precipIcon = level.isAboveFreezing ? '💧 Regen' : '❄️ Schnee';
+
+    card.innerHTML = `
+      <div class="tier-name-col">
+        <span>${level.icon}</span>
+        <span>${level.name}</span>
+      </div>
+      <div class="tier-elevation-badge">${level.z.toLocaleString('de-DE')} m</div>
+      <div class="tier-temp-col">
+        <span class="tier-temp-val" style="color:${tempColor}">${Math.round(convertTemp(level.temp))}°</span>
+        <div class="tier-temp-bar" style="background:${tempColor}; width: 60%;"></div>
+      </div>
+      <div class="tier-meta-col">
+        <span class="tier-wind">💨 ${level.wind} km/h</span>
+        <span class="tier-precip">${precipIcon}</span>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function setupAltitudeSlider() {
+  const slider = document.getElementById('profile-hour-slider');
+  const label = document.getElementById('profile-time-label');
+
+  slider.addEventListener('input', (e) => {
+    state.selectedAltitudeHour = parseInt(e.target.value);
+    const h = state.selectedAltitudeHour;
+    label.innerText = h === 0 ? 'Jetzt' : `In ${h} Stunden`;
+    renderAltitudeChart();
+  });
+}
+
+// =============================================================================
+// TAB 3: INTERACTIVE LEAFLET MAP & LIVE RADAR
+// =============================================================================
+function initLeafletMap() {
+  const mapElem = document.getElementById('interactive-map');
   if (!mapElem) return;
 
-  // Initialize Leaflet Map
-  state.radar.map = L.map('radar-map', {
+  // Initialize Map
+  state.map.instance = L.map('interactive-map', {
     zoomControl: true,
     attributionControl: false
-  }).setView([state.currentLocation.lat, state.currentLocation.lon], 7);
+  }).setView([state.currentLocation.lat, state.currentLocation.lon], 9);
 
-  // Dark Map Tiles
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 14,
-    subdomains: 'abcd'
-  }).addTo(state.radar.map);
+  // Dark Base Layer
+  state.map.baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 16
+  }).addTo(state.map.instance);
 
-  // Current Location Marker
-  state.radar.marker = L.circleMarker([state.currentLocation.lat, state.currentLocation.lon], {
-    radius: 7,
-    color: '#0a84ff',
-    fillColor: '#64d2ff',
-    fillOpacity: 0.9,
-    weight: 2
-  }).addTo(state.radar.map);
+  // Location Marker
+  state.map.marker = L.marker([state.currentLocation.lat, state.currentLocation.lon])
+    .addTo(state.map.instance)
+    .bindPopup(`<b>${state.currentLocation.name}</b><br>${state.currentLocation.elevation} m`)
+    .openPopup();
 
-  // Fetch RainViewer Radar Frames
+  // Map Click to inspect any coordinate!
+  state.map.instance.on('click', async (e) => {
+    const lat = e.latlng.lat;
+    const lon = e.latlng.lng;
+    selectExactLocation({
+      name: `Punkt (${lat.toFixed(3)}, ${lon.toFixed(3)})`,
+      lat: lat,
+      lon: lon,
+      elevation: 1000
+    });
+  });
+
+  // Layer buttons
+  document.querySelectorAll('.map-layer-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.map-layer-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setMapLayer(btn.dataset.layer);
+    });
+  });
+
+  // Load RainViewer Radar frames
+  loadRainViewerRadar();
+}
+
+async function loadRainViewerRadar() {
   try {
     const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-    if (!res.ok) throw new Error(`RainViewer HTTP ${res.status}`);
     const data = await res.json();
-    
-    // Combine past radar frames + nowcast forecast frames
-    const frames = [...(data.radar.past || []), ...(data.radar.nowcast || [])];
-    state.radar.frames = frames;
-    state.radar.host = data.host;
+    state.map.radarFrames = [...(data.radar.past || []), ...(data.radar.nowcast || [])];
+    state.map.radarHost = data.host;
 
     const slider = document.getElementById('radar-time-slider');
-    slider.max = frames.length - 1;
-    slider.value = (data.radar.past || []).length - 1; // latest live frame
-    state.radar.currentFrameIndex = parseInt(slider.value);
+    slider.max = state.map.radarFrames.length - 1;
+    slider.value = (data.radar.past || []).length - 1;
+    state.map.radarIndex = parseInt(slider.value);
 
-    // Preload radar layers
-    showRadarFrame(state.radar.currentFrameIndex);
+    showRadarTileFrame(state.map.radarIndex);
 
-    // Bind slider & play controls
     slider.addEventListener('input', (e) => {
       stopRadarAnimation();
-      showRadarFrame(parseInt(e.target.value));
+      showRadarTileFrame(parseInt(e.target.value));
     });
 
     document.getElementById('radar-play-btn').addEventListener('click', toggleRadarPlay);
-
-  } catch (err) {
-    console.error('Fehler beim Laden des RainViewer Radars:', err);
-    document.getElementById('radar-time-display').innerText = 'Radar temporär nicht verfügbar';
+  } catch (e) {
+    console.warn('Radar konnte nicht geladen werden:', e);
   }
 }
 
-function showRadarFrame(index) {
-  const frames = state.radar.frames;
-  if (!frames || !frames[index]) return;
+function showRadarTileFrame(idx) {
+  const frames = state.map.radarFrames;
+  if (!frames || !frames[idx]) return;
 
-  state.radar.currentFrameIndex = index;
-  const frame = frames[index];
+  state.map.radarIndex = idx;
+  const frame = frames[idx];
 
-  // Remove existing radar tile layer
-  if (state.radar.activeTileLayer) {
-    state.radar.map.removeLayer(state.radar.activeTileLayer);
+  if (state.map.radarTileLayer) {
+    state.map.instance.removeLayer(state.map.radarTileLayer);
   }
 
-  // Polarimetric RainViewer HD Tile Layer
-  // Color scheme 2 = universal high-contrast weather colors
-  const tileUrl = `${state.radar.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-  state.radar.activeTileLayer = L.tileLayer(tileUrl, {
+  const url = `${state.map.radarHost}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+  state.map.radarTileLayer = L.tileLayer(url, {
     opacity: 0.75,
-    zIndex: 100
-  }).addTo(state.radar.map);
+    zIndex: 200
+  }).addTo(state.map.instance);
 
-  // Format timestamp label
-  const time = new Date(frame.time * 1000);
-  const timeStr = time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  const isNowcast = index >= (state.radar.frames.length - 4);
-  document.getElementById('radar-time-display').innerText = `${timeStr} ${isNowcast ? '(Prognose / Nowcast)' : '(Polarimetrischer Scan)'}`;
-  document.getElementById('radar-time-slider').value = index;
+  const t = new Date(frame.time * 1000);
+  document.getElementById('radar-time-display').innerText = `${t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Radarscan`;
+  document.getElementById('radar-time-slider').value = idx;
 }
 
 function toggleRadarPlay() {
   const btn = document.getElementById('radar-play-btn');
-  if (state.radar.isPlaying) {
+  if (state.map.radarPlaying) {
     stopRadarAnimation();
   } else {
-    state.radar.isPlaying = true;
+    state.map.radarPlaying = true;
     btn.innerText = '⏸';
-    state.radar.animationInterval = setInterval(() => {
-      let nextIndex = state.radar.currentFrameIndex + 1;
-      if (nextIndex >= state.radar.frames.length) {
-        nextIndex = 0;
-      }
-      showRadarFrame(nextIndex);
-    }, 750);
+    state.map.radarInterval = setInterval(() => {
+      let next = state.map.radarIndex + 1;
+      if (next >= state.map.radarFrames.length) next = 0;
+      showRadarTileFrame(next);
+    }, 700);
   }
 }
 
 function stopRadarAnimation() {
-  if (state.radar.animationInterval) {
-    clearInterval(state.radar.animationInterval);
-    state.radar.animationInterval = null;
+  if (state.map.radarInterval) {
+    clearInterval(state.map.radarInterval);
+    state.map.radarInterval = null;
   }
-  state.radar.isPlaying = false;
+  state.map.radarPlaying = false;
   document.getElementById('radar-play-btn').innerText = '▶';
 }
 
-function updateLiveRadarLocation(lat, lon) {
-  if (state.radar.map) {
-    state.radar.map.setView([lat, lon], 8);
-    if (state.radar.marker) {
-      state.radar.marker.setLatLng([lat, lon]);
-    }
+function setMapLayer(layerType) {
+  if (state.map.baseTileLayer) {
+    state.map.instance.removeLayer(state.map.baseTileLayer);
+  }
+
+  const radarControls = document.getElementById('radar-floating-controls');
+
+  if (layerType === 'topo') {
+    state.map.baseTileLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 16 }).addTo(state.map.instance);
+    if (radarControls) radarControls.style.display = 'none';
+  } else if (layerType === 'satellite') {
+    state.map.baseTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 17 }).addTo(state.map.instance);
+    if (radarControls) radarControls.style.display = 'none';
+  } else {
+    // Default Radar mode
+    state.map.baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 16 }).addTo(state.map.instance);
+    if (radarControls) radarControls.style.display = 'flex';
   }
 }
 
-// =============================================================================
-// SEARCH & GEOCODING AUTOCOMPLETE (Open-Meteo Geocoding)
-// =============================================================================
-let searchDebounceTimer = null;
+function updateMapLocation() {
+  if (!state.map.instance) return;
+  const loc = state.currentLocation;
+  state.map.instance.setView([loc.lat, loc.lon], 9);
+  if (state.map.marker) {
+    state.map.marker.setLatLng([loc.lat, loc.lon]);
+    state.map.marker.getPopup().setContent(`<b>${loc.name}</b><br>${loc.elevation} m`).update();
+  }
+  const chip = document.getElementById('map-location-chip');
+  if (chip) chip.innerHTML = `<span>📍 ${loc.name}</span>`;
+}
 
+// =============================================================================
+// TAB 4: FAVORITEN & SUCHE
+// =============================================================================
+function setupFavorites() {
+  const addBtn = document.getElementById('add-current-favorite-btn');
+  const favToggle = document.getElementById('fav-toggle-btn');
+
+  if (addBtn) addBtn.addEventListener('click', toggleFavoriteCurrent);
+  if (favToggle) favToggle.addEventListener('click', toggleFavoriteCurrent);
+
+  renderFavoritesTab();
+}
+
+function toggleFavoriteCurrent() {
+  const loc = state.currentLocation;
+  const idx = state.favorites.findIndex(f => f.name.toLowerCase() === loc.name.toLowerCase());
+
+  if (idx >= 0) {
+    state.favorites.splice(idx, 1);
+  } else {
+    state.favorites.push({
+      name: loc.name,
+      lat: loc.lat,
+      lon: loc.lon,
+      elevation: loc.elevation,
+      country: loc.country
+    });
+  }
+
+  localStorage.setItem('best_weather_favorites_v2', JSON.stringify(state.favorites));
+  updateFavStarUI();
+  renderFavoritesTab();
+}
+
+function updateFavStarUI() {
+  const btn = document.getElementById('fav-toggle-btn');
+  const isFav = state.favorites.some(f => f.name.toLowerCase() === state.currentLocation.name.toLowerCase());
+  if (btn) {
+    btn.innerText = isFav ? '★' : '☆';
+    btn.classList.toggle('favorited', isFav);
+  }
+}
+
+function renderFavoritesTab() {
+  const grid = document.getElementById('favorites-grid');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+  state.favorites.forEach((fav, i) => {
+    const card = document.createElement('div');
+    card.className = 'favorite-card';
+    card.innerHTML = `
+      <div class="fav-info">
+        <div class="fav-name">${fav.name}</div>
+        <div class="fav-meta">🏔️ ${fav.elevation} m • ${fav.country || ''}</div>
+      </div>
+      <div class="fav-actions">
+        <button class="fav-del-btn" title="Aus Favoriten entfernen">✕</button>
+      </div>
+    `;
+
+    // Click to load
+    card.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('fav-del-btn')) {
+        selectExactLocation(fav);
+        switchTab('tab-overview');
+      }
+    });
+
+    // Delete button
+    card.querySelector('.fav-del-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.favorites.splice(i, 1);
+      localStorage.setItem('best_weather_favorites_v2', JSON.stringify(state.favorites));
+      renderFavoritesTab();
+      updateFavStarUI();
+    });
+
+    grid.appendChild(card);
+  });
+}
+
+// =============================================================================
+// SEARCH AUTOCOMPLETE & GPS (EXACT COORDINATES & ELEVATION)
+// =============================================================================
 function setupSearch() {
   const input = document.getElementById('location-search-input');
   const dropdown = document.getElementById('search-results-dropdown');
   const clearBtn = document.getElementById('clear-search-btn');
+  const gpsBtn = document.getElementById('gps-btn');
+  const unitBtn = document.getElementById('unit-toggle-btn');
+
+  let debounceTimer = null;
 
   input.addEventListener('input', (e) => {
-    const val = e.target.value.trim();
-    clearBtn.style.display = val.length > 0 ? 'flex' : 'none';
+    const q = e.target.value.trim();
+    clearBtn.style.display = q.length > 0 ? 'flex' : 'none';
 
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-
-    if (val.length < 2) {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    if (q.length < 2) {
       dropdown.style.display = 'none';
       return;
     }
 
-    searchDebounceTimer = setTimeout(async () => {
+    debounceTimer = setTimeout(async () => {
       try {
-        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(val)}&count=8&language=de&format=json`;
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=de&format=json`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -871,11 +955,11 @@ function setupSearch() {
             `;
 
             row.addEventListener('click', () => {
-              selectLocation({
+              selectExactLocation({
                 name: item.name,
                 lat: item.latitude,
                 lon: item.longitude,
-                elevation: item.elevation || 500,
+                elevation: Math.round(item.elevation || 500),
                 country: item.country || ''
               });
               dropdown.style.display = 'none';
@@ -887,190 +971,111 @@ function setupSearch() {
           });
           dropdown.style.display = 'block';
         } else {
-          dropdown.innerHTML = '<div style="padding:14px; text-align:center; color:rgba(255,255,255,0.6); font-size:13px;">Keine Orte gefunden</div>';
+          dropdown.innerHTML = '<div style="padding:14px; text-align:center; color:rgba(255,255,255,0.6); font-size:13px;">Kein Ort gefunden</div>';
           dropdown.style.display = 'block';
         }
       } catch (err) {
-        console.error('Geocoding Fehler:', err);
+        console.error('Suche fehlgeschlagen:', err);
       }
-    }, 280);
+    }, 250);
   });
 
   clearBtn.addEventListener('click', () => {
     input.value = '';
     clearBtn.style.display = 'none';
     dropdown.style.display = 'none';
-    input.focus();
   });
 
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-wrapper') && !e.target.closest('.search-dropdown')) {
+    if (!e.target.closest('.search-container') && !e.target.closest('.search-dropdown')) {
       dropdown.style.display = 'none';
     }
   });
-}
 
-function selectLocation(loc) {
-  state.currentLocation = loc;
-  
-  // Highlight matching preset button if any
-  document.querySelectorAll('.preset-pill').forEach(btn => {
-    const lat = parseFloat(btn.dataset.lat);
-    const lon = parseFloat(btn.dataset.lon);
-    if (Math.abs(lat - loc.lat) < 0.05 && Math.abs(lon - loc.lon) < 0.05) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-
-  fetchWeatherData(loc.lat, loc.lon);
-}
-
-// =============================================================================
-// GPS & PRESETS & FAVORITES
-// =============================================================================
-function setupPresetsAndGPS() {
-  // Preset buttons
-  document.querySelectorAll('.preset-pill').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selectLocation({
-        name: btn.dataset.name,
-        lat: parseFloat(btn.dataset.lat),
-        lon: parseFloat(btn.dataset.lon),
-        elevation: 500
-      });
-    });
-  });
-
-  // GPS Button
-  const gpsBtn = document.getElementById('gps-btn');
-  gpsBtn.addEventListener('click', () => {
-    if ('geolocation' in navigator) {
-      gpsBtn.style.opacity = '0.5';
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          gpsBtn.style.opacity = '1';
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          
-          // Reverse geocoding via Open-Meteo or generic name
-          let placeName = 'Mein Standort';
-          try {
-            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${lat.toFixed(2)},${lon.toFixed(2)}&count=1&language=de`);
-            const geoData = await geoRes.json();
-            if (geoData.results && geoData.results[0]) {
-              placeName = geoData.results[0].name;
-            }
-          } catch(e) {}
-
-          selectLocation({
-            name: placeName,
-            lat: lat,
-            lon: lon,
-            elevation: 400
-          });
-        },
-        (error) => {
-          gpsBtn.style.opacity = '1';
-          alert('GPS-Standort konnte nicht ermittelt werden. Bitte Berechtigung in Safari erlauben.');
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    } else {
-      alert('Geolocation wird von diesem Browser nicht unterstützt.');
-    }
-  });
-
-  // Favorite Star Button
-  const favBtn = document.getElementById('favorite-btn');
-  favBtn.addEventListener('click', () => {
-    const loc = state.currentLocation;
-    const idx = state.favorites.findIndex(f => f.name === loc.name);
-    if (idx >= 0) {
-      state.favorites.splice(idx, 1);
-    } else {
-      state.favorites.push(loc);
-    }
-    localStorage.setItem('best_weather_favorites', JSON.stringify(state.favorites));
-    updateFavoriteStarUI();
-  });
-
-  // Unit toggle (°C / °F)
-  const unitBtn = document.getElementById('unit-toggle-btn');
-  unitBtn.addEventListener('click', () => {
-    state.unit = state.unit === 'celsius' ? 'fahrenheit' : 'celsius';
-    unitBtn.innerText = state.unit === 'celsius' ? '°C' : '°F';
-    renderApp();
-  });
-
-  // Desktop iPhone Frame Mode Toggle
-  const toggleFrameBtn = document.getElementById('toggle-frame-btn');
-  if (toggleFrameBtn) {
-    toggleFrameBtn.addEventListener('click', () => {
-      const container = document.getElementById('device-container');
-      if (container.classList.contains('desktop-wide-active')) {
-        container.classList.remove('desktop-wide-active');
-        container.classList.add('iphone-frame-active');
-        toggleFrameBtn.innerText = '🖥️ Vollbild-Ansicht';
-      } else {
-        container.classList.remove('iphone-frame-active');
-        container.classList.add('desktop-wide-active');
-        toggleFrameBtn.innerText = '📱 iPhone-Ansicht';
+  // GPS Geolocation
+  if (gpsBtn) {
+    gpsBtn.addEventListener('click', () => {
+      if ('geolocation' in navigator) {
+        gpsBtn.style.opacity = '0.5';
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            gpsBtn.style.opacity = '1';
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            selectExactLocation({
+              name: 'Mein Standort',
+              lat: lat,
+              lon: lon,
+              elevation: 500
+            });
+          },
+          (err) => {
+            gpsBtn.style.opacity = '1';
+            alert('GPS-Standort konnte nicht ermittelt werden.');
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
       }
     });
   }
-}
 
-function updateFavoriteStarUI() {
-  const favBtn = document.getElementById('favorite-btn');
-  const isFav = state.favorites.some(f => f.name === state.currentLocation.name);
-  if (isFav) {
-    favBtn.innerText = '★';
-    favBtn.classList.add('favorited');
-  } else {
-    favBtn.innerText = '☆';
-    favBtn.classList.remove('favorited');
+  // Unit switch
+  if (unitBtn) {
+    unitBtn.addEventListener('click', () => {
+      state.unit = state.unit === 'celsius' ? 'fahrenheit' : 'celsius';
+      unitBtn.innerText = state.unit === 'celsius' ? '°C' : '°F';
+      renderOverviewTab();
+      renderMountainTab();
+      renderAltitudeChart();
+    });
   }
 }
 
+function selectExactLocation(loc) {
+  loadLocation(loc);
+}
+
+// =============================================================================
+// TAB 5: ALPEN-MESSNETZE GEO-ROUTING HIGHLIGHT
+// =============================================================================
+function updateGeoRoutingNetworks() {
+  const lat = state.currentLocation.lat;
+  const lon = state.currentLocation.lon;
+
+  const netDwd = document.getElementById('net-dwd');
+  const netLawis = document.getElementById('net-lawis');
+  const netSuedtirol = document.getElementById('net-suedtirol');
+  const netSlf = document.getElementById('net-slf');
+  const routingBadge = document.getElementById('active-routing-badge');
+
+  // Reset highlights
+  [netDwd, netLawis, netSuedtirol, netSlf].forEach(n => {
+    if (n) n.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+  });
+
+  if (lat >= 47.05 && lat <= 48.0 && lon >= 9.5 && lon <= 13.5) {
+    // Bayerischer Alpenrand & Nordtirol -> LAWIS & DWD
+    if (netLawis) netLawis.style.borderColor = 'var(--ios-cyan)';
+    if (netDwd) netDwd.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = 'Geo-Routing: LAWIS Bayern / Tirol + DWD aktiv';
+  } else if (lat < 47.05 && lat >= 45.8 && lon >= 10.4 && lon <= 12.6) {
+    // Südtirol & Dolomiten -> Open Data Hub Südtirol
+    if (netSuedtirol) netSuedtirol.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = 'Geo-Routing: Open Data Hub Südtirol aktiv';
+  } else if (lon < 10.2 && lat >= 45.5 && lat <= 47.8) {
+    // Schweiz & Westalpen -> SLF IMIS + Météo-France
+    if (netSlf) netSlf.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = 'Geo-Routing: SLF IMIS Schweiz aktiv';
+  } else {
+    if (netDwd) netDwd.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = 'Geo-Routing: DWD MOSMIX & Open-Meteo aktiv';
+  }
+}
+
+// Temperature Conversion Helper
 function convertTemp(celsius) {
   if (state.unit === 'fahrenheit') {
     return (celsius * 9/5) + 32;
   }
   return celsius;
 }
-
-function formatTemp(celsius) {
-  const val = Math.round(convertTemp(celsius));
-  return `${val}°${state.unit === 'celsius' ? 'C' : 'F'}`;
-}
-
-// =============================================================================
-// INITIALIZATION
-// =============================================================================
-document.addEventListener('DOMContentLoaded', () => {
-  // Start Canvas Engine
-  state.canvasEngine = new WeatherCanvasEngine('weather-canvas');
-
-  // Update status bar time clock
-  setInterval(() => {
-    const timeElem = document.getElementById('ios-status-time');
-    if (timeElem) {
-      const d = new Date();
-      timeElem.innerText = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    }
-  }, 1000);
-
-  // Setup UI event listeners
-  setupSearch();
-  setupPresetsAndGPS();
-
-  // Initialize Live Radar
-  initLiveRadar();
-
-  // Initial Weather Load for default location (München)
-  fetchWeatherData(state.currentLocation.lat, state.currentLocation.lon);
-});

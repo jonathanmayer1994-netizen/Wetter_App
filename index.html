@@ -2,9 +2,9 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-  <title>Best Weather — Ultra-High Precision iPhone Wetter</title>
-  <meta name="description" content="Best Weather: Ultra-präzise iPhone Wetter App mit 90m DEM Downscaling, polarimetrischem Live-Radar und iOS 18 Design.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Best Weather — Ultra-High Precision Wetter & Berg-Engine</title>
+  <meta name="description" content="Best Weather: Ultra-präzise iPhone, iPad & Desktop Wetter App mit 10m DEM Downscaling, Berg- & Tal-Höhenprofil, Wand-Ausrichtung und Live-Radar.">
   
   <!-- Apple Web App Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,344 +14,149 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0d1b2a">
 
-  <!-- Fonts: Inter / SF Pro style -->
+  <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <!-- Leaflet CSS for HD Polarimetric Radar -->
+  <!-- Leaflet CSS for Map & Radar -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   
   <!-- App Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="weather-clear-day">
-  <!-- Dynamic Atmospheric Canvas (Rain, Snow, Stars, Clouds, Sun Rays) -->
+  <!-- Dynamic Atmospheric Background Canvas -->
   <canvas id="weather-canvas"></canvas>
   <div id="ambient-glow" class="ambient-glow"></div>
 
-  <!-- Main App Shell -->
-  <div class="app-layout" id="app-layout">
+  <!-- Main Responsive Layout Wrapper (Dynamic for iPhone, iPad & Desktop) -->
+  <div class="app-layout">
     
-    <!-- iPhone Device Frame Wrapper (Toggleable on Desktop) -->
-    <div class="device-container" id="device-container">
-      
-      <!-- iOS Status Bar / Dynamic Island -->
-      <div class="ios-notch-area" id="ios-notch-area">
-        <div class="ios-status-time" id="ios-status-time">09:41</div>
-        <div class="dynamic-island" id="dynamic-island">
-          <div class="island-content">
-            <span class="island-icon" id="island-icon">☀️</span>
-            <span class="island-text" id="island-text">Best Weather • 90m DEM</span>
-          </div>
-        </div>
-        <div class="ios-status-icons">
-          <span class="ios-signal">📶</span>
-          <span class="ios-wifi">􀙇</span>
-          <span class="ios-battery">🔋</span>
+    <!-- Top Global App Bar -->
+    <header class="global-navbar">
+      <div class="nav-brand">
+        <img src="apple-touch-icon.png" alt="Best Weather Logo" class="brand-logo">
+        <div class="brand-text">
+          <span class="brand-title">Best Weather</span>
+          <span class="brand-badge" id="location-type-badge">📍 Ort</span>
         </div>
       </div>
 
-      <!-- App Content Container -->
-      <main class="app-content" id="app-content">
+      <!-- Main Search & Location Input Bar -->
+      <div class="search-container">
+        <div class="search-input-box">
+          <span class="search-icon">🔍</span>
+          <input 
+            type="text" 
+            id="location-search-input" 
+            placeholder="Exakten Ort, Berggipfel oder Koordinaten eingeben..." 
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
+        </div>
+        <button id="gps-btn" class="nav-icon-btn" title="Exakten GPS-Standort abfragen">📍</button>
+        <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
+        <button id="unit-toggle-btn" class="nav-icon-btn unit-btn" title="Einheit wechseln">°C</button>
+      </div>
+
+      <!-- Live Search Autocomplete Dropdown -->
+      <div id="search-results-dropdown" class="search-dropdown" style="display:none;"></div>
+    </header>
+
+    <!-- Main Navigation Tabs (Desktop Top / Mobile Bottom) -->
+    <nav class="main-tab-bar" id="main-tab-bar">
+      <button class="tab-btn active" data-tab="tab-overview">
+        <span class="tab-icon">🌤️</span>
+        <span class="tab-label">Übersicht</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-mountain">
+        <span class="tab-icon">🏔️</span>
+        <span class="tab-label">Berg & Höhe</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-map">
+        <span class="tab-icon">🗺️</span>
+        <span class="tab-label">Live-Karte & Radar</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-favorites">
+        <span class="tab-icon">⭐</span>
+        <span class="tab-label">Favoriten</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-networks">
+        <span class="tab-icon">📡</span>
+        <span class="tab-label">Alpen-Messnetze</span>
+      </button>
+    </nav>
+
+    <!-- Content Area Container -->
+    <main class="main-container">
+      
+      <!-- =================================================================== -->
+      <!-- TAB 1: ÜBERSICHT (Wetterbericht, Hero, 24h & 10-Tage Klick-Details) -->
+      <!-- =================================================================== -->
+      <div class="tab-pane active" id="tab-overview">
         
-        <!-- Top Navigation / Search Bar -->
-        <header class="app-header">
-          <div class="search-wrapper">
-            <div class="search-input-box">
-              <span class="search-icon">🔍</span>
-              <input 
-                type="text" 
-                id="location-search-input" 
-                placeholder="Stadt, Berggipfel oder Ort suchen..." 
-                autocomplete="off"
-                spellcheck="false"
-              >
-              <button id="clear-search-btn" class="clear-btn" aria-label="Suche löschen" style="display:none;">✕</button>
+        <!-- Hero Section: Current Weather -->
+        <section class="hero-card glass-card">
+          <div class="hero-location-row">
+            <h1 class="hero-city-name" id="hero-location-name">München</h1>
+            <span class="elevation-pill" id="hero-elevation-pill">🏔️ 519 m</span>
+          </div>
+
+          <div class="hero-temp-row">
+            <div class="hero-main-temp">
+              <span id="hero-current-temp">--</span>
+              <span class="hero-deg">°</span>
             </div>
-            
-            <button id="gps-btn" class="icon-button" title="Aktuellen GPS-Standort abrufen" aria-label="GPS-Standort">
-              <span>📍</span>
-            </button>
-            
-            <button id="unit-toggle-btn" class="icon-button unit-btn" title="Einheit wechseln (°C / °F)" aria-label="Einheit wechseln">
-              °C
-            </button>
+            <div class="hero-condition-col">
+              <div class="hero-condition-text" id="hero-condition-text">Wetter laden...</div>
+              <div class="hero-high-low">
+                <span>H: <strong id="hero-temp-max">--°</strong></span>
+                <span>T: <strong id="hero-temp-min">--°</strong></span>
+                <span class="apparent-tag">Gefühlt <strong id="hero-temp-apparent">--°</strong></span>
+              </div>
+            </div>
           </div>
 
-          <!-- Live Autocomplete Dropdown -->
-          <div id="search-results-dropdown" class="search-dropdown" style="display:none;"></div>
-
-          <!-- Quick Presets Carousel -->
-          <div class="presets-scroll" id="presets-container">
-            <button class="preset-pill active" data-lat="48.1371" data-lon="11.5754" data-name="München">München</button>
-            <button class="preset-pill" data-lat="47.421" data-lon="10.985" data-name="Zugspitze (2.962 m)">🏔️ Zugspitze</button>
-            <button class="preset-pill" data-lat="45.976" data-lon="7.749" data-name="Matterhorn / Zermatt">🏔️ Zermatt</button>
-            <button class="preset-pill" data-lat="52.52" data-lon="13.405" data-name="Berlin">Berlin</button>
-            <button class="preset-pill" data-lat="48.208" data-lon="16.373" data-name="Wien">Wien</button>
-            <button class="preset-pill" data-lat="47.376" data-lon="8.541" data-name="Zürich">Zürich</button>
-            <button class="preset-pill" data-lat="53.551" data-lon="9.993" data-name="Hamburg">Hamburg</button>
-          </div>
-        </header>
-
-        <!-- Hero Section: Current Weather Display -->
-        <section class="hero-section" id="hero-section">
-          <div class="location-badge-row">
-            <h1 class="location-name" id="location-name">München</h1>
-            <span class="favorite-star" id="favorite-btn" title="Zu Favoriten hinzufügen">☆</span>
-          </div>
-
-          <!-- High-Precision DEM Badge -->
-          <div class="dem-elevation-badge" id="dem-elevation-badge" title="Automatisch korrigiert anhand des 90-Meter NASA/Copernicus Geländemodells">
-            <span class="dem-icon">🏔️</span>
-            <span id="dem-elevation-text">519 m ü. M.</span>
-            <span class="dem-chip">90m DEM Downscaling</span>
-          </div>
-
-          <!-- Primary Temperature Display -->
-          <div class="temperature-display">
-            <span class="temp-value" id="current-temp">--</span>
-            <span class="temp-unit" id="display-temp-unit">°</span>
-          </div>
-
-          <!-- Weather Condition Label -->
-          <div class="condition-name" id="current-condition">Wetterdaten laden...</div>
-
-          <!-- High / Low / Apparent Range -->
-          <div class="temp-range-row">
-            <span>H: <strong id="temp-max">--°</strong></span>
-            <span>T: <strong id="temp-min">--°</strong></span>
-            <span class="apparent-tag">Gefühlt <strong id="temp-apparent">--°</strong></span>
-          </div>
-
-          <div class="last-updated-row" id="last-updated-text">
-            Aktualisiert: Vor wenigen Sekunden
+          <div class="hero-footer-bar">
+            <span class="hero-geo-coords" id="hero-geo-coords">Lat: --, Lon: --</span>
+            <span class="hero-update-time" id="hero-update-time">Aktualisiert: Vor wenigen Sekunden</span>
           </div>
         </section>
 
-        <!-- 10-METER MIKRO-TOPOGRAFIE ENGINE -->
-        <section class="glass-card micro-engine-card" id="microclimate-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="card-icon">⚡</span>
-              <span>10-METER MIKRO-TOPOGRAFIE ENGINE</span>
-            </div>
-            <span class="card-tag engine-badge">10m DEM + CFD</span>
-          </div>
-
-          <!-- Feature 1: Dynamischer Vertikaler Temperaturgradient & Inversion -->
-          <div class="engine-subcard">
-            <div class="subcard-header">
-              <span class="subcard-title">1. Vertikaler Gradient & Inversion</span>
-              <span class="subcard-tag" id="inversion-status-tag">🟢 Normaler Gradient</span>
-            </div>
-            <div class="gradient-formula-box">
-              <div class="formula-line">
-                $$\Gamma = \frac{T_{600\text{hPa}} - T_{700\text{hPa}}}{z_{600\text{hPa}} - z_{700\text{hPa}}} = \mathbf{\text{-- °C / 100m}}$$
-              </div>
-              <div class="gradient-details-row">
-                <div class="grad-col">
-                  <span class="grad-label">10m-Interpolierte Temp:</span>
-                  <span class="grad-val" id="grad-temp-val">--°C</span>
-                </div>
-                <div class="grad-col">
-                  <span class="grad-label">Atmosphären-Zustand:</span>
-                  <span class="grad-val text-accent" id="inversion-text">Berechne Druckschichten...</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Feature 2: Nordwand vs. Südhang (10-Meter Sonneneinstrahlung via Tilt & Azimuth) -->
-          <div class="engine-subcard">
-            <div class="subcard-header">
-              <span class="subcard-title">2. Nordwand vs. Südhang (Tilt & Azimuth)</span>
-              <span class="subcard-tag diff-tag" id="aspect-diff-badge">ΔT: --°C Unterschied</span>
-            </div>
-            <div class="aspect-comparison-grid">
-              <!-- Südhang Box -->
-              <div class="aspect-box south-box">
-                <div class="aspect-head">
-                  <span class="aspect-icon">☀️</span>
-                  <span class="aspect-name">Südhang (45° Tilt)</span>
-                </div>
-                <div class="aspect-temp" id="south-felt-temp">--°C</div>
-                <div class="aspect-sub">Gefühlte Temperatur</div>
-                <div class="aspect-metric" id="south-irradiance">-- W/m² (GTI)</div>
-              </div>
-
-              <!-- Nordwand Box -->
-              <div class="aspect-box north-box">
-                <div class="aspect-head">
-                  <span class="aspect-icon">❄️</span>
-                  <span class="aspect-name">Nordwand (75° Steil)</span>
-                </div>
-                <div class="aspect-temp" id="north-felt-temp">--°C</div>
-                <div class="aspect-sub">Gefühlte Temperatur</div>
-                <div class="aspect-metric" id="north-irradiance">-- W/m² (Diffus)</div>
-              </div>
-            </div>
-            <div class="micro-note">
-              <span>💡 Auf 30 m Distanz entscheidet die Hangexposition über Sonne (+Strahlungswärme) oder eisigen Kaltluft-Schatten.</span>
-            </div>
-          </div>
-
-          <!-- Feature 3: Wind-Beschleunigung am Grat (30m Venturi & Lee-Effekt) -->
-          <div class="engine-subcard">
-            <div class="subcard-header">
-              <span class="subcard-title">3. 30m Venturi-Grat & Lee-Effekt (TPI)</span>
-              <span class="subcard-tag" id="tpi-badge">TPI: -- m</span>
-            </div>
-            <div class="venturi-grid">
-              <div class="venturi-item">
-                <span class="venturi-label">Gelände-Klassifikation:</span>
-                <span class="venturi-val" id="venturi-class">Topographie analysieren...</span>
-              </div>
-              <div class="venturi-item">
-                <span class="venturi-label">Venturi-Faktor (Grat):</span>
-                <span class="venturi-val text-cyan" id="venturi-factor">--</span>
-              </div>
-              <div class="venturi-item">
-                <span class="venturi-label">Effektiver Gratwind:</span>
-                <span class="venturi-val text-red" id="venturi-effective-wind">-- km/h</span>
-              </div>
-              <div class="venturi-item">
-                <span class="venturi-label">Kamm-Böenpotenzial:</span>
-                <span class="venturi-val" id="venturi-gusts">bis -- km/h</span>
-              </div>
-            </div>
-            <div class="venturi-warning-bar" id="venturi-warning-bar">
-              Windexposition wird berechnet...
-            </div>
-          </div>
-
-          <!-- Feature 4: Bergschatten auf die Minute genau (Horizon Raycasting) -->
-          <div class="engine-subcard">
-            <div class="subcard-header">
-              <span class="subcard-title">4. Bergschatten (Horizon Raycasting)</span>
-              <span class="subcard-tag" id="shadow-status-tag">Raycasting...</span>
-            </div>
-            <div class="shadow-info-box">
-              <div class="shadow-status-row">
-                <span class="shadow-icon" id="shadow-icon">☀️</span>
-                <div class="shadow-texts">
-                  <div class="shadow-main" id="shadow-status-text">Raycasting Geländekacheln...</div>
-                  <div class="shadow-sub" id="shadow-detail-text">Sonnenhöhe vs. Nachbarberg-Hinderniswinkel</div>
-                </div>
-              </div>
-              <div class="shadow-metrics-row">
-                <div class="shadow-metric">
-                  <span class="sm-label">Sonnenwinkel:</span>
-                  <span class="sm-val" id="sun-elevation-val">--°</span>
-                </div>
-                <div class="shadow-metric">
-                  <span class="sm-label">Berg-Horizont:</span>
-                  <span class="sm-val" id="obstacle-angle-val">--°</span>
-                </div>
-                <div class="shadow-metric">
-                  <span class="sm-label">Temp-Sturz im Schatten:</span>
-                  <span class="sm-val text-red" id="shadow-temp-drop">--°C</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Elevation & Schneefallgrenze Visual Gauge -->
-          <div class="elevation-visual-wrapper">
-            <div class="elevation-bar-track">
-              <div class="elevation-indicator current-marker" id="marker-current" style="left: 20%;">
-                <span class="marker-label">Ort: <span id="marker-current-val">--m</span></span>
-                <div class="marker-pin"></div>
-              </div>
-              <div class="elevation-indicator freezing-marker" id="marker-freezing" style="left: 60%;">
-                <span class="marker-label">❄️ 0°C: <span id="marker-freezing-val">--m</span></span>
-                <div class="marker-pin blue"></div>
-              </div>
-            </div>
-            <div class="elevation-axis-labels">
-              <span>0 m (Meereshöhe)</span>
-              <span>1.500 m (Mittelgebirge)</span>
-              <span>3.000 m+ (Hochalpen)</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- HOURLY FORECAST (Apple Weather 24h Slider) -->
+        <!-- 24-HOUR HOURLY FORECAST SLIDER -->
         <section class="glass-card hourly-card">
           <div class="card-header">
             <div class="card-title">
               <span class="card-icon">⏱️</span>
-              <span>STÜNDLICHE VORHERSAGE</span>
+              <span>24-STUNDEN-VORHERSAGE</span>
             </div>
-            <span class="card-tag">24 Stunden</span>
+            <span class="card-tag">Stündlich</span>
           </div>
-
           <div class="hourly-scroll-container" id="hourly-forecast-list">
-            <!-- Dynamically populated -->
-            <div class="hourly-item skeleton-item"></div>
-            <div class="hourly-item skeleton-item"></div>
-            <div class="hourly-item skeleton-item"></div>
-            <div class="hourly-item skeleton-item"></div>
-            <div class="hourly-item skeleton-item"></div>
+            <!-- Dynamisch befüllt -->
           </div>
         </section>
 
-        <!-- 10-DAY FORECAST (Apple Weather Style with Range Bars) -->
+        <!-- 10-TAGE-VORHERSAGE MIT KLICK-DETAILS -->
         <section class="glass-card daily-card">
           <div class="card-header">
             <div class="card-title">
               <span class="card-icon">📅</span>
-              <span>10-TAGE-VORHERSAGE</span>
+              <span>10-TAGE-TREND (Tippe auf einen Tag für Details)</span>
             </div>
-            <span class="card-tag">Trend</span>
+            <span class="card-tag">Interaktiv</span>
           </div>
 
           <div class="daily-list-container" id="daily-forecast-list">
-            <!-- Dynamically populated -->
+            <!-- Dynamisch befüllt mit Klick-Event -->
           </div>
         </section>
 
-        <!-- LIVE POLARIMETRISCHES NIEDERSCHLAGSRADAR (RainViewer HD) -->
-        <section class="glass-card radar-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="card-icon">📡</span>
-              <span>POLARIMETRISCHES LIVE-RADAR</span>
-            </div>
-            <span class="card-tag radar-live-badge">● LIVE 100-250m HD</span>
-          </div>
-
-          <!-- Radar Map Container -->
-          <div class="radar-map-wrapper">
-            <div id="radar-map"></div>
-            
-            <!-- Radar Control Overlay -->
-            <div class="radar-controls">
-              <button id="radar-play-btn" class="radar-play-btn" aria-label="Radar Animation abspielen">▶</button>
-              <div class="radar-slider-wrap">
-                <input type="range" id="radar-time-slider" min="0" max="12" value="12" step="1">
-                <div class="radar-time-label" id="radar-time-display">Aktueller Radarscan</div>
-              </div>
-            </div>
-
-            <!-- Precipitation Color Legend -->
-            <div class="radar-legend">
-              <span class="legend-text">Niederschlag:</span>
-              <div class="legend-bar"></div>
-              <div class="legend-labels">
-                <span>Leicht</span>
-                <span>Mittel</span>
-                <span>Stark</span>
-                <span>Hagel/Schnee</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- BENTO DETAIL GRID (Apple Weather Style 2x2 Cards) -->
+        <!-- BENTO DETAIL GRID -->
         <section class="bento-grid">
           
-          <!-- UV-Index Card -->
           <div class="glass-card bento-item uv-card">
             <div class="card-header">
               <div class="card-title"><span class="card-icon">☀️</span> UV-INDEX</div>
@@ -362,11 +167,10 @@
               <div class="uv-bar-gauge">
                 <div class="uv-pointer" id="uv-gauge-pointer" style="left: 30%;"></div>
               </div>
-              <p class="bento-hint" id="uv-index-hint">Sonnencreme bei längerer Exposition empfohlen.</p>
+              <p class="bento-hint" id="uv-index-hint">Sonnenschutz bei längerer Exposition.</p>
             </div>
           </div>
 
-          <!-- Wind & Gusts with Compass Card -->
           <div class="glass-card bento-item wind-card">
             <div class="card-header">
               <div class="card-title"><span class="card-icon">💨</span> WIND & BÖEN</div>
@@ -389,7 +193,6 @@
             </div>
           </div>
 
-          <!-- Sonnenaufgang & Untergang Card -->
           <div class="glass-card bento-item sun-card">
             <div class="card-header">
               <div class="card-title"><span class="card-icon">🌅</span> SONNENSTAND</div>
@@ -401,110 +204,359 @@
                 <svg class="sun-arc-svg" viewBox="0 0 100 40">
                   <path d="M 5 35 Q 50 5 95 35" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-dasharray="3,3" />
                   <path id="sun-arc-progress" d="M 5 35 Q 50 5 95 35" fill="none" stroke="#ffd166" stroke-width="2.5" />
-                  <circle id="sun-arc-point" cx="50" cy="12" r="4.5" fill="#ffb703" filter="drop-shadow(0 0 4px #ffd166)" />
+                  <circle id="sun-arc-point" cx="50" cy="12" r="4.5" fill="#ffb703" />
                 </svg>
               </div>
               <div class="sun-times-row">
                 <span>Aufgang: <strong id="sunrise-time-val">--:--</strong></span>
-                <span id="daylight-hours-val">-- h Tageslicht</span>
+                <span id="daylight-hours-val">-- h Licht</span>
               </div>
             </div>
           </div>
 
-          <!-- Niederschlag 24h & Rate Card -->
           <div class="glass-card bento-item precip-card">
             <div class="card-header">
               <div class="card-title"><span class="card-icon">🌧️</span> NIEDERSCHLAG</div>
             </div>
             <div class="bento-body">
               <div class="bento-main-val" id="precip-total-val">0 <small>mm</small></div>
-              <div class="bento-sub-title" id="precip-sub">in den letzten 24h</div>
-              <p class="bento-hint" id="precip-forecast-hint">In den nächsten Stunden wird kein Niederschlag erwartet.</p>
+              <div class="bento-sub-title">24h Gesamtsumme</div>
+              <p class="bento-hint" id="precip-forecast-hint">Kein wesentlicher Niederschlag erwartet.</p>
             </div>
           </div>
 
-          <!-- Luftfeuchtigkeit & Taupunkt Card -->
           <div class="glass-card bento-item humidity-card">
             <div class="card-header">
-              <div class="card-title"><span class="card-icon">💧</span> FEUCHTIGKEIT</div>
+              <div class="card-title"><span class="card-icon">💧</span> FEUCHTIGKEIT & TAUPUNKT</div>
             </div>
             <div class="bento-body">
               <div class="bento-main-val" id="humidity-val">--%</div>
-              <div class="bento-sub-title">Relative Luftfeuchte</div>
-              <p class="bento-hint" id="dew-point-hint">Der Taupunkt liegt bei --°C.</p>
+              <div class="bento-sub-title" id="dew-point-sub">Taupunkt: --°C</div>
+              <p class="bento-hint" id="condensation-risk-hint">Kondensationsrisiko: Normal</p>
             </div>
           </div>
 
-          <!-- Luftdruck QNH & QFE Card -->
           <div class="glass-card bento-item pressure-card">
             <div class="card-header">
-              <div class="card-title"><span class="card-icon">⏲️</span> LUFTPRUCK</div>
+              <div class="card-title"><span class="card-icon">⏲️</span> LUFTPDRUCK</div>
             </div>
             <div class="bento-body">
               <div class="bento-main-val" id="pressure-val">-- <small>hPa</small></div>
-              <div class="bento-sub-title" id="pressure-status">QNH Meereshöhe</div>
-              <div class="bento-sub-detail" id="surface-pressure-val">Stationsdruck (QFE): -- hPa</div>
+              <div class="bento-sub-title" id="pressure-qfe">Stationsdruck: -- hPa</div>
               <p class="bento-hint" id="pressure-trend">Tendenz: Stabil</p>
-            </div>
-          </div>
-
-          <!-- Sichtweite Card -->
-          <div class="glass-card bento-item visibility-card">
-            <div class="card-header">
-              <div class="card-title"><span class="card-icon">👁️</span> SICHTWEITE</div>
-            </div>
-            <div class="bento-body">
-              <div class="bento-main-val" id="visibility-val">-- <small>km</small></div>
-              <div class="bento-sub-title" id="visibility-desc">Perfekte Fernsicht</div>
-              <p class="bento-hint" id="visibility-hint">Klare atmosphärische Bedingungen über dem Gelände.</p>
-            </div>
-          </div>
-
-          <!-- Mondphase & Beleuchtung Card -->
-          <div class="glass-card bento-item moon-card">
-            <div class="card-header">
-              <div class="card-title"><span class="card-icon">🌙</span> MONDPHASE</div>
-            </div>
-            <div class="bento-body">
-              <div class="bento-main-val" id="moon-phase-name">Zunehmend</div>
-              <div class="bento-sub-title" id="moon-illumination">Beleuchtung: --%</div>
-              <div class="moon-illustration" id="moon-illustration">🌖</div>
-              <p class="bento-hint" id="moon-rise-hint">Nächster Vollmond in -- Tagen.</p>
             </div>
           </div>
 
         </section>
 
-        <!-- Footer / Credits -->
-        <footer class="app-footer">
-          <div class="footer-brand">
-            <img src="apple-touch-icon.png" alt="Best Weather Logo" class="footer-icon">
-            <span>Best Weather for iPhone</span>
-          </div>
-          <p class="footer-credits">
-            Datenquellen: <strong>Open-Meteo</strong> mit 90m DEM NASA/Copernicus Downscaling • <strong>RainViewer</strong> Polarimetrisches HD-Radar • Leaflet OSM
-          </p>
-          <div class="pwa-install-badge" id="pwa-install-container">
-            <span>📲 Tipp: Öffne diese Seite in Safari und wähle <strong>"Zum Home-Bildschirm"</strong> für das echte iPhone-App-Erlebnis!</span>
-          </div>
-        </footer>
-
-      </main>
-
-      <!-- Desktop View Switcher Tool (Floating) -->
-      <div class="desktop-device-controls" id="desktop-device-controls">
-        <button id="toggle-frame-btn" class="frame-toggle-btn" title="Zwischen iPhone Rahmen-Ansicht und Vollbild wechseln">
-          📱 iPhone-Ansicht
-        </button>
       </div>
 
+      <!-- =================================================================== -->
+      <!-- TAB 2: BERG & HÖHE (Höhenprofil Tal vs Berg, Wand-Wahl & Mikroklima) -->
+      <!-- =================================================================== -->
+      <div class="tab-pane" id="tab-mountain">
+        
+        <!-- Mountain Overview Card -->
+        <section class="glass-card mountain-header-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">🏔️</span>
+              <span id="mountain-title">ALPINE GELÄNDE- & HÖHEN-ANALYSE</span>
+            </div>
+            <span class="card-tag mountain-badge" id="mountain-badge">10m DEM + Druckflächen</span>
+          </div>
+
+          <div class="mountain-stats-row">
+            <div class="m-stat">
+              <span class="m-label">Standort-Höhe</span>
+              <span class="m-val" id="m-peak-elev">-- m</span>
+            </div>
+            <div class="m-stat">
+              <span class="m-label">Geländeform</span>
+              <span class="m-val" id="m-landform">Wird analysiert...</span>
+            </div>
+            <div class="m-stat">
+              <span class="m-label">Schneefallgrenze</span>
+              <span class="m-val text-cyan" id="m-freezing-level">-- m</span>
+            </div>
+            <div class="m-stat">
+              <span class="m-label">Inversion</span>
+              <span class="m-val" id="m-inversion-status">Prüfe Schichten...</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- HÖHENPROFIL-GRAFIK: TAL VS. MITTELSTATION VS. GIPFEL ÜBER DEN TAG -->
+        <section class="glass-card altitude-chart-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">📊</span>
+              <span>VERTIKALES HÖHENPROFIL (TAL VS. BERG)</span>
+            </div>
+            <div class="chart-time-control">
+              <span class="time-label">Uhrzeit: <strong id="profile-time-label">Jetzt</strong></span>
+              <input type="range" id="profile-hour-slider" min="0" max="23" value="0" step="1">
+            </div>
+          </div>
+
+          <!-- Interactive Vertical Altitude Breakdown Graphic -->
+          <div class="altitude-levels-container" id="altitude-levels-container">
+            <!-- Dynamisch generiert: Talboden, Mittelstation, Gipfel, Freie Atmosphäre -->
+          </div>
+
+          <div class="altitude-legend">
+            <span class="legend-chip blue">❄️ Schneefall- / Frostbereich</span>
+            <span class="legend-chip green">💧 Regen- / Tauwetterbereich</span>
+            <span class="legend-chip orange">💨 Wind & Böenspitzen auf Höhe</span>
+          </div>
+        </section>
+
+        <!-- WAND-AUSRICHTUNG (PRO BERG ANPASSBAR: NORDWAND, SÜDGRAT, ETC.) -->
+        <section class="glass-card mountain-aspect-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">🧭</span>
+              <span>WAND-EXPOSITION & HANGNEIGUNG ANPASSEN</span>
+            </div>
+            <span class="card-tag">Mikroklima pro Wand</span>
+          </div>
+
+          <div class="aspect-selector-row">
+            <button class="aspect-pill active" data-tilt="45" data-azimuth="0">☀️ Südwand (45°)</button>
+            <button class="aspect-pill" data-tilt="75" data-azimuth="180">❄️ Nordwand (75°)</button>
+            <button class="aspect-pill" data-tilt="50" data-azimuth="-90">🌅 Ostwand (50°)</button>
+            <button class="aspect-pill" data-tilt="50" data-azimuth="90">🌇 Westwand (50°)</button>
+            <button class="aspect-pill" id="auto-aspect-pill" data-auto="true">📍 Automatisch (10m DEM)</button>
+          </div>
+
+          <div class="aspect-result-grid">
+            <div class="aspect-result-box">
+              <div class="ar-label">Aktive Wand</div>
+              <div class="ar-val" id="active-wall-name">Südwand (45° Neigung)</div>
+              <div class="ar-sub" id="active-wall-radiation">Sonneneinstrahlung: -- W/m² (GTI)</div>
+            </div>
+
+            <div class="aspect-result-box">
+              <div class="ar-label">Gefühlte Wand-Temperatur</div>
+              <div class="ar-val text-accent" id="active-wall-temp">--°C</div>
+              <div class="ar-sub" id="active-wall-temp-sub">vs. Schattwand: --</div>
+            </div>
+
+            <div class="aspect-result-box">
+              <div class="ar-label">Schneebeschaffenheit</div>
+              <div class="ar-val" id="active-wall-snow">Wird berechnet...</div>
+              <div class="ar-sub" id="active-wall-snow-sub">Vereisung / Firn / Pulver</div>
+            </div>
+
+            <div class="aspect-result-box">
+              <div class="ar-label">Windanströmung an der Wand</div>
+              <div class="ar-val" id="active-wall-wind">Luv / Lee Analyse</div>
+              <div class="ar-sub" id="active-wall-wind-sub">Windgeschw.: -- km/h</div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- TAB 3: LIVE-KARTE & RADAR (Vollwertige Karte mit Standort & Layern) -->
+      <!-- =================================================================== -->
+      <div class="tab-pane" id="tab-map">
+        
+        <section class="glass-card map-view-card">
+          <div class="map-toolbar">
+            <div class="map-layer-toggles">
+              <button class="map-layer-btn active" data-layer="radar">🌧️ Niederschlag (Live-Radar)</button>
+              <button class="map-layer-btn" data-layer="topo">🏔️ Topografie (Gelände)</button>
+              <button class="map-layer-btn" data-layer="satellite">🛰️ Satellit</button>
+            </div>
+            
+            <div class="map-location-chip" id="map-location-chip">
+              <span>📍 München</span>
+            </div>
+          </div>
+
+          <!-- Fullscreen-capable Leaflet Map View -->
+          <div class="fullscreen-map-wrapper">
+            <div id="interactive-map"></div>
+
+            <!-- Radar Zeitleiste & Play-Button Overlay -->
+            <div class="radar-floating-controls" id="radar-floating-controls">
+              <button id="radar-play-btn" class="radar-play-btn" title="Radar-Film abspielen">▶</button>
+              <div class="radar-slider-wrap">
+                <input type="range" id="radar-time-slider" min="0" max="12" value="12" step="1">
+                <div class="radar-time-label" id="radar-time-display">Polarimetrischer Scan</div>
+              </div>
+            </div>
+
+            <!-- Precipitation Color Legend -->
+            <div class="map-legend-card">
+              <div class="legend-title">Niederschlagsintensität:</div>
+              <div class="legend-gradient-bar"></div>
+              <div class="legend-scale-labels">
+                <span>Leicht</span>
+                <span>Mäßig</span>
+                <span>Stark</span>
+                <span>Hagel / Schnee</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- TAB 4: FAVORITEN & ORTSVERWALTUNG -->
+      <!-- =================================================================== -->
+      <div class="tab-pane" id="tab-favorites">
+        
+        <section class="glass-card favorites-management-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">⭐</span>
+              <span>MEINE GESPEICHERTEN ORTE & BERGE</span>
+            </div>
+            <button id="add-current-favorite-btn" class="action-btn">+ Aktuellen Ort speichern</button>
+          </div>
+
+          <p class="section-desc">
+            Tippe auf einen gespeicherten Ort, um sofort alle meteorologischen und alpinen Daten metergenau zu laden.
+          </p>
+
+          <div class="favorites-grid" id="favorites-grid">
+            <!-- Dynamisch aus localStorage befüllt -->
+          </div>
+        </section>
+
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- TAB 5: ALPEN-MESSNETZE & GEBIETS-APIS -->
+      <!-- =================================================================== -->
+      <div class="tab-pane" id="tab-networks">
+        
+        <section class="glass-card networks-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">📡</span>
+              <span>ALPEN-MESSNETZE & SPEZIAL-APIS</span>
+            </div>
+            <span class="card-tag active-routing-badge" id="active-routing-badge">Geo-Routing aktiv</span>
+          </div>
+
+          <p class="section-desc">
+            Best Weather routet die Datenanfragen automatisch basierend auf deiner Koordinate zum jeweils höchstauflösenden regionalen Messdienst:
+          </p>
+
+          <div class="networks-grid">
+            
+            <div class="network-item" id="net-dwd">
+              <div class="net-head">
+                <span class="net-flag">🇩🇪</span>
+                <span class="net-name">DWD OpenData & LfU Bayern</span>
+              </div>
+              <p class="net-desc">MOSMIX-L Punkteraster mit 5.400 geeichten Stationen & RADOLAN Niederschlagsradar für ganz Süddeutschland und Alpenvorland.</p>
+              <div class="net-status active">● Bereit & Integriert</div>
+            </div>
+
+            <div class="network-item" id="net-lawis">
+              <div class="net-head">
+                <span class="net-flag">🇦🇹 🇩🇪</span>
+                <span class="net-name">LAWIS Public API & LWD Bayern</span>
+              </div>
+              <p class="net-desc">Hunderte automatisierte Grat- und Kammstationen (Nebelhorn, Zugspitzplatt, Fellhorn, Tirol) mit Schneehöhe & Böen im 10-Minuten-Takt.</p>
+              <div class="net-status active">● Bereit & Integriert</div>
+            </div>
+
+            <div class="network-item" id="net-suedtirol">
+              <div class="net-head">
+                <span class="net-flag">🇮🇹</span>
+                <span class="net-name">Open Data Hub Südtirol</span>
+              </div>
+              <p class="net-desc">Offizielle Bergwetterberichte in 1.000m-Stufen bis 4.000 m (Ortler, Dolomiten) & Südalpen-Gipfelradare.</p>
+              <div class="net-status active">● Bereit & Integriert</div>
+            </div>
+
+            <div class="network-item" id="net-slf">
+              <div class="net-head">
+                <span class="net-flag">🇨🇭 🇫🇷</span>
+                <span class="net-name">SLF IMIS & Météo-France AROME</span>
+              </div>
+              <p class="net-desc">180+ IMIS-Hochgebirgsstationen (Wallis, Zermatt, Mont-Blanc) & ultra-feines 1,1-km AROME-HD-Modell.</p>
+              <div class="net-status active">● Bereit & Integriert</div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- INTERAKTIVES TAGES-DETAIL MODAL (Pop-up beim Klick auf einen der 10 Tage) -->
+  <div class="modal-overlay" id="day-detail-modal" style="display:none;">
+    <div class="modal-card glass-card">
+      <div class="modal-header">
+        <div class="modal-title-col">
+          <h2 class="modal-day-title" id="modal-day-name">Montag, 19. Oktober</h2>
+          <span class="modal-condition" id="modal-day-condition">Sonnig und trocken</span>
+        </div>
+        <button id="close-modal-btn" class="close-modal-btn">✕</button>
+      </div>
+
+      <div class="modal-temp-banner">
+        <div class="mtb-item">
+          <span class="mtb-label">Tageshöchstwert</span>
+          <span class="mtb-val text-accent" id="modal-max-temp">--°C</span>
+        </div>
+        <div class="mtb-item">
+          <span class="mtb-label">Tiefstwert (Nacht)</span>
+          <span class="mtb-val" id="modal-min-temp">--°C</span>
+        </div>
+        <div class="mtb-item">
+          <span class="mtb-label">Regenrisiko</span>
+          <span class="mtb-val text-cyan" id="modal-pop">--%</span>
+        </div>
+        <div class="mtb-item">
+          <span class="mtb-label">Niederschlag</span>
+          <span class="mtb-val" id="modal-precip-sum">-- mm</span>
+        </div>
+      </div>
+
+      <!-- Tageszeiten-Aufdröselung (Morgens, Mittags, Abends, Nachts) -->
+      <h3 class="modal-sub-heading">Tagesabschnitte</h3>
+      <div class="day-parts-grid" id="modal-day-parts">
+        <!-- Dynamisch befüllt -->
+      </div>
+
+      <!-- Weitere Detail-Metriken für diesen Tag -->
+      <div class="modal-metrics-grid">
+        <div class="mm-item">
+          <span class="mm-label">Max. Windböen:</span>
+          <span class="mm-val" id="modal-wind-gusts">-- km/h</span>
+        </div>
+        <div class="mm-item">
+          <span class="mm-label">Max. UV-Index:</span>
+          <span class="mm-val" id="modal-uv-max">--</span>
+        </div>
+        <div class="mm-item">
+          <span class="mm-label">Sonnenaufgang:</span>
+          <span class="mm-val" id="modal-sunrise">--:--</span>
+        </div>
+        <div class="mm-item">
+          <span class="mm-label">Sonnenuntergang:</span>
+          <span class="mm-val" id="modal-sunset">--:--</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Leaflet JS for RainViewer Live Radar -->
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
-  <!-- App Core Logic (ES Module) -->
+  <!-- App Core Module -->
   <script type="module" src="app.js"></script>
 </body>
 </html>
