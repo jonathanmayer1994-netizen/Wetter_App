@@ -6,6 +6,7 @@
 import { MicroEngine } from './microEngine.js';
 import { AlpineStorage } from './storage.js';
 import { resilientFetch, escapeHtml } from './httpClient.js';
+import { MapLibreWeatherMap } from './maplibreWeatherMap.js';
 
 // =============================================================================
 // GLOBAL STATE & PERSISTENCE
@@ -30,6 +31,7 @@ const state = {
   favorites: [],
   map: {
     instance: null,
+    maplibreInstance: null,
     marker: null,
     activeLayer: 'radar',
     activeOverlay: 'precip',
@@ -385,6 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupWebcamModal();
   setupSportsTab();
   initLeafletMap();
+  initMapLibreWeatherMap();
   setupSourcesQuickNav();
   setupExpertModeToggle();
 
@@ -408,6 +411,9 @@ function setupTabs() {
     if (document.hidden) {
       if (state.canvasEngine) state.canvasEngine.pause();
       if (state.map && state.map.radarPlaying) stopRadarAnimation();
+      if (state.map && state.map.maplibreInstance && state.map.maplibreInstance.radarPlaying) {
+        state.map.maplibreInstance.pauseRadar();
+      }
     } else {
       if (state.canvasEngine) state.canvasEngine.resume();
     }
@@ -424,8 +430,13 @@ function switchTab(tabId) {
   });
 
   // Radar-Animation sofort stoppen, wenn der Nutzer den Map-Tab verlässt!
-  if (tabId !== 'tab-map' && state.map && state.map.radarPlaying) {
-    stopRadarAnimation();
+  if (tabId !== 'tab-map') {
+    if (state.map && state.map.radarPlaying) {
+      stopRadarAnimation();
+    }
+    if (state.map && state.map.maplibreInstance && state.map.maplibreInstance.radarPlaying) {
+      state.map.maplibreInstance.pauseRadar();
+    }
   }
 
   if (tabId === 'tab-mountain') {
@@ -449,13 +460,48 @@ function switchTab(tabId) {
     }, 100);
   }
 
-  if (tabId === 'tab-map' && state.map.instance) {
-    setTimeout(() => {
-      state.map.instance.invalidateSize();
-      if (state.currentLocation) {
-        state.map.instance.setView([state.currentLocation.lat, state.currentLocation.lon], 9);
+  if (tabId === 'tab-map') {
+    if (!state.map.maplibreInstance) {
+      initMapLibreWeatherMap();
+    } else if (state.map.maplibreInstance.map) {
+      setTimeout(() => {
+        state.map.maplibreInstance.map.resize();
+      }, 150);
+    }
+
+    if (state.map.instance) {
+      setTimeout(() => {
+        state.map.instance.invalidateSize();
+        if (state.currentLocation) {
+          state.map.instance.setView([state.currentLocation.lat, state.currentLocation.lon], 9);
+        }
+      }, 150);
+    }
+  }
+}
+
+async function initMapLibreWeatherMap() {
+  const container = document.getElementById('maplibre-interactive-map');
+  if (!container || state.map.maplibreInstance) return;
+
+  try {
+    const weatherMap = new MapLibreWeatherMap({
+      containerId: 'maplibre-interactive-map',
+      onStationSelect: (st) => {
+        selectExactLocation({
+          name: st.name,
+          lat: st.lat,
+          lon: st.lon,
+          elevation: st.elevation,
+          country: 'Alpenraum',
+          isMountain: st.isMountain
+        });
       }
-    }, 150);
+    });
+    state.map.maplibreInstance = weatherMap;
+    await weatherMap.init();
+  } catch (err) {
+    console.warn('MapLibre GL JS Wetterkarten-Initialisierung:', err);
   }
 }
 

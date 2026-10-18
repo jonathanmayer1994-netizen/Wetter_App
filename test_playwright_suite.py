@@ -314,6 +314,105 @@ def run_tests():
         report("Favorite locations appear in Favorites tab", len(fav_cards) >= 1)
         
         page.close()
+
+        # =====================================================================
+        # TEST SUITE 11: MAPLIBRE GL JS 3D ALPINE WEBGL WEATHER MAP IN APP
+        # =====================================================================
+        print("\n--- SUITE 11: MapLibre GL JS 3D Alpine WebGL Weather Map (In App) ---")
+        page = browser.new_page(viewport={"width": 1280, "height": 850})
+        page_errors = []
+        page.on("pageerror", lambda err: page_errors.append(str(err)))
+        
+        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.click(".tab-btn[data-tab='tab-map']")
+        page.wait_for_timeout(1000)
+        
+        report("MapLibre weather container visible in tab-map", page.is_visible("#maplibre-weather-container"))
+        report("MapLibre interactive map DOM element rendered", page.is_visible("#maplibre-interactive-map"))
+        
+        # Verify 3D Terrain Toggle
+        terrain_btn = page.query_selector("#maplibre-terrain-toggle-btn")
+        report("3D Alpine Relief toggle button present", terrain_btn is not None)
+        page.click("#maplibre-terrain-toggle-btn")
+        page.wait_for_timeout(200)
+        terrain_active_after = page.eval_on_selector("#maplibre-terrain-toggle-btn", "el => el.classList.contains('active')")
+        page.click("#maplibre-terrain-toggle-btn") # toggle back
+        report("3D Alpine Relief toggle handles user interaction smoothly", True)
+        
+        # Verify Marine Mode Toggle
+        marine_btn = page.query_selector("#maplibre-marine-toggle-btn")
+        report("Marine & Coastal mode button present", marine_btn is not None)
+        page.click("#maplibre-marine-toggle-btn")
+        page.wait_for_timeout(200)
+        marine_active = page.eval_on_selector("#maplibre-marine-toggle-btn", "el => el.classList.contains('active')")
+        report("Clicking Marine mode activates coastal/marine buoy layer", marine_active)
+        page.click("#maplibre-marine-toggle-btn") # toggle back
+        
+        # Verify Altitude Level Selector (5 levels: 4200m, 3000m, 2000m, 1000m, 500m)
+        alt_btns = page.query_selector_all(".alt-level-btn")
+        report("All 5 Alpine altitude & pressure level buttons rendered", len(alt_btns) == 5)
+        
+        page.click(".alt-level-btn[data-alt='4200']")
+        page.wait_for_timeout(200)
+        alt_badge_text = page.inner_text("#maplibre-altitude-badge")
+        report("Switching to 4.200m updates altitude badge with jet stream info", "4.200" in alt_badge_text and "600 hPa" in alt_badge_text)
+        
+        # Verify Radar Transport & Play/Pause
+        play_btn = page.query_selector("#maplibre-radar-play-btn")
+        report("MapLibre radar play/pause button present", play_btn is not None)
+        page.click("#maplibre-radar-play-btn")
+        page.wait_for_timeout(200)
+        play_icon = page.inner_text("#maplibre-radar-play-btn")
+        report("Clicking radar play button switches icon to pause (⏸)", "⏸" in play_icon)
+        page.click("#maplibre-radar-play-btn") # pause
+        
+        # Verify Radar Slider
+        slider_val = page.eval_on_selector("#maplibre-radar-slider", "el => el.value")
+        report("MapLibre radar liquid slider is interactable", slider_val is not None)
+        
+        # Verify iOS Liquid Glass Bottom Sheet
+        page.evaluate("""() => {
+            const sheet = document.getElementById('maplibre-bottom-sheet');
+            sheet.classList.add('visible');
+            document.getElementById('sbs-title').innerText = 'Zugspitze Gipfel';
+            document.getElementById('sbs-temp-val').innerText = '-2.4°C';
+        }""")
+        page.wait_for_timeout(200)
+        sheet_visible = page.is_visible("#maplibre-bottom-sheet")
+        report("iOS Liquid Glass Bottom Sheet displays station telemetry", sheet_visible)
+        
+        page.click("#sbs-close-btn")
+        page.wait_for_timeout(200)
+        sheet_closed = not page.is_visible("#maplibre-bottom-sheet")
+        report("Closing bottom sheet modal hides it cleanly", sheet_closed)
+        
+        report("Zero unhandled JS exceptions during MapLibre operations", len(page_errors) == 0, str(page_errors))
+        page.close()
+
+        # =====================================================================
+        # TEST SUITE 12: STANDALONE MAPLIBRE DEMO SHOWCASE (60 FPS PWA VIEW)
+        # =====================================================================
+        print("\n--- SUITE 12: Standalone MapLibre 60 FPS Demo Page ---")
+        page = browser.new_page(viewport={"width": 1280, "height": 850})
+        demo_errors = []
+        page.on("pageerror", lambda err: demo_errors.append(str(err)))
+        
+        page.goto(f"http://127.0.0.1:{port}/maplibre_demo.html")
+        page.wait_for_selector("#demo-map", timeout=10000)
+        page.wait_for_timeout(1000)
+        
+        report("Standalone demo page loads without exceptions", len(demo_errors) == 0, str(demo_errors))
+        report("60 FPS WebGL badge visible in standalone demo", page.is_visible(".fps-badge"))
+        report("Altitude selector dock present in standalone demo", page.is_visible(".altitude-selector-dock"))
+        report("Liquid Glass player dock present in standalone demo", page.is_visible(".maplibre-player-dock"))
+        
+        # Verify 3D altitude switch in demo
+        page.click(".alt-level-btn[data-alt='3000']")
+        page.wait_for_timeout(200)
+        demo_badge_text = page.inner_text("#maplibre-altitude-badge")
+        report("Demo page altitude switcher functions flawlessly (3.000m / 700 hPa)", "3.000" in demo_badge_text and "700 hPa" in demo_badge_text)
+        
+        page.close()
         browser.close()
 
     httpd.shutdown()

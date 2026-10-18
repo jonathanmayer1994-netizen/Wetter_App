@@ -23,6 +23,10 @@
   <!-- Leaflet CSS for Map & Radar -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   
+  <!-- MapLibre GL JS (Hardware-accelerated 60 FPS 3D WebGL Engine) -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
   <!-- App Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -1164,7 +1168,155 @@
       <!-- =================================================================== -->
       <div class="tab-pane" id="tab-map">
         
+        <!-- =================================================================== -->
+        <!-- 3D WEBGL ALPEN-WETTERKARTE (MAPLIBRE GL JS & APPLE LIQUID GLASS)    -->
+        <!-- =================================================================== -->
+        <section class="glass-card maplibre-section-card" style="margin-bottom: 24px;">
+          <div class="card-header" style="margin-bottom: 14px;">
+            <div class="card-title">
+              <span class="card-icon">🏔️</span>
+              <span>3D-ALPEN-WETTERKARTE & RADAR (60 FPS WEBGL)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="card-tag" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35);">⚡ Hardwarebeschleunigt</span>
+              <a href="maplibre_demo.html" target="_blank" class="maplibre-toggle-pill" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Eigenes Vollbildfenster öffnen">↗ Vollbild</a>
+            </div>
+          </div>
+
+          <div class="maplibre-weather-container" id="maplibre-weather-container">
+            <div id="maplibre-interactive-map"></div>
+
+            <!-- Sleek Top Floating Liquid Glass Dock -->
+            <div class="maplibre-top-dock liquid-glass-dock">
+              <div class="maplibre-top-controls">
+                <button class="maplibre-toggle-pill active" id="maplibre-terrain-toggle-btn" title="3D-Relief & Hillshading an/aus">
+                  🏔️ 3D Alpen-Relief
+                </button>
+                <button class="maplibre-toggle-pill" id="maplibre-marine-toggle-btn" title="Küste, Wellenhöhe & Wassertemperatur">
+                  🌊 Marine-Modus
+                </button>
+              </div>
+
+              <div class="maplibre-altitude-badge" id="maplibre-altitude-badge">
+                🏔️ <strong>Tal / Boden</strong> (500 m) • Wind: <strong>18 km/h</strong> • Temp: <strong>10.8°C</strong>
+              </div>
+            </div>
+
+            <!-- Floating Altitude & Pressure Selector Dock (Right Side) -->
+            <div class="altitude-selector-dock liquid-glass-panel">
+              <button class="alt-level-btn" data-alt="4200" title="4.200 m (600 hPa) - Freie Höhenströmung Alpenhauptkamm">
+                <span>4.200 m</span>
+                <small>600 hPa</small>
+              </button>
+              <button class="alt-level-btn" data-alt="3000" title="3.000 m (700 hPa) - Hochalpine Gipfellage">
+                <span>3.000 m</span>
+                <small>700 hPa</small>
+              </button>
+              <button class="alt-level-btn" data-alt="2000" title="2.000 m (800 hPa) - Kammlagen & Pässe">
+                <span>2.000 m</span>
+                <small>800 hPa</small>
+              </button>
+              <button class="alt-level-btn" data-alt="1000" title="1.000 m (900 hPa) - Mittelgebirge & Almtäler">
+                <span>1.000 m</span>
+                <small>900 hPa</small>
+              </button>
+              <button class="alt-level-btn active" data-alt="500" title="Tal / Boden (2m / 10m - 1013 hPa)">
+                <span>Tal / Boden</span>
+                <small>2m / 10m</small>
+              </button>
+            </div>
+
+            <!-- Bottom Floating Liquid Glass Player Dock -->
+            <div class="maplibre-player-dock liquid-glass-dock">
+              <!-- Row 1: Radar Mode Chip, Time Banner & Legend -->
+              <div class="maplibre-player-topline">
+                <div class="maplibre-time-block">
+                  <span class="radar-mode-chip live" id="maplibre-radar-status-chip">📡 Doppler-Radar</span>
+                  <span class="maplibre-time-text" id="maplibre-radar-time-text">🔴 LIVE • Jetzt</span>
+                  <button class="maplibre-toggle-pill" id="maplibre-radar-jump-live" style="padding: 4px 10px; font-size: 11px;">
+                    🔴 Jetzt
+                  </button>
+                </div>
+
+                <div class="maplibre-legend-row">
+                  <span style="opacity:0.75; font-size: 11px;">Intensität:</span>
+                  <div class="maplibre-legend-bar" title="Niesel → Mäßig → Starkregen → Schnee / Hagel"></div>
+                  <span style="font-size: 11px; opacity:0.85;">Niesel / Schnee</span>
+                </div>
+              </div>
+
+              <!-- Row 2: Transport Buttons & Scrubber Slider -->
+              <div class="maplibre-player-controls">
+                <div class="maplibre-transport-btns">
+                  <button id="maplibre-radar-prev-btn" class="maplibre-ctrl-btn" title="10 Min zurück">⏮</button>
+                  <button id="maplibre-radar-play-btn" class="maplibre-ctrl-btn maplibre-play-btn" title="Live-Radar abspielen / pausieren">▶</button>
+                  <button id="maplibre-radar-next-btn" class="maplibre-ctrl-btn" title="10 Min vor">⏭</button>
+                  <button id="maplibre-radar-speed-btn" class="maplibre-ctrl-btn maplibre-speed-btn" title="Geschwindigkeit umschalten">1x</button>
+                </div>
+
+                <div class="maplibre-slider-wrap">
+                  <input type="range" id="maplibre-radar-slider" class="liquid-slider" min="0" max="30" value="12" step="1">
+                </div>
+              </div>
+            </div>
+
+            <!-- iOS Liquid Glass Bottom Sheet Modal for Stations -->
+            <div class="station-bottom-sheet liquid-glass-panel" id="maplibre-bottom-sheet">
+              <div class="sbs-handle-bar" onclick="document.getElementById('maplibre-bottom-sheet').classList.remove('visible')"></div>
+              
+              <div class="sbs-header">
+                <div class="sbs-title-wrap">
+                  <span class="sbs-title" id="sbs-title">Zugspitze Gipfel</span>
+                  <div class="sbs-sub">
+                    <span id="sbs-elevation">2.962 m ü. M.</span>
+                    <span class="sbs-agency-badge" id="sbs-agency-badge">LAWIS</span>
+                  </div>
+                </div>
+                <button class="sbs-close-btn" id="sbs-close-btn" title="Schließen">✕</button>
+              </div>
+
+              <div class="sbs-grid">
+                <div class="sbs-card">
+                  <span class="sbs-card-label">Temperatur</span>
+                  <span class="sbs-card-val" id="sbs-temp-val">-2.4°C</span>
+                  <span class="sbs-card-sub" id="sbs-dew-val">Taupunkt: -5.1°C</span>
+                </div>
+
+                <div class="sbs-card">
+                  <span class="sbs-card-label">Schnee</span>
+                  <span class="sbs-card-val" id="sbs-snow-val">145 cm</span>
+                  <span class="sbs-card-sub" id="sbs-fresh-snow-val">24h Neuschnee: +15 cm</span>
+                </div>
+
+                <div class="sbs-card">
+                  <span class="sbs-card-label">Wind & Böen</span>
+                  <span class="sbs-card-val" id="sbs-wind-val">42 km/h</span>
+                  <div class="sbs-wind-row sbs-card-sub">
+                    <span class="sbs-compass-needle" id="sbs-compass-needle">↑</span>
+                    <span id="sbs-wind-dir-text">250° (WSW)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sbs-actions">
+                <button class="sbs-action-btn" id="sbs-select-location-btn">
+                  📍 Als Hauptstandort für Wetterberichte wählen
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- 2D LEAFLET MULTI-LAYER & 48H MODELL-RADAR KARTE                     -->
+        <!-- =================================================================== -->
         <section class="glass-card map-view-card">
+          <div class="card-header" style="margin-bottom: 12px;">
+            <div class="card-title">
+              <span class="card-icon">🗺️</span>
+              <span>2D-GROSSRAUMRADAR & 48H-MODELLPROGNOSE (DWD & ECMWF)</span>
+            </div>
+          </div>
           <!-- Fullscreen-capable Leaflet Map View with Floating Controls Dock -->
           <div class="fullscreen-map-wrapper" id="fullscreen-map-wrapper">
             <div id="interactive-map"></div>
