@@ -123,16 +123,15 @@ export class MapLibreWeatherMap {
       version: 8,
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       sources: {
-        'carto-dark': {
+        'osm-dark': {
           type: 'raster',
           tiles: [
-            'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-            'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-            'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-            'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
           ],
           tileSize: 256,
-          attribution: '&copy; OpenStreetMap &copy; CARTO'
+          attribution: '&copy; OpenStreetMap contributors'
         },
         'terrain-dem': {
           type: 'raster-dem',
@@ -146,13 +145,15 @@ export class MapLibreWeatherMap {
       },
       layers: [
         {
-          id: 'carto-dark-tiles',
+          id: 'dark-matter-tiles',
           type: 'raster',
-          source: 'carto-dark',
+          source: 'osm-dark',
           paint: {
-            'raster-opacity': 0.95,
-            'raster-contrast': 0.15,
-            'raster-brightness-min': 0.05
+            'raster-saturation': -0.92,
+            'raster-contrast': 0.28,
+            'raster-brightness-max': 0.28,
+            'raster-brightness-min': 0.03,
+            'raster-opacity': 0.98
           }
         },
         {
@@ -160,10 +161,10 @@ export class MapLibreWeatherMap {
           type: 'hillshade',
           source: 'terrain-dem',
           paint: {
-            'hillshade-exaggeration': 0.85,
-            'hillshade-shadow-color': '#030712',
+            'hillshade-exaggeration': 0.88,
+            'hillshade-shadow-color': '#020617',
             'hillshade-highlight-color': '#38bdf8',
-            'hillshade-accent-color': '#1e293b'
+            'hillshade-accent-color': '#0f172a'
           }
         }
       ]
