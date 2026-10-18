@@ -261,6 +261,169 @@
 
         </section>
 
+        <!-- =================================================================== -->
+        <!-- MULTI-MODELL-ENSEMBLE: ECMWF IFS (0.25°) VS. GFS SEAMLESS (NOAA) -->
+        <!-- =================================================================== -->
+        <section class="glass-card multi-model-card" id="multi-model-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">🌐</span>
+              <span>ENSEMBLE-PROGNOSE: ECMWF IFS (0.25°) VS. GFS SEAMLESS</span>
+            </div>
+            <div class="model-consensus-badge" id="model-consensus-badge">
+              <span class="mcb-icon">🎯</span>
+              <span class="mcb-text" id="model-consensus-text">Modell-Konsens wird berechnet...</span>
+            </div>
+          </div>
+
+          <div class="model-comparison-grid">
+            <!-- ECMWF IFS Card -->
+            <div class="model-tier-card ecmwf-tier">
+              <div class="model-tier-header">
+                <span class="model-badge ecmwf-badge">🇪🇺 ECMWF IFS 0.25°</span>
+                <span class="model-origin">Reading, UK (Global #1)</span>
+              </div>
+              <div class="model-tier-body">
+                <div class="model-stat-row">
+                  <span class="ms-label">Temperatur:</span>
+                  <span class="ms-val text-green" id="ecmwf-temp-val">--°C</span>
+                </div>
+                <div class="model-stat-row">
+                  <span class="ms-label">24h Niederschlag:</span>
+                  <span class="ms-val text-cyan" id="ecmwf-precip-val">-- mm</span>
+                </div>
+                <div class="model-stat-row">
+                  <span class="ms-label">Spitzenwind:</span>
+                  <span class="ms-val text-yellow" id="ecmwf-wind-val">-- km/h</span>
+                </div>
+              </div>
+              <div class="model-tier-footer">
+                <span>Europäisches Leitmodell mit 0.25° Gitterauflösung</span>
+              </div>
+            </div>
+
+            <!-- GFS Seamless Card -->
+            <div class="model-tier-card gfs-tier">
+              <div class="model-tier-header">
+                <span class="model-badge gfs-badge">🇺🇸 GFS Seamless</span>
+                <span class="model-origin">NOAA / NCEP (USA)</span>
+              </div>
+              <div class="model-tier-body">
+                <div class="model-stat-row">
+                  <span class="ms-label">Temperatur:</span>
+                  <span class="ms-val text-green" id="gfs-temp-val">--°C</span>
+                </div>
+                <div class="model-stat-row">
+                  <span class="ms-label">24h Niederschlag:</span>
+                  <span class="ms-val text-cyan" id="gfs-precip-val">-- mm</span>
+                </div>
+                <div class="model-stat-row">
+                  <span class="ms-label">Spitzenwind:</span>
+                  <span class="ms-val text-yellow" id="gfs-wind-val">-- km/h</span>
+                </div>
+              </div>
+              <div class="model-tier-footer">
+                <span>US-Globalsystem für großräumige Druckgradienten</span>
+              </div>
+            </div>
+
+            <!-- Consensus & Delta Box -->
+            <div class="model-tier-card consensus-tier">
+              <div class="model-tier-header">
+                <span class="model-badge delta-badge">⚖️ Ensemble-Sicherheit</span>
+                <span class="model-origin" id="model-confidence-pct">--% Konfidenz</span>
+              </div>
+              <div class="model-tier-body">
+                <div class="model-stat-row">
+                  <span class="ms-label">Temperatur-Delta:</span>
+                  <span class="ms-val text-accent" id="model-delta-temp">Δ --°C</span>
+                </div>
+                <div class="model-stat-row">
+                  <span class="ms-label">Niederschlags-Delta:</span>
+                  <span class="ms-val" id="model-delta-precip">Δ -- mm</span>
+                </div>
+                <div class="model-stat-row">
+                  <span class="ms-label">Vorhersagestabilität:</span>
+                  <span class="ms-val text-green" id="model-stability-val">Sehr stabil</span>
+                </div>
+              </div>
+              <div class="model-tier-footer">
+                <span id="model-verdict-text">Vergleiche Berechnungen beider Modelle...</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- LUFTQUALITÄT & ALPINE UV-EXPOSITION (CAMS & COPERNICUS ATMOSPHERE) -->
+        <!-- =================================================================== -->
+        <section class="glass-card air-quality-card" id="air-quality-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">🌿</span>
+              <span>LUFTQUALITÄT & ALPINE UV-EXPOSITION</span>
+            </div>
+            <div class="aqi-badge" id="aqi-badge">
+              <span class="aqi-dot" id="aqi-dot"></span>
+              <span class="aqi-title" id="aqi-category-title">Sehr gut (AQI 1)</span>
+            </div>
+          </div>
+
+          <div class="air-quality-grid">
+            <!-- UV Index Box -->
+            <div class="aq-item uv-box">
+              <div class="aq-item-header">
+                <span class="aq-icon">☀️</span>
+                <span class="aq-label">UV-Index & Bergsonne</span>
+              </div>
+              <div class="aq-main-row">
+                <div class="aq-val text-yellow" id="aq-uv-val">--</div>
+                <div class="aq-sub-col">
+                  <div class="aq-clear-uv">Clear-Sky Max: <strong id="aq-uv-clearsky">--</strong></div>
+                  <div class="aq-boost-tag" id="aq-uv-boost-tag">Höhenatmosphäre (+--%)</div>
+                </div>
+              </div>
+              <div class="aq-hint" id="aq-uv-protection">Eigenschutzzeit ungeschützt: <strong>--</strong></div>
+            </div>
+
+            <!-- PM2.5 Feinstaub -->
+            <div class="aq-item">
+              <div class="aq-item-header">
+                <span class="aq-icon">🌫️</span>
+                <span class="aq-label">Feinstaub PM2.5</span>
+              </div>
+              <div class="aq-main-row">
+                <div class="aq-val" id="aq-pm25-val">-- <small>µg/m³</small></div>
+              </div>
+              <div class="aq-hint" id="aq-pm25-hint">WHO-Grenzwert: 15 µg/m³</div>
+            </div>
+
+            <!-- PM10 Feinstaub -->
+            <div class="aq-item">
+              <div class="aq-item-header">
+                <span class="aq-icon">💨</span>
+                <span class="aq-label">Feinstaub PM10</span>
+              </div>
+              <div class="aq-main-row">
+                <div class="aq-val" id="aq-pm10-val">-- <small>µg/m³</small></div>
+              </div>
+              <div class="aq-hint" id="aq-pm10-hint">WHO-Grenzwert: 45 µg/m³</div>
+            </div>
+
+            <!-- Ozon O3 -->
+            <div class="aq-item">
+              <div class="aq-item-header">
+                <span class="aq-icon">🛡️</span>
+                <span class="aq-label">Bodennahes Ozon (O₃)</span>
+              </div>
+              <div class="aq-main-row">
+                <div class="aq-val" id="aq-ozone-val">-- <small>µg/m³</small></div>
+              </div>
+              <div class="aq-hint" id="aq-ozone-hint">Reizgas-Richtwert: 120 µg/m³</div>
+            </div>
+          </div>
+        </section>
+
       </div>
 
       <!-- =================================================================== -->
@@ -501,6 +664,8 @@
                 <span class="mtg-label">🌦️ WETTER-EBENEN:</span>
                 <div class="map-btn-pills">
                   <button class="map-overlay-btn active" data-overlay="precip" title="Niederschlags-Radar mit Regen & Schnee-Unterscheidung">🌧️❄️ Regen & Schnee</button>
+                  <button class="map-overlay-btn" data-overlay="rainviewer-radar" title="RainViewer HD Niederschlagsradar (Live Scan + Nowcast)">📡 RainViewer Radar</button>
+                  <button class="map-overlay-btn" data-overlay="rainviewer-sat" title="RainViewer Infrarot Satellitenfilm (Wolken)">🛰️ RainViewer Satellit</button>
                   <button class="map-overlay-btn" data-overlay="wind" title="Windströmung, Vektoren & Böen">💨 Wind & Strömung</button>
                   <button class="map-overlay-btn" data-overlay="clouds" title="Bewölkungsgrad & Wolkenbedeckung">☁️ Bewölkungsgrad</button>
                   <button class="map-overlay-btn" data-overlay="temp" title="Temperatur-Feld & Frostgrenze">🌡️ Temperatur</button>

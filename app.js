@@ -19,6 +19,8 @@ const state = {
   },
   weatherData: null,
   microData: null,
+  multiModel: null,
+  airQuality: null,
   unit: 'celsius',
   activeTab: 'tab-overview',
   activeAspect: { tilt: 45, azimuth: 0, isAuto: false },
@@ -357,21 +359,29 @@ async function loadLocation(loc) {
     const customTilt = state.activeAspect.isAuto ? null : state.activeAspect.tilt;
     const customAzimuth = state.activeAspect.isAuto ? null : state.activeAspect.azimuth;
 
-    // Call MicroEngine preserving the official elevation as reference ground truth!
-    const microResult = await MicroEngine.getMicroScaleWeather(
-      loc.lat,
-      loc.lon,
-      loc.elevation, // Exact official elevation preserved!
-      loc.isMountain,
-      customTilt,
-      customAzimuth
-    );
+    // Call MicroEngine, Multi-Model Ensemble, and Air Quality APIs in parallel
+    const [microResult, multiModel, airQuality] = await Promise.all([
+      MicroEngine.getMicroScaleWeather(
+        loc.lat,
+        loc.lon,
+        loc.elevation, // Exact official elevation preserved!
+        loc.isMountain,
+        customTilt,
+        customAzimuth
+      ),
+      MicroEngine.fetchMultiModelComparison(loc.lat, loc.lon),
+      MicroEngine.fetchAirQualityAndUV(loc.lat, loc.lon, loc.elevation)
+    ]);
 
     state.microData = microResult;
     state.weatherData = microResult.weatherRaw;
+    state.multiModel = multiModel;
+    state.airQuality = airQuality;
 
     // Render all UI components
     renderOverviewTab();
+    renderMultiModelComparison();
+    renderAirQualityAndUV();
     renderAdaptiveTab2();
     renderFavoritesTab();
     updateMapLocation();
@@ -701,6 +711,105 @@ function render10DayForecast(daily, hourly) {
 
     container.appendChild(wrapper);
   }
+}
+
+// =============================================================================
+// MULTI-MODELL-ENSEMBLE (ECMWF IFS 0.25° VS. GFS SEAMLESS)
+// =============================================================================
+function renderMultiModelComparison() {
+  const mm = state.multiModel;
+  if (!mm) return;
+
+  const consensusText = document.getElementById('model-consensus-text');
+  if (consensusText) consensusText.innerText = `${mm.consensusText} (${mm.consensusScore}%)`;
+
+  const ecTemp = document.getElementById('ecmwf-temp-val');
+  const ecPrecip = document.getElementById('ecmwf-precip-val');
+  const ecWind = document.getElementById('ecmwf-wind-val');
+  if (ecTemp && mm.ecmwf.currentTemp !== null) {
+    const t = Math.round(convertTemp(mm.ecmwf.currentTemp));
+    ecTemp.innerText = `${t > 0 ? '+' : ''}${t}°C`;
+  }
+  if (ecPrecip) ecPrecip.innerText = `${mm.ecmwf.precip24h} mm`;
+  if (ecWind) ecWind.innerText = `${mm.ecmwf.maxWind24h} km/h`;
+
+  const gfsTemp = document.getElementById('gfs-temp-val');
+  const gfsPrecip = document.getElementById('gfs-precip-val');
+  const gfsWind = document.getElementById('gfs-wind-val');
+  if (gfsTemp && mm.gfs.currentTemp !== null) {
+    const t = Math.round(convertTemp(mm.gfs.currentTemp));
+    gfsTemp.innerText = `${t > 0 ? '+' : ''}${t}°C`;
+  }
+  if (gfsPrecip) gfsPrecip.innerText = `${mm.gfs.precip24h} mm`;
+  if (gfsWind) gfsWind.innerText = `${mm.gfs.maxWind24h} km/h`;
+
+  const deltaTemp = document.getElementById('model-delta-temp');
+  const deltaPrecip = document.getElementById('model-delta-precip');
+  const confidencePct = document.getElementById('model-confidence-pct');
+  const stabilityVal = document.getElementById('model-stability-val');
+  const verdictText = document.getElementById('model-verdict-text');
+
+  if (mm.ecmwf.currentTemp !== null && mm.gfs.currentTemp !== null) {
+    const dTemp = Math.abs(mm.ecmwf.currentTemp - mm.gfs.currentTemp);
+    if (deltaTemp) deltaTemp.innerText = `Δ ${dTemp.toFixed(1)} °C`;
+  }
+  const dPrecip = Math.abs(mm.ecmwf.precip24h - mm.gfs.precip24h);
+  if (deltaPrecip) deltaPrecip.innerText = `Δ ${dPrecip.toFixed(1)} mm`;
+
+  if (confidencePct) confidencePct.innerText = `${mm.consensusScore}% Konfidenz`;
+  if (stabilityVal) {
+    stabilityVal.innerText = mm.consensusScore >= 85 ? 'Sehr stabil (Hohe Sicherheit)' : mm.consensusScore >= 70 ? 'Stabil (Geringe Abweichung)' : 'Volatil (Diskrepanz vorhanden)';
+    stabilityVal.style.color = mm.consensusScore >= 80 ? '#30d158' : mm.consensusScore >= 65 ? '#ffd166' : '#ff9f0a';
+  }
+
+  if (verdictText) {
+    if (mm.consensusScore >= 85) {
+      verdictText.innerText = 'ECMWF IFS und GFS prognostizieren ein nahezu identisches Wetterfenster.';
+    } else if (dPrecip > 3) {
+      verdictText.innerText = `Niederschlags-Diskrepanz: ${mm.ecmwf.precip24h > mm.gfs.precip24h ? 'ECMWF berechnet stärkere Schauer' : 'GFS berechnet höhere Niederschlagsmengen'}.`;
+    } else {
+      verdictText.innerText = 'Leichte Differenzen bei Temperaturverlauf oder Windspitzen.';
+    }
+  }
+}
+
+// =============================================================================
+// LUFTQUALITÄT & ALPINE UV-EXPOSITION (CAMS & COPERNICUS)
+// =============================================================================
+function renderAirQualityAndUV() {
+  const aq = state.airQuality;
+  if (!aq) return;
+
+  const catTitle = document.getElementById('aqi-category-title');
+  const dot = document.getElementById('aqi-dot');
+  if (catTitle) catTitle.innerText = `${aq.aqi.category} (AQI ${aq.aqi.index})`;
+  if (dot) dot.style.background = aq.aqi.color;
+
+  const uvVal = document.getElementById('aq-uv-val');
+  const uvClear = document.getElementById('aq-uv-clearsky');
+  const uvBoost = document.getElementById('aq-uv-boost-tag');
+  const uvProt = document.getElementById('aq-uv-protection');
+
+  if (uvVal) uvVal.innerText = aq.uv.current.toFixed(1);
+  if (uvClear) uvClear.innerText = `UV ${aq.uv.clearSky.toFixed(1)}`;
+  if (uvBoost) {
+    if (aq.uv.isHighAltitudeBoost) {
+      uvBoost.innerText = `🏔️ Höhenstrahlung: +${aq.uv.boostPercent}% UV`;
+      uvBoost.style.display = 'inline-block';
+    } else {
+      uvBoost.innerText = 'Bodennahe Troposphäre';
+      uvBoost.style.display = 'inline-block';
+    }
+  }
+  if (uvProt) uvProt.innerHTML = `Eigenschutzzeit ungeschützt: <strong>${aq.uv.protectionMinutes}</strong>`;
+
+  const pm25 = document.getElementById('aq-pm25-val');
+  const pm10 = document.getElementById('aq-pm10-val');
+  const ozone = document.getElementById('aq-ozone-val');
+
+  if (pm25) pm25.innerHTML = `${aq.pollutants.pm25} <small>µg/m³</small>`;
+  if (pm10) pm10.innerHTML = `${aq.pollutants.pm10} <small>µg/m³</small>`;
+  if (ozone) ozone.innerHTML = `${aq.pollutants.ozone} <small>µg/m³</small>`;
 }
 
 /**
@@ -1725,17 +1834,15 @@ async function updateWeatherOverlay() {
   const legendBar = document.getElementById('map-legend-bar');
   const legendLabels = document.getElementById('map-legend-labels');
 
-  // 1. NIEDERSCHLAG & SCHNEE (Unterscheidung nach Temperatur)
-  if (overlay === 'precip') {
+  // 1. NIEDERSCHLAG & SCHNEE / RAINVIEWER LIVE RADAR
+  if (overlay === 'precip' || overlay === 'rainviewer-radar') {
     stopWindCanvas();
     if (radarControls) radarControls.style.display = 'flex';
-    if (state.map.radarFrames && state.map.radarFrames.length && state.map.radarTileLayer) {
-      if (!state.map.instance.hasLayer(state.map.radarTileLayer)) {
-        state.map.instance.addLayer(state.map.radarTileLayer);
-      }
+    if (state.map.radarFrames && state.map.radarFrames.length) {
+      showRadarTileFrame(state.map.radarIndex);
     }
 
-    if (legendTitle) legendTitle.innerText = '🌧️ Regen & ❄️ Schnee (Typ-Erkennung):';
+    if (legendTitle) legendTitle.innerText = '📡 RainViewer HD Niederschlagsradar (Regen & Schnee):';
     if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #0099ff, #00e600, #ffcc00, #ff3300, #d946ef, #ffffff)';
     if (legendLabels) {
       legendLabels.innerHTML = `
@@ -1767,6 +1874,23 @@ async function updateWeatherOverlay() {
       const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [45, 12] });
       const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
       m.on('click', () => selectExactLocation(st));
+    }
+  }
+
+  // 1b. RAINVIEWER INFRAROT SATELLITEN-FILM
+  else if (overlay === 'rainviewer-sat') {
+    stopWindCanvas();
+    if (radarControls) radarControls.style.display = 'flex';
+    showRadarTileFrame(state.map.radarIndex);
+
+    if (legendTitle) legendTitle.innerText = '🛰️ RainViewer Infrarot Satellitenfilm (Wolken & Konvektion):';
+    if (legendBar) legendBar.style.background = 'linear-gradient(90deg, #1e293b, #475569, #94a3b8, #ffffff, #64d2ff)';
+    if (legendLabels) {
+      legendLabels.innerHTML = `
+        <span style="color:#94a3b8;">Wolkenlos / Warm</span>
+        <span style="color:#ffffff;">Dichte Bewölkung</span>
+        <span style="color:#64d2ff;">Hohe Eiswolken / Cb</span>
+      `;
     }
   }
 
@@ -2032,12 +2156,13 @@ async function loadRainViewerRadar() {
     const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
     const data = await res.json();
     state.map.radarFrames = [...(data.radar.past || []), ...(data.radar.nowcast || [])];
+    state.map.satFrames = (data.satellite && data.satellite.infrared) ? data.satellite.infrared : [];
     state.map.radarHost = data.host;
 
     const slider = document.getElementById('radar-time-slider');
     if (slider) {
-      slider.max = state.map.radarFrames.length - 1;
-      slider.value = (data.radar.past || []).length - 1;
+      slider.max = Math.max(0, state.map.radarFrames.length - 1);
+      slider.value = (data.radar.past || []).length > 0 ? (data.radar.past.length - 1) : 0;
       state.map.radarIndex = parseInt(slider.value);
 
       showRadarTileFrame(state.map.radarIndex);
@@ -2056,7 +2181,11 @@ async function loadRainViewerRadar() {
 }
 
 function showRadarTileFrame(idx) {
-  const frames = state.map.radarFrames;
+  const isSat = state.map.activeOverlay === 'rainviewer-sat';
+  const frames = (isSat && state.map.satFrames && state.map.satFrames.length > 0)
+    ? state.map.satFrames
+    : state.map.radarFrames;
+
   if (!frames || !frames[idx]) return;
 
   state.map.radarIndex = idx;
@@ -2067,17 +2196,32 @@ function showRadarTileFrame(idx) {
   }
 
   // Palette 8 = Differenzierung von Regen (Blau/Grün) und Schnee (Cyan/Magenta/Weiß)
-  const url = `${state.map.radarHost}${frame.path}/256/{z}/{x}/{y}/8/1_1.png`;
+  // Palette 0 = Infrarot für Satellit
+  const colorScheme = isSat ? 0 : 8;
+  const url = `${state.map.radarHost}${frame.path}/256/{z}/{x}/{y}/${colorScheme}/1_1.png`;
   state.map.radarTileLayer = L.tileLayer(url, {
-    opacity: 0.78,
+    opacity: isSat ? 0.65 : 0.78,
     zIndex: 200,
     maxNativeZoom: 18,
     maxZoom: 20
   }).addTo(state.map.instance);
 
   const t = new Date(frame.time * 1000);
+  const diffMinutes = Math.round((Date.now() - t.getTime()) / 60000);
+  let relLabel = '';
+  if (Math.abs(diffMinutes) <= 3) {
+    relLabel = '🔴 Live-Scan';
+  } else if (diffMinutes > 0) {
+    relLabel = `Vor ${diffMinutes} Min.`;
+  } else {
+    relLabel = `+${Math.abs(diffMinutes)} Min. (Nowcast)`;
+  }
+
   const timeDisplay = document.getElementById('radar-time-display');
-  if (timeDisplay) timeDisplay.innerText = `${t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Radarscan`;
+  if (timeDisplay) {
+    const scanType = isSat ? 'Infrarot-Satellitenfilm' : 'Radarscan';
+    timeDisplay.innerText = `${t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr (${relLabel}) • ${scanType}`;
+  }
   const slider = document.getElementById('radar-time-slider');
   if (slider) slider.value = idx;
 }

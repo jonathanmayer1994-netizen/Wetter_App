@@ -500,6 +500,172 @@ export const MicroEngine = {
     return hourlyProfiles;
   },
 
+  /**
+   * STUFE 5: Multi-Modell-Vergleich (ECMWF IFS 0.25° vs. GFS Seamless)
+   * Ermöglicht hochpräzise Ensemble-Analysen und Konsens-Bewertungen
+   */
+  async fetchMultiModelComparison(lat, lon) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,precipitation,wind_speed_10m&models=ecmwf_ifs025,gfs_seamless`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Multi-Modell HTTP-Fehler: ${res.status}`);
+      const data = await res.json();
+      const h = data.hourly;
+      if (!h || !h.time) return null;
+
+      // Finde aktuellen Zeitstempel
+      const nowMs = Date.now();
+      let idx = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i < Math.min(36, h.time.length); i++) {
+        const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          idx = i;
+        }
+      }
+
+      // 24h Summen & Schnitte
+      const next24 = Math.min(24, h.time.length - idx);
+      let ecmwfPrecipSum = 0;
+      let gfsPrecipSum = 0;
+      let ecmwfMaxWind = 0;
+      let gfsMaxWind = 0;
+
+      for (let j = 0; j < next24; j++) {
+        const i = idx + j;
+        ecmwfPrecipSum += h.precipitation_ecmwf_ifs025 ? (h.precipitation_ecmwf_ifs025[i] || 0) : 0;
+        gfsPrecipSum += h.precipitation_gfs_seamless ? (h.precipitation_gfs_seamless[i] || 0) : 0;
+
+        const eW = h.wind_speed_10m_ecmwf_ifs025 ? (h.wind_speed_10m_ecmwf_ifs025[i] || 0) : 0;
+        const gW = h.wind_speed_10m_gfs_seamless ? (h.wind_speed_10m_gfs_seamless[i] || 0) : 0;
+        if (eW > ecmwfMaxWind) ecmwfMaxWind = eW;
+        if (gW > gfsMaxWind) gfsMaxWind = gW;
+      }
+
+      const ecmwfTemp = h.temperature_2m_ecmwf_ifs025 ? h.temperature_2m_ecmwf_ifs025[idx] : null;
+      const gfsTemp = h.temperature_2m_gfs_seamless ? h.temperature_2m_gfs_seamless[idx] : null;
+
+      // Modell-Konsens / Unsicherheit (50 bis 99%)
+      const tempDiff = Math.abs((ecmwfTemp !== null ? ecmwfTemp : 0) - (gfsTemp !== null ? gfsTemp : 0));
+      const precipDiff = Math.abs(ecmwfPrecipSum - gfsPrecipSum);
+      const consensus = Math.max(50, Math.min(99, Math.round(100 - (tempDiff * 8 + precipDiff * 4))));
+
+      return {
+        timestamp: h.time[idx],
+        consensusScore: consensus,
+        consensusText: consensus >= 88 ? 'Sehr hohe Modell-Einigkeit' : consensus >= 75 ? 'Gute Modell-Übereinstimmung' : 'Erhöhte Modell-Diskrepanz',
+        ecmwf: {
+          name: 'ECMWF IFS 0.25°',
+          origin: 'Europäisches Zentrum für mittelfristige Wettervorhersage (Reading)',
+          currentTemp: ecmwfTemp !== null ? Math.round(ecmwfTemp * 10) / 10 : null,
+          precip24h: Math.round(ecmwfPrecipSum * 10) / 10,
+          maxWind24h: Math.round(ecmwfMaxWind),
+          hourlyTemp: (h.temperature_2m_ecmwf_ifs025 || []).slice(idx, idx + 24),
+          hourlyPrecip: (h.precipitation_ecmwf_ifs025 || []).slice(idx, idx + 24),
+          hourlyWind: (h.wind_speed_10m_ecmwf_ifs025 || []).slice(idx, idx + 24)
+        },
+        gfs: {
+          name: 'GFS Seamless',
+          origin: 'US National Oceanic & Atmospheric Administration (NOAA)',
+          currentTemp: gfsTemp !== null ? Math.round(gfsTemp * 10) / 10 : null,
+          precip24h: Math.round(gfsPrecipSum * 10) / 10,
+          maxWind24h: Math.round(gfsMaxWind),
+          hourlyTemp: (h.temperature_2m_gfs_seamless || []).slice(idx, idx + 24),
+          hourlyPrecip: (h.precipitation_gfs_seamless || []).slice(idx, idx + 24),
+          hourlyWind: (h.wind_speed_10m_gfs_seamless || []).slice(idx, idx + 24)
+        }
+      };
+    } catch (err) {
+      console.warn('Multi-Modell API nicht verfügbar:', err);
+      return null;
+    }
+  },
+
+  /**
+   * STUFE 6: Alpine Luftqualität & UV-Exposition (CAMS / Open-Meteo Air Quality)
+   */
+  async fetchAirQualityAndUV(lat, lon, elevation = 500) {
+    try {
+      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=uv_index,uv_index_clear_sky,pm10,pm2_5,ozone`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Air Quality HTTP-Fehler: ${res.status}`);
+      const data = await res.json();
+      const h = data.hourly;
+      if (!h || !h.time) return null;
+
+      const nowMs = Date.now();
+      let idx = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i < Math.min(36, h.time.length); i++) {
+        const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          idx = i;
+        }
+      }
+
+      const uv = h.uv_index ? (h.uv_index[idx] || 0) : 0;
+      const uvClear = h.uv_index_clear_sky ? (h.uv_index_clear_sky[idx] || uv) : uv;
+      const pm10 = h.pm10 ? (h.pm10[idx] || 0) : 0;
+      const pm25 = h.pm2_5 ? (h.pm2_5[idx] || 0) : 0;
+      const ozone = h.ozone ? (h.ozone[idx] || 0) : 0;
+
+      // Eigenschutzzeit der Haut in Minuten (Hauttyp II)
+      let protectionMinutes = '> 60 Min.';
+      if (uv >= 8) protectionMinutes = '10–15 Min. (Sehr hoch)';
+      else if (uv >= 6) protectionMinutes = '20–25 Min. (Hoch)';
+      else if (uv >= 3) protectionMinutes = '30–45 Min. (Mittel)';
+      else if (uv < 1) protectionMinutes = 'Keine Gefährdung (Niedrig)';
+
+      // Europäischer AQI (Air Quality Index nach CAMS / EEA)
+      let aqiCategory = 'Sehr gut';
+      let aqiColor = '#30d158';
+      let aqiIndex = 1;
+      if (pm25 > 50 || pm10 > 90 || ozone > 180) {
+        aqiCategory = 'Sehr ungesund';
+        aqiColor = '#ff453a';
+        aqiIndex = 5;
+      } else if (pm25 > 25 || pm10 > 50 || ozone > 130) {
+        aqiCategory = 'Ungesund für Sensible';
+        aqiColor = '#ff9f0a';
+        aqiIndex = 4;
+      } else if (pm25 > 15 || pm10 > 30 || ozone > 90) {
+        aqiCategory = 'Mäßig belastet';
+        aqiColor = '#ffd166';
+        aqiIndex = 3;
+      } else if (pm25 > 10 || pm10 > 20 || ozone > 60) {
+        aqiCategory = 'Gut / Rein';
+        aqiColor = '#64d2ff';
+        aqiIndex = 2;
+      }
+
+      return {
+        timestamp: h.time[idx],
+        aqi: {
+          category: aqiCategory,
+          color: aqiColor,
+          index: aqiIndex
+        },
+        uv: {
+          current: Math.round(uv * 10) / 10,
+          clearSky: Math.round(uvClear * 10) / 10,
+          protectionMinutes: protectionMinutes,
+          isHighAltitudeBoost: elevation > 1800,
+          boostPercent: elevation > 1000 ? Math.round(((elevation - 1000) / 1000) * 12) : 0
+        },
+        pollutants: {
+          pm25: Math.round(pm25 * 10) / 10,
+          pm10: Math.round(pm10 * 10) / 10,
+          ozone: Math.round(ozone * 10) / 10
+        }
+      };
+    } catch (err) {
+      console.warn('Luftqualitäts-API nicht verfügbar:', err);
+      return null;
+    }
+  },
+
   interpolateWindDirection(dir1, dir2, weight) {
     const rad1 = (dir1 * Math.PI) / 180;
     const rad2 = (dir2 * Math.PI) / 180;
