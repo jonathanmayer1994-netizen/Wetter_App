@@ -129,43 +129,134 @@
           </div>
         </section>
 
-        <!-- HIGH-PRECISION CARD: 90m DEM & Mikroklima-Downscaling -->
-        <section class="glass-card microclimate-card" id="microclimate-card">
+        <!-- 10-METER MIKRO-TOPOGRAFIE ENGINE -->
+        <section class="glass-card micro-engine-card" id="microclimate-card">
           <div class="card-header">
             <div class="card-title">
-              <span class="card-icon">📐</span>
-              <span>MIKROKLIMA & DEM-DOWNSCALING</span>
+              <span class="card-icon">⚡</span>
+              <span>10-METER MIKRO-TOPOGRAFIE ENGINE</span>
             </div>
-            <span class="card-tag">Copernicus 90m + CFD</span>
+            <span class="card-tag engine-badge">10m DEM + CFD</span>
           </div>
-          
-          <div class="microclimate-grid">
-            <div class="micro-item">
-              <div class="micro-label">Geländehöhe (DEM)</div>
-              <div class="micro-val" id="micro-elevation">-- m</div>
-              <div class="micro-sub" id="micro-elevation-sub">NASA/Copernicus 90m</div>
-            </div>
 
-            <div class="micro-item">
-              <div class="micro-label">0°C Schneefallgrenze</div>
-              <div class="micro-val" id="micro-freezing-level">-- m</div>
-              <div class="micro-sub" id="micro-freezing-sub">--</div>
+          <!-- Feature 1: Dynamischer Vertikaler Temperaturgradient & Inversion -->
+          <div class="engine-subcard">
+            <div class="subcard-header">
+              <span class="subcard-title">1. Vertikaler Gradient & Inversion</span>
+              <span class="subcard-tag" id="inversion-status-tag">🟢 Normaler Gradient</span>
             </div>
-
-            <div class="micro-item">
-              <div class="micro-label">Taupunkt & Sättigung</div>
-              <div class="micro-val" id="micro-dew-point">--°C</div>
-              <div class="micro-sub" id="micro-dew-sub">Kondensationsrisiko: --</div>
-            </div>
-
-            <div class="micro-item">
-              <div class="micro-label">Topographischer Wind-Effekt</div>
-              <div class="micro-val" id="micro-wind-effect">--</div>
-              <div class="micro-sub" id="micro-wind-sub">Venturi & Hang-Downscaling</div>
+            <div class="gradient-formula-box">
+              <div class="formula-line">
+                $$\Gamma = \frac{T_{600\text{hPa}} - T_{700\text{hPa}}}{z_{600\text{hPa}} - z_{700\text{hPa}}} = \mathbf{\text{-- °C / 100m}}$$
+              </div>
+              <div class="gradient-details-row">
+                <div class="grad-col">
+                  <span class="grad-label">10m-Interpolierte Temp:</span>
+                  <span class="grad-val" id="grad-temp-val">--°C</span>
+                </div>
+                <div class="grad-col">
+                  <span class="grad-label">Atmosphären-Zustand:</span>
+                  <span class="grad-val text-accent" id="inversion-text">Berechne Druckschichten...</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Elevation vs Freezing Level Visual Gauge -->
+          <!-- Feature 2: Nordwand vs. Südhang (10-Meter Sonneneinstrahlung via Tilt & Azimuth) -->
+          <div class="engine-subcard">
+            <div class="subcard-header">
+              <span class="subcard-title">2. Nordwand vs. Südhang (Tilt & Azimuth)</span>
+              <span class="subcard-tag diff-tag" id="aspect-diff-badge">ΔT: --°C Unterschied</span>
+            </div>
+            <div class="aspect-comparison-grid">
+              <!-- Südhang Box -->
+              <div class="aspect-box south-box">
+                <div class="aspect-head">
+                  <span class="aspect-icon">☀️</span>
+                  <span class="aspect-name">Südhang (45° Tilt)</span>
+                </div>
+                <div class="aspect-temp" id="south-felt-temp">--°C</div>
+                <div class="aspect-sub">Gefühlte Temperatur</div>
+                <div class="aspect-metric" id="south-irradiance">-- W/m² (GTI)</div>
+              </div>
+
+              <!-- Nordwand Box -->
+              <div class="aspect-box north-box">
+                <div class="aspect-head">
+                  <span class="aspect-icon">❄️</span>
+                  <span class="aspect-name">Nordwand (75° Steil)</span>
+                </div>
+                <div class="aspect-temp" id="north-felt-temp">--°C</div>
+                <div class="aspect-sub">Gefühlte Temperatur</div>
+                <div class="aspect-metric" id="north-irradiance">-- W/m² (Diffus)</div>
+              </div>
+            </div>
+            <div class="micro-note">
+              <span>💡 Auf 30 m Distanz entscheidet die Hangexposition über Sonne (+Strahlungswärme) oder eisigen Kaltluft-Schatten.</span>
+            </div>
+          </div>
+
+          <!-- Feature 3: Wind-Beschleunigung am Grat (30m Venturi & Lee-Effekt) -->
+          <div class="engine-subcard">
+            <div class="subcard-header">
+              <span class="subcard-title">3. 30m Venturi-Grat & Lee-Effekt (TPI)</span>
+              <span class="subcard-tag" id="tpi-badge">TPI: -- m</span>
+            </div>
+            <div class="venturi-grid">
+              <div class="venturi-item">
+                <span class="venturi-label">Gelände-Klassifikation:</span>
+                <span class="venturi-val" id="venturi-class">Topographie analysieren...</span>
+              </div>
+              <div class="venturi-item">
+                <span class="venturi-label">Venturi-Faktor (Grat):</span>
+                <span class="venturi-val text-cyan" id="venturi-factor">--</span>
+              </div>
+              <div class="venturi-item">
+                <span class="venturi-label">Effektiver Gratwind:</span>
+                <span class="venturi-val text-red" id="venturi-effective-wind">-- km/h</span>
+              </div>
+              <div class="venturi-item">
+                <span class="venturi-label">Kamm-Böenpotenzial:</span>
+                <span class="venturi-val" id="venturi-gusts">bis -- km/h</span>
+              </div>
+            </div>
+            <div class="venturi-warning-bar" id="venturi-warning-bar">
+              Windexposition wird berechnet...
+            </div>
+          </div>
+
+          <!-- Feature 4: Bergschatten auf die Minute genau (Horizon Raycasting) -->
+          <div class="engine-subcard">
+            <div class="subcard-header">
+              <span class="subcard-title">4. Bergschatten (Horizon Raycasting)</span>
+              <span class="subcard-tag" id="shadow-status-tag">Raycasting...</span>
+            </div>
+            <div class="shadow-info-box">
+              <div class="shadow-status-row">
+                <span class="shadow-icon" id="shadow-icon">☀️</span>
+                <div class="shadow-texts">
+                  <div class="shadow-main" id="shadow-status-text">Raycasting Geländekacheln...</div>
+                  <div class="shadow-sub" id="shadow-detail-text">Sonnenhöhe vs. Nachbarberg-Hinderniswinkel</div>
+                </div>
+              </div>
+              <div class="shadow-metrics-row">
+                <div class="shadow-metric">
+                  <span class="sm-label">Sonnenwinkel:</span>
+                  <span class="sm-val" id="sun-elevation-val">--°</span>
+                </div>
+                <div class="shadow-metric">
+                  <span class="sm-label">Berg-Horizont:</span>
+                  <span class="sm-val" id="obstacle-angle-val">--°</span>
+                </div>
+                <div class="shadow-metric">
+                  <span class="sm-label">Temp-Sturz im Schatten:</span>
+                  <span class="sm-val text-red" id="shadow-temp-drop">--°C</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Elevation & Schneefallgrenze Visual Gauge -->
           <div class="elevation-visual-wrapper">
             <div class="elevation-bar-track">
               <div class="elevation-indicator current-marker" id="marker-current" style="left: 20%;">
@@ -413,7 +504,7 @@
   <!-- Leaflet JS for RainViewer Live Radar -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
-  <!-- App Core Logic -->
-  <script src="app.js"></script>
+  <!-- App Core Logic (ES Module) -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>

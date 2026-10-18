@@ -631,46 +631,295 @@ html, body {
 }
 
 /* ==========================================================================
-   MICROCLIMATE & DEM-DOWNSCALING CARD
+   10-METER MIKRO-TOPOGRAFIE ENGINE
    ========================================================================== */
-.microclimate-card {
-  border: 1px solid rgba(100, 210, 255, 0.35);
-  box-shadow: 0 8px 32px rgba(0, 110, 255, 0.15), var(--glass-inner-shadow);
+.micro-engine-card {
+  border: 1px solid rgba(100, 210, 255, 0.4);
+  box-shadow: 0 10px 36px rgba(0, 110, 255, 0.2), var(--glass-inner-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.microclimate-grid {
+.engine-badge {
+  background: linear-gradient(135deg, rgba(255, 159, 10, 0.35), rgba(255, 69, 58, 0.35)) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 159, 10, 0.5);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.engine-subcard {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.subcard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.subcard-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.subcard-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+.diff-tag {
+  background: rgba(255, 159, 10, 0.2);
+  color: #ffb703;
+  border: 1px solid rgba(255, 159, 10, 0.35);
+}
+
+/* Feature 1: Dynamic Lapse Rate Box */
+.gradient-formula-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formula-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ios-cyan);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 210, 255, 0.15);
+  overflow-x: auto;
+}
+
+.gradient-details-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.grad-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.grad-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.grad-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Feature 2: Aspect Comparison (Nordwand vs. Südhang) */
+.aspect-comparison-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 10px;
 }
 
-.micro-item {
-  background: rgba(0, 0, 0, 0.2);
+.aspect-box {
   border-radius: 16px;
-  padding: 10px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform 0.2s ease;
 }
 
-.micro-label {
+.aspect-box:hover {
+  transform: translateY(-2px);
+}
+
+.south-box {
+  background: linear-gradient(145deg, rgba(255, 159, 10, 0.16) 0%, rgba(255, 110, 0, 0.06) 100%);
+  border: 1px solid rgba(255, 180, 50, 0.35);
+  box-shadow: 0 4px 16px rgba(255, 150, 0, 0.1);
+}
+
+.north-box {
+  background: linear-gradient(145deg, rgba(100, 210, 255, 0.14) 0%, rgba(30, 80, 160, 0.06) 100%);
+  border: 1px solid rgba(100, 210, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 150, 255, 0.08);
+}
+
+.aspect-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.aspect-icon {
+  font-size: 14px;
+}
+
+.aspect-name {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.south-box .aspect-name { color: #ffd166; }
+.north-box .aspect-name { color: #a0e1ff; }
+
+.aspect-temp {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin: 2px 0;
+}
+
+.south-box .aspect-temp { color: #ffbe0b; text-shadow: 0 0 12px rgba(255, 190, 11, 0.4); }
+.north-box .aspect-temp { color: #e0f2fe; text-shadow: 0 0 12px rgba(100, 210, 255, 0.3); }
+
+.aspect-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.aspect-metric {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  margin-top: 4px;
 }
 
-.micro-val {
-  font-size: 18px;
+.micro-note {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+  padding: 0 2px;
+}
+
+/* Feature 3: Venturi & TPI Grid */
+.venturi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.venturi-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.venturi-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.venturi-val {
+  font-size: 13px;
   font-weight: 700;
   color: #ffffff;
+}
+
+.venturi-warning-bar {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffd166;
+  background: rgba(255, 190, 11, 0.12);
+  border: 1px solid rgba(255, 190, 11, 0.25);
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin-top: 4px;
+}
+
+/* Feature 4: Horizon Raycasting Shadow Box */
+.shadow-info-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shadow-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.shadow-icon {
+  font-size: 24px;
+}
+
+.shadow-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shadow-main {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.shadow-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.shadow-metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 8px;
+}
+
+.shadow-metric {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sm-label {
+  font-size: 9px;
+  color: var(--text-tertiary);
+}
+
+.sm-val {
+  font-size: 12px;
+  font-weight: 700;
   font-family: var(--font-mono);
 }
 
-.micro-sub {
-  font-size: 10px;
-  color: var(--text-tertiary);
-  margin-top: 2px;
-}
+.text-cyan { color: var(--ios-cyan) !important; }
+.text-red { color: var(--ios-red) !important; }
+.text-accent { color: #ffd60a !important; }
 
 /* Elevation Track Visual */
 .elevation-visual-wrapper {

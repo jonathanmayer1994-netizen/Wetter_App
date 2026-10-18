@@ -1,7 +1,10 @@
 /**
  * BEST WEATHER — Ultra-High Precision iPhone Weather App
  * Powered by Open-Meteo 90m DEM Downscaling & RainViewer Polarimetric Live Radar
+ * Featuring 10-Meter Micro-Topography Engine (Copernicus DEM, TPI Venturi, GTI, Horizon Raycast)
  */
+
+import { MicroEngine } from './microEngine.js';
 
 // =============================================================================
 // STATE & CONFIGURATION
@@ -276,8 +279,8 @@ class WeatherCanvasEngine {
 // =============================================================================
 async function fetchWeatherData(lat, lon) {
   try {
-    // Open-Meteo with DEM-Downscaling enabled via &elevation=nan
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&elevation=nan&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,surface_pressure,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,freezing_level_height&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max&timezone=auto`;
+    // Open-Meteo with DEM-Downscaling, pressure layers (925-500hPa), and tilted solar irradiance (GTI)
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&elevation=nan&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,surface_pressure,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,freezing_level_height,temperature_925hPa,temperature_850hPa,temperature_700hPa,temperature_600hPa,temperature_500hPa,geopotential_height_925hPa,geopotential_height_850hPa,geopotential_height_700hPa,geopotential_height_600hPa,geopotential_height_500hPa,wind_speed_700hPa,wind_speed_600hPa,global_tilted_irradiance,direct_normal_irradiance,diffuse_radiation,direct_radiation&tilt=45&azimuth=0&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max&timezone=auto`;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -337,7 +340,7 @@ function renderApp() {
   document.getElementById('temp-apparent').innerText = `${apparent}°`;
   document.getElementById('last-updated-text').innerText = `Zuletzt aktualisiert: ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
-  // Render High Precision DEM & Microclimate Downscaling Card
+  // Render 10-Meter Micro-Topography Engine Section
   renderMicroclimate(cur, hourly, daily);
 
   // Render 24h Hourly Forecast Slider
@@ -354,64 +357,129 @@ function renderApp() {
 }
 
 // =============================================================================
-// HIGH-PRECISION MICROCLIMATE & DEM DOWNSCALING SECTION
+// 10-METER MIKRO-TOPOGRAFIE ENGINE LOGIK
 // =============================================================================
-function renderMicroclimate(cur, hourly, daily) {
+async function renderMicroclimate(cur, hourly, daily) {
   const elev = state.currentLocation.elevation;
-  document.getElementById('micro-elevation').innerText = `${elev.toLocaleString('de-DE')} m`;
+  const lat = state.currentLocation.lat;
+  const lon = state.currentLocation.lon;
 
-  // Freezing Level (Schneefallgrenze / 0°C Isotherme)
+  // 1. Dynamischer Vertikaler Temperaturgradient (Gamma) & Inversion
+  const grad = MicroEngine.calculateDynamicLapseRate(elev, hourly, 0);
+  if (grad) {
+    const formulaElem = document.querySelector('.formula-line');
+    if (formulaElem) {
+      const lName = grad.lowerLayer ? grad.lowerLayer.level : '700hPa';
+      const uName = grad.upperLayer ? grad.upperLayer.level : '600hPa';
+      formulaElem.innerHTML = `$$\\Gamma = \\frac{T_{${uName}} - T_{${lName}}}{z_{${uName}} - z_{${lName}}} = \\mathbf{${grad.gammaPer100m > 0 ? '+' : ''}${grad.gammaPer100m}\\text{ °C / 100m}}$$`;
+    }
+    const gradTempElem = document.getElementById('grad-temp-val');
+    if (gradTempElem) {
+      gradTempElem.innerText = `${grad.interpolatedTemp}°C (10m Fels)`;
+    }
+    const invTag = document.getElementById('inversion-status-tag');
+    const invText = document.getElementById('inversion-text');
+    if (invTag && invText) {
+      if (grad.isInversion) {
+        invTag.innerText = `🟡 Inversion aktiv (+${grad.inversionDelta}°C)`;
+        invTag.style.background = 'rgba(255, 214, 10, 0.25)';
+        invTag.style.color = '#ffd60a';
+        invText.innerText = `⚠️ Kaltluftsee im Tal! Warme Luftschicht am Berg.`;
+      } else {
+        invTag.innerText = `🟢 Normaler Gradient`;
+        invTag.style.background = 'rgba(48, 209, 88, 0.2)';
+        invTag.style.color = '#30d158';
+        invText.innerText = `Standard Troposphäre (${grad.gammaPer100m}°C/100m)`;
+      }
+    }
+  }
+
+  // 2. Nordwand vs. Südhang (10-Meter Sonneneinstrahlung via Tilt & Azimuth)
+  const sunPos = MicroEngine.getSunPosition(lat, lon, new Date());
+  const aspectData = MicroEngine.calculateAspectComparison(
+    cur.temperature_2m,
+    cur.apparent_temperature,
+    sunPos,
+    cur.cloud_cover > 80
+  );
+  const sFelt = document.getElementById('south-felt-temp');
+  const sIrr = document.getElementById('south-irradiance');
+  const nFelt = document.getElementById('north-felt-temp');
+  const nIrr = document.getElementById('north-irradiance');
+  const diffBadge = document.getElementById('aspect-diff-badge');
+
+  if (sFelt) sFelt.innerText = `${aspectData.southSlope.feltTemp}°C`;
+  if (sIrr) sIrr.innerText = `${aspectData.southSlope.irradiance} W/m² (GTI)`;
+  if (nFelt) nFelt.innerText = `${aspectData.northFace.feltTemp}°C`;
+  if (nIrr) nIrr.innerText = `${aspectData.northFace.irradiance} W/m² (Diffus)`;
+  if (diffBadge) diffBadge.innerText = `ΔT: ${aspectData.deltaTemp}°C Unterschied auf 30m`;
+
+  // 3. Wind-Beschleunigung am Grat (30m Venturi & Lee-Effekt via TPI)
+  const terrain = await MicroEngine.sampleTerrainGrid(lat, lon, elev);
+  const altWind = hourly && hourly.wind_speed_700hPa ? hourly.wind_speed_700hPa[0] : (cur.wind_speed_10m * 1.5);
+  const venturi = MicroEngine.calculateVenturiWind(cur.wind_speed_10m, altWind, terrain.tpi, cur.wind_direction_10m);
+
+  const tpiBadge = document.getElementById('tpi-badge');
+  const vClass = document.getElementById('venturi-class');
+  const vFactor = document.getElementById('venturi-factor');
+  const vWind = document.getElementById('venturi-effective-wind');
+  const vGusts = document.getElementById('venturi-gusts');
+  const vBar = document.getElementById('venturi-warning-bar');
+
+  if (tpiBadge) tpiBadge.innerText = `TPI: ${terrain.tpi > 0 ? '+' : ''}${terrain.tpi} m`;
+  if (vClass) vClass.innerText = venturi.classification;
+  if (vFactor) vFactor.innerText = `x${venturi.speedUpFactor}`;
+  if (vWind) vWind.innerText = `${venturi.effectiveWind} km/h`;
+  if (vGusts) vGusts.innerText = `bis ${venturi.gustPotential} km/h`;
+  if (vBar) vBar.innerText = venturi.warning || 'Stabile Strömung ohne signifikanten Grat-Venturi-Effekt.';
+
+  // 4. Bergschatten auf die Minute genau (Horizon Raycasting)
+  const shadow = await MicroEngine.checkHorizonShadow(lat, lon, elev, sunPos);
+  const shadowTag = document.getElementById('shadow-status-tag');
+  const shadowIcon = document.getElementById('shadow-icon');
+  const shadowText = document.getElementById('shadow-status-text');
+  const shadowDetail = document.getElementById('shadow-detail-text');
+  const sunElevElem = document.getElementById('sun-elevation-val');
+  const obsAngleElem = document.getElementById('obstacle-angle-val');
+  const shadowDropElem = document.getElementById('shadow-temp-drop');
+
+  if (shadowTag) {
+    if (shadow.inShadow) {
+      shadowTag.innerText = '🏔️ Bergschatten aktiv';
+      shadowTag.style.background = 'rgba(100, 210, 255, 0.25)';
+      shadowTag.style.color = '#64d2ff';
+      if (shadowIcon) shadowIcon.innerText = '🏔️';
+    } else {
+      shadowTag.innerText = '☀️ Direkte Sonne';
+      shadowTag.style.background = 'rgba(255, 214, 10, 0.25)';
+      shadowTag.style.color = '#ffd60a';
+      if (shadowIcon) shadowIcon.innerText = '☀️';
+    }
+  }
+  if (shadowText) shadowText.innerText = shadow.statusText;
+  if (shadowDetail) shadowDetail.innerText = `Sonnenstand: ${sunPos.elevation}° (Azimut: ${sunPos.azimuth}°)`;
+  if (sunElevElem) sunElevElem.innerText = `${sunPos.elevation}°`;
+  if (obsAngleElem) obsAngleElem.innerText = `${shadow.obstacleAngle}°`;
+  if (shadowDropElem) shadowDropElem.innerText = shadow.tempDrop > 0 ? `-${shadow.tempDrop}°C` : '0°C';
+
+  // 5. Freezing Level Visual Gauge
   let freezingLevel = 0;
   if (hourly && hourly.freezing_level_height && hourly.freezing_level_height.length > 0) {
     freezingLevel = Math.round(hourly.freezing_level_height[0]);
-    document.getElementById('micro-freezing-level').innerText = `${freezingLevel.toLocaleString('de-DE')} m`;
-
-    const diff = freezingLevel - elev;
-    if (diff <= 0) {
-      document.getElementById('micro-freezing-sub').innerHTML = `<span style="color:#64d2ff; font-weight:700;">❄️ Frost/Schnee auf Standort-Höhe!</span>`;
-    } else {
-      document.getElementById('micro-freezing-sub').innerText = `+${diff.toLocaleString('de-DE')} m über Standort`;
-    }
-
-    // Position Elevation Visual Gauge Markers
     const maxGauge = 3500;
     const currentPercent = Math.min(100, Math.max(5, (elev / maxGauge) * 100));
     const freezingPercent = Math.min(100, Math.max(5, (freezingLevel / maxGauge) * 100));
     
-    document.getElementById('marker-current').style.left = `${currentPercent}%`;
-    document.getElementById('marker-current-val').innerText = `${elev}m`;
-    document.getElementById('marker-freezing').style.left = `${freezingPercent}%`;
-    document.getElementById('marker-freezing-val').innerText = `${freezingLevel}m`;
+    const curMarker = document.getElementById('marker-current');
+    const curVal = document.getElementById('marker-current-val');
+    const freezMarker = document.getElementById('marker-freezing');
+    const freezVal = document.getElementById('marker-freezing-val');
+    
+    if (curMarker) curMarker.style.left = `${currentPercent}%`;
+    if (curVal) curVal.innerText = `${elev}m`;
+    if (freezMarker) freezMarker.style.left = `${freezingPercent}%`;
+    if (freezVal) freezVal.innerText = `${freezingLevel}m`;
   }
-
-  // Dew point & condensation risk
-  let dewPoint = cur.temperature_2m - ((100 - cur.relative_humidity_2m) / 5);
-  if (hourly && hourly.dew_point_2m && hourly.dew_point_2m.length > 0) {
-    dewPoint = hourly.dew_point_2m[0];
-  }
-  document.getElementById('micro-dew-point').innerText = `${dewPoint.toFixed(1)} °C`;
-  
-  const dewSpread = Math.abs(cur.temperature_2m - dewPoint);
-  let dewRisk = 'Gering (Trockene Luft)';
-  if (dewSpread < 1.8) dewRisk = '⚠️ Hoch (Nebel- & Reifbildung)';
-  else if (dewSpread < 3.5) dewRisk = 'Mäßig (Tau/Kondensation)';
-  document.getElementById('micro-dew-sub').innerText = `Kondensationsrisiko: ${dewRisk}`;
-
-  // Topographical Wind-Downscaling (Venturi & Ridge Acceleration)
-  let windEffect = 'Normal (Tal/Ebene)';
-  let windSub = 'Standard Grenzschichtströmung';
-  if (elev > 1800) {
-    windEffect = 'Hochalpin / Grat-Effekt';
-    windSub = 'Venturi-Böenverstärkung an Kämmen';
-  } else if (elev > 800) {
-    windEffect = 'Mittelgebirgs-Kompression';
-    windSub = 'Hangwinde & orografische Verstärkung';
-  } else if (cur.wind_speed_10m < 6) {
-    windEffect = 'Geschützte Talinversion';
-    windSub = 'Kaltluftseen-Bildung möglich';
-  }
-  document.getElementById('micro-wind-effect').innerText = windEffect;
-  document.getElementById('micro-wind-sub').innerText = windSub;
 }
 
 // =============================================================================
