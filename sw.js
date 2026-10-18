@@ -3,13 +3,16 @@
  * High-performance Alpine Offline PWA Cache Engine
  */
 
-const CACHE_NAME = 'best-weather-v1.0.0';
+const CACHE_NAME = 'best-weather-v1.0.1';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './microEngine.js',
+  './storage.js',
+  './httpClient.js',
+  './gpx.worker.js',
   './manifest.json',
   './favicon.png',
   './icon-192.png',

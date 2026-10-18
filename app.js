@@ -3919,7 +3919,7 @@ function preloadRadarFrames(frames, host) {
   frames.forEach(f => {
     if (f.type === 'past' && f.path) {
       const colorScheme = 8;
-      const zoom = (state.map.instance && state.map.instance.getZoom()) || 8;
+      const zoom = Math.min(7, (state.map.instance && state.map.instance.getZoom()) || 7);
       const lat = state.currentLocation.lat;
       const lon = state.currentLocation.lon;
       const x = Math.floor((lon + 180) / 360 * Math.pow(2, zoom));
@@ -4059,8 +4059,10 @@ function showUnifiedRadarFrame(idx) {
       state.map.radarTileLayer = L.tileLayer(url, {
         opacity: 0.82,
         zIndex: 250,
-        maxNativeZoom: 18,
-        maxZoom: 20
+        maxNativeZoom: 7, // RainViewer Free API Zoom Cap: Leaflet skaliert Stufe 7 verlustfrei hoch und verhindert "Zoom Level Not Supported"
+        maxZoom: 20,
+        tileSize: 256,
+        errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
       }).addTo(state.map.instance);
     }
 
