@@ -712,9 +712,20 @@ html, body {
 }
 
 .daily-icon-box {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .daily-cond-text {
@@ -724,6 +735,7 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.2px;
 }
 
 /* Col 3: Precip */
@@ -3185,12 +3197,16 @@ html, body {
   }
 
   .daily-cond-text {
-    font-size: 12px;
-    max-width: 110px;
+    font-size: 13px;
+    max-width: 170px;
+    font-weight: 600;
   }
 
   .daily-icon-box {
-    font-size: 20px;
+    font-size: 18px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
   }
 
   .daily-precip-chip {

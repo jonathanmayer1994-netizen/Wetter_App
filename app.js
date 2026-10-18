@@ -549,8 +549,9 @@ function render10DayForecast(daily, hourly) {
     const dayNameFull = isToday ? 'Heute' : weekdaysFull[d.getDay()];
     const dateShort = d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
 
-    const code = daily.weather_code[i];
-    const info = WMO_CODES[code] || WMO_CODES[0];
+    const syn = MicroEngine.computeRepresentativeDailyCondition(i, daily, hourly, isToday, state.weatherData?.current);
+    const condIcon = syn.icon;
+    const condLabel = syn.label;
     const pop = daily.precipitation_probability_max ? Math.round(daily.precipitation_probability_max[i]) : 0;
     const rainSum = daily.precipitation_sum ? daily.precipitation_sum[i] : 0;
     const windSpd = Math.round(daily.wind_speed_10m_max ? daily.wind_speed_10m_max[i] : 12);
@@ -627,8 +628,8 @@ function render10DayForecast(daily, hourly) {
         <div class="daily-row-mobile-bottom">
           <!-- 2. Condition & Icon -->
           <div class="daily-condition-cell">
-            <span class="daily-icon-box">${info.icon}</span>
-            <span class="daily-cond-text">${info.label}</span>
+            <span class="daily-icon-box" title="${condLabel}">${condIcon}</span>
+            <span class="daily-cond-text" title="${condLabel}">${condLabel}</span>
           </div>
 
           <!-- 3. Precipitation & Rain Sum -->
@@ -1142,8 +1143,7 @@ function openDayDetailModal(dayIndex, daily, hourly) {
 
   const d = new Date(daily.time[dayIndex]);
   const dateStr = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const code = daily.weather_code[dayIndex];
-  const info = WMO_CODES[code] || WMO_CODES[0];
+  const syn = MicroEngine.computeRepresentativeDailyCondition(dayIndex, daily, hourly, dayIndex === 0, state.weatherData?.current);
 
   // 1. Header & Ort
   const locBadge = document.getElementById('modal-location-badge');
@@ -1153,14 +1153,7 @@ function openDayDetailModal(dayIndex, daily, hourly) {
   }
 
   document.getElementById('modal-day-name').innerText = dateStr;
-
-  let synopNote = 'Ruhige Wetterlage';
-  if (code >= 95) synopNote = 'Gewittergefahr & starke Turbulenzen';
-  else if (code >= 71) synopNote = 'Schneefallgrenze beachten';
-  else if (code >= 51) synopNote = 'Regenschauer und feuchte Luftmasse';
-  else if (code >= 1 && code <= 3) synopNote = 'Wechselnd bewölkt mit sonnigen Abschnitten';
-  else if (code === 0) synopNote = 'Sonnig und wolkenloser Himmel';
-  document.getElementById('modal-day-condition').innerText = `${info.icon} ${info.label} • ${synopNote}`;
+  document.getElementById('modal-day-condition').innerText = `${syn.icon} ${syn.label} • ${syn.synopNote}`;
 
   // 2. Extrahiere die 24 Stunden dieses spezifischen Tages
   const dayStartHourIdx = dayIndex * 24;

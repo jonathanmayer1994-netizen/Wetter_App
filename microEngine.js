@@ -1160,5 +1160,156 @@ export const MicroEngine = {
       console.warn('Zukunfts-Radar Prognose konnte nicht geladen werden:', err);
       return null;
     }
+  },
+
+  /**
+   * Berechnet die exakt repräsentative Tageswetterlage (Icon, präziser Text & Synop-Zusammenfassung).
+   * Verhindert irreführende Rohdaten (wie z.B. 2h Frühnebel um 6 Uhr morgens, der einen 95% sonnigen Tag
+   * fälschlicherweise als 'Nebel' abstempelt, oder 0.2mm Nieselregen, der 9h strahlenden Sonnenschein überdeckt).
+   */
+  computeRepresentativeDailyCondition(dayIndex, daily, hourly, isToday = false, curWeather = null) {
+    if (!daily || !daily.time || !daily.time[dayIndex]) {
+      return { icon: '🌤️', label: 'Heiter', synopNote: 'Ruhige Wetterlage', theme: 'clear-day' };
+    }
+
+    const startH = dayIndex * 24;
+    const endH = Math.min(startH + 24, (hourly && hourly.time) ? hourly.time.length : startH);
+
+    // Tagesstunden filtern (Tageslichtzeit ca. 07:00 bis 19:00 Uhr)
+    let daytimeIndices = [];
+    for (let h = startH; h < endH; h++) {
+      const hourOfDay = (h - startH);
+      const isDayFlag = (hourly && hourly.is_day && hourly.is_day[h] !== undefined)
+        ? hourly.is_day[h] === 1
+        : (hourOfDay >= 7 && hourOfDay <= 19);
+      if (isDayFlag || (hourOfDay >= 7 && hourOfDay <= 19)) {
+        daytimeIndices.push(h);
+      }
+    }
+    if (daytimeIndices.length === 0) {
+      for (let h = startH; h < endH; h++) daytimeIndices.push(h);
+    }
+
+    // Für 'Heute': Berücksichtige insbesondere die aktive & verbleibende Tageszeit
+    let activeIndices = daytimeIndices;
+    if (isToday) {
+      const nowHour = new Date().getHours();
+      if (nowHour >= 10 && nowHour <= 19) {
+        const remaining = daytimeIndices.filter(h => (h - startH) >= nowHour);
+        if (remaining.length > 0) {
+          activeIndices = remaining;
+        }
+      }
+    }
+
+    // Kennzahlen extrahieren
+    const codes = activeIndices.map(h => (hourly && hourly.weather_code) ? hourly.weather_code[h] : 0);
+    const precips = activeIndices.map(h => (hourly && hourly.precipitation) ? hourly.precipitation[h] : 0);
+    const snows = activeIndices.map(h => (hourly && hourly.snowfall) ? hourly.snowfall[h] : 0);
+    const clouds = activeIndices.map(h => (hourly && hourly.cloud_cover) ? hourly.cloud_cover[h] : 50);
+
+    const precipSum = daily.precipitation_sum ? (daily.precipitation_sum[dayIndex] || 0) : 0;
+    const snowSum = daily.snowfall_sum ? (daily.snowfall_sum[dayIndex] || 0) : 0;
+    const sunDur = daily.sunshine_duration ? (daily.sunshine_duration[dayIndex] || 0) : 0;
+    const daylight = daily.daylight_duration ? (daily.daylight_duration[dayIndex] || 1) : 1;
+    const sunRatio = daylight > 0 ? (sunDur / daylight) : 0;
+    const avgCloud = clouds.length > 0 ? (clouds.reduce((a, b) => a + b, 0) / clouds.length) : 50;
+
+    // 1. GEWITTER & UNWETTER
+    const hasThunder = codes.some(c => c >= 95);
+    const hasHail = codes.some(c => c === 96 || c === 99);
+    if (hasThunder) {
+      return {
+        icon: '⛈️',
+        label: hasHail ? 'Gewitter & Hagel' : 'Gewitter',
+        synopNote: 'Gewittergefahr & stürmische Böen',
+        theme: 'thunder'
+      };
+    }
+
+    // 2. SCHNEE & WINTERNIEDERSCHLAG
+    const snowHours = snows.filter(s => s > 0).length + codes.filter(c => (c >= 71 && c <= 77) || c === 85 || c === 86).length;
+    if (snowSum >= 1.5 || snowHours >= 3) {
+      if (sunRatio >= 0.30) {
+        return { icon: '🌨️', label: 'Schneeschauer', synopNote: 'Schneeschauer mit sonnigen Phasen', theme: 'snow' };
+      }
+      return { icon: '❄️', label: snowSum >= 6.0 ? 'Kräftiger Schneefall' : 'Schneefall', synopNote: 'Schneefallgrenze & Glättegefahr beachten', theme: 'snow' };
+    }
+    if (snowSum > 0.2 || snowHours >= 1) {
+      return { icon: '🌨️', label: 'Leichte Schneeschauer', synopNote: 'Vereinzelte Schneeschauer', theme: 'snow' };
+    }
+
+    // 3. REGEN & SCHAUER
+    const rainHours = precips.filter(p => p >= 0.25).length;
+    if (precipSum >= 2.0) {
+      if (rainHours <= 3 && sunRatio >= 0.30) {
+        return { icon: '🌦️', label: 'Sonne & Schauer', synopNote: 'Wechselhaft mit sonnigen Abschnitten', theme: 'rain' };
+      }
+      if (precipSum >= 10.0) {
+        return { icon: '🌧️', label: 'Starkregen', synopNote: 'Ergiebiger Niederschlag', theme: 'rain' };
+      }
+      if (rainHours >= 5) {
+        return { icon: '🌧️', label: 'Dauerregen', synopNote: 'Länger anhaltender Regen', theme: 'rain' };
+      }
+      return { icon: '🌧️', label: 'Regnerisch', synopNote: 'Wiederholte Regenfälle', theme: 'rain' };
+    }
+
+    if (precipSum >= 0.5) {
+      if (sunRatio >= 0.40) {
+        return { icon: '🌦️', label: 'Heiter, Schauer', synopNote: 'Überwiegend trocken mit vereinzelten Schauern', theme: 'rain' };
+      }
+      return { icon: '🌧️', label: 'Leichter Regen', synopNote: 'Gelegentlicher Niesel- oder Schauerregen', theme: 'rain' };
+    }
+
+    // 4. TROCKENE ODER SPUREN-NIEDERSCHLAG (< 0.5 mm)
+    // Nebel-Analyse (Unterscheide harmlosen Frühnebel von ganztägigem Inversionsnebel)
+    const fogCoreHours = activeIndices.filter(h => {
+      const hod = (h - startH);
+      const c = (hourly && hourly.weather_code) ? hourly.weather_code[h] : 0;
+      return hod >= 10 && hod <= 16 && (c === 45 || c === 48);
+    }).length;
+
+    const fogMorning = activeIndices.some(h => {
+      const hod = (h - startH);
+      const c = (hourly && hourly.weather_code) ? hourly.weather_code[h] : 0;
+      return hod >= 5 && hod <= 9 && (c === 45 || c === 48);
+    });
+
+    if (fogCoreHours >= 4) {
+      return { icon: '🌫️', label: 'Dichter Nebel', synopNote: 'Ganztägig zäher Nebel / Hochnebel', theme: 'fog' };
+    }
+
+    if (fogMorning && sunRatio >= 0.40 && !isToday) {
+      return {
+        icon: '🌤️',
+        label: sunRatio >= 0.65 ? 'Frühnebel, sonnig' : 'Frühnebel, heiter',
+        synopNote: 'Nach Auflösung des Frühnebels viel Sonne',
+        theme: 'clear-day'
+      };
+    }
+
+    // Für Heute: Wenn aktuelle Zeit >= 11 Uhr ist und Himmel klar/wolkig ist, niemals 'Nebel' anzeigen
+    if (isToday && curWeather) {
+      const curCloud = curWeather.cloud_cover !== undefined ? curWeather.cloud_cover : avgCloud;
+      const curWCode = curWeather.weather_code !== undefined ? curWeather.weather_code : 0;
+      if (curWCode !== 45 && curWCode !== 48) {
+        if (curCloud <= 25) return { icon: '☀️', label: 'Sonnig', synopNote: 'Sonnig und wolkenlos', theme: 'clear-day' };
+        if (curCloud <= 50) return { icon: '🌤️', label: 'Überwiegend heiter', synopNote: 'Sonnige Abschnitte mit lockeren Wolken', theme: 'clear-day' };
+        if (curCloud <= 75) return { icon: '⛅', label: 'Teilweise bewölkt', synopNote: 'Wechsel von Wolken und Aufheiterungen', theme: 'cloudy' };
+        return { icon: '☁️', label: 'Bedeckt', synopNote: 'Überwiegend geschlossene Wolkendecke', theme: 'cloudy' };
+      }
+    }
+
+    // Sonnenschein & Bewölkungs-Stufen
+    if (sunRatio >= 0.68 || avgCloud < 25) {
+      return { icon: '☀️', label: 'Sonnig', synopNote: 'Sonnig und wolkenloser Himmel', theme: 'clear-day' };
+    }
+    if (sunRatio >= 0.45 || avgCloud < 50) {
+      return { icon: '🌤️', label: 'Überwiegend heiter', synopNote: 'Viel Sonnenschein bei lockeren Wolkenfeldern', theme: 'clear-day' };
+    }
+    if (sunRatio >= 0.20 || avgCloud < 75) {
+      return { icon: '⛅', label: 'Teilweise bewölkt', synopNote: 'Mischung aus Wolken und heiteren Phasen', theme: 'cloudy' };
+    }
+    return { icon: '☁️', label: 'Bedeckt', synopNote: 'Überwiegend graue, geschlossene Wolkenschicht', theme: 'cloudy' };
   }
 };
