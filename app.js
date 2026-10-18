@@ -1254,25 +1254,34 @@ function renderAltitudeChart() {
     const card = document.createElement('div');
     card.className = 'altitude-tier-card';
 
+    const t = Math.round(convertTemp(level.temp));
+    const tFormatted = t > 0 ? `+${t}°` : `${t}°`;
+
     let tempColor = '#30d158';
     if (level.temp < 0) tempColor = '#64d2ff';
     else if (level.temp > 18) tempColor = '#ff9f0a';
 
+    // Proportionale Skala: -20°C bis +30°C
+    const tempPct = Math.max(10, Math.min(100, Math.round(((level.temp - (-20)) / 48) * 100)));
     const precipIcon = level.isAboveFreezing ? '💧 Regen' : '❄️ Schnee';
 
     card.innerHTML = `
-      <div class="tier-name-col">
-        <span>${level.icon}</span>
-        <span>${level.name}</span>
+      <div class="tier-left">
+        <span class="tier-icon">${level.icon}</span>
+        <span class="tier-name">${level.name}</span>
+        <span class="tier-elevation-badge">${level.z.toLocaleString('de-DE')} m</span>
       </div>
-      <div class="tier-elevation-badge">${level.z.toLocaleString('de-DE')} m</div>
-      <div class="tier-temp-col">
-        <span class="tier-temp-val" style="color:${tempColor}">${Math.round(convertTemp(level.temp))}°</span>
-        <div class="tier-temp-bar" style="background:${tempColor}; width: 60%;"></div>
+
+      <div class="tier-center">
+        <span class="tier-temp-val" style="color:${tempColor}">${tFormatted}</span>
+        <div class="tier-gauge-track">
+          <div class="tier-gauge-fill" style="background:${tempColor}; width: ${tempPct}%;"></div>
+        </div>
       </div>
-      <div class="tier-meta-col">
-        <span class="tier-wind">💨 ${level.wind} km/h</span>
-        <span class="tier-precip">${precipIcon}</span>
+
+      <div class="tier-right">
+        <span class="tier-wind-chip">💨 ${level.wind} km/h</span>
+        <span class="tier-precip-chip ${level.isAboveFreezing ? 'precip-rain' : 'precip-snow'}">${precipIcon}</span>
       </div>
     `;
     container.appendChild(card);
