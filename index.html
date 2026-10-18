@@ -46,24 +46,24 @@
 
       <!-- Main Search & Location Input Bar -->
       <div class="search-container">
-        <!-- Spotlight Search Trigger Pill (Cmd+K) -->
-        <button id="spotlight-trigger-btn" class="spotlight-trigger-pill" type="button" title="Globale Schnellsuche öffnen (⌘K)">
-          <span class="stp-icon">🔍</span>
-          <span class="stp-text" id="spotlight-trigger-text">Ort, Gipfel oder Koordinaten suchen...</span>
-          <kbd class="stp-kbd">⌘K</kbd>
-        </button>
+        <div class="search-input-box">
+          <span class="search-icon">🔍</span>
+          <input 
+            type="text" 
+            id="location-search-input" 
+            placeholder="Ort, Gipfel oder Koordinaten suchen..." 
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button id="spotlight-trigger-btn" class="stp-kbd" type="button" title="Globale Schnellsuche öffnen (⌘K)" style="cursor:pointer; border:1px solid rgba(255,255,255,0.2);">⌘K</button>
+          <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
+        </div>
 
         <!-- 1-Klick GPS-Standort Pill -->
         <button id="quick-gps-btn" class="header-gps-pill" type="button" title="1-Klick: Meinen genauen GPS-Standort & Berghöhe ermitteln">
           <span class="hgp-icon">📍</span>
-          <span class="hgp-text">Mein Standort</span>
+          <span class="hgp-text">Standort</span>
         </button>
-
-        <!-- Hidden input for standard autocomplete / fallback -->
-        <div class="search-input-box" style="display:none;">
-          <input type="text" id="location-search-input" autocomplete="off" spellcheck="false">
-          <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
-        </div>
 
         <button id="gps-btn" class="nav-icon-btn" style="display:none;" title="Exakten GPS-Standort abfragen">📍</button>
         <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
@@ -110,6 +110,8 @@
       <!-- =================================================================== -->
       <!-- TAB 1: ÜBERSICHT (Wetterbericht, Hero, 24h & 10-Tage Klick-Details) -->
       <!-- =================================================================== -->
+      <div class="tab-pane active" id="tab-overview">
+
         <!-- AKUTER UNWETTER- & GEFAHREN-BANNER (TOP PRIORITY ALERT) -->
         <div class="hero-hazard-alert" id="hero-hazard-alert" style="display:none;" role="alert">
           <div class="hha-content">
@@ -2138,6 +2140,7 @@
         <div class="modal-footer-actions">
           <button type="button" class="action-btn action-btn-secondary" id="day-modal-close-action">✕ Schließen</button>
         </div>
+      </div>
       </div>
 
     </div>

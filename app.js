@@ -589,10 +589,14 @@ function updateLocationHeaderUI() {
   document.getElementById('hero-geo-coords').innerText = `Lat: ${loc.lat.toFixed(4)}, Lon: ${loc.lon.toFixed(4)}`;
   document.getElementById('hero-update-time').innerText = `Aktualisiert: ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 
-  // Feature 2A: Spotlight-Suchleiste Text aktualisieren
+  // Feature 2A: Suchleiste & Spotlight Text aktualisieren
   const spotlightText = document.getElementById('spotlight-trigger-text');
   if (spotlightText) {
     spotlightText.innerText = `${loc.isMountain ? '🏔️' : '🏙️'} ${loc.name} (${loc.elevation.toLocaleString('de-DE')} m) • Suchen...`;
+  }
+  const searchInput = document.getElementById('location-search-input');
+  if (searchInput) {
+    searchInput.placeholder = `${loc.isMountain ? '🏔️' : '🏙️'} ${loc.name} (${loc.elevation.toLocaleString('de-DE')} m) — Ort oder Gipfel suchen...`;
   }
 
   const badge = document.getElementById('location-type-badge');
