@@ -1066,5 +1066,99 @@ export const MicroEngine = {
         status: '🟢 Live HD'
       }
     ];
+  },
+
+  /**
+   * STUFE 11: 24- bis 36-Stunden-Zukunfts-Radar & Niederschlags-Prognose
+   * Lädt stündliche hochauflösende Niederschlags- und Schneefelder für die gesamte Region
+   */
+  async fetch24hRadarForecast(stations) {
+    if (!stations || stations.length === 0) return null;
+    try {
+      const lats = stations.map(s => s.lat.toFixed(3)).join(',');
+      const lons = stations.map(s => s.lon.toFixed(3)).join(',');
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=precipitation,snowfall,rain,temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&forecast_days=3`;
+      
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Radar-Prognose HTTP-Fehler: ${res.status}`);
+      const rawData = await res.json();
+      const stationResults = Array.isArray(rawData) ? rawData : [rawData];
+
+      if (!stationResults[0] || !stationResults[0].hourly || !stationResults[0].hourly.time) {
+        return null;
+      }
+
+      const times = stationResults[0].hourly.time;
+      const nowMs = Date.now();
+
+      // Finde den aktuellen Stundenindex
+      let curIdx = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i < Math.min(48, times.length); i++) {
+        const diff = Math.abs(new Date(times[i]).getTime() - nowMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          curIdx = i;
+        }
+      }
+
+      // Baue stündliche Prognose-Frames für die nächsten 24 bis 36 Stunden
+      const forecastFrames = [];
+      const hoursCount = Math.min(36, times.length - curIdx);
+
+      for (let h = 0; h < hoursCount; h++) {
+        const idx = curIdx + h;
+        const timeStr = times[idx];
+        const timeObj = new Date(timeStr);
+
+        const cells = [];
+        let maxPrecipMm = 0;
+
+        for (let s = 0; s < stations.length; s++) {
+          const st = stations[s];
+          const stHourly = stationResults[s] ? stationResults[s].hourly : null;
+          if (!stHourly) continue;
+
+          const precip = stHourly.precipitation ? (stHourly.precipitation[idx] || 0) : 0;
+          const snow = stHourly.snowfall ? (stHourly.snowfall[idx] || 0) : 0;
+          const temp = stHourly.temperature_2m ? (stHourly.temperature_2m[idx] || 0) : 10;
+          const wCode = stHourly.weather_code ? (stHourly.weather_code[idx] || 0) : 0;
+
+          if (precip > 0.05 || snow > 0 || (wCode >= 51 && wCode <= 99)) {
+            if (precip > maxPrecipMm) maxPrecipMm = precip;
+
+            const isSnow = temp <= 1.5 || snow > 0 || (wCode >= 71 && wCode <= 86);
+            cells.push({
+              name: st.name,
+              lat: st.lat,
+              lon: st.lon,
+              elevation: st.elevation,
+              precipMm: Math.round(precip * 10) / 10,
+              snowCm: Math.round(snow * 10) / 10,
+              temperature: Math.round(temp * 10) / 10,
+              isSnow: isSnow,
+              wCode: wCode,
+              intensity: precip >= 6.0 ? 'heavy' : precip >= 2.0 ? 'moderate' : 'light'
+            });
+          }
+        }
+
+        forecastFrames.push({
+          hourOffset: h,
+          time: timeStr,
+          timestampMs: timeObj.getTime(),
+          hoursFromNow: h,
+          label: h === 0 ? 'Jetzt' : `+${h} Std.`,
+          hasPrecipitation: cells.length > 0,
+          maxPrecipMm: Math.round(maxPrecipMm * 10) / 10,
+          cells: cells
+        });
+      }
+
+      return forecastFrames;
+    } catch (err) {
+      console.warn('Zukunfts-Radar Prognose konnte nicht geladen werden:', err);
+      return null;
+    }
   }
 };

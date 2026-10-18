@@ -753,50 +753,42 @@
       <div class="tab-pane" id="tab-map">
         
         <section class="glass-card map-view-card">
-          <!-- 1. DUAL TOOLBAR: BASISKARTE (OSM) & WETTER-OVERLAYS -->
-          <div class="map-toolbar">
-            <div class="map-controls-row">
-              <div class="map-toolbar-group">
-                <span class="mtg-label">🗺️ BASISKARTE:</span>
-                <div class="map-btn-pills">
-                  <button class="map-base-btn active" data-base="osm-standard" title="OpenStreetMap Standard (Original)">🗺️ OSM Standard</button>
-                  <button class="map-base-btn" data-base="osm-outdoor" title="OSM Topo & Outdoor Relief">🏔️ OSM Outdoor</button>
-                  <button class="map-base-btn" data-base="osm-dark" title="OSM Dunkelmodus (High-Contrast)">🌙 OSM Dunkel</button>
-                  <button class="map-base-btn" data-base="satellite" title="Satelliten-Luftbild">🛰️ Satellit</button>
-                </div>
-              </div>
-
-              <div class="map-location-chip" id="map-location-chip">
-                <span>📍 München</span>
-              </div>
-            </div>
-
-            <div class="map-controls-row" style="margin-top: 6px;">
-              <div class="map-toolbar-group">
-                <span class="mtg-label">🌦️ WETTER-EBENEN:</span>
-                <div class="map-btn-pills">
-                  <button class="map-overlay-btn active" data-overlay="precip" title="Niederschlags-Radar mit Regen & Schnee-Unterscheidung">🌧️❄️ Regen & Schnee</button>
-                  <button class="map-overlay-btn" data-overlay="rainviewer-radar" title="RainViewer HD Niederschlagsradar (Live Scan + Nowcast)">📡 RainViewer Radar</button>
-                  <button class="map-overlay-btn" data-overlay="rainviewer-sat" title="RainViewer Infrarot Satellitenfilm (Wolken)">🛰️ RainViewer Satellit</button>
-                  <button class="map-overlay-btn" data-overlay="lightning" title="Live-Blitzentladungen & Gewitter-Tracker">⚡ Blitzortung Live</button>
-                  <button class="map-overlay-btn" data-overlay="wind" title="Windströmung, Vektoren & Böen">💨 Wind & Strömung</button>
-                  <button class="map-overlay-btn" data-overlay="clouds" title="Bewölkungsgrad & Wolkenbedeckung">☁️ Bewölkungsgrad</button>
-                  <button class="map-overlay-btn" data-overlay="temp" title="Temperatur-Feld & Frostgrenze">🌡️ Temperatur</button>
-                  <button class="map-overlay-btn" data-overlay="pressure" title="Luftdruck QNH & Isobaren">⏲️ Luftdruck</button>
-                </div>
-              </div>
-
-              <!-- GPX Action Button -->
-              <div class="map-toolbar-actions">
-                <button class="gpx-launch-btn" id="gpx-open-btn" title="GPX-Tour importieren und Mikrowetter analysieren">🥾 GPX Tour laden</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Fullscreen-capable Leaflet Map View -->
-          <div class="fullscreen-map-wrapper">
+          <!-- Fullscreen-capable Leaflet Map View with Floating Controls Dock -->
+          <div class="fullscreen-map-wrapper" id="fullscreen-map-wrapper">
             <div id="interactive-map"></div>
             <canvas id="wind-flow-canvas" class="wind-flow-canvas" style="display:none;"></canvas>
+
+            <!-- 1. SLEEK FLOATING TOP DOCK (WETTER-EBENEN, KARTENSTIL & ACTIONS) -->
+            <div class="map-floating-topbar" id="map-floating-topbar">
+              <!-- Overlay Switcher Pills -->
+              <div class="mft-group">
+                <span class="mft-label">Wetter:</span>
+                <button class="map-overlay-btn active" data-overlay="precip" title="24-Stunden hochauflösender Niederschlags- & Schneefilm">🌧️❄️ 24h Radar</button>
+                <button class="map-overlay-btn" data-overlay="wind" title="Animierte Windströmung & Böen">💨 Wind</button>
+                <button class="map-overlay-btn" data-overlay="lightning" title="Live-Blitzentladungen & Gewitter-Tracker">⚡ Blitze</button>
+                <button class="map-overlay-btn" data-overlay="clouds" title="Bewölkungsgrad & Wolkenfelder">☁️ Wolken</button>
+                <button class="map-overlay-btn" data-overlay="temp" title="Temperatur-Feld & Frostgrenzen">🌡️ Temp</button>
+                <button class="map-overlay-btn" data-overlay="pressure" title="Luftdruck QNH & Isobaren">⏲️ Druck</button>
+              </div>
+
+              <!-- Basiskarten Switcher Pills -->
+              <div class="mft-group">
+                <span class="mft-label">Karte:</span>
+                <button class="map-base-btn active" data-base="osm-outdoor" title="OSM Topo Relief & Bergkonturen">🏔️ Topo</button>
+                <button class="map-base-btn" data-base="osm-dark" title="OSM Dunkelmodus (High Contrast)">🌙 Dunkel</button>
+                <button class="map-base-btn" data-base="satellite" title="Satelliten-Luftbild">🛰️ Satellit</button>
+                <button class="map-base-btn" data-base="osm-standard" title="OpenStreetMap Standard">🗺️ Standard</button>
+              </div>
+
+              <!-- Action Toggles -->
+              <div class="mft-group mft-actions">
+                <button class="map-toggle-btn" id="stations-toggle-btn" title="Städte & Messstationen ein- oder ausblenden">🏷️ Stationen: Aus</button>
+                <button class="gpx-launch-btn" id="gpx-open-btn" title="GPX-Tour laden & Höhenprofil">🥾 GPX Tour</button>
+                <div class="map-location-chip" id="map-location-chip">
+                  <span>📍 München</span>
+                </div>
+              </div>
+            </div>
 
             <!-- Floating Thunderstorm Proximity Warning Box -->
             <div class="thunderstorm-alert-box" id="thunderstorm-alert-box" style="display:none;">
@@ -813,16 +805,7 @@
               <div class="tab-advice" id="tab-advice">⚠️ Grate, Gipfel und Klettersteige unverzüglich verlassen!</div>
             </div>
 
-            <!-- Radar Zeitleiste & Play-Button Overlay -->
-            <div class="radar-floating-controls" id="radar-floating-controls">
-              <button id="radar-play-btn" class="radar-play-btn" title="Radar-Film abspielen">▶</button>
-              <div class="radar-slider-wrap">
-                <input type="range" id="radar-time-slider" min="0" max="12" value="12" step="1">
-                <div class="radar-time-label" id="radar-time-display">Polarimetrischer Scan</div>
-              </div>
-            </div>
-
-            <!-- Precipitation & Weather Color Legend -->
+            <!-- Precipitation & Weather Color Legend (Top Right) -->
             <div class="map-legend-card" id="map-legend-card">
               <div class="legend-title" id="map-legend-title">Niederschlagsintensität & Typ:</div>
               <div class="legend-gradient-bar" id="map-legend-bar"></div>
@@ -833,6 +816,50 @@
                 <span>Schnee / Graupel</span>
               </div>
             </div>
+
+            <!-- =================================================================== -->
+            <!-- 2. HIGH-END 24H RADAR TIMELINE PLAYER (APPLE WEATHER / WINDY STYLE) -->
+            <!-- =================================================================== -->
+            <div class="radar-floating-controls modern-radar-player" id="radar-floating-controls">
+              <!-- Row 1: Time Display, Mode Chip & Fast Jump Buttons -->
+              <div class="radar-player-topline">
+                <div class="radar-info-left">
+                  <span class="radar-mode-chip" id="radar-mode-chip">🔮 24h Prognose-Radar</span>
+                  <span class="radar-time-banner" id="radar-time-display">Heute, 14:00 Uhr • +2 Std. Zukunft</span>
+                </div>
+
+                <div class="radar-jump-pills">
+                  <button class="radar-jump-btn" data-target="past">🔴 Live (-2h)</button>
+                  <button class="radar-jump-btn" data-target="now">Jetzt</button>
+                  <button class="radar-jump-btn" data-target="3">+3h</button>
+                  <button class="radar-jump-btn" data-target="6">+6h</button>
+                  <button class="radar-jump-btn" data-target="12">+12h</button>
+                  <button class="radar-jump-btn" data-target="24">+24h</button>
+                </div>
+              </div>
+
+              <!-- Row 2: Transport Controls & Timeline Track -->
+              <div class="radar-player-bottomline">
+                <div class="radar-transport-btns">
+                  <button id="radar-prev-btn" class="radar-transport-btn" title="1 Stunde zurück">⏮</button>
+                  <button id="radar-play-btn" class="radar-play-btn" title="24h-Radar abspielen / pausieren">▶</button>
+                  <button id="radar-next-btn" class="radar-transport-btn" title="1 Stunde vor">⏭</button>
+                  <button id="radar-speed-btn" class="radar-speed-btn" title="Geschwindigkeit umschalten">1x</button>
+                </div>
+
+                <div class="radar-slider-container">
+                  <input type="range" id="radar-time-slider" min="0" max="28" value="4" step="1">
+                  <div class="radar-timeline-markers">
+                    <span class="rtm-past">-2 Std. (Radar)</span>
+                    <span class="rtm-now">🔴 JETZT</span>
+                    <span class="rtm-future">+6 Std.</span>
+                    <span class="rtm-future">+12 Std.</span>
+                    <span class="rtm-future">+24 Std. (DWD & ECMWF)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </section>
 
