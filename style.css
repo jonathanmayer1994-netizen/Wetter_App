@@ -2994,18 +2994,115 @@ html, body {
 }
 
 /* ==========================================================================
-   TAB 5: ALPEN-MESSNETZE & REGIONEN
+   TAB 5: ALPEN-MESSNETZE, DATENQUELLEN & METEOROLOGISCHE MODELLE
    ========================================================================== */
 .networks-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 
 .active-routing-badge {
   background: rgba(48, 209, 88, 0.2) !important;
   color: #30d158 !important;
   border-color: rgba(48, 209, 88, 0.4) !important;
+}
+
+/* Quick Navigation Anchor Pills */
+.sources-quick-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 8px 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.sources-quick-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.sources-nav-btn {
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sources-nav-btn:hover,
+.sources-nav-btn.active {
+  background: rgba(10, 132, 255, 0.22);
+  border-color: var(--ios-blue);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Category Sections */
+.sources-category-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.sources-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 10px;
+}
+
+.sources-category-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sources-cat-icon {
+  font-size: 20px;
+}
+
+.sources-cat-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.sources-cat-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+  text-transform: uppercase;
+}
+
+.sources-category-subtitle {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: -6px;
+  line-height: 1.4;
 }
 
 .networks-grid {
@@ -3015,27 +3112,112 @@ html, body {
 }
 
 .network-item {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(15, 23, 42, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.network-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .net-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  font-size: 15px;
+}
+
+.net-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.net-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.net-provider-pill {
+  font-size: 9px;
   font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-secondary);
 }
 
 .net-desc {
   font-size: 12px;
   color: var(--text-secondary);
-  line-height: 1.45;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.sources-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.source-param-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(10, 132, 255, 0.12);
+  border: 1px solid rgba(10, 132, 255, 0.22);
+  color: #93c5fd;
+}
+
+.source-param-tag.snow {
+  background: rgba(192, 132, 252, 0.15);
+  border-color: rgba(192, 132, 252, 0.3);
+  color: #f5d0fe;
+}
+
+.source-param-tag.alert {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.source-param-tag.green {
+  background: rgba(48, 209, 88, 0.15);
+  border-color: rgba(48, 209, 88, 0.3);
+  color: #86efac;
+}
+
+.source-param-tag.orange {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fde68a;
+}
+
+.net-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.net-update {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
 }
 
 .net-status.active {

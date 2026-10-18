@@ -100,7 +100,7 @@
       </button>
       <button class="tab-btn" data-tab="tab-networks">
         <span class="tab-icon">📡</span>
-        <span class="tab-label">Alpen-Messnetze</span>
+        <span class="tab-label">Messnetze & Quellen</span>
       </button>
     </nav>
 
@@ -1291,62 +1291,637 @@
       </div>
 
       <!-- =================================================================== -->
-      <!-- TAB 5: ALPEN-MESSNETZE & GEBIETS-APIS -->
+      <!-- TAB 5: ALPEN-MESSNETZE, METEOROLOGISCHE QUELLEN & MODELL-ENGINE -->
       <!-- =================================================================== -->
       <div class="tab-pane" id="tab-networks">
         
         <section class="glass-card networks-card">
+          <!-- Card Header & Active Geo-Routing Badge -->
           <div class="card-header">
             <div class="card-title">
               <span class="card-icon">📡</span>
-              <span>ALPEN-MESSNETZE & SPEZIAL-APIS</span>
+              <span>ALPEN-MESSNETZE, DATENQUELLEN & METEOROLOGISCHE MODELLE</span>
             </div>
             <span class="card-tag active-routing-badge" id="active-routing-badge">Geo-Routing aktiv</span>
           </div>
 
           <p class="section-desc">
-            Best Weather routet die Datenanfragen automatisch basierend auf deiner Koordinate zum jeweils höchstauflösenden regionalen Messdienst:
+            Best Weather garantiert 100% meteorologische Transparenz. Jede Funktion der App – von Schneehöhen, Neuschneemengen und dem offiziellen Lawinenlagebericht über hochauflösende numerische Wettermodelle bis hin zu Live-Radar, Blitzortung, 10m-Geländeklima, Stadtklima und Sport-Physik – basiert auf geeichten Messdaten offizieller staatlicher Institute, europäischer Messnetze und wissenschaftlicher Satellitendaten:
           </p>
 
-          <div class="networks-grid">
-            
-            <div class="network-item" id="net-dwd">
-              <div class="net-head">
-                <span class="net-flag">🇩🇪</span>
-                <span class="net-name">DWD OpenData & LfU Bayern</span>
-              </div>
-              <p class="net-desc">MOSMIX-L Punkteraster mit 5.400 geeichten Stationen & RADOLAN Niederschlagsradar für ganz Süddeutschland und Alpenvorland.</p>
-              <div class="net-status active">● Bereit & Integriert</div>
-            </div>
-
-            <div class="network-item" id="net-lawis">
-              <div class="net-head">
-                <span class="net-flag">🇦🇹 🇩🇪</span>
-                <span class="net-name">LAWIS Public API & LWD Bayern</span>
-              </div>
-              <p class="net-desc">Hunderte automatisierte Grat- und Kammstationen (Nebelhorn, Zugspitzplatt, Fellhorn, Tirol) mit Schneehöhe & Böen im 10-Minuten-Takt.</p>
-              <div class="net-status active">● Bereit & Integriert</div>
-            </div>
-
-            <div class="network-item" id="net-suedtirol">
-              <div class="net-head">
-                <span class="net-flag">🇮🇹</span>
-                <span class="net-name">Open Data Hub Südtirol</span>
-              </div>
-              <p class="net-desc">Offizielle Bergwetterberichte in 1.000m-Stufen bis 4.000 m (Ortler, Dolomiten) & Südalpen-Gipfelradare.</p>
-              <div class="net-status active">● Bereit & Integriert</div>
-            </div>
-
-            <div class="network-item" id="net-slf">
-              <div class="net-head">
-                <span class="net-flag">🇨🇭 🇫🇷</span>
-                <span class="net-name">SLF IMIS & Météo-France AROME</span>
-              </div>
-              <p class="net-desc">180+ IMIS-Hochgebirgsstationen (Wallis, Zermatt, Mont-Blanc) & ultra-feines 1,1-km AROME-HD-Modell.</p>
-              <div class="net-status active">● Bereit & Integriert</div>
-            </div>
-
+          <!-- Quick Navigation Anchor Chips -->
+          <div class="sources-quick-nav">
+            <a href="#src-cat-networks" class="sources-nav-btn active">🏔️ Alpen-Messnetze</a>
+            <a href="#src-cat-snow" class="sources-nav-btn">❄️ Schnee & Lawinen</a>
+            <a href="#src-cat-weather" class="sources-nav-btn">☀️ Alles zum Wetter</a>
+            <a href="#src-cat-radar" class="sources-nav-btn">📡 Live-Radar & Blitze</a>
+            <a href="#src-cat-micro" class="sources-nav-btn">🦅 Mikroklima & 10m</a>
+            <a href="#src-cat-urban" class="sources-nav-btn">🏙️ Stadtklima & Umwelt</a>
+            <a href="#src-cat-sports" class="sources-nav-btn">🚴 Sport & Karten</a>
           </div>
+
+          <!-- ================================================================= -->
+          <!-- KATEGORIE 1: REGIONALE ALPEN-MESSNETZE & DYNAMISCHES GEO-ROUTING -->
+          <!-- ================================================================= -->
+          <div class="sources-category-box" id="src-cat-networks">
+            <div class="sources-category-header">
+              <div class="sources-category-title-wrap">
+                <span class="sources-cat-icon">🏔️</span>
+                <span class="sources-cat-title">Regionale Alpen-Messnetze & Aktives Geo-Routing</span>
+              </div>
+              <span class="sources-cat-badge">Echtzeit-Messnetze</span>
+            </div>
+            <p class="sources-category-subtitle">
+              Best Weather routet die Datenanfragen automatisch basierend auf deiner Koordinate zum jeweils höchstauflösenden regionalen Messdienst:
+            </p>
+
+            <div class="networks-grid">
+              
+              <!-- 1. DWD Bayern -->
+              <div class="network-item" id="net-dwd">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🇩🇪</span>
+                    <span class="net-name">DWD OpenData & LfU Bayern</span>
+                  </div>
+                  <span class="net-provider-pill">5.400 Stationen</span>
+                </div>
+                <p class="net-desc">MOSMIX-L Punkteraster mit 5.400 geeichten Bodenstationen, RADOLAN Niederschlagsradar (1-km-Raster) und bayerische LfU-Gewässerpegel für ganz Süddeutschland und das Alpenvorland.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">Talwetter</span>
+                  <span class="source-param-tag">MOSMIX-Statistik</span>
+                  <span class="source-param-tag">RADOLAN-Radar</span>
+                  <span class="source-param-tag green">Boden-Sensornetz</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Takt: Stündlich & 10-Min.</span>
+                  <div class="net-status active">● Bereit & Integriert</div>
+                </div>
+              </div>
+
+              <!-- 2. LAWIS & LWD -->
+              <div class="network-item" id="net-lawis">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🇦🇹 🇩🇪</span>
+                    <span class="net-name">LAWIS Public API & LWD Bayern / Tirol</span>
+                  </div>
+                  <span class="net-provider-pill">600+ Bergstationen</span>
+                </div>
+                <p class="net-desc">Über 600 automatisierte alpine Grat- und Kammstationen (Nebelhorn, Zugspitzplatt, Fellhorn, Seegrube, Sonnblick) mit berührungsloser Laser-/Ultraschall-Schneehöhe, 10-Minuten-Windböen und Schneedichte.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag snow">Schneehöhen (cm)</span>
+                  <span class="source-param-tag alert">Kamm-Windböen</span>
+                  <span class="source-param-tag">Lawinenwarndienst</span>
+                  <span class="source-param-tag green">Gratstationen</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Takt: 10-Minuten-Echtzeit</span>
+                  <div class="net-status active">● Bereit & Integriert</div>
+                </div>
+              </div>
+
+              <!-- 3. Südtirol -->
+              <div class="network-item" id="net-suedtirol">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🇮🇹</span>
+                    <span class="net-name">Open Data Hub Südtirol & ARPAV</span>
+                  </div>
+                  <span class="net-provider-pill">Dolomiten-Netz</span>
+                </div>
+                <p class="net-desc">Offizielle Bergwetterberichte in 1.000m-Stufen bis 4.000 m (Ortler, Dolomiten, Drei Zinnen, Brenta), Südalpen-Radar und hydrologische Landesmessnetze Bozen und Venetien.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">Dolomiten-Bergwetter</span>
+                  <span class="source-param-tag">Höhenstufen bis 4.000m</span>
+                  <span class="source-param-tag snow">Südalpen-Schnee</span>
+                  <span class="source-param-tag green">Landesmessnetz</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Takt: 15-Minuten-Takt</span>
+                  <div class="net-status active">● Bereit & Integriert</div>
+                </div>
+              </div>
+
+              <!-- 4. SLF Schweiz & Météo-France -->
+              <div class="network-item" id="net-slf">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🇨🇭 🇫🇷</span>
+                    <span class="net-name">SLF IMIS & Météo-France AROME</span>
+                  </div>
+                  <span class="net-provider-pill">180+ IMIS & 1,1 km</span>
+                </div>
+                <p class="net-desc">180+ IMIS-Hochgebirgsstationen des Schweizer SLF Davos (Wallis, Zermatt, Engadin, Berner Oberland) kombiniert mit dem ultra-feinen 1,1-km AROME-Alpenmodell von Météo-France.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">Schweizer Hochgebirge</span>
+                  <span class="source-param-tag snow">IMIS-Schneeverwehung</span>
+                  <span class="source-param-tag">Mont-Blanc-Massiv</span>
+                  <span class="source-param-tag green">AROME-HD</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Takt: 30-Min. & 1,1-km-Gitter</span>
+                  <div class="net-status active">● Bereit & Integriert</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ================================================================= -->
+          <!-- KATEGORIE 2: SCHNEEMENGE, LAWINENLAGEBERICHT & WINTERSPORT -->
+          <!-- ================================================================= -->
+          <div class="sources-category-box" id="src-cat-snow">
+            <div class="sources-category-header">
+              <div class="sources-category-title-wrap">
+                <span class="sources-cat-icon">❄️</span>
+                <span class="sources-cat-title">Schneemenge, Lawinenlagebericht (EAWS) & Alpin-Physik</span>
+              </div>
+              <span class="sources-cat-badge">Winter- & Alpinsport</span>
+            </div>
+            <p class="sources-category-subtitle">
+              Messdaten zur Schneelage, Neuschneezuwächsen, Gefahrenstufen und Schneedecken-Stabilität:
+            </p>
+
+            <div class="networks-grid">
+              
+              <!-- Schneehöhen & Neuschnee -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🏔️</span>
+                    <span class="net-name">Schneehöhe, Neuschnee (24h/48h) & Zustand</span>
+                  </div>
+                  <span class="net-provider-pill">LAWIS & ERA5-Land</span>
+                </div>
+                <p class="net-desc">Erfasst die Gesamtschneehöhe am Berg und im Tal via Ultraschall-/Lasersensoren. Berechnet 24h- und 48h-Neuschneezuwächse (cm), Schneedichte (kg/m³) und physikalischen Schneezustand (Pulverschnee, Firn, Nassschnee, Bruchharsch).</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag snow">Gesamtschnee (cm)</span>
+                  <span class="source-param-tag snow">24h / 48h Neuschnee</span>
+                  <span class="source-param-tag">Schneedichte</span>
+                  <span class="source-param-tag green">Schneezustands-Klassifikation</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: LAWIS, LfU Bayern, SLF Davos, ERA5</span>
+                  <div class="net-status active">● Stündlich geeicht</div>
+                </div>
+              </div>
+
+              <!-- EAWS Lawinenlagebericht -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">⚠️</span>
+                    <span class="net-name">Offizieller Lawinenlagebericht (EAWS)</span>
+                  </div>
+                  <span class="net-provider-pill">Offizieller Standard</span>
+                </div>
+                <p class="net-desc">Vollständige Integration der offiziellen 5-stufigen europäischen Lawinengefahrenskala (Stufe 1 Gering bis 5 Sehr groß). Analyse der 4 Kern-Gefahrenmuster (Triebschnee, Altschnee, Nassschnee, Gleitschnee) unter Berücksichtigung von Exposition, Höhe und Hangsteilheit (>30°, >35°, >40°).</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag alert">EAWS Stufe 1–5</span>
+                  <span class="source-param-tag alert">Triebschneeproblem</span>
+                  <span class="source-param-tag alert">Altschneeproblem</span>
+                  <span class="source-param-tag orange">Hangneigungs-Matrix</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: EAWS, LWD Bayern, LWD Tirol, SLF</span>
+                  <div class="net-status active">● Täglich 07:30 / 17:00</div>
+                </div>
+              </div>
+
+              <!-- Nullgradgrenze & Schneefallgrenze -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🎿</span>
+                    <span class="net-name">Nullgradgrenze & Schneefallgrenze</span>
+                  </div>
+                  <span class="net-provider-pill">3D-Atmosphäre</span>
+                </div>
+                <p class="net-desc">Berechnung der 0°C-Isotherme (m ü. M.) in der freien Atmosphäre und der effektiven orografischen Schneefallgrenze unter Einbezug der Feuchttemperatur (Wet-Bulb-Effekt), Verdunstungskälte bei starkem Schneefall und Tal-Inversionsschichten.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag snow">0°C-Grenze (m)</span>
+                  <span class="source-param-tag snow">Schneefallgrenze (m)</span>
+                  <span class="source-param-tag">Feuchttemperatur (Tw)</span>
+                  <span class="source-param-tag green">Isothermen-Profil</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: DWD ICON 3D & Barometrische Physik</span>
+                  <div class="net-status active">● Stündliche Berechnung</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ================================================================= -->
+          <!-- KATEGORIE 3: ALLES ZUM WETTER: NUMERISCHE VORHERSAGEMODELLE -->
+          <!-- ================================================================= -->
+          <div class="sources-category-box" id="src-cat-weather">
+            <div class="sources-category-header">
+              <div class="sources-category-title-wrap">
+                <span class="sources-cat-icon">☀️</span>
+                <span class="sources-cat-title">Alles zum Wetter: Numerische Prognosemodelle</span>
+              </div>
+              <span class="sources-cat-badge">Wettervorhersage & Physik</span>
+            </div>
+            <p class="sources-category-subtitle">
+              Hochauflösende Wettermodelle, Ensemble-Systeme und statistische Nachbearbeitung:
+            </p>
+
+            <div class="networks-grid">
+              
+              <!-- DWD ICON-D2 -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🇩🇪</span>
+                    <span class="net-name">DWD ICON-D2 (Super-HD Alpenraum)</span>
+                  </div>
+                  <span class="net-provider-pill">2,2 km Gitter</span>
+                </div>
+                <p class="net-desc">Konvektionsauflösendes Hochpräzisionsmodell des Deutschen Wetterdienstes (Offenbach). Berechnet kleinräumige Gebirgsaufwinde, Föhndurchbrüche in Alpentälern, lokale Schauer- und Gewitterzellen sowie stündliche Windspitzen für +1h bis +48h.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">Temperatur 2m</span>
+                  <span class="source-param-tag alert">Windspitzen & Böen</span>
+                  <span class="source-param-tag snow">Niederschlag & Schnee</span>
+                  <span class="source-param-tag">Föhneffekte</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: Deutscher Wetterdienst (DWD)</span>
+                  <div class="net-status active">● Alle 3 Stunden neu</div>
+                </div>
+              </div>
+
+              <!-- ECMWF IFS -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🇪🇺</span>
+                    <span class="net-name">ECMWF IFS (Weltweiter Goldstandard)</span>
+                  </div>
+                  <span class="net-provider-pill">9 km High-Res</span>
+                </div>
+                <p class="net-desc">Das weltweit führende globale Wettermodell für mittelfristige Prognosen. Bildet das Rückgrat für die 10-Tage-Vorhersage, synoptische Großwetterlagen, 500-hPa-Geopotenzial, Frontdurchgänge und die verlässliche Trendermittlung.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">10-Tage-Trend</span>
+                  <span class="source-param-tag">Geopotenzial 500 hPa</span>
+                  <span class="source-param-tag">Großwetterlagen</span>
+                  <span class="source-param-tag green">Frontensysteme</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: Europäisches Zentrum (ECMWF)</span>
+                  <div class="net-status active">● 2× täglich (00Z & 12Z)</div>
+                </div>
+              </div>
+
+              <!-- NOAA GFS -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🇺🇸</span>
+                    <span class="net-name">NOAA GFS (Global Forecast System)</span>
+                  </div>
+                  <span class="net-provider-pill">13 km Global</span>
+                </div>
+                <p class="net-desc">Das unabhängige globale Wettermodell der USA. Wird in Best Weather für die Multi-Model-Diskrepanz-Engine herangezogen, um Vorhersageabweichungen (Niederschlags- und Windunterschiede) und Modellkonsens transparent darzustellen.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag orange">Modell-Diskrepanz</span>
+                  <span class="source-param-tag">Verlässlichkeits-Score</span>
+                  <span class="source-param-tag">GFS vs. ECMWF</span>
+                  <span class="source-param-tag green">Ensemble-Konsens</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: NOAA National Weather Service</span>
+                  <div class="net-status active">● 4× täglich (6h-Takt)</div>
+                </div>
+              </div>
+
+              <!-- DWD MOSMIX-L -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">📍</span>
+                    <span class="net-name">DWD MOSMIX-L (Statistisches Post-Processing)</span>
+                  </div>
+                  <span class="net-provider-pill">Punktgenau</span>
+                </div>
+                <p class="net-desc">Statistische Kalibrierung von Modellvorhersagen durch jahrzehntelange Messreihen an realen Bodenstationen. Beseitigt systematische Modell-Verzerrungen an Talgrund- und Gipfelstandorten für maximale Punktgenauigkeit.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">5.400 Stationen</span>
+                  <span class="source-param-tag">Bias-Korrektur</span>
+                  <span class="source-param-tag">Lokale Temperaturkurve</span>
+                  <span class="source-param-tag green">Sonnenscheindauer</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: DWD MOSMIX-L OpenData</span>
+                  <div class="net-status active">● Stündliche Kalibrierung</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ================================================================= -->
+          <!-- KATEGORIE 4: LIVE-RADAR, 48H-PROGNOSEFILM & BLITZORTUNG -->
+          <!-- ================================================================= -->
+          <div class="sources-category-box" id="src-cat-radar">
+            <div class="sources-category-header">
+              <div class="sources-category-title-wrap">
+                <span class="sources-cat-icon">📡</span>
+                <span class="sources-cat-title">Live-Radar, 48h-Prognosefilm & Blitzortung</span>
+              </div>
+              <span class="sources-cat-badge">Doppler & Nowcasting</span>
+            </div>
+            <p class="sources-category-subtitle">
+              Echtzeit-Niederschlagsechos, stündliche 48h-Zukunftsbilder und Millisekunden-Blitzpeilung:
+            </p>
+
+            <div class="networks-grid">
+              
+              <!-- RainViewer Doppler-Radar -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🌧️</span>
+                    <span class="net-name">RainViewer HD Doppler-Radar (-2h bis jetzt)</span>
+                  </div>
+                  <span class="net-provider-pill">Echte Doppler-Reflektivität</span>
+                </div>
+                <p class="net-desc">Direkte Kachelintegration der nationalen Wetterradare (DWD RADOLAN, MeteoSchweiz Doppler, Austro Control). Liefert kalibrierte Doppler-Reflektivität (dBZ) im 10-Minuten-Takt von -2h bis zum aktuellen Live-Scan mit hardwarebeschleunigtem Preloading.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">Radarreflektivität (dBZ)</span>
+                  <span class="source-param-tag snow">Regen- & Schneeechos</span>
+                  <span class="source-param-tag">MaxNativeZoom 7</span>
+                  <span class="source-param-tag green">60 FPS Hardware-Preload</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: RainViewer & Nationale Wetterdienste</span>
+                  <div class="net-status active">● Alle 10 Minuten live</div>
+                </div>
+              </div>
+
+              <!-- 48h Prognose-Radar -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🔮</span>
+                    <span class="net-name">48h Zukunfts-Radar & Niederschlagsfilm</span>
+                  </div>
+                  <span class="net-provider-pill">+1h bis +48h</span>
+                </div>
+                <p class="net-desc">Stündliche räumliche Niederschlags- und Schneefelder für 21 alpine Referenz-Koordinaten. Ermöglicht lückenloses Scrubbing über 48 Stunden mit meteorologischen Schnellsprung-Zwischenschritten (+3h, +6h, +12h, +18h, +24h, +30h, +36h, +42h, +48h).</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">48h Zukunftsfilm</span>
+                  <span class="source-param-tag">Stündliche Zwischenschritte</span>
+                  <span class="source-param-tag snow">Alpinschnee-Tracking</span>
+                  <span class="source-param-tag green">Zell-Intensität (mm/h)</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: Open-Meteo High-Resolution Ensemble</span>
+                  <div class="net-status active">● Stündliche Berechnung</div>
+                </div>
+              </div>
+
+              <!-- Blitzortung.org -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">⚡</span>
+                    <span class="net-name">Blitzortung.org Community TOA & Gewitter-Tracker</span>
+                  </div>
+                  <span class="net-provider-pill">Millisekunden-Echtzeit</span>
+                </div>
+                <p class="net-desc">Weltweites Sensornetzwerk aus VLF-Empfängern zur Blitzortung per Time-of-Arrival (TOA) Methode. Berechnet die Entfernung zum nächsten Blitz, Blitztyp (Wolke-Boden CG vs. Wolke-Wolke IC), Stromstärke in kA, Schallaufzeit (Donner-Sekunden = km × 3) und Eintreffzeit (ETA).</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag alert">Wolke-Boden (CG)</span>
+                  <span class="source-param-tag alert">Wolke-Wolke (IC)</span>
+                  <span class="source-param-tag">Donner-Verzögerung</span>
+                  <span class="source-param-tag orange">Eintreffzeit (ETA)</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: Blitzortung.org TOA Community</span>
+                  <div class="net-status active">● Live-Millisekunden-Push</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ================================================================= -->
+          <!-- KATEGORIE 5: 10M-GELÄNDEMODELL & MIKROKLIMA-PHYSIK -->
+          <!-- ================================================================= -->
+          <div class="sources-category-box" id="src-cat-micro">
+            <div class="sources-category-header">
+              <div class="sources-category-title-wrap">
+                <span class="sources-cat-icon">🦅</span>
+                <span class="sources-cat-title">10m-Geländemodell & Alpine Mikroklima-Physik</span>
+              </div>
+              <span class="sources-cat-badge">Topografie & Physik</span>
+            </div>
+            <p class="sources-category-subtitle">
+              Berechnung orografischer Wetterveränderungen an Steilhängen, Tälern und Gebirgskämmen:
+            </p>
+
+            <div class="networks-grid">
+              
+              <!-- Copernicus DEM -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🛰️</span>
+                    <span class="net-name">Copernicus DEM & NASA SRTM (10m / 30m Gitter)</span>
+                  </div>
+                  <span class="net-provider-pill">Satelliten-DEM</span>
+                </div>
+                <p class="net-desc">Hochauflösende Geländehöhen-Interpolation auf 10m-Raster. Berechnet die exakte Geländehöhe jedes Tourenpunkts, die Hangneigung (Slope in Grad) für Lawinenrisiken und die Hangexposition (Nord/Süd/Ost/West) für solare Einstrahlung.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">10m / 30m Höhenraster</span>
+                  <span class="source-param-tag orange">Hangneigung (Slope °)</span>
+                  <span class="source-param-tag">Exposition (Aspect)</span>
+                  <span class="source-param-tag green">Kamm-Kompression (Venturi)</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: Copernicus Digital Elevation Model</span>
+                  <div class="net-status active">● Geodätische Basis</div>
+                </div>
+              </div>
+
+              <!-- MicroEngine Physik -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🧪</span>
+                    <span class="net-name">MicroEngine: Mikrometeorologische Gradienten</span>
+                  </div>
+                  <span class="net-provider-pill">Barometrische Physik</span>
+                </div>
+                <p class="net-desc">Physikalisches 4-Schichten-Modell (Talboden, Mittelstation, Gipfelgrat, freie Atmosphäre) nach dem feuchtadiabatischen Gradienten (0,65°C / 100m). Erkennt Temperaturinversionen (warmer Gipfel über Kaltluftsee), Lee-Föhneffekte und Kaltluftseen in Senken.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">4 Höhenschichten</span>
+                  <span class="source-param-tag green">Inversionserkennung</span>
+                  <span class="source-param-tag orange">Föhn-Lee-Erwärmung</span>
+                  <span class="source-param-tag">Kaltluftseen-Modellierung</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: Best Weather MicroEngine Physik</span>
+                  <div class="net-status active">● Dynamisch je Koordinate</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ================================================================= -->
+          <!-- KATEGORIE 6: STADTKLEINWETTER, BIOWETTER & UMWELT-MESSNETZE -->
+          <!-- ================================================================= -->
+          <div class="sources-category-box" id="src-cat-urban">
+            <div class="sources-category-header">
+              <div class="sources-category-title-wrap">
+                <span class="sources-cat-icon">🏙️</span>
+                <span class="sources-cat-title">Stadtklima, Biowetter & Umwelt-Messnetze</span>
+              </div>
+              <span class="sources-cat-badge">Umwelt & Gesundheit</span>
+            </div>
+            <p class="sources-category-subtitle">
+              Messdaten zu Feinstaub, Schadstoffen, Pollenflug, UV-Strahlung und thermischem Wohlbefinden:
+            </p>
+
+            <div class="networks-grid">
+              
+              <!-- Copernicus CAMS & UBA -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">💨</span>
+                    <span class="net-name">Copernicus CAMS & Umweltbundesamt (UBA)</span>
+                  </div>
+                  <span class="net-provider-pill">Europäischer CAQI</span>
+                </div>
+                <p class="net-desc">Atmosphärisches Umwelt-Monitoring zur stündlichen Messung von Feinstaub (PM2.5, PM10), bodennahem Ozon (O₃), Stickstoffdioxid (NO₂) und Schwefeldioxid (SO₂) mit Einstufung in den offiziellen europäischen Luftqualitätsindex (CAQI 1–5).</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag alert">Feinstaub PM2.5 / PM10</span>
+                  <span class="source-param-tag orange">Ozon (O₃)</span>
+                  <span class="source-param-tag">Stickstoffdioxid (NO₂)</span>
+                  <span class="source-param-tag green">CAQI Luftqualitäts-Index</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: Copernicus CAMS & Umweltbundesamt</span>
+                  <div class="net-status active">● Stündliche Messwerte</div>
+                </div>
+              </div>
+
+              <!-- DWD Pollenflug -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🌸</span>
+                    <span class="net-name">DWD Pollenflug-Gefahrenindex (Medizin-Meteorologie)</span>
+                  </div>
+                  <span class="net-provider-pill">8 Allergene</span>
+                </div>
+                <p class="net-desc">Amtliche Gefahrenstufen für die 8 wichtigsten allergenen Pflanzenarten: Birke, Gräser, Hasel, Erle, Esche, Beifuß, Ambrosia und Roggen (Stufe 0: Keine bis Stufe 3: Hohe Belastung) mit saisonalen Blühprognosen.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag orange">8 Allergen-Arten</span>
+                  <span class="source-param-tag alert">Pollen-Warnstufen</span>
+                  <span class="source-param-tag">Allergiker-Schutzhinweise</span>
+                  <span class="source-param-tag green">Saisonale Phänologie</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: DWD Medizin-Meteorologie & PID</span>
+                  <div class="net-status active">● Täglich aktualisiert</div>
+                </div>
+              </div>
+
+              <!-- Biowetter & UV-Index -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🌡️</span>
+                    <span class="net-name">Biowetter, Gefühlte Temperatur & UV-Index</span>
+                  </div>
+                  <span class="net-provider-pill">Klima-Michel-Modell</span>
+                </div>
+                <p class="net-desc">Biometeorologische Wärmebilanz des menschlichen Körpers (Gefühlte Temperatur nach Klima-Michel unter Einbezug von Windchill, Strahlung und Luftfeuchte). UV-Index (1 bis 11+) mit maximaler Sonnenbrandzeit und Schutzmaßnahmen.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">Klima-Michel-Modell</span>
+                  <span class="source-param-tag">Gefühlte Temperatur</span>
+                  <span class="source-param-tag orange">UV-Index & Schutzzeit</span>
+                  <span class="source-param-tag alert">Thermischer Stress</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: DWD Biowetter & NOAA UV Engine</span>
+                  <div class="net-status active">● Stündliche Berechnung</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ================================================================= -->
+          <!-- KATEGORIE 7: SPORT, TOUREN-ROUTING & KARTENTECHNOLOGIE -->
+          <!-- ================================================================= -->
+          <div class="sources-category-box" id="src-cat-sports">
+            <div class="sources-category-header">
+              <div class="sources-category-title-wrap">
+                <span class="sources-cat-icon">🚴</span>
+                <span class="sources-cat-title">Sport, Touren-Routing & Kartentechnologie</span>
+              </div>
+              <span class="sources-cat-badge">Alpinsport & GIS</span>
+            </div>
+            <p class="sources-category-subtitle">
+              Schweizer SAC-Wanderskala, DIN 33466 / Munter-Formel, Radsport-Wattphysik und GIS-Karten:
+            </p>
+
+            <div class="networks-grid">
+              
+              <!-- SAC Wanderskala & Watt-Physik -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">⏱️</span>
+                    <span class="net-name">SAC-Wanderskala, DIN 33466 & Watt-Steigungsphysik</span>
+                  </div>
+                  <span class="net-provider-pill">Alpiner Standard</span>
+                </div>
+                <p class="net-desc">Differenzierte Tourenzeit- und Wetterfenster-Berechnung für Wandern (SAC-Norm T1–T6: 4 km/h flach, 400 Hm/h Aufstieg mit Munter-Formel) und Radsport (Watt-äquivalente Steigungsmodelle nach Minetti mit 4 individuellen Fitness-Stufen: Gemütlich, Normal, Sportlich, Profi).</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag">SAC T1–T6 Skala</span>
+                  <span class="source-param-tag green">DIN 33466 Marschzeit</span>
+                  <span class="source-param-tag">Watt-Steigungsmodell</span>
+                  <span class="source-param-tag orange">4 Fitness-Stufen</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: Schweizer Alpen-Club (SAC) & Minetti</span>
+                  <div class="net-status active">● Dynamisch je GPX-Route</div>
+                </div>
+              </div>
+
+              <!-- Basiskarten & Satellit -->
+              <div class="network-item">
+                <div class="net-head">
+                  <div class="net-title-group">
+                    <span class="net-flag">🗺️</span>
+                    <span class="net-name">Kartografie: OpenTopoMap, CartoDB & Esri Satellite</span>
+                  </div>
+                  <span class="net-provider-pill">4 GIS-Ebenen</span>
+                </div>
+                <p class="net-desc">Vier nahtlos umschaltbare GIS-Basiskarten: Topografisches OpenTopo Relief mit Geländeschummerung und Höhenlinien, CartoDB Dark Matter Kontrastkarte für Radarbeobachtung, Esri World Imagery Satelliten-Orthophotos und OSM Standard.</p>
+                <div class="sources-tags-row">
+                  <span class="source-param-tag green">OpenTopo Relief & Konturen</span>
+                  <span class="source-param-tag">CartoDB Dark Matter</span>
+                  <span class="source-param-tag">Esri HD-Satellitenbilder</span>
+                  <span class="source-param-tag">OpenStreetMap Standard</span>
+                </div>
+                <div class="net-foot">
+                  <span class="net-update">Quelle: OSM, OpenTopoMap, CartoDB, Esri</span>
+                  <div class="net-status active">● Weltweiter Geodatenstand</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
         </section>
 
       </div>

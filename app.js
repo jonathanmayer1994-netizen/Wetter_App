@@ -385,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupWebcamModal();
   setupSportsTab();
   initLeafletMap();
+  setupSourcesQuickNav();
 
   // Load initial location (München: 520 m)
   loadLocation(state.currentLocation);
@@ -5039,6 +5040,25 @@ function updateGeoRoutingNetworks() {
     if (netDwd) netDwd.style.borderColor = 'var(--ios-cyan)';
     if (routingBadge) routingBadge.innerText = 'Geo-Routing: DWD MOSMIX & Open-Meteo aktiv';
   }
+}
+
+/**
+ * Sanftes Scrollen und Aktiv-Highlighting der Quellen-Kategorien in Tab 5
+ */
+function setupSourcesQuickNav() {
+  document.querySelectorAll('.sources-nav-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = btn.getAttribute('href')?.replace('#', '');
+      if (!targetId) return;
+      const targetElem = document.getElementById(targetId);
+      if (targetElem) {
+        document.querySelectorAll('.sources-nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        targetElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
 }
 
 // Temperature Conversion Helper
