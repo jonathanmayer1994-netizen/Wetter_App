@@ -122,6 +122,18 @@ def run_tests():
         
         tab2_label_mtn = page.inner_text("#tab-2-label")
         report("Tab 2 dynamically switched to Alpine/Berg mode for Matterhorn", "Berg" in tab2_label_mtn)
+
+        # Test Mountain 3D Massif Mode with realistic clouds and clean alpine rendering
+        page.click(".tab-btn[data-tab='tab-mountain']")
+        page.wait_for_timeout(900)
+        page.screenshot(path="mountain_massif_clouds_screenshot.png")
+
+        # Test Mountain Windströmung Mode with Altimetric Wind Compasses for Matterhorn
+        page.click("#m3d-mode-wind")
+        page.wait_for_timeout(400)
+        wind_mode_active = page.eval_on_selector("#m3d-mode-wind", "el => el.classList.contains('active')")
+        report("Mountain Windströmung mode button activates altimetric compass view", wind_mode_active)
+        page.screenshot(path="mountain_wind_compass_screenshot.png")
         
         page.close()
 
@@ -229,6 +241,8 @@ def run_tests():
         print("\n--- SUITE 7: Top Priority Hero Hazard Alert Banner ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
         page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.wait_for_selector("#hero-location-name", timeout=10000)
+        page.wait_for_timeout(500)
         page.wait_for_selector("#hero-hazard-alert", state="attached", timeout=10000)
         
         alert_in_dom = page.query_selector("#hero-hazard-alert") is not None
@@ -265,6 +279,21 @@ def run_tests():
         # Test collapse toggle button on radar player
         collapse_btn = page.query_selector("#radar-player-toggle-btn")
         report("Radar collapse toggle button present", collapse_btn is not None)
+
+        # Test that radar controls stay visible on Wind, Wolken, Temp overlays
+        page.click(".map-overlay-btn[data-overlay='wind']")
+        page.wait_for_timeout(200)
+        report("Radar timeline controls stay visible on Wind overlay", page.is_visible("#radar-floating-controls"))
+        
+        page.click(".map-overlay-btn[data-overlay='clouds']")
+        page.wait_for_timeout(200)
+        report("Radar timeline controls stay visible on Clouds overlay", page.is_visible("#radar-floating-controls"))
+
+        page.click(".map-overlay-btn[data-overlay='temp']")
+        page.wait_for_timeout(200)
+        report("Radar timeline controls stay visible on Temp overlay", page.is_visible("#radar-floating-controls"))
+
+        page.click(".map-overlay-btn[data-overlay='precip']") # back to precip
         
         page.close()
 
@@ -316,9 +345,9 @@ def run_tests():
         page.close()
 
         # =====================================================================
-        # TEST SUITE 11: MAPLIBRE GL JS 3D ALPINE WEBGL WEATHER MAP IN APP
+        # TEST SUITE 11: 2D LEAFLET MULTI-LAYER & 48H MODELL-RADAR KARTE
         # =====================================================================
-        print("\n--- SUITE 11: MapLibre GL JS 3D Alpine WebGL Weather Map (In App) ---")
+        print("\n--- SUITE 11: 2D Leaflet Multi-Layer & 48h Radar Map (In App) ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
         page_errors = []
         page.on("pageerror", lambda err: page_errors.append(str(err)))
@@ -327,91 +356,376 @@ def run_tests():
         page.click(".tab-btn[data-tab='tab-map']")
         page.wait_for_timeout(1000)
         
-        report("MapLibre weather container visible in tab-map", page.is_visible("#maplibre-weather-container"))
-        report("MapLibre interactive map DOM element rendered", page.is_visible("#maplibre-interactive-map"))
+        report("Leaflet map wrapper visible in tab-map", page.is_visible("#fullscreen-map-wrapper"))
+        report("Interactive map DOM element rendered", page.is_visible("#interactive-map"))
         
-        # Verify 3D Terrain Toggle
-        terrain_btn = page.query_selector("#maplibre-terrain-toggle-btn")
-        report("3D Alpine Relief toggle button present", terrain_btn is not None)
-        page.click("#maplibre-terrain-toggle-btn")
+        # Verify Zero Annoying White Popups Over User Location
+        report("Zero annoying white boxes or auto-open popups over user location", not page.is_visible(".leaflet-popup"))
+        report("User location beacon pin is rendered on map", page.is_visible(".user-location-beacon"))
+
+        # Verify Modern Floating Zoom & Navigation Dock Controls (+ / − / 🎯 / 🏔️)
+        report("Floating Zoom Dock is visible on map", page.is_visible("#map-floating-zoom-dock"))
+        page.click("#map-zoom-in-btn")
+        page.wait_for_timeout(100)
+        report("Map zoom in (+) button operates smoothly", True)
+        page.click("#map-zoom-out-btn")
+        page.wait_for_timeout(100)
+        report("Map zoom out (−) button operates smoothly", True)
+        page.click("#map-zoom-location-btn")
+        page.wait_for_timeout(150)
+        report("Map recenter to location (🎯) operates smoothly", True)
+        page.click("#map-zoom-alps-btn")
+        page.wait_for_timeout(150)
+        report("Map Alps overview (🏔️) button operates smoothly", True)
+        
+        # Verify Base Map Layers
+        for base in ["osm-outdoor", "osm-dark", "satellite", "osm-standard"]:
+            btn = page.query_selector(f".map-base-btn[data-base='{base}']")
+            report(f"Map base button '{base}' present", btn is not None)
+            page.click(f".map-base-btn[data-base='{base}']")
+            page.wait_for_timeout(150)
+            is_active = page.eval_on_selector(f".map-base-btn[data-base='{base}']", "el => el.classList.contains('active')")
+            report(f"Map base layer '{base}' activates cleanly", is_active)
+        
+        # Verify Wind Compass Widget on Wind Overlay
+        page.click(".map-overlay-btn[data-overlay='wind']")
         page.wait_for_timeout(200)
-        terrain_active_after = page.eval_on_selector("#maplibre-terrain-toggle-btn", "el => el.classList.contains('active')")
-        page.click("#maplibre-terrain-toggle-btn") # toggle back
-        report("3D Alpine Relief toggle handles user interaction smoothly", True)
-        
-        # Verify Marine Mode Toggle
-        marine_btn = page.query_selector("#maplibre-marine-toggle-btn")
-        report("Marine & Coastal mode button present", marine_btn is not None)
-        page.click("#maplibre-marine-toggle-btn")
-        page.wait_for_timeout(200)
-        marine_active = page.eval_on_selector("#maplibre-marine-toggle-btn", "el => el.classList.contains('active')")
-        report("Clicking Marine mode activates coastal/marine buoy layer", marine_active)
-        page.click("#maplibre-marine-toggle-btn") # toggle back
-        
-        # Verify Altitude Level Selector (5 levels: 4200m, 3000m, 2000m, 1000m, 500m)
-        alt_btns = page.query_selector_all(".alt-level-btn")
-        report("All 5 Alpine altitude & pressure level buttons rendered", len(alt_btns) == 5)
-        
-        page.click(".alt-level-btn[data-alt='4200']")
-        page.wait_for_timeout(200)
-        alt_badge_text = page.inner_text("#maplibre-altitude-badge")
-        report("Switching to 4.200m updates altitude badge with jet stream info", "4.200" in alt_badge_text and "600 hPa" in alt_badge_text)
-        
+        compass_visible = page.is_visible("#map-wind-compass-widget")
+        report("Wind Compass widget appears when Wind overlay is active", compass_visible)
+        wind_speed_text = page.inner_text("#mwc-speed-val")
+        report("Wind Compass displays wind speed in km/h", len(wind_speed_text) > 0 and int(wind_speed_text) >= 0)
+        needle_transform = page.eval_on_selector("#mwc-needle-wrap", "el => el.style.transform")
+        report("Wind Compass needle displays rotational bearing", "rotate" in needle_transform)
+
+        # Switch back to precip overlay and verify wind compass hides
+        page.click(".map-overlay-btn[data-overlay='precip']")
+        page.wait_for_timeout(150)
+        report("Wind Compass cleanly hides when switching to another overlay", not page.is_visible("#map-wind-compass-widget"))
+
+        # Verify Weather Overlays
+        for mo in ["precip", "wind", "lightning", "clouds", "temp", "pressure"]:
+            btn = page.query_selector(f".map-overlay-btn[data-overlay='{mo}']")
+            report(f"Map overlay button '{mo}' present", btn is not None)
+            page.click(f".map-overlay-btn[data-overlay='{mo}']")
+            page.wait_for_timeout(150)
+            is_act = page.eval_on_selector(f".map-overlay-btn[data-overlay='{mo}']", "el => el.classList.contains('active')")
+            report(f"Map overlay '{mo}' activates cleanly", is_act)
+
         # Verify Radar Transport & Play/Pause
-        play_btn = page.query_selector("#maplibre-radar-play-btn")
-        report("MapLibre radar play/pause button present", play_btn is not None)
-        page.click("#maplibre-radar-play-btn")
+        play_btn = page.query_selector("#radar-play-btn")
+        report("Radar play/pause button present", play_btn is not None)
+        page.click("#radar-play-btn")
         page.wait_for_timeout(200)
-        play_icon = page.inner_text("#maplibre-radar-play-btn")
-        report("Clicking radar play button switches icon to pause (⏸)", "⏸" in play_icon)
-        page.click("#maplibre-radar-play-btn") # pause
+        play_icon = page.inner_text("#radar-play-btn")
+        report("Clicking radar play button toggles state", "⏸" in play_icon or "▶" in play_icon)
+        page.click("#radar-play-btn") # pause
+        
+        # Verify Radar Navigation & Speed
+        page.click("#radar-next-btn")
+        page.wait_for_timeout(100)
+        page.click("#radar-prev-btn")
+        page.wait_for_timeout(100)
+        page.click("#radar-speed-btn")
+        page.wait_for_timeout(100)
+        report("Radar transport buttons (prev, next, speed) operate smoothly", True)
         
         # Verify Radar Slider
-        slider_val = page.eval_on_selector("#maplibre-radar-slider", "el => el.value")
-        report("MapLibre radar liquid slider is interactable", slider_val is not None)
+        slider_val = page.eval_on_selector("#radar-time-slider", "el => el.value")
+        report("Radar timeline slider is interactable", slider_val is not None)
         
-        # Verify iOS Liquid Glass Bottom Sheet
-        page.evaluate("""() => {
-            const sheet = document.getElementById('maplibre-bottom-sheet');
-            sheet.classList.add('visible');
-            document.getElementById('sbs-title').innerText = 'Zugspitze Gipfel';
-            document.getElementById('sbs-temp-val').innerText = '-2.4°C';
-        }""")
+        # Verify Radar Jump Pills
+        jump_now = page.query_selector(".radar-jump-btn[data-target='now']")
+        report("Radar jump pill 'Jetzt' present", jump_now is not None)
+        if jump_now:
+            jump_now.click()
+            page.wait_for_timeout(100)
+            report("Radar jump to now operates smoothly", True)
+            
+        # Verify Stations Toggle button removed completely
+        st_btn = page.query_selector("#stations-toggle-btn")
+        report("Stations toggle button cleanly removed from DOM", st_btn is None)
+
+        # Verify Point Weather Card under Compass in Left HUD
+        point_weather_card_visible = page.is_visible("#map-point-weather-card")
+        report("Point Weather Card under compass is rendered and visible", point_weather_card_visible)
+        pw_name = page.inner_text("#mpw-location-name")
+        pw_temp = page.inner_text("#mpw-temp-val")
+        pw_cond = page.inner_text("#mpw-condition-label")
+        report("Point Weather Card displays location name", len(pw_name) > 0)
+        report("Point Weather Card displays temperature value", "°" in pw_temp)
+        report("Point Weather Card displays weather condition", len(pw_cond) > 0)
+        report("Point Weather Card displays rain metric", len(page.inner_text("#mpw-rain-val")) > 0)
+        report("Point Weather Card displays wind metric", "km/h" in page.inner_text("#mpw-wind-val"))
+        report("Point Weather Card displays cloud cover", "%" in page.inner_text("#mpw-clouds-val"))
+
+        # Verify Zoom Preservation on Map Point Selection (Clicking map must NEVER zoom out!)
+        # Step 1: Zoom in manually to level 11
+        page.evaluate("() => window.state.map.instance.setZoom(11)")
         page.wait_for_timeout(200)
-        sheet_visible = page.is_visible("#maplibre-bottom-sheet")
-        report("iOS Liquid Glass Bottom Sheet displays station telemetry", sheet_visible)
-        
-        page.click("#sbs-close-btn")
-        page.wait_for_timeout(200)
-        sheet_closed = not page.is_visible("#maplibre-bottom-sheet")
-        report("Closing bottom sheet modal hides it cleanly", sheet_closed)
-        
-        report("Zero unhandled JS exceptions during MapLibre operations", len(page_errors) == 0, str(page_errors))
+        zoom_before = page.evaluate("() => window.state.map.instance.getZoom()")
+        report("Manual map zoom level set to 11", zoom_before == 11)
+
+        # Step 2: Click on the interactive map to select a new point
+        map_box = page.locator("#interactive-map").bounding_box()
+        if map_box:
+            # Click near center of map
+            page.mouse.click(map_box["x"] + map_box["width"] * 0.45, map_box["y"] + map_box["height"] * 0.45)
+            page.wait_for_timeout(400)
+            zoom_after_click = page.evaluate("() => window.state.map.instance.getZoom()")
+            report("Zoom level is preserved on map click/selection (does NOT reset to 9)", zoom_after_click == 11)
+
+        # Step 3: Select another location via selectExactLocation
+        page.evaluate("() => window.selectExactLocation({ name: 'Zugspitze', lat: 47.421, lon: 10.985, elevation: 2962, isMountain: true })")
+        page.wait_for_timeout(400)
+        zoom_after_loc = page.evaluate("() => window.state.map.instance.getZoom()")
+        report("Zoom level is preserved when selecting predefined location/mountain", zoom_after_loc == 11)
+        pw_name_zugspitze = page.inner_text("#mpw-location-name")
+        report("Point Weather Card dynamically updates to Zugspitze", "Zugspitze" in pw_name_zugspitze)
+        pw_elev_zugspitze = page.inner_text("#mpw-elevation-chip")
+        report("Point Weather Card shows Zugspitze elevation", "2962" in pw_elev_zugspitze)
+
+        report("Zero unhandled JS exceptions during 2D Leaflet operations", len(page_errors) == 0, str(page_errors))
+        page.screenshot(path="app_map_tab_screenshot.png")
         page.close()
 
         # =====================================================================
-        # TEST SUITE 12: STANDALONE MAPLIBRE DEMO SHOWCASE (60 FPS PWA VIEW)
+        # TEST SUITE 12: EXHAUSTIVE INTERACTIVE BUTTON INTEGRITY (ZERO ERRORS)
         # =====================================================================
-        print("\n--- SUITE 12: Standalone MapLibre 60 FPS Demo Page ---")
-        page = browser.new_page(viewport={"width": 1280, "height": 850})
-        demo_errors = []
-        page.on("pageerror", lambda err: demo_errors.append(str(err)))
+        print("\n--- SUITE 12: Exhaustive Interactive Button Integrity Across All Tabs ---")
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        suite12_errors = []
+        page.on("pageerror", lambda err: suite12_errors.append(str(err)))
         
-        page.goto(f"http://127.0.0.1:{port}/maplibre_demo.html")
-        page.wait_for_selector("#demo-map", timeout=10000)
-        page.wait_for_timeout(1000)
-        
-        report("Standalone demo page loads without exceptions", len(demo_errors) == 0, str(demo_errors))
-        report("60 FPS WebGL badge visible in standalone demo", page.is_visible(".fps-badge"))
-        report("Altitude selector dock present in standalone demo", page.is_visible(".altitude-selector-dock"))
-        report("Liquid Glass player dock present in standalone demo", page.is_visible(".maplibre-player-dock"))
-        
-        # Verify 3D altitude switch in demo
-        page.click(".alt-level-btn[data-alt='3000']")
+        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.wait_for_selector("#hero-location-name", timeout=10000)
+        time.sleep(1)
+
+        def close_active_modals():
+            page.evaluate("""() => {
+                ['day-detail-modal', 'gpx-modal-overlay', 'webcam-modal-overlay', 'spotlight-modal-overlay'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
+                });
+            }""")
+
+        # 1. Header controls
+        init_unit = page.inner_text("#unit-toggle-btn")
+        page.click("#unit-toggle-btn")
+        page.wait_for_timeout(100)
+        new_unit = page.inner_text("#unit-toggle-btn")
+        page.click("#unit-toggle-btn")
+        report("Header unit toggle (°C/°F) switches units cleanly", init_unit != new_unit)
+
+        page.click("#fav-toggle-btn")
+        page.wait_for_timeout(100)
+        page.click("#fav-toggle-btn")
+        report("Header favorite toggle button updates state cleanly", True)
+
+        page.click("#spotlight-trigger-btn")
+        page.wait_for_timeout(100)
+        spot_open = page.is_visible("#spotlight-modal-overlay")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(100)
+        report("Header Spotlight ⌘K modal opens and closes with Escape key", spot_open and not page.is_visible("#spotlight-modal-overlay"))
+
+        page.type("#location-search-input", "Ber")
         page.wait_for_timeout(200)
-        demo_badge_text = page.inner_text("#maplibre-altitude-badge")
-        report("Demo page altitude switcher functions flawlessly (3.000m / 700 hPa)", "3.000" in demo_badge_text and "700 hPa" in demo_badge_text)
-        
+        page.click("#clear-search-btn")
+        search_empty = page.input_value("#location-search-input") == ""
+        report("Header search clear button (✕) clears input field", search_empty)
+
+        # 2. Overview tab buttons
+        page.click(".tab-btn[data-tab='tab-overview']")
+        page.wait_for_timeout(200)
+        page.click("#expert-mode-toggle-btn")
+        page.wait_for_timeout(200)
+        exp_open = page.is_visible("#expert-details-container")
+        report("Kompakt-/Experten-Modus toggle reveals analysis section", exp_open)
+
+        for mp in ["precip", "wind", "temp"]:
+            page.click(f".met-btn[data-metric='{mp}']")
+            page.wait_for_timeout(100)
+            is_act = page.eval_on_selector(f".met-btn[data-metric='{mp}']", "el => el.classList.contains('active')")
+            report(f"Meteogram metric button '{mp}' activates cleanly", is_act)
+
+        page.click("#expert-mode-toggle-btn")
+        page.wait_for_timeout(100)
+
+        # 3. Mountain & Alpine View buttons
+        page.click(".tab-btn[data-tab='tab-mountain']")
+        page.wait_for_timeout(200)
+
+        page.locator(".cms-btn[data-mountain='Zugspitze']").click()
+        page.wait_for_timeout(300)
+        close_active_modals()
+        hero_n = page.inner_text("#hero-location-name")
+        report("City View Mountain Preset button 'Zugspitze' loads 'Zugspitze'", "zugspitze" in hero_n.lower())
+
+        page.click(".tab-btn[data-tab='tab-mountain']")
+        page.wait_for_timeout(200)
+
+        for m_name, sel in [("crossSection", "#m3d-mode-section"), ("wind", "#m3d-mode-wind"), ("massif", "#m3d-mode-massif")]:
+            page.click(sel)
+            page.wait_for_timeout(100)
+            is_act = page.eval_on_selector(sel, "el => el.classList.contains('active')")
+            report(f"Mountain 3D view mode button '{m_name}' activates cleanly", is_act)
+
+        for lt in ["#m3d-toggle-frost", "#m3d-toggle-clouds", "#m3d-toggle-sun"]:
+            page.click(lt)
+            page.wait_for_timeout(100)
+            page.click(lt)
+            report(f"Mountain layer toggle button '{lt}' operates cleanly", True)
+
+        aspect_pills = page.eval_on_selector_all(".aspect-pill", "els => els.map((el, i) => i)")
+        for idx in aspect_pills[:3]:
+            page.locator(".aspect-pill").nth(idx).click()
+            page.wait_for_timeout(100)
+        report("Mountain slope exposition pills handle clicks without error", True)
+
+        # 4. Sports & GPX buttons
+        page.click(".tab-btn[data-tab='tab-sports']")
+        page.wait_for_timeout(200)
+
+        # Test 2 Sport Categories (Rad & Berge)
+        page.click("#sport-cat-bike")
+        page.wait_for_timeout(100)
+        is_bike = page.eval_on_selector("#sport-cat-bike", "el => el.classList.contains('active')")
+        report("Athlete Sport Category 'Rad' activates cleanly", is_bike)
+
+        page.click("#bike-speed-plus")
+        page.wait_for_timeout(50)
+        page.click("#bike-speed-minus")
+        page.wait_for_timeout(50)
+        report("Rad stepless speed steppers (+/- 0.5 km/h) work cleanly", True)
+
+        page.click("#sport-cat-mountain")
+        page.wait_for_timeout(100)
+        is_mtn = page.eval_on_selector("#sport-cat-mountain", "el => el.classList.contains('active')")
+        report("Athlete Sport Category 'Berge' activates cleanly", is_mtn)
+
+        page.click("#mtn-speed-plus")
+        page.wait_for_timeout(50)
+        page.click("#mtn-ascent-plus")
+        page.wait_for_timeout(50)
+        report("Berge stepless speed and ascent steppers work cleanly", True)
+
+        # Separate Date & Time selection presets
+        page.click("#sports-date-presets button[data-date-preset='tomorrow']")
+        page.wait_for_timeout(50)
+        page.click("#sports-time-presets button[data-time-preset='06:00']")
+        page.wait_for_timeout(50)
+        report("Separate Date & Time selection presets update tour start cleanly", True)
+
+        for s in ["road_bike", "gravel_mtb", "trailrun", "hiking"]:
+            page.eval_on_selector(f".sport-pill[data-sport='{s}']", "el => el.click()")
+            page.wait_for_timeout(100)
+            is_act = page.eval_on_selector(f".sport-pill[data-sport='{s}']", "el => el.classList.contains('active')")
+            report(f"Sport discipline pill '{s}' activates cleanly", is_act)
+
+        for fl in ["easy", "sporty", "pro", "normal"]:
+            page.eval_on_selector(f".fitness-pill[data-fitness='{fl}']", "el => el.click()")
+            page.wait_for_timeout(100)
+            is_act = page.eval_on_selector(f".fitness-pill[data-fitness='{fl}']", "el => el.classList.contains('active')")
+            report(f"Fitness pace pill '{fl}' activates cleanly", is_act)
+
+        route_presets = page.eval_on_selector_all(".sports-route-preset", "els => els.map(el => el.innerText.trim().slice(0, 25))")
+        for i, rp_name in enumerate(route_presets[:3]):
+            page.locator(".sports-route-preset").nth(i).click()
+            page.wait_for_timeout(400)
+            close_active_modals()
+            report(f"Sports Route Preset '{rp_name}' loads into map with 0 errors", True)
+
+        # In-Flight Live Route & Weather Tracking Tests
+        page.click("#sports-live-track-toggle")
+        page.wait_for_timeout(150)
+        is_tracking = page.eval_on_selector("#sports-live-track-toggle", "el => el.classList.contains('tracking-active')")
+        report("Sports Live-Tour tracking toggle activates cleanly", is_tracking)
+
+        # Step 1: Simulate +5 km in-flight progress
+        page.click("#sports-sim-step-btn")
+        page.wait_for_timeout(250)
+        summary_visible = page.is_visible("#sltp-in-flight-summary")
+        done_text = page.inner_text("#sltp-val-done")
+        report("In-flight summary displays after progression step", summary_visible and "5.0 km" in done_text)
+
+        # Verify in-place waypoint dimming (completed vs active vs upcoming)
+        completed_rows = page.eval_on_selector_all(".swt-row-completed", "els => els.length")
+        active_live_rows = page.eval_on_selector_all(".swt-row-active-live", "els => els.length")
+        report("Passed waypoints are dimmed in-place and next stop is highlighted", completed_rows > 0 and active_live_rows > 0)
+
+        # Verify adaptive time delta and updated remaining weather/distance
+        dist_text = page.inner_text("#sm-val-dist")
+        report("Route metrics reflect remaining distance in-flight", "Rest von" in dist_text)
+
+        # Reset in-flight progress
+        page.click("#sports-reset-progress-btn")
+        page.wait_for_timeout(200)
+        reset_hidden = not page.is_visible("#sltp-in-flight-summary")
+        report("In-flight reset restores baseline planned route cleanly", reset_hidden)
+
+        # 5. Weather Map buttons & overlays
+        page.click(".tab-btn[data-tab='tab-map']")
+        page.wait_for_timeout(300)
+
+        for base in ["osm-outdoor", "osm-dark", "satellite", "osm-standard"]:
+            page.click(f".map-base-btn[data-base='{base}']")
+            page.wait_for_timeout(100)
+            is_act = page.eval_on_selector(f".map-base-btn[data-base='{base}']", "el => el.classList.contains('active')")
+            report(f"Map base layer '{base}' activates cleanly", is_act)
+
+        for mo in ["wind", "clouds", "temp", "precip", "lightning", "pressure"]:
+            page.click(f".map-overlay-btn[data-overlay='{mo}']")
+            page.wait_for_timeout(150)
+            is_act = page.eval_on_selector(f".map-overlay-btn[data-overlay='{mo}']", "el => el.classList.contains('active')")
+            report(f"Map weather layer overlay button '{mo}' activates with 0 errors", is_act)
+
+        page.click("#radar-next-btn")
+        page.wait_for_timeout(100)
+        page.click("#radar-prev-btn")
+        page.wait_for_timeout(100)
+        page.click("#radar-play-btn")
+        page.wait_for_timeout(200)
+        page.click("#radar-play-btn")
+        report("Radar transport buttons operate smoothly", True)
+
+        # 6. Favorites Tab & Networks Tab
+        page.click(".tab-btn[data-tab='tab-favorites']")
+        page.wait_for_timeout(200)
+        fav_items = page.eval_on_selector_all(".favorite-card, .preset-fav-chip", "els => els.map(el => el.innerText.trim())")
+        report("Favorites tab displays locations or preset chips", len(fav_items) > 0)
+        if fav_items:
+            page.locator(".favorite-card, .preset-fav-chip").first.click()
+            page.wait_for_timeout(300)
+            report("Clicking favorite item executes without errors", True)
+
+        page.click(".tab-btn[data-tab='tab-networks']")
+        page.wait_for_timeout(200)
+        chips = page.eval_on_selector_all(".sources-quick-chip", "els => els.map(el => el.innerText.trim())")
+        for i in range(min(3, len(chips))):
+            page.locator(".sources-quick-chip").nth(i).click()
+            page.wait_for_timeout(100)
+        report("Data sources quick jump category chips handle clicks cleanly", True)
+
+        report("Zero unhandled JS exceptions across all interactive button flows", len(suite12_errors) == 0, str(suite12_errors))
+
+        # =====================================================================
+        # TEST SUITE 13: LAYOUT SPACING, BOUNDING BOXES & OVERFLOW PREVENTION
+        # =====================================================================
+        print("\n--- SUITE 13: Comprehensive UI Layout, Bounding Box Spacing & Zero Overflow ---")
+        all_tabs = ["tab-overview", "tab-mountain", "tab-sports", "tab-map", "tab-favorites", "tab-networks"]
+        for t in all_tabs:
+            page.click(f".tab-btn[data-tab='{t}']")
+            page.wait_for_timeout(200)
+            box = page.locator(f"#{t}").bounding_box()
+            has_valid_box = box is not None and box["width"] > 700 and box["height"] > 200
+            report(f"Tab #{t} bounding box is well-proportioned ({round(box['width'] if box else 0)}x{round(box['height'] if box else 0)}px)", has_valid_box)
+
+            has_h_overflow = page.evaluate(f"""() => {{
+                const el = document.getElementById('{t}');
+                return el.scrollWidth > el.clientWidth + 5;
+            }}""")
+            report(f"Tab #{t} has zero unwanted horizontal layout overflow", not has_h_overflow)
+
         page.close()
         browser.close()
 

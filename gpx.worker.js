@@ -1,7 +1,7 @@
 /**
- * BEST WEATHER — GPX & Alpine Math Web Worker
- * Offloads heavy GPX parsing, SAC hiking formulas and coordinate calculations
- * from the main thread for smooth 120 FPS UI.
+ * BEST WEATHER — GPX & Alpine Math Web Worker (Task 6a)
+ * Features Ramer-Douglas-Peucker (RDP) point decimation, SAC hiking math,
+ * and high-speed Transferable ArrayBuffers for zero-copy UI data transport.
  */
 
 self.onmessage = function (e) {
@@ -11,7 +11,34 @@ self.onmessage = function (e) {
     try {
       const { xmlString } = payload;
       const parsed = parseGPXFast(xmlString);
-      self.postMessage({ status: 'success', action: 'parseGPX', data: parsed });
+
+      // Extract Transferable TypedArrays for high-speed zero-copy transfer
+      const decimated = parsed.decimatedPoints || parsed.points;
+      const pointCount = decimated.length;
+      const lats = new Float32Array(pointCount);
+      const lons = new Float32Array(pointCount);
+      const eles = new Float32Array(pointCount);
+      const dists = new Float32Array(pointCount);
+
+      for (let i = 0; i < pointCount; i++) {
+        lats[i] = decimated[i].lat;
+        lons[i] = decimated[i].lon;
+        eles[i] = decimated[i].ele;
+        dists[i] = decimated[i].distFromStartKm;
+      }
+
+      parsed.transferable = {
+        lats,
+        lons,
+        eles,
+        dists
+      };
+
+      // Post message with transferable buffers
+      self.postMessage(
+        { status: 'success', action: 'parseGPX', data: parsed },
+        [lats.buffer, lons.buffer, eles.buffer, dists.buffer]
+      );
     } catch (err) {
       self.postMessage({ status: 'error', action: 'parseGPX', error: err.message });
     }
@@ -30,6 +57,56 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+/**
+ * Perpendicular distance in 2D coordinates for RDP
+ */
+function perpendicularDistance(pt, lineStart, lineEnd) {
+  const dx = lineEnd.distFromStartKm - lineStart.distFromStartKm;
+  const dy = lineEnd.ele - lineStart.ele;
+
+  if (dx === 0 && dy === 0) {
+    const px = pt.distFromStartKm - lineStart.distFromStartKm;
+    const py = pt.ele - lineStart.ele;
+    return Math.sqrt(px * px + py * py);
+  }
+
+  const t = ((pt.distFromStartKm - lineStart.distFromStartKm) * dx + (pt.ele - lineStart.ele) * dy) / (dx * dx + dy * dy);
+  const clampedT = Math.max(0, Math.min(1, t));
+  const projX = lineStart.distFromStartKm + clampedT * dx;
+  const projY = lineStart.ele + clampedT * dy;
+
+  const diffX = (pt.distFromStartKm - projX) * 1000; // in meters
+  const diffY = pt.ele - projY; // in meters
+  return Math.sqrt(diffX * diffX + diffY * diffY);
+}
+
+/**
+ * Ramer-Douglas-Peucker decimation algorithm (O(N log N) recursive simplification)
+ */
+function rdpDecimate(points, epsilon = 8.0) {
+  if (points.length <= 2) return points;
+
+  let dmax = 0;
+  let index = 0;
+  const end = points.length - 1;
+
+  for (let i = 1; i < end; i++) {
+    const d = perpendicularDistance(points[i], points[0], points[end]);
+    if (d > dmax) {
+      index = i;
+      dmax = d;
+    }
+  }
+
+  if (dmax > epsilon) {
+    const rec1 = rdpDecimate(points.slice(0, index + 1), epsilon);
+    const rec2 = rdpDecimate(points.slice(index), epsilon);
+    return rec1.slice(0, -1).concat(rec2);
+  } else {
+    return [points[0], points[end]];
+  }
 }
 
 function parseGPXFast(xmlString) {
@@ -57,7 +134,6 @@ function parseGPXFast(xmlString) {
   let minEle = Infinity;
   let maxEle = -Infinity;
 
-  // Hysterese-Schwellenwert (5m) gegen GPS-Höhenrauschen
   let lastEleAnchor = trkpts[0].ele;
 
   for (let i = 0; i < trkpts.length; i++) {
@@ -68,8 +144,11 @@ function parseGPXFast(xmlString) {
 
     if (i > 0) {
       const prev = points[i - 1];
-      const d = calculateHaversineDistance(prev.lat, prev.lon, lat, lon);
-      totalDistanceM += d;
+      // 3D-Haversine Distanz: Berücksichtigung des Höhendeltas dz für reale alpine Wegstrecken
+      const dHorizontal = calculateHaversineDistance(prev.lat, prev.lon, lat, lon);
+      const dzStep = ele - prev.ele;
+      const d3D = Math.sqrt(dHorizontal * dHorizontal + dzStep * dzStep);
+      totalDistanceM += d3D;
 
       const dz = ele - lastEleAnchor;
       if (Math.abs(dz) >= 4.0) {
@@ -97,15 +176,20 @@ function parseGPXFast(xmlString) {
     trackName = nameMatch[1].trim();
   }
 
+  // Adaptive Ramer-Douglas-Peucker Decimation: reduces 20.000+ points to ~400-800 key points
+  const decimatedPoints = points.length > 500 ? rdpDecimate(points, 7.5) : points;
+
   return {
     success: true,
     name: trackName,
     pointCount: points.length,
+    decimatedCount: decimatedPoints.length,
     totalDistanceKm: Math.round((totalDistanceM / 1000) * 10) / 10,
     totalAscentM: Math.round(totalAscentM),
     totalDescentM: Math.round(totalDescentM),
     minElevationM: Math.round(minEle),
     maxElevationM: Math.round(maxEle),
-    points
+    points,
+    decimatedPoints
   };
 }

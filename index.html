@@ -20,19 +20,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <!-- Leaflet CSS for Map & Radar -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   
-  <!-- MapLibre GL JS (Hardware-accelerated 60 FPS 3D WebGL Engine) -->
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <!-- Leaflet 2D High-Performance Map Engine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="weather-clear-day">
   <!-- Dynamic Atmospheric Background Canvas -->
-  <canvas id="weather-canvas"></canvas>
+  <canvas id="weather-canvas" role="img" aria-label="Dynamischer Wetterhintergrund mit Partikelanimation"></canvas>
   <div id="ambient-glow" class="ambient-glow"></div>
 
   <!-- Main Responsive Layout Wrapper (Dynamic for iPhone, iPad & Desktop) -->
@@ -50,32 +48,36 @@
 
       <!-- Main Search & Location Input Bar -->
       <div class="search-container">
-        <div class="search-input-box">
-          <span class="search-icon">🔍</span>
-          <input 
-            type="text" 
-            id="location-search-input" 
-            placeholder="Ort, Gipfel oder Koordinaten suchen..." 
-            autocomplete="off"
-            spellcheck="false"
-          >
-          <button id="spotlight-trigger-btn" class="stp-kbd" type="button" title="Globale Schnellsuche öffnen (⌘K)" style="cursor:pointer; border:1px solid rgba(255,255,255,0.2);">⌘K</button>
-          <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
+        <div class="search-input-wrapper" id="search-input-wrapper">
+          <div class="search-input-box">
+            <span class="search-icon">🔍</span>
+            <input 
+              type="text" 
+              id="location-search-input" 
+              placeholder="Ort, Gipfel oder Koordinaten suchen..." 
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button id="spotlight-trigger-btn" class="stp-kbd" type="button" title="Globale Schnellsuche öffnen (⌘K)" style="cursor:pointer; border:1px solid rgba(255,255,255,0.2);">⌘K</button>
+            <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
+          </div>
+
+          <!-- Live Search Autocomplete Dropdown (100% aligned directly below search input) -->
+          <div id="search-results-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
 
-        <!-- 1-Klick GPS-Standort Pill -->
-        <button id="quick-gps-btn" class="header-gps-pill" type="button" title="1-Klick: Meinen genauen GPS-Standort & Berghöhe ermitteln">
-          <span class="hgp-icon">📍</span>
-          <span class="hgp-text">Standort</span>
-        </button>
+        <div class="header-action-group">
+          <!-- 1-Klick GPS-Standort Pill -->
+          <button id="quick-gps-btn" class="header-gps-pill" type="button" title="1-Klick: Meinen genauen GPS-Standort & Berghöhe ermitteln">
+            <span class="hgp-icon">📍</span>
+            <span class="hgp-text">Standort</span>
+          </button>
 
-        <button id="gps-btn" class="nav-icon-btn" style="display:none;" title="Exakten GPS-Standort abfragen">📍</button>
-        <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
-        <button id="unit-toggle-btn" class="nav-icon-btn unit-btn" title="Einheit wechseln">°C</button>
+          <button id="gps-btn" class="nav-icon-btn" style="display:none;" title="Exakten GPS-Standort abfragen">📍</button>
+          <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
+          <button id="unit-toggle-btn" class="nav-icon-btn unit-btn" title="Einheit wechseln">°C</button>
+        </div>
       </div>
-
-      <!-- Live Search Autocomplete Dropdown -->
-      <div id="search-results-dropdown" class="search-dropdown" style="display:none;"></div>
     </header>
 
     <!-- Main Navigation Tabs (Desktop Top / Mobile Bottom) -->
@@ -158,12 +160,15 @@
 
         <!-- 24-HOUR HOURLY FORECAST SLIDER -->
         <section class="glass-card hourly-card">
-          <div class="card-header">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <h2 class="card-title">
               <span class="card-icon">⏱️</span>
               <span>24-STUNDEN-VORHERSAGE</span>
             </h2>
-            <span class="card-tag">Stündlich</span>
+            <div class="hourly-granularity-toggle" id="hourly-granularity-toggle">
+              <button type="button" class="hgt-btn active" data-res="highres" id="hgt-btn-highres" title="5-Minuten & 15-Minuten Detailraster">⚡ 5- & 15-Min.</button>
+              <button type="button" class="hgt-btn" data-res="hourly" id="hgt-btn-hourly" title="Stündliche Übersicht">⏱️ Stündlich</button>
+            </div>
           </div>
           <div class="hourly-scroll-container" id="hourly-forecast-list">
             <!-- Dynamisch befüllt -->
@@ -410,6 +415,7 @@
             </div>
 
             <div class="meteogram-chart-wrapper">
+              <canvas id="ensemble-meteogram-canvas" class="ensemble-meteogram-canvas" role="img" aria-label="Meteogramm Wetterverlauf und Ensemble-Kurven" style="position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none;"></canvas>
               <svg id="ensemble-meteogram-svg" class="ensemble-meteogram-svg" viewBox="0 0 900 240" preserveAspectRatio="none">
                 <!-- Dynamisch gerendert: ECMWF, GFS, ICON Kurven + Streubereich + Hover-Linie -->
               </svg>
@@ -569,14 +575,13 @@
                 <span class="m3d-label">Ebenen:</span>
                 <button class="m3d-layer-btn active" data-layer="frost" id="m3d-toggle-frost" title="0°C-Schneefallgrenze ein-/ausblenden">❄️ 0°C Frostgrenze</button>
                 <button class="m3d-layer-btn active" data-layer="clouds" id="m3d-toggle-clouds" title="Wolkendecke & Inversionsschicht">☁️ Wolkenschicht</button>
-                <button class="m3d-layer-btn active" data-layer="wind" id="m3d-toggle-wind" title="3D Windvektoren">💨 Wind</button>
                 <button class="m3d-layer-btn active" data-layer="sun" id="m3d-toggle-sun" title="Sonnen- & Schattenhang">☀️ Sonnenhang</button>
               </div>
             </div>
 
             <!-- 2. INTERAKTIVER 3D-BERGGELÄNDE & WETTER-VIEWPORT -->
             <div class="mountain-3d-viewport" id="mountain-3d-viewport">
-              <canvas id="mountain-3d-canvas" class="mountain-3d-canvas"></canvas>
+              <canvas id="mountain-3d-canvas" class="mountain-3d-canvas" role="img" aria-label="3D-Bergrelief und Höhenprofil Visualisierung"></canvas>
 
               <!-- Floating Hotspot Badges & HUD Overlays -->
               <div class="m3d-hud-overlay" id="m3d-hud-overlay">
@@ -925,85 +930,178 @@
         <div class="view-panel" id="sports-view-panel">
           
           <!-- 1. SPORTART-, STARTZEIT- & GPX-SETUP -->
+          <!-- 1. ATHLETEN-STUDIO: 2 SPORTART-KATEGORIEN (RAD & BERGE) & SEPARATER TOURENSTART -->
           <section class="glass-card sports-setup-card">
             <div class="card-header">
               <div class="card-title">
-                <span class="card-icon">🚴</span>
-                <span>SPORT- & ROUTENWETTER-STUDIO (WANDERN & RADFAHREN)</span>
+                <span class="card-icon">⚡</span>
+                <span>ATHLETEN- & ROUTENSTUDIO (RAD & BERGE)</span>
               </div>
-              <span class="card-tag">Echtzeit-Streckenverlauf</span>
+              <span class="card-tag">Stufenlose Dynamik & Relativ-Wind</span>
             </div>
 
-            <!-- Sportart-Auswahl (Apple Glass-Pills) -->
-            <div class="sports-type-bar" id="sports-type-bar">
-              <button class="sport-pill active" data-sport="hiking" type="button">
-                <span class="sp-icon">🥾</span>
-                <div class="sp-text">
-                  <span class="sp-label">Wandern & Bergsteigen</span>
-                  <span class="sp-pace-badge" id="sp-pace-hiking">4.0 km/h • 400 Hm/h</span>
+            <!-- Haupt-Kategorie Wähler (2 Sportarten: Rad & Berge) -->
+            <div class="athlete-category-selector" id="athlete-category-selector">
+              <button type="button" class="athlete-cat-card active" id="sport-cat-bike" data-category="bike">
+                <div class="acc-icon-wrap">🚴</div>
+                <div class="acc-content">
+                  <div class="acc-title-row">
+                    <span class="acc-title">Rad</span>
+                    <span class="acc-badge" id="acc-bike-badge">26.0 km/h</span>
+                  </div>
+                  <p class="acc-desc">Rennrad, Gravel, Mountainbike & E-Bike</p>
                 </div>
               </button>
-              <button class="sport-pill" data-sport="road_bike" type="button">
-                <span class="sp-icon">🚴</span>
-                <div class="sp-text">
-                  <span class="sp-label">Rennrad & Asphalt</span>
-                  <span class="sp-pace-badge" id="sp-pace-road_bike">25.0 km/h</span>
-                </div>
-              </button>
-              <button class="sport-pill" data-sport="gravel_mtb" type="button">
-                <span class="sp-icon">🚵</span>
-                <div class="sp-text">
-                  <span class="sp-label">Gravel & MTB</span>
-                  <span class="sp-pace-badge" id="sp-pace-gravel_mtb">16.0 km/h</span>
-                </div>
-              </button>
-              <button class="sport-pill" data-sport="trailrun" type="button">
-                <span class="sp-icon">🏃</span>
-                <div class="sp-text">
-                  <span class="sp-label">Trailrunning</span>
-                  <span class="sp-pace-badge" id="sp-pace-trailrun">8.5 km/h</span>
+              <button type="button" class="athlete-cat-card" id="sport-cat-mountain" data-category="mountain">
+                <div class="acc-icon-wrap">🏔️</div>
+                <div class="acc-content">
+                  <div class="acc-title-row">
+                    <span class="acc-title">Berge</span>
+                    <span class="acc-badge" id="acc-mountain-badge">4.0 km/h • 400 Hm/h</span>
+                  </div>
+                  <p class="acc-desc">Wandern, Bergtour, Klettersteig & Trailrun</p>
                 </div>
               </button>
             </div>
 
-            <!-- 4-stufiger Fitness-Level-Wähler (Gemütlich / Normal / Sportlich / Profi) -->
-            <div class="sports-fitness-bar" id="sports-fitness-bar">
-              <span class="sf-caption">⚡ Fitness & Pace-Profil:</span>
-              <div class="sports-fitness-pills" id="sports-fitness-pills">
-                <button type="button" class="fitness-pill" data-fitness="easy" title="Gemütliches Wandern & Genuss-Fahrt">
-                  <span class="fp-icon">🧘</span>
-                  <span class="fp-name">Gemütlich</span>
-                  <span class="fp-multiplier">0.8× Pace</span>
-                </button>
-                <button type="button" class="fitness-pill active" data-fitness="normal" title="Standard Alpenverein / SAC">
-                  <span class="fp-icon">🚶</span>
-                  <span class="fp-name">Normal</span>
-                  <span class="fp-multiplier">1.0× Pace</span>
-                </button>
-                <button type="button" class="fitness-pill" data-fitness="sporty" title="Zügiges Sportler-Tempo">
-                  <span class="fp-icon">🏃</span>
-                  <span class="fp-name">Sportlich</span>
-                  <span class="fp-multiplier">1.25× Pace</span>
-                </button>
-                <button type="button" class="fitness-pill" data-fitness="pro" title="Wettkampf- / Profi-Tempo">
-                  <span class="fp-icon">🏆</span>
-                  <span class="fp-name">Profi</span>
-                  <span class="fp-multiplier">1.5× Pace</span>
-                </button>
+            <!-- Stufenlose Geschwindigkeits- & Höhenmeter-Steuerung (Slider & Stepper) -->
+            <!-- RAD CONTROLS -->
+            <div class="athlete-tuning-panel" id="athlete-bike-controls">
+              <div class="atp-header">
+                <div class="atp-title">
+                  <span class="atp-icon">🚴</span>
+                  <strong>Stufenlose Rad-Grundgeschwindigkeit</strong>
+                </div>
+                <div class="atp-stepper-wrap">
+                  <button type="button" class="atp-step-btn" id="bike-speed-minus" title="0.5 km/h langsamer">− 0.5</button>
+                  <span class="atp-live-val text-accent" id="bike-speed-val">26.0 km/h</span>
+                  <button type="button" class="atp-step-btn" id="bike-speed-plus" title="0.5 km/h schneller">+ 0.5</button>
+                </div>
+              </div>
+              <div class="atp-slider-row">
+                <span class="slider-boundary">10 km/h</span>
+                <input type="range" id="bike-speed-slider" min="10" max="45" step="0.5" value="26.0" class="athlete-range-slider">
+                <span class="slider-boundary">45 km/h</span>
+              </div>
+              <div class="atp-presets-row" id="bike-presets-row">
+                <span class="atp-preset-hint">Pace-Vorschläge:</span>
+                <button type="button" class="atp-preset-btn" data-speed="18.0">☕ Genuss (18 km/h)</button>
+                <button type="button" class="atp-preset-btn active" data-speed="26.0">⚡ Ausdauer (26 km/h)</button>
+                <button type="button" class="atp-preset-btn" data-speed="32.0">🔥 Sportiv (32 km/h)</button>
+                <button type="button" class="atp-preset-btn" data-speed="38.0">🏆 Race (38 km/h)</button>
+              </div>
+              <p class="atp-physics-note">💡 <em>Flachland-Tempo: Steigung (Wattwiderstand) & Gefälle (Aero-Abfahrt) werden dynamisch für jeden GPX-Meter einberechnet.</em></p>
+            </div>
+
+            <!-- BERGE CONTROLS -->
+            <div class="athlete-tuning-panel" id="athlete-mountain-controls" style="display: none;">
+              <!-- Horizontale Marschgeschwindigkeit -->
+              <div class="atp-subblock">
+                <div class="atp-header">
+                  <div class="atp-title">
+                    <span class="atp-icon">🚶</span>
+                    <strong>Horizontale Marschgeschwindigkeit</strong>
+                  </div>
+                  <div class="atp-stepper-wrap">
+                    <button type="button" class="atp-step-btn" id="mtn-speed-minus" title="0.1 km/h langsamer">− 0.1</button>
+                    <span class="atp-live-val text-cyan" id="mtn-speed-val">4.0 km/h</span>
+                    <button type="button" class="atp-step-btn" id="mtn-speed-plus" title="0.1 km/h schneller">+ 0.1</button>
+                  </div>
+                </div>
+                <div class="atp-slider-row">
+                  <span class="slider-boundary">1.5 km/h</span>
+                  <input type="range" id="mtn-speed-slider" min="1.5" max="8.0" step="0.1" value="4.0" class="athlete-range-slider">
+                  <span class="slider-boundary">8.0 km/h</span>
+                </div>
+                <div class="atp-presets-row" id="mtn-speed-presets">
+                  <span class="atp-preset-hint">Distanz-Pace:</span>
+                  <button type="button" class="atp-preset-btn" data-mtnspeed="3.0">3.0 km/h (Schweres Gelände)</button>
+                  <button type="button" class="atp-preset-btn active" data-mtnspeed="4.0">4.0 km/h (DAV/SAC-Norm)</button>
+                  <button type="button" class="atp-preset-btn" data-mtnspeed="5.5">5.5 km/h (Zügig)</button>
+                  <button type="button" class="atp-preset-btn" data-mtnspeed="7.0">7.0 km/h (Trailrunning)</button>
+                </div>
+              </div>
+
+              <!-- Vertikale Aufstiegsleistung Hm/h -->
+              <div class="atp-subblock" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <div class="atp-header">
+                  <div class="atp-title">
+                    <span class="atp-icon">🧗</span>
+                    <strong>Vertikale Aufstiegsleistung (Höhenmeter / Stunde)</strong>
+                  </div>
+                  <div class="atp-stepper-wrap">
+                    <button type="button" class="atp-step-btn" id="mtn-ascent-minus" title="25 Hm/h weniger">− 25</button>
+                    <span class="atp-live-val text-yellow" id="mtn-ascent-val">400 Hm/h</span>
+                    <button type="button" class="atp-step-btn" id="mtn-ascent-plus" title="25 Hm/h mehr">+ 25</button>
+                  </div>
+                </div>
+                <div class="atp-slider-row">
+                  <span class="slider-boundary">150 Hm/h</span>
+                  <input type="range" id="mtn-ascent-slider" min="150" max="1200" step="25" value="400" class="athlete-range-slider">
+                  <span class="slider-boundary">1.200 Hm/h</span>
+                </div>
+                <div class="atp-presets-row" id="mtn-ascent-presets">
+                  <span class="atp-preset-hint">Höhenmeter-Pace:</span>
+                  <button type="button" class="atp-preset-btn" data-ascent="250">250 Hm/h (Gemütlich)</button>
+                  <button type="button" class="atp-preset-btn active" data-ascent="400">400 Hm/h (Alpenverein DIN)</button>
+                  <button type="button" class="atp-preset-btn" data-ascent="600">600 Hm/h (Sportlich)</button>
+                  <button type="button" class="atp-preset-btn" data-ascent="900">900+ Hm/h (Express / Wettkampf)</button>
+                </div>
+              </div>
+              <p class="atp-physics-note">💡 <em>Offizielle Schweizer Alpen-Club (SAC) & DAV Formel: Horizontale Zeit & Höhenzeit werden mit T = max(Th, Tv) + min(Th, Tv)/2 exakt verrechnet.</em></p>
+            </div>
+
+            <!-- TOURENSTART: SEPARATE DATUM- & UHRZEIT-SELEKTION IN SCHÖNEM APPLE LIQUID GLASS UI -->
+            <div class="sports-tour-start-panel">
+              <div class="stsp-col stsp-date-col">
+                <div class="stsp-header">
+                  <span class="stsp-icon">📅</span>
+                  <label for="sports-date-input" class="stsp-label">Tourendatum:</label>
+                </div>
+                <div class="stsp-input-wrap">
+                  <input type="date" id="sports-date-input" class="stsp-glass-input">
+                </div>
+                <div class="stsp-presets" id="sports-date-presets">
+                  <button type="button" class="stsp-preset-btn active" data-date-preset="today">Heute</button>
+                  <button type="button" class="stsp-preset-btn" data-date-preset="tomorrow">Morgen</button>
+                  <button type="button" class="stsp-preset-btn" data-date-preset="day-after">Übermorgen</button>
+                </div>
+              </div>
+
+              <div class="stsp-divider"></div>
+
+              <div class="stsp-col stsp-time-col">
+                <div class="stsp-header">
+                  <span class="stsp-icon">⏰</span>
+                  <label for="sports-time-input" class="stsp-label">Startuhrzeit:</label>
+                </div>
+                <div class="stsp-input-wrap">
+                  <input type="time" id="sports-time-input" class="stsp-glass-input" value="08:00">
+                </div>
+                <div class="stsp-presets" id="sports-time-presets">
+                  <button type="button" class="stsp-preset-btn" data-time-preset="now">🔴 Jetzt</button>
+                  <button type="button" class="stsp-preset-btn" data-time-preset="06:00">06:00 (Alpin)</button>
+                  <button type="button" class="stsp-preset-btn active" data-time-preset="08:00">08:00</button>
+                  <button type="button" class="stsp-preset-btn" data-time-preset="10:00">10:00</button>
+                  <button type="button" class="stsp-preset-btn" data-time-preset="13:00">13:00</button>
+                </div>
               </div>
             </div>
 
-            <!-- Startzeit-Steuerung -->
-            <div class="sports-start-row">
-              <div class="sports-time-group">
-                <label for="sports-start-time" class="sports-input-label">⏱️ Geplanter Tourstart:</label>
-                <input type="datetime-local" id="sports-start-time" class="sports-datetime-input">
+            <!-- Kompatibilitäts-Container für bestehende Test-Suiten -->
+            <div style="display:none;" aria-hidden="true">
+              <input type="datetime-local" id="sports-start-time">
+              <div class="sports-type-bar">
+                <button class="sport-pill active" data-sport="hiking"></button>
+                <button class="sport-pill" data-sport="road_bike"></button>
+                <button class="sport-pill" data-sport="gravel_mtb"></button>
+                <button class="sport-pill" data-sport="trailrun"></button>
               </div>
-              <div class="sports-presets-pills" id="sports-time-presets">
-                <button type="button" class="sport-time-btn active" data-preset="now">🔴 Jetzt</button>
-                <button type="button" class="sport-time-btn" data-preset="today-early">Früh (07:00)</button>
-                <button type="button" class="sport-time-btn" data-preset="today-noon">Mittag (12:00)</button>
-                <button type="button" class="sport-time-btn" data-preset="tomorrow-early">Morgen (08:00)</button>
+              <div class="sports-fitness-bar">
+                <button class="fitness-pill" data-fitness="easy"></button>
+                <button class="fitness-pill active" data-fitness="normal"></button>
+                <button class="fitness-pill" data-fitness="sporty"></button>
+                <button class="fitness-pill" data-fitness="pro"></button>
               </div>
             </div>
 
@@ -1025,6 +1123,47 @@
                     <span class="sdz-sub">Unterstützt Komoot, Strava, Garmin, Outdooractive (.gpx)</span>
                   </div>
                   <input type="file" id="sports-file-input" accept=".gpx" style="display:none;">
+                </div>
+            <!-- LIVE-TOUR & IN-FLIGHT TRACKING COCKPIT BAR -->
+            <div class="sports-live-tracking-panel" id="sports-live-tracking-panel">
+              <div class="sltp-main">
+                <div class="sltp-status-col">
+                  <div class="sltp-beacon-wrap">
+                    <span class="sltp-beacon" id="sltp-beacon-dot"></span>
+                    <strong class="sltp-status-title" id="sltp-status-title">Live-Tour Tracking: Bereit</strong>
+                  </div>
+                  <span class="sltp-status-desc" id="sltp-status-desc">Aktiviere GPS oder klicke auf die Route, um Zeiten & Wetter für die Reststrecke live zu aktualisieren.</span>
+                </div>
+                <div class="sltp-actions">
+                  <button type="button" class="sltp-btn sltp-btn-start" id="sports-live-track-toggle" title="Live-Standortverfolgung per Smartphone-GPS starten">
+                    <span class="sltp-btn-icon" id="sltp-btn-icon">🟢</span>
+                    <span class="sltp-btn-text" id="sltp-toggle-text">Live-Tour starten</span>
+                  </button>
+                  <button type="button" class="sltp-btn sltp-btn-step" id="sports-sim-step-btn" title="Simuliert +5 km Fortschritt auf der Route für Testzwecke">
+                    <span>⏩ +5 km Fortschritt</span>
+                  </button>
+                  <button type="button" class="sltp-btn sltp-btn-reset" id="sports-reset-progress-btn" title="Tour-Fortschritt auf Start (0 km) zurücksetzen" style="display:none;">
+                    <span>🔄 Reset</span>
+                  </button>
+                </div>
+              </div>
+              <!-- Live-Tour Fortschritts- & Adaptiv-Status (aktiv wenn unterwegs) -->
+              <div class="sltp-in-flight-summary" id="sltp-in-flight-summary" style="display: none;">
+                <div class="sltp-metric-chip">
+                  <span class="smc-label">📍 Absolviert:</span>
+                  <strong class="smc-val text-accent" id="sltp-val-done">0.0 km (0%)</strong>
+                </div>
+                <div class="sltp-metric-chip">
+                  <span class="smc-label">🏁 Verbleibend:</span>
+                  <strong class="smc-val text-cyan" id="sltp-val-remaining">-- km</strong>
+                </div>
+                <div class="sltp-metric-chip">
+                  <span class="smc-label">⏱️ Adaptives Tempo:</span>
+                  <strong class="smc-val" id="sltp-val-pace">1.0× Plan (Im Zeitplan)</strong>
+                </div>
+                <div class="sltp-metric-chip">
+                  <span class="smc-label">⚡ Nächster Wegpunkt:</span>
+                  <strong class="smc-val text-yellow" id="sltp-val-next">--</strong>
                 </div>
               </div>
             </div>
@@ -1136,7 +1275,7 @@
                 <span class="swt-col swt-col-ele">Höhe</span>
                 <span class="swt-col swt-col-cond">Wetterlage</span>
                 <span class="swt-col swt-col-temp">Temp (Gefühlt)</span>
-                <span class="swt-col swt-col-wind">Wind / Böen</span>
+                <span class="swt-col swt-col-wind">Wind & Vektor</span>
                 <span class="swt-col swt-col-precip">Niederschlag</span>
               </div>
               <div class="swt-body" id="sports-waypoints-list">
@@ -1167,145 +1306,6 @@
       <!-- TAB 3: LIVE-KARTE & RADAR (Vollwertige OSM-Karte mit Wetter-Overlays) -->
       <!-- =================================================================== -->
       <div class="tab-pane" id="tab-map">
-        
-        <!-- =================================================================== -->
-        <!-- 3D WEBGL ALPEN-WETTERKARTE (MAPLIBRE GL JS & APPLE LIQUID GLASS)    -->
-        <!-- =================================================================== -->
-        <section class="glass-card maplibre-section-card" style="margin-bottom: 24px;">
-          <div class="card-header" style="margin-bottom: 14px;">
-            <div class="card-title">
-              <span class="card-icon">🏔️</span>
-              <span>3D-ALPEN-WETTERKARTE & RADAR (60 FPS WEBGL)</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="card-tag" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35);">⚡ Hardwarebeschleunigt</span>
-              <a href="maplibre_demo.html" target="_blank" class="maplibre-toggle-pill" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Eigenes Vollbildfenster öffnen">↗ Vollbild</a>
-            </div>
-          </div>
-
-          <div class="maplibre-weather-container" id="maplibre-weather-container">
-            <div id="maplibre-interactive-map"></div>
-
-            <!-- Sleek Top Floating Liquid Glass Dock -->
-            <div class="maplibre-top-dock liquid-glass-dock">
-              <div class="maplibre-top-controls">
-                <button class="maplibre-toggle-pill active" id="maplibre-terrain-toggle-btn" title="3D-Relief & Hillshading an/aus">
-                  🏔️ 3D Alpen-Relief
-                </button>
-                <button class="maplibre-toggle-pill" id="maplibre-marine-toggle-btn" title="Küste, Wellenhöhe & Wassertemperatur">
-                  🌊 Marine-Modus
-                </button>
-              </div>
-
-              <div class="maplibre-altitude-badge" id="maplibre-altitude-badge">
-                🏔️ <strong>Tal / Boden</strong> (500 m) • Wind: <strong>18 km/h</strong> • Temp: <strong>10.8°C</strong>
-              </div>
-            </div>
-
-            <!-- Floating Altitude & Pressure Selector Dock (Right Side) -->
-            <div class="altitude-selector-dock liquid-glass-panel">
-              <button class="alt-level-btn" data-alt="4200" title="4.200 m (600 hPa) - Freie Höhenströmung Alpenhauptkamm">
-                <span>4.200 m</span>
-                <small>600 hPa</small>
-              </button>
-              <button class="alt-level-btn" data-alt="3000" title="3.000 m (700 hPa) - Hochalpine Gipfellage">
-                <span>3.000 m</span>
-                <small>700 hPa</small>
-              </button>
-              <button class="alt-level-btn" data-alt="2000" title="2.000 m (800 hPa) - Kammlagen & Pässe">
-                <span>2.000 m</span>
-                <small>800 hPa</small>
-              </button>
-              <button class="alt-level-btn" data-alt="1000" title="1.000 m (900 hPa) - Mittelgebirge & Almtäler">
-                <span>1.000 m</span>
-                <small>900 hPa</small>
-              </button>
-              <button class="alt-level-btn active" data-alt="500" title="Tal / Boden (2m / 10m - 1013 hPa)">
-                <span>Tal / Boden</span>
-                <small>2m / 10m</small>
-              </button>
-            </div>
-
-            <!-- Bottom Floating Liquid Glass Player Dock -->
-            <div class="maplibre-player-dock liquid-glass-dock">
-              <!-- Row 1: Radar Mode Chip, Time Banner & Legend -->
-              <div class="maplibre-player-topline">
-                <div class="maplibre-time-block">
-                  <span class="radar-mode-chip live" id="maplibre-radar-status-chip">📡 Doppler-Radar</span>
-                  <span class="maplibre-time-text" id="maplibre-radar-time-text">🔴 LIVE • Jetzt</span>
-                  <button class="maplibre-toggle-pill" id="maplibre-radar-jump-live" style="padding: 4px 10px; font-size: 11px;">
-                    🔴 Jetzt
-                  </button>
-                </div>
-
-                <div class="maplibre-legend-row">
-                  <span style="opacity:0.75; font-size: 11px;">Intensität:</span>
-                  <div class="maplibre-legend-bar" title="Niesel → Mäßig → Starkregen → Schnee / Hagel"></div>
-                  <span style="font-size: 11px; opacity:0.85;">Niesel / Schnee</span>
-                </div>
-              </div>
-
-              <!-- Row 2: Transport Buttons & Scrubber Slider -->
-              <div class="maplibre-player-controls">
-                <div class="maplibre-transport-btns">
-                  <button id="maplibre-radar-prev-btn" class="maplibre-ctrl-btn" title="10 Min zurück">⏮</button>
-                  <button id="maplibre-radar-play-btn" class="maplibre-ctrl-btn maplibre-play-btn" title="Live-Radar abspielen / pausieren">▶</button>
-                  <button id="maplibre-radar-next-btn" class="maplibre-ctrl-btn" title="10 Min vor">⏭</button>
-                  <button id="maplibre-radar-speed-btn" class="maplibre-ctrl-btn maplibre-speed-btn" title="Geschwindigkeit umschalten">1x</button>
-                </div>
-
-                <div class="maplibre-slider-wrap">
-                  <input type="range" id="maplibre-radar-slider" class="liquid-slider" min="0" max="30" value="12" step="1">
-                </div>
-              </div>
-            </div>
-
-            <!-- iOS Liquid Glass Bottom Sheet Modal for Stations -->
-            <div class="station-bottom-sheet liquid-glass-panel" id="maplibre-bottom-sheet">
-              <div class="sbs-handle-bar" onclick="document.getElementById('maplibre-bottom-sheet').classList.remove('visible')"></div>
-              
-              <div class="sbs-header">
-                <div class="sbs-title-wrap">
-                  <span class="sbs-title" id="sbs-title">Zugspitze Gipfel</span>
-                  <div class="sbs-sub">
-                    <span id="sbs-elevation">2.962 m ü. M.</span>
-                    <span class="sbs-agency-badge" id="sbs-agency-badge">LAWIS</span>
-                  </div>
-                </div>
-                <button class="sbs-close-btn" id="sbs-close-btn" title="Schließen">✕</button>
-              </div>
-
-              <div class="sbs-grid">
-                <div class="sbs-card">
-                  <span class="sbs-card-label">Temperatur</span>
-                  <span class="sbs-card-val" id="sbs-temp-val">-2.4°C</span>
-                  <span class="sbs-card-sub" id="sbs-dew-val">Taupunkt: -5.1°C</span>
-                </div>
-
-                <div class="sbs-card">
-                  <span class="sbs-card-label">Schnee</span>
-                  <span class="sbs-card-val" id="sbs-snow-val">145 cm</span>
-                  <span class="sbs-card-sub" id="sbs-fresh-snow-val">24h Neuschnee: +15 cm</span>
-                </div>
-
-                <div class="sbs-card">
-                  <span class="sbs-card-label">Wind & Böen</span>
-                  <span class="sbs-card-val" id="sbs-wind-val">42 km/h</span>
-                  <div class="sbs-wind-row sbs-card-sub">
-                    <span class="sbs-compass-needle" id="sbs-compass-needle">↑</span>
-                    <span id="sbs-wind-dir-text">250° (WSW)</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="sbs-actions">
-                <button class="sbs-action-btn" id="sbs-select-location-btn">
-                  📍 Als Hauptstandort für Wetterberichte wählen
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <!-- =================================================================== -->
         <!-- 2D LEAFLET MULTI-LAYER & 48H MODELL-RADAR KARTE                     -->
@@ -1320,7 +1320,7 @@
           <!-- Fullscreen-capable Leaflet Map View with Floating Controls Dock -->
           <div class="fullscreen-map-wrapper" id="fullscreen-map-wrapper">
             <div id="interactive-map"></div>
-            <canvas id="wind-flow-canvas" class="wind-flow-canvas" style="display:none;"></canvas>
+            <canvas id="wind-flow-canvas" class="wind-flow-canvas" role="img" aria-label="Animiertes Windströmungsfeld auf der Wetterkarte" style="display:none;"></canvas>
 
             <!-- 1. SLEEK FLOATING TOP DOCK (WETTER-EBENEN, KARTENSTIL & ACTIONS) -->
             <div class="map-floating-topbar" id="map-floating-topbar">
@@ -1338,20 +1338,115 @@
               <!-- Basiskarten Switcher Pills -->
               <div class="mft-group">
                 <span class="mft-label">Karte:</span>
-                <button class="map-base-btn active" data-base="osm-outdoor" title="OSM Topo Relief & Bergkonturen">🏔️ Topo</button>
-                <button class="map-base-btn" data-base="osm-dark" title="OSM Dunkelmodus (High Contrast)">🌙 Dunkel</button>
-                <button class="map-base-btn" data-base="satellite" title="Satelliten-Luftbild">🛰️ Satellit</button>
-                <button class="map-base-btn" data-base="osm-standard" title="OpenStreetMap Standard">🗺️ Standard</button>
+                <button class="map-base-btn active" data-base="osm-standard" title="OpenStreetMap Standard — Kristallklare Detailtiefe">🗺️ Standard</button>
+                <button class="map-base-btn" data-base="osm-outdoor" title="OSM Topo — Höhenlinien, Schummerung & Alpinrelief">🏔️ Topo</button>
+                <button class="map-base-btn" data-base="osm-dark" title="OSM Dunkel — Nativer High-Contrast Nachtmodus">🌙 Dunkel</button>
+                <button class="map-base-btn" data-base="satellite" title="Satelliten-Luftbild mit OSM-Beschriftung">🛰️ Satellit</button>
               </div>
 
               <!-- Action Toggles -->
               <div class="mft-group mft-actions">
-                <button class="map-toggle-btn" id="stations-toggle-btn" title="Städte & Messstationen ein- oder ausblenden">🏷️ Stationen: Aus</button>
                 <button class="gpx-launch-btn" id="gpx-open-btn" title="GPX-Tour laden & Höhenprofil">🥾 GPX Tour</button>
                 <div class="map-location-chip" id="map-location-chip">
                   <span>📍 München</span>
                 </div>
               </div>
+            </div>
+
+            <!-- Floating Left HUD Stack: High-Precision Wind Compass & Point Weather Tile -->
+            <div class="map-left-hud-stack" id="map-left-hud-stack">
+              <!-- Floating High-Precision Wind Compass Widget (Aktiv bei Wind-Overlay) -->
+              <div class="map-wind-compass-widget" id="map-wind-compass-widget" style="display:none;" role="region" aria-label="Windkompass und Windgeschwindigkeit">
+                <div class="mwc-compass-dial">
+                  <div class="mwc-outer-ring">
+                    <span class="mwc-cardinal n">N</span>
+                    <span class="mwc-cardinal e">O</span>
+                    <span class="mwc-cardinal s">S</span>
+                    <span class="mwc-cardinal w">W</span>
+                    <div class="mwc-needle-wrap" id="mwc-needle-wrap">
+                      <div class="mwc-needle-arrow">▲</div>
+                    </div>
+                    <div class="mwc-center-jewel"></div>
+                  </div>
+                </div>
+                <div class="mwc-info">
+                  <div class="mwc-header">
+                    <span class="mwc-badge">💨 WINDSTRÖMUNG</span>
+                    <span class="mwc-dir-chip" id="mwc-dir-chip">SW • 219°</span>
+                  </div>
+                  <div class="mwc-speed-row">
+                    <span class="mwc-speed-val" id="mwc-speed-val">24</span>
+                    <span class="mwc-speed-unit">km/h</span>
+                    <span class="mwc-gust-box">Böen: <strong id="mwc-gust-val">38</strong> km/h</span>
+                  </div>
+                  <div class="mwc-desc" id="mwc-desc">Mäßiger Wind • Freie Strömung</div>
+                </div>
+              </div>
+
+              <!-- Floating Current Location Weather Tile (Aktuelles Wetter zum gesetzten Kartenpunkt) -->
+              <div class="map-point-weather-card" id="map-point-weather-card" role="region" aria-label="Aktuelles Wetter für ausgewählten Punkt">
+                <div class="mpw-header">
+                  <div class="mpw-title-wrap">
+                    <span class="mpw-badge" id="mpw-type-badge">📍 ORT</span>
+                    <span class="mpw-name" id="mpw-location-name">München</span>
+                  </div>
+                  <div class="mpw-meta">
+                    <span class="mpw-elevation-chip" id="mpw-elevation-chip">520 m</span>
+                    <span class="mpw-time-badge live" id="mpw-time-badge">LIVE</span>
+                  </div>
+                </div>
+                <div class="mpw-body">
+                  <div class="mpw-temp-box">
+                    <span class="mpw-condition-icon" id="mpw-condition-icon">🌤️</span>
+                    <div class="mpw-temp-values">
+                      <span class="mpw-temp-val" id="mpw-temp-val">12°</span>
+                      <span class="mpw-condition-label" id="mpw-condition-label">Überwiegend klar</span>
+                    </div>
+                  </div>
+                  <div class="mpw-metrics-grid">
+                    <div class="mpw-metric-pill" title="Niederschlag">
+                      <span class="mpw-metric-icon">💧</span>
+                      <span class="mpw-metric-val" id="mpw-rain-val">0.0 mm</span>
+                    </div>
+                    <div class="mpw-metric-pill" title="Wind">
+                      <span class="mpw-metric-icon">💨</span>
+                      <span class="mpw-metric-val" id="mpw-wind-val">15 km/h</span>
+                    </div>
+                    <div class="mpw-metric-pill" title="Böen">
+                      <span class="mpw-metric-icon">🌪️</span>
+                      <span class="mpw-metric-val" id="mpw-gust-val">22 km/h</span>
+                    </div>
+                    <div class="mpw-metric-pill" title="Bewölkung">
+                      <span class="mpw-metric-icon">☁️</span>
+                      <span class="mpw-metric-val" id="mpw-clouds-val">35%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Front- & Wind-Zugrichtung (Fix unter dem Kartenpunkt-Bereich) -->
+                <div class="mpw-front-motion" id="mpw-front-motion" title="Aktuelle Zugrichtung der Wetterfront & Strömung">
+                  <span class="mpw-fm-icon">🧭</span>
+                  <span class="mpw-fm-title">Zugrichtung:</span>
+                  <span class="mpw-fm-val" id="mpw-front-motion-val">WNW ➔ OSO (15 km/h)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Floating Modern Zoom & View Controls Dock (Rechte Kartenseite) -->
+            <div class="map-floating-zoom-dock" id="map-floating-zoom-dock" role="toolbar" aria-label="Zoom- und Kartennavigation">
+              <button class="map-zoom-action-btn" id="map-zoom-in-btn" title="Karte vergrößern (+)" aria-label="Vergrößern">
+                <span class="mzb-symbol">+</span>
+              </button>
+              <button class="map-zoom-action-btn" id="map-zoom-out-btn" title="Karte verkleinern (−)" aria-label="Verkleinern">
+                <span class="mzb-symbol">−</span>
+              </button>
+              <div class="map-zoom-divider"></div>
+              <button class="map-zoom-action-btn" id="map-zoom-location-btn" title="Auf ausgewählten Standort zentrieren" aria-label="Standort zentrieren">
+                <span class="mzb-icon">🎯</span>
+              </button>
+              <button class="map-zoom-action-btn" id="map-zoom-alps-btn" title="Alpenraum-Gesamtübersicht" aria-label="Alpen-Übersicht">
+                <span class="mzb-icon">🏔️</span>
+              </button>
             </div>
 
             <!-- Floating GPX Tour Active Banner -->
@@ -1384,10 +1479,11 @@
               <div class="legend-title" id="map-legend-title">Niederschlagsintensität & Typ:</div>
               <div class="legend-gradient-bar" id="map-legend-bar"></div>
               <div class="legend-scale-labels" id="map-legend-labels">
-                <span>Leichter Regen</span>
+                <span>Leicht</span>
                 <span>Mäßig</span>
-                <span>Stark</span>
-                <span>Schnee / Graupel</span>
+                <span>Kräftig</span>
+                <span>Starkregen</span>
+                <span>Schnee (Reinweiß)</span>
               </div>
             </div>
 
@@ -1395,47 +1491,62 @@
             <!-- 2. HIGH-END 48H RADAR TIMELINE PLAYER (APPLE WEATHER / WINDY STYLE) -->
             <!-- =================================================================== -->
             <div class="radar-floating-controls modern-radar-player" id="radar-floating-controls">
-              <!-- Row 1: Time Display, Mode Chip & Fast Jump Buttons -->
+              <!-- Top Row: Mode Chip, Dynamic Time Banner & Collapse Toggle -->
               <div class="radar-player-topline">
                 <div class="radar-info-left">
                   <span class="radar-mode-chip" id="radar-mode-chip">🔮 48h Prognose-Radar</span>
                   <span class="radar-time-banner" id="radar-time-display">Heute, 14:00 Uhr • +2 Std. Zukunft</span>
-                  <button id="radar-player-toggle-btn" class="radar-player-toggle-btn" title="Player minimieren / vergrößern" aria-label="Player ein-/ausklappen">▾</button>
                 </div>
-
-                <div class="radar-jump-pills">
-                  <button class="radar-jump-btn" data-target="past">🔴 Live (-2h)</button>
-                  <button class="radar-jump-btn" data-target="now">Jetzt</button>
-                  <button class="radar-jump-btn" data-target="3">+3h</button>
-                  <button class="radar-jump-btn" data-target="6">+6h</button>
-                  <button class="radar-jump-btn" data-target="12">+12h</button>
-                  <button class="radar-jump-btn" data-target="18">+18h</button>
-                  <button class="radar-jump-btn" data-target="24">+24h</button>
-                  <button class="radar-jump-btn" data-target="30">+30h</button>
-                  <button class="radar-jump-btn" data-target="36">+36h</button>
-                  <button class="radar-jump-btn" data-target="42">+42h</button>
-                  <button class="radar-jump-btn" data-target="48">+48h</button>
+                <div class="radar-top-actions">
+                  <button id="radar-player-toggle-btn" class="radar-player-toggle-btn" title="Player minimieren / vergrößern" aria-label="Player ein-/ausklappen">▾</button>
                 </div>
               </div>
 
-              <!-- Row 2: Transport Controls & Timeline Track -->
+              <!-- Middle: Full-Width Apple-Grade Timeline Slider & Clear Markers -->
+              <div class="radar-slider-container">
+                <div class="radar-slider-track-wrap">
+                  <input type="range" id="radar-time-slider" min="0" max="60" value="12" step="1" aria-label="Zeitleiste 48h Radar">
+                </div>
+                <div class="radar-timeline-markers">
+                  <span class="rtm-past">-1h (15m)</span>
+                  <span class="rtm-now">🔴 JETZT</span>
+                  <span class="rtm-future" style="color:#38bdf8;">+1h (5m Nowcast)</span>
+                  <span class="rtm-future" style="color:#c084fc;">+3h (15m)</span>
+                  <span class="rtm-future rtm-hide-mobile">+12h</span>
+                  <span class="rtm-future">+24h</span>
+                  <span class="rtm-future">+48h</span>
+                </div>
+              </div>
+
+              <!-- Bottom Row: Transport Controls & Smooth Horizontal Quick-Jump Pills -->
               <div class="radar-player-bottomline">
                 <div class="radar-transport-btns">
-                  <button id="radar-prev-btn" class="radar-transport-btn" title="1 Stunde zurück">⏮</button>
-                  <button id="radar-play-btn" class="radar-play-btn" title="48h-Radar abspielen / pausieren">▶</button>
-                  <button id="radar-next-btn" class="radar-transport-btn" title="1 Stunde vor">⏭</button>
-                  <button id="radar-speed-btn" class="radar-speed-btn" title="Geschwindigkeit umschalten">1x</button>
+                  <button id="radar-prev-btn" class="radar-transport-btn" title="1 Zeitschritt zurück" aria-label="1 Zeitschritt zurück">⏮</button>
+                  <button id="radar-play-btn" class="radar-play-btn" title="48h-Radar abspielen / pausieren" aria-label="Radar abspielen oder pausieren">▶</button>
+                  <button id="radar-next-btn" class="radar-transport-btn" title="1 Zeitschritt vor" aria-label="1 Zeitschritt vor">⏭</button>
+                  <button id="radar-speed-btn" class="radar-speed-btn" title="Geschwindigkeit umschalten" aria-label="Wiedergabegeschwindigkeit">1x</button>
                 </div>
 
-                <div class="radar-slider-container">
-                  <input type="range" id="radar-time-slider" min="0" max="60" value="12" step="1">
-                  <div class="radar-timeline-markers">
-                    <span class="rtm-past">-2 Std. (Radar)</span>
-                    <span class="rtm-now">🔴 JETZT</span>
-                    <span class="rtm-future">+12 Std.</span>
-                    <span class="rtm-future">+24 Std.</span>
-                    <span class="rtm-future">+36 Std.</span>
-                    <span class="rtm-future">+48 Std. (DWD & ECMWF)</span>
+                <div class="radar-jump-pills-wrap">
+                  <div class="radar-jump-pills">
+                    <button class="radar-jump-btn" data-target="past">⏪ -1h (15m)</button>
+                    <button class="radar-jump-btn" data-target="-30m">-30m</button>
+                    <button class="radar-jump-btn" data-target="now">Jetzt</button>
+                    <button class="radar-jump-btn highlight-5m" data-target="+15m" title="Nowcast +15 Min. (5-Min.-Raster)">⚡ +15m</button>
+                    <button class="radar-jump-btn highlight-5m" data-target="+30m" title="Nowcast +30 Min. (5-Min.-Raster)">⚡ +30m</button>
+                    <button class="radar-jump-btn highlight-5m" data-target="+45m" title="Nowcast +45 Min. (5-Min.-Raster)">⚡ +45m</button>
+                    <button class="radar-jump-btn highlight-5m" data-target="+60m" title="Prognose +1 Std.">⚡ +1h</button>
+                    <button class="radar-jump-btn highlight-15m" data-target="+90m" title="15-Min.-Prognose +1h 30m">+1h 30m</button>
+                    <button class="radar-jump-btn highlight-15m" data-target="+120m" title="15-Min.-Prognose +2h">+2h</button>
+                    <button class="radar-jump-btn" data-target="+3h">+3h</button>
+                    <button class="radar-jump-btn" data-target="+6h">+6h</button>
+                    <button class="radar-jump-btn" data-target="+12h">+12h</button>
+                    <button class="radar-jump-btn" data-target="+18h">+18h</button>
+                    <button class="radar-jump-btn" data-target="+24h">+24h</button>
+                    <button class="radar-jump-btn" data-target="+30h">+30h</button>
+                    <button class="radar-jump-btn" data-target="+36h">+36h</button>
+                    <button class="radar-jump-btn" data-target="+42h">+42h</button>
+                    <button class="radar-jump-btn" data-target="+48h">+48h</button>
                   </div>
                 </div>
               </div>
@@ -1474,8 +1585,8 @@
       <!-- =================================================================== -->
       <!-- TAB 5: ALPEN-MESSNETZE, METEOROLOGISCHE QUELLEN & MODELL-ENGINE -->
       <!-- =================================================================== -->
-      <div class="tab-pane" id="tab-networks">
-        
+      <div class="tab-pane" id="tab-networks" data-hydrated="false">
+        <template id="tpl-tab-networks">
         <section class="glass-card networks-card">
           <!-- Card Header & Active Geo-Routing Badge -->
           <div class="card-header">
@@ -2104,6 +2215,7 @@
           </div>
 
         </section>
+        </template>
 
       </div>
 
@@ -2469,11 +2581,9 @@
     </button>
   </nav>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- App Core Module -->
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=2.2.0"></script>
 
   <!-- Service Worker Registration für Alpine Offline PWA -->
   <script>

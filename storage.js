@@ -1,19 +1,23 @@
 /**
- * BEST WEATHER — IndexedDB Alpine Storage Engine
- * High-capacity offline storage replacing localStorage for large GPX files
- * and multi-day meteorological datasets with safe fallback.
+ * BEST WEATHER — IndexedDB Alpine Storage Engine (Task 7a)
+ * Features Debounced Write Queue, separation of static GPX text vs. dynamic timeline,
+ * and high-capacity offline storage with graceful fallback.
  */
 
 const DB_NAME = 'BestWeatherAlpineDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise = null;
+let debouncedTourTimer = null;
+let pendingTourSave = null;
+let pendingResolvers = [];
 
 function getDB() {
   if (dbPromise) return dbPromise;
 
   dbPromise = new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
+      dbPromise = null;
       return reject(new Error('IndexedDB not supported'));
     }
 
@@ -24,6 +28,9 @@ function getDB() {
       if (!db.objectStoreNames.contains('tours')) {
         db.createObjectStore('tours', { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains('gpx_raw')) {
+        db.createObjectStore('gpx_raw', { keyPath: 'id' });
+      }
       if (!db.objectStoreNames.contains('weather')) {
         db.createObjectStore('weather', { keyPath: 'id' });
       }
@@ -33,7 +40,10 @@ function getDB() {
     };
 
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      dbPromise = null; // Rejection nicht permanent cachen
+      reject(req.error);
+    };
   });
 
   return dbPromise;
@@ -41,23 +51,79 @@ function getDB() {
 
 export const AlpineStorage = {
   /**
-   * Speichert eine GPX-Tour sicher in IndexedDB (oder Fallback)
+   * Debounced Queue zum Speichern einer Tour (verhindert I/O-Spikes und Promise-Leaks)
+   */
+  queueSaveTour(tour, delayMs = 600) {
+    pendingTourSave = tour;
+    if (debouncedTourTimer) clearTimeout(debouncedTourTimer);
+
+    return new Promise((resolve) => {
+      pendingResolvers.push(resolve);
+
+      debouncedTourTimer = setTimeout(async () => {
+        debouncedTourTimer = null;
+        const resolvers = [...pendingResolvers];
+        pendingResolvers = [];
+
+        try {
+          if (pendingTourSave) {
+            const res = await this.saveTour(pendingTourSave);
+            pendingTourSave = null;
+            resolvers.forEach((r) => r(res));
+          } else {
+            resolvers.forEach((r) => r(true));
+          }
+        } catch (err) {
+          resolvers.forEach((r) => r(false));
+        }
+      }, delayMs);
+    });
+  },
+
+  /**
+   * Speichert eine GPX-Tour sicher mit Trennung von Roh-XML und dynamischer Timeline
    */
   async saveTour(tour) {
+    const tourId = tour.id || 'current_tour';
+
+    // 1. Wenn Roh-XML vorhanden ist, separat in 'gpx_raw' ablegen (nur 1x nötig)
+    if (tour.gpxXml) {
+      try {
+        const db = await getDB();
+        await new Promise((res) => {
+          const tx = db.transaction('gpx_raw', 'readwrite');
+          tx.objectStore('gpx_raw').put({ id: tourId, xml: tour.gpxXml, timestamp: Date.now() });
+          tx.oncomplete = () => res(true);
+          tx.onerror = () => res(false);
+        });
+      } catch (_) {}
+    }
+
+    // 2. Schlankes Tour-Objekt (ohne redundanten Riesenstring) in 'tours' ablegen
+    const lightweightTour = {
+      ...tour,
+      id: tourId,
+      gpxXml: null, // abgetrennt für blitzschnelle Schreiboperationen
+      hasRawGpx: Boolean(tour.gpxXml)
+    };
+
     try {
       const db = await getDB();
       return new Promise((resolve, reject) => {
         const tx = db.transaction('tours', 'readwrite');
         const store = tx.objectStore('tours');
-        store.put(tour);
+        store.put(lightweightTour);
         tx.oncomplete = () => resolve(true);
         tx.onerror = () => reject(tx.error);
       });
     } catch (e) {
       // Fallback auf LocalStorage mit Quota-Schutz
       try {
-        const key = `tour_${tour.id || 'current'}`;
-        const miniTour = { ...tour, gpxXml: (tour.gpxXml && tour.gpxXml.length > 500000) ? null : tour.gpxXml };
+        const key = `tour_${tourId}`;
+        const miniTour = {
+          ...lightweightTour,
+          parsedGPX: tour.parsedGPX ? { ...tour.parsedGPX, points: (tour.parsedGPX.points || []).slice(0, 100) } : null
+        };
         localStorage.setItem(key, JSON.stringify(miniTour));
       } catch (lsErr) {
         console.warn('Storage Fallback Quota Error:', lsErr);
@@ -67,18 +133,37 @@ export const AlpineStorage = {
   },
 
   /**
-   * Lädt eine Tour aus IndexedDB
+   * Lädt eine Tour aus IndexedDB und führt Roh-XML und Timeline wieder zusammen
    */
-  async getTour(id) {
+  async getTour(id = 'current_tour') {
     try {
       const db = await getDB();
-      return new Promise((resolve, reject) => {
+      const tour = await new Promise((resolve, reject) => {
         const tx = db.transaction('tours', 'readonly');
         const store = tx.objectStore('tours');
         const req = store.get(id);
         req.onsuccess = () => resolve(req.result || null);
         req.onerror = () => reject(req.error);
       });
+
+      if (!tour) return null;
+
+      // Roh-XML bei Bedarf nachladen
+      if (!tour.gpxXml) {
+        try {
+          const rawEntry = await new Promise((res) => {
+            const tx = db.transaction('gpx_raw', 'readonly');
+            const req = tx.objectStore('gpx_raw').get(id);
+            req.onsuccess = () => res(req.result || null);
+            req.onerror = () => res(null);
+          });
+          if (rawEntry && rawEntry.xml) {
+            tour.gpxXml = rawEntry.xml;
+          }
+        } catch (_) {}
+      }
+
+      return tour;
     } catch (e) {
       try {
         const raw = localStorage.getItem(`tour_${id}`);
@@ -137,7 +222,6 @@ export const AlpineStorage = {
           req.onsuccess = () => resolve(req.result || null);
           req.onerror = () => resolve(null);
         } else {
-          // Hole neuesten Eintrag
           const req = store.openCursor(null, 'prev');
           req.onsuccess = (e) => {
             const cursor = e.target.result;
@@ -157,7 +241,7 @@ export const AlpineStorage = {
   },
 
   /**
-   * Sicheres Setzen in LocalStorage (mit Schutz gegen Safari Private Mode)
+   * Sicheres Setzen in LocalStorage
    */
   safeSetItem(key, value) {
     try {

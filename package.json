@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --check app.js microEngine.js sw.js storage.js httpClient.js gpx.worker.js",
-    "dev": "python3 -m http.server 8080"
+    "dev": "python3 -m http.server 8000"
   },
   "keywords": [
     "alpine-weather",
