@@ -30,6 +30,7 @@ dist/
 .env.local
 .env.*.local
 *.log
+.vite/
 
 # Test artifacts, screenshots & scratch
 *.png
@@ -40,3 +41,4 @@ dist/
 scratch/
 __pycache__/
 .pytest_cache/
+coverage/

@@ -1,19 +1,29 @@
 {
   "name": "best-weather-alpine-platform",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Ultra-High Precision Alpine Weather & Urban Climate Platform",
   "type": "module",
   "scripts": {
-    "test": "node --check app.js microEngine.js sw.js storage.js httpClient.js gpx.worker.js",
-    "dev": "python3 -m http.server 8000"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "node --check app.js microEngine.js sw.js storage.js httpClient.js gpx.worker.js core/*.js features/*.js",
+    "lint": "echo 'Add ESLint later for full linting'"
   },
   "keywords": [
     "alpine-weather",
     "pwa",
     "gpx",
     "offline",
-    "downscaling"
+    "downscaling",
+    "vite"
   ],
   "author": "Jona",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
 }
