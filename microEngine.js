@@ -2526,7 +2526,29 @@ export const MicroEngine = {
     }
     return { icon: '☁️', label: 'Bedeckt', synopNote: 'Überwiegend graue, geschlossene Wolkenschicht', theme: 'cloudy' };
   }
-};
+,
+
+  async fetchBrightSkyCurrent(lat, lon) {
+    try {
+      const url = `https://api.brightsky.dev/current_weather?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.weather || null;
+    } catch (e) {
+      console.warn("Bright Sky nicht erreichbar:", e.message);
+      return null;
+    }
+  },
+
+  calculateSpread(values) {
+    const nums = (values || []).filter(v => typeof v === "number" && !isNaN(v));
+    if (!nums.length) return null;
+    const min = Math.min(...nums);
+    const max = Math.max(...nums);
+    const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+    return { min, max, avg, spread: +(max - min).toFixed(1) };
+  }};
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = MicroEngine;

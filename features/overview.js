@@ -1,3 +1,4 @@
+import { MicroEngine } from '../microEngine.js';
 /**
  * BEST WEATHER — Overview Domain Feature Module (Task 1a)
  * Hero header, 24h hourly forecast slider, 10-day trend, Multi-Model comparison,
@@ -167,7 +168,49 @@ export function renderOverviewTab() {
   // Exact Temperature
   const finalTemp = (m && state.currentLocation.isMountain) ? m.microWeather.temperature10m : cur.temperature_2m;
   document.getElementById('hero-current-temp').innerText = Math.round(convertTemp(finalTemp));
-  document.getElementById('hero-condition-text').innerText = code.label;
+
+  // Multi-Model-Spread anzeigen (falls vorhanden)
+  (async () => {
+    try {
+      const spreadEl = document.getElementById('hero-temp-spread');
+      if (!spreadEl || !MicroEngine.calculateSpread) return;
+      // Beispiel: Temperatur-Spread aus stündlichen Werten der nächsten Stunden
+      const hourly = w.hourly;
+      if (hourly && hourly.temperature_2m) {
+        const nextTemps = hourly.temperature_2m.slice(0, 6);
+        const spread = MicroEngine.calculateSpread(nextTemps);
+        if (spread && spread.spread > 1) {
+          spreadEl.textContent = ` (${Math.round(spread.min)}–${Math.round(spread.max)}°)`;
+          spreadEl.style.display = 'inline';
+        }
+      }
+    } catch (_) {}
+  })();
+
+  // Bright Sky Current (DWD-Station) bevorzugt, Fallback auf Modell
+  (async () => {
+    try {
+      const loc = state.currentLocation;
+      if (!loc || !MicroEngine.fetchBrightSkyCurrent) return;
+      const station = await MicroEngine.fetchBrightSkyCurrent(loc.lat, loc.lon);
+      if (station && typeof station.temperature === 'number') {
+        const el = document.getElementById('hero-current-temp');
+        if (el) el.innerText = Math.round(convertTemp(station.temperature));
+        const cond = document.getElementById('hero-condition-text');
+        if (cond && station.condition) cond.innerText = station.condition;
+        const src = document.getElementById('hero-source-badge');
+        if (src) src.innerText = 'DWD-Station';
+      }
+    } catch (_) {}
+  })();
+  // Cloud-Cover in die Bedingung einbeziehen (Hero und Karte konsistent)
+  const cloud = cur.cloud_cover !== undefined ? cur.cloud_cover : (w.hourly && w.hourly.cloud_cover ? w.hourly.cloud_cover[0] : 0);
+  let conditionLabel = code.label;
+  if (cloud >= 75) conditionLabel = 'Bedeckt';
+  else if (cloud >= 50) conditionLabel = 'Wolkig';
+  else if (cloud >= 25) conditionLabel = 'Teilweise bewölkt';
+  else if (cloud < 15 && (cur.weather_code === 0 || cur.weather_code === 1)) conditionLabel = 'Klar / Wolkenlos';
+  document.getElementById('hero-condition-text').innerText = conditionLabel;
 
   if (daily && daily.temperature_2m_max && daily.temperature_2m_max.length > 0) {
     document.getElementById('hero-temp-max').innerText = `${Math.round(convertTemp(daily.temperature_2m_max[0]))}°`;
