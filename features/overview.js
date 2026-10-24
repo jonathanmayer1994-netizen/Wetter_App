@@ -169,24 +169,6 @@ export function renderOverviewTab() {
   const finalTemp = (m && state.currentLocation.isMountain) ? m.microWeather.temperature10m : cur.temperature_2m;
   document.getElementById('hero-current-temp').innerText = Math.round(convertTemp(finalTemp));
 
-  // Multi-Model-Spread anzeigen (falls vorhanden)
-  (async () => {
-    try {
-      const spreadEl = document.getElementById('hero-temp-spread');
-      if (!spreadEl || !MicroEngine.calculateSpread) return;
-      // Beispiel: Temperatur-Spread aus stündlichen Werten der nächsten Stunden
-      const hourly = w.hourly;
-      if (hourly && hourly.temperature_2m) {
-        const nextTemps = hourly.temperature_2m.slice(0, 6);
-        const spread = MicroEngine.calculateSpread(nextTemps);
-        if (spread && spread.spread > 1) {
-          spreadEl.textContent = ` (${Math.round(spread.min)}–${Math.round(spread.max)}°)`;
-          spreadEl.style.display = 'inline';
-        }
-      }
-    } catch (_) {}
-  })();
-
   // Bright Sky Current (DWD-Station) bevorzugt, Fallback auf Modell
   (async () => {
     try {
@@ -197,7 +179,8 @@ export function renderOverviewTab() {
         const el = document.getElementById('hero-current-temp');
         if (el) el.innerText = Math.round(convertTemp(station.temperature));
         const cond = document.getElementById('hero-condition-text');
-        if (cond && station.condition) cond.innerText = station.condition;
+        // Englische Station-Condition nicht übernehmen – deutsche Bezeichnung bleibt erhalten
+        // if (cond && station.condition) cond.innerText = station.condition;
         const src = document.getElementById('hero-source-badge');
         if (src) src.innerText = 'DWD-Station';
       }
@@ -777,16 +760,16 @@ export function render10DayForecast(daily, hourly) {
             <span class="daily-cond-text" title="${condLabel}">${condLabel}</span>
           </div>
 
-          <!-- 3. Precipitation & Rain Sum -->
+          <!-- 3. Precipitation: Regen + Schnee getrennt -->
           <div class="daily-precip-cell">
-            ${pop > 10 || rainSum > 0 ? `
-              <span class="daily-precip-chip ${rainSum >= 5 ? 'heavy-rain' : ''}">
-                <span class="precip-pop">💧 ${pop}%</span>
-                <span class="precip-sum">${rainSum.toFixed(1)} mm</span>
-              </span>
-            ` : `
-              <span class="daily-precip-dry">💧 0% • Trocken</span>
-            `}
+            ${(() => {
+              const snowSum = daily.snowfall_sum ? (daily.snowfall_sum[i] || 0) : 0;
+              const parts = [];
+              if (pop > 10 || rainSum > 0.05) parts.push(`💧 ${pop}% ${rainSum.toFixed(1)} mm`);
+              if (snowSum > 0.05) parts.push(`❄️ ${snowSum.toFixed(1)} cm`);
+              if (parts.length === 0) return '<span class="daily-precip-dry">💧 0% • Trocken</span>';
+              return `<span class="daily-precip-chip ${rainSum >= 5 || snowSum >= 5 ? 'heavy-rain' : ''}">${parts.join(' · ')}</span>`;
+            })()}
           </div>
 
           <!-- 4. Wind & Gusts -->
