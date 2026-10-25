@@ -147,6 +147,12 @@ export function validateMultiModel(mm) {
     consensusScore: typeof mm.consensusScore === 'number' ? Math.max(50, Math.min(99, mm.consensusScore)) : 82,
     consensusText: mm.consensusText || 'Gute Modell-Übereinstimmung',
     hourlyTime: Array.isArray(mm.hourlyTime) ? mm.hourlyTime : [],
+    strategy: mm.strategy || null,
+    weights: mm.weights || null,
+    activeRegionalModel: mm.activeRegionalModel || null,
+    regional: mm.regional || null,
+    icon: mm.icon || null,
+    weightedConsensus: mm.weightedConsensus || null,
     ecmwf: {
       name: mm.ecmwf.name || 'ECMWF IFS 0.25°',
       origin: mm.ecmwf.origin || 'Europäisches Zentrum für mittelfristige Wettervorhersage',

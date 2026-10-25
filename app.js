@@ -13,7 +13,7 @@ import { validateLocation } from './core/contracts.js';
 
 // Domain Feature Modules (Task 1a)
 import { setupLocationTypeToggle, updateLocationHeaderUI, updateAlpineSkyIllumination, renderOverviewTab, setupExpertModeToggle, renderMultiModelComparison, renderAirQualityAndUV, setupMeteogramControls, openDayDetailModal, convertTemp, setupHourlyGranularityToggle } from './features/overview.js';
-import { setupWallSelector, setupAltitudeSlider, setupMountain3DControls, setupWebcamModal, renderAdaptiveTab2, renderMountain3DModel, drawMountain3DCanvas, startMountain3DAnimation, stopMountain3DAnimation } from './features/mountain.js';
+import { setupWallSelector, setupAltitudeSlider, setupMountainControls, setupMountain3DControls, setupWebcamModal, renderAdaptiveTab2 } from './features/mountain.js';
 import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard } from './features/map.js';
 import { setupGPXInspector, setupSportsTab } from './features/sports.js';
 import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers } from './features/search.js';
@@ -62,21 +62,13 @@ export function switchTab(tabId) {
     if (state.map?.radarPlaying) stopRadarAnimation();
   }
 
-  if (tabId === 'tab-mountain') {
+  if (tabId === 'tab-map') {
     setTimeout(() => {
-      renderMountain3DModel();
-      startMountain3DAnimation();
-    }, 60);
-  } else {
-    stopMountain3DAnimation();
-    if (tabId === 'tab-map') {
-      setTimeout(() => {
-        if (state.map.instance) {
-          state.map.instance.invalidateSize();
-          if (state.currentLocation) state.map.instance.panTo([state.currentLocation.lat, state.currentLocation.lon], { animate: false });
-        }
-      }, 100);
-    }
+      if (state.map.instance) {
+        state.map.instance.invalidateSize();
+        if (state.currentLocation) state.map.instance.panTo([state.currentLocation.lat, state.currentLocation.lon], { animate: false });
+      }
+    }, 100);
   }
 }
 
@@ -86,12 +78,8 @@ export function setupTabs() {
     if (document.hidden) {
       if (state.canvasEngine) state.canvasEngine.pause();
       if (state.map?.radarPlaying) stopRadarAnimation();
-      stopMountain3DAnimation();
     } else {
       if (state.canvasEngine) state.canvasEngine.resume();
-      if (state.activeTab === 'tab-mountain') {
-        startMountain3DAnimation();
-      }
     }
   });
 }
@@ -112,15 +100,19 @@ export async function loadLocation(loc) {
     const customAzimuth = state.activeAspect.isAuto ? null : state.activeAspect.azimuth;
 
     const [microResult, multiModel, airQuality] = await Promise.all([
-      MicroEngine.getMicroScaleWeather(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain, customTilt, customAzimuth),
-      MicroEngine.fetchMultiModelComparison(validLoc.lat, validLoc.lon),
+      MicroEngine.getMicroScaleWeather(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain, customTilt, customAzimuth, validLoc.country),
+      MicroEngine.fetchMultiModelComparison(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain),
       MicroEngine.fetchAirQualityAndUV(validLoc.lat, validLoc.lon, validLoc.elevation)
     ]);
 
     state.microData = microResult;
     state.weatherData = microResult.weatherRaw;
-    state.multiModel = multiModel;
+    state.multiModel = multiModel || microResult.multiModel;
     state.airQuality = airQuality;
+
+    if (state.multiModel && state.multiModel.weightedConsensus) {
+      MicroEngine.applyMultiModelWeightsToWeather(state.weatherData, state.microData, state.multiModel);
+    }
 
     await WeatherTourCache.saveLocationAndWeather(validLoc, state.weatherData, state.microData);
 
@@ -178,7 +170,7 @@ window.loadLocation = loadLocation;
 window.selectExactLocation = selectExactLocation;
 window.renderOverviewTab = renderOverviewTab;
 window.renderAdaptiveTab2 = renderAdaptiveTab2;
-window.drawMountain3DCanvas = drawMountain3DCanvas;
+window.drawMountain3DCanvas = () => {};
 window.openDayDetailModal = openDayDetailModal;
 window.convertTemp = convertTemp;
 window.updatePointWeatherCard = updatePointWeatherCard;
@@ -197,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSpotlightAndQuickGps();
   setupWallSelector();
   setupAltitudeSlider();
-  setupMountain3DControls();
+  setupMountainControls();
   setupFavorites();
   setupLocationTypeToggle();
   setupHourlyGranularityToggle();

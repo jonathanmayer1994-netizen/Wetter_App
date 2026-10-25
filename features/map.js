@@ -7,7 +7,6 @@
 import { state } from '../core/state.js';
 import { BASE_LAYERS, REGIONAL_STATIONS, WMO_CODES } from '../core/constants.js';
 import { selectExactLocation } from './search.js';
-import { drawMountain3DCanvas } from './mountain.js';
 import { MicroEngine } from '../microEngine.js';
 import { escapeHtml } from '../httpClient.js';
 
@@ -170,9 +169,7 @@ export function initLeafletMap() {
     }
     if (resizeDebounce) clearTimeout(resizeDebounce);
     resizeDebounce = setTimeout(() => {
-      if (state.activeTab === 'tab-mountain') {
-        drawMountain3DCanvas();
-      } else if (state.activeTab === 'tab-map' && state.map.instance) {
+      if (state.activeTab === 'tab-map' && state.map.instance) {
         state.map.instance.invalidateSize();
       }
     }, 100);
@@ -2010,7 +2007,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     state.map.weatherLayerGroup.clearLayers();
 
     stations.forEach(st => {
-      const tVal = st.temperature !== undefined ? st.temperature : 10;
+      const tVal = (st.temperature !== undefined && st.temperature !== null) ? Number(st.temperature) : 10;
       let color = '#22c55e';
       if (tVal < -5) color = '#1e40af';
       else if (tVal <= 0) color = '#06b6d4';
@@ -2038,9 +2035,10 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     });
 
     if (timeDisplay) {
-      const isFrost = locWeather.temp <= 0;
+      const curT = (locWeather.temp !== undefined && locWeather.temp !== null) ? Number(locWeather.temp) : 0;
+      const isFrost = curT <= 0;
       const tTag = isFrost ? '❄️ Frostgrenze' : '💧 Plusgrade';
-      timeDisplay.innerText = `${dayStr}, ${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${locWeather.temp.toFixed(1)}°C (${tTag})`;
+      timeDisplay.innerText = `${dayStr}, ${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${curT.toFixed(1)}°C (${tTag})`;
     }
   }
 
@@ -2060,7 +2058,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     state.map.weatherLayerGroup.clearLayers();
 
     stations.forEach(st => {
-      const p = st.pressureMsl !== undefined ? st.pressureMsl : (st.weather ? st.weather.pressure_msl : 1013.2);
+      const p = (st.pressureMsl !== undefined && st.pressureMsl !== null) ? Number(st.pressureMsl) : ((st.weather && st.weather.pressure_msl != null) ? Number(st.weather.pressure_msl) : 1013.2);
       let color = '#38bdf8';
       let tag = 'Normal';
       if (p >= 1022) { color = '#3b82f6'; tag = '🔵 Hoch H'; }

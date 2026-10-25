@@ -545,12 +545,12 @@
             </div>
           </section>
 
-          <!-- VERTIKALES HÖHENPROFIL & 3D BERG-WETTERMODELL -->
+          <!-- VERTIKALES WETTER-HÖHENPROFIL & HÖHENSTUFEN -->
           <section class="glass-card altitude-chart-card">
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">🏔️</span>
-                <span>3D-BERGGELÄNDE & WETTER-HÖHENSCHNITT</span>
+                <span>WETTER-HÖHENPROFIL & HÖHENSTUFEN</span>
               </div>
               
               <!-- Smarte Zeitnavigation: Stepper & Badge -->
@@ -561,80 +561,6 @@
                   <span class="tb-text" id="profile-time-label">Jetzt</span>
                 </div>
                 <button class="time-step-btn" id="time-step-next" title="1 Stunde vor">›</button>
-              </div>
-            </div>
-
-            <!-- 1. 3D MODUS- & EBENEN-KONTROLLDOCK -->
-            <div class="m3d-controls-dock" id="m3d-controls-dock">
-              <!-- View Modes -->
-              <div class="m3d-group">
-                <span class="m3d-label">Ansicht:</span>
-                <button class="m3d-mode-btn active" data-mode="massif" id="m3d-mode-massif" title="3D Isometrisches Alpenrelief">🏔️ 3D Massiv</button>
-                <button class="m3d-mode-btn" data-mode="crossSection" id="m3d-mode-section" title="Vertikaler meteorologischer Profilschnitt">📐 Vertikalschnitt</button>
-                <button class="m3d-mode-btn" data-mode="wind" id="m3d-mode-wind" title="3D Windströmung & Lee-Effekt">💨 Windströmung</button>
-              </div>
-
-              <!-- Layer Toggles -->
-              <div class="m3d-group m3d-layer-toggles">
-                <span class="m3d-label">Ebenen:</span>
-                <button class="m3d-layer-btn active" data-layer="frost" id="m3d-toggle-frost" title="0°C-Schneefallgrenze ein-/ausblenden">❄️ 0°C Frostgrenze</button>
-                <button class="m3d-layer-btn active" data-layer="clouds" id="m3d-toggle-clouds" title="Wolkendecke & Inversionsschicht">☁️ Wolkenschicht</button>
-                <button class="m3d-layer-btn active" data-layer="sun" id="m3d-toggle-sun" title="Sonnen- & Schattenhang">☀️ Sonnenhang</button>
-              </div>
-            </div>
-
-            <!-- 2. INTERAKTIVER 3D-BERGGELÄNDE & WETTER-VIEWPORT -->
-            <div class="mountain-3d-viewport" id="mountain-3d-viewport">
-              <canvas id="mountain-3d-canvas" class="mountain-3d-canvas" role="img" aria-label="3D-Bergrelief und Höhenprofil Visualisierung"></canvas>
-
-              <!-- Floating Hotspot Badges & HUD Overlays -->
-              <div class="m3d-hud-overlay" id="m3d-hud-overlay">
-                <!-- Peak HUD Badge (Top) -->
-                <div class="m3d-hud-badge badge-peak" id="m3d-hud-peak">
-                  <span class="mhb-icon">🏔️</span>
-                  <div class="mhb-body">
-                    <div class="mhb-title">Gipfel (<span id="m3d-val-peak-z">-- m</span>)</div>
-                    <div class="mhb-metric"><strong id="m3d-val-peak-temp">--°</strong> • <span id="m3d-val-peak-cond">Schnee</span></div>
-                    <div class="mhb-sub">Wind: <span id="m3d-val-peak-wind">-- km/h</span> (Böen <span id="m3d-val-peak-gusts">--</span>)</div>
-                  </div>
-                </div>
-
-                <!-- 0°C Frost Line Plane Badge -->
-                <div class="m3d-hud-badge badge-frost" id="m3d-hud-frost">
-                  <span class="mhb-icon">❄️</span>
-                  <div class="mhb-body">
-                    <div class="mhb-title">0°C Schneefallgrenze</div>
-                    <div class="mhb-metric text-cyan"><strong id="m3d-val-frost-z">-- m</strong></div>
-                    <div class="mhb-sub" id="m3d-val-frost-sub">Darüber Schnee, darunter Regen</div>
-                  </div>
-                </div>
-
-                <!-- Mid-Station HUD Badge -->
-                <div class="m3d-hud-badge badge-mid" id="m3d-hud-mid">
-                  <span class="mhb-icon">🚡</span>
-                  <div class="mhb-body">
-                    <div class="mhb-title">Mittelstation (<span id="m3d-val-mid-z">-- m</span>)</div>
-                    <div class="mhb-metric"><strong id="m3d-val-mid-temp">--°</strong> • <span id="m3d-val-mid-cond">Regen</span></div>
-                    <div class="mhb-sub">Wind: <span id="m3d-val-mid-wind">-- km/h</span></div>
-                  </div>
-                </div>
-
-                <!-- Valley Floor HUD Badge -->
-                <div class="m3d-hud-badge badge-valley" id="m3d-hud-valley">
-                  <span class="mhb-icon">🏡</span>
-                  <div class="mhb-body">
-                    <div class="mhb-title">Talboden (<span id="m3d-val-valley-z">-- m</span>)</div>
-                    <div class="mhb-metric"><strong id="m3d-val-valley-temp">--°</strong> • <span id="m3d-val-valley-cond">Trocken</span></div>
-                    <div class="mhb-sub">Wind: <span id="m3d-val-valley-wind">-- km/h</span></div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 3D Mountain Interactive Status Bar -->
-              <div class="m3d-status-bar" id="m3d-status-bar">
-                <span class="msb-item" id="msb-inversion-badge">🏔️ Gipfel über Wolkendecke</span>
-                <span class="msb-item" id="msb-lapse-rate">-0.65°C / 100 Hm</span>
-                <span class="msb-item" id="msb-aspect-info">Luv-Stau Südwand • Lee-Windschatten</span>
               </div>
             </div>
 
@@ -830,13 +756,13 @@
 
         <!-- BEREICH B: NUR FÜR STÄDTE & FLACHLAND (z. B. München, Berlin, Wien) -->
         <div id="city-view-panel" class="view-panel" style="display:none;">
-          <!-- 3D-Alpinmodell Schnellzugriff-Banner -->
+          <!-- Alpines Bergwetter Schnellzugriff-Banner -->
           <section class="glass-card city-mountain-switch-card" id="city-mountain-switch-card">
             <div class="cms-header">
               <span class="cms-icon">🏔️</span>
               <div class="cms-info">
-                <div class="cms-title">3D-BERGGELÄNDE & WETTER-HÖHENMODELL</div>
-                <div class="cms-desc">Für diesen Ort (520 m) ist aktuell die Flachland-Analyse aktiv. Wechsle mit einem Klick zu einem Alpengipfel, um das interaktive 3D-Bergmassiv mit 0°C-Schneegrenze, Inversion, Windgradient und Niederschlagsphasen zu betrachten:</div>
+                <div class="cms-title">ALPINES BERGWETTER & HÖHENPROFIL</div>
+                <div class="cms-desc">Für diesen Ort (520 m) ist aktuell die Flachland-Analyse aktiv. Wechsle mit einem Klick zu einem Alpengipfel, um das alpine Höhenprofil mit 0°C-Schneegrenze, Inversion, Windgradient und Höhenstufen zu betrachten:</div>
               </div>
             </div>
             <div class="cms-mountains-list">
@@ -2563,7 +2489,7 @@
     </button>
     <button class="mbn-btn" data-tab="tab-mountain" type="button" style="position:relative;">
       <span class="mbn-icon">🏔️</span>
-      <span class="mbn-label">Berg & 3D</span>
+      <span class="mbn-label">Berg & Höhe</span>
       <span class="nav-warning-dot" id="mbn-dot-mountain"></span>
     </button>
     <button class="mbn-btn" data-tab="tab-sports" type="button" style="position:relative;">

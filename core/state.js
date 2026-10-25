@@ -47,25 +47,7 @@ export const state = {
     radarHost: '',
     regionalStationsData: []
   },
-  mountain3D: {
-    canvas: null,
-    ctx: null,
-    viewMode: 'massif',
-    showFrostLine: true,
-    showClouds: true,
-    showWind: false,
-    showSun: true,
-    animFrame: null,
-    weatherParticles: [],
-    windParticles: [],
-    cloudDrift: 0,
-    rotationAngle: 0,
-    pitchAngle: 0,
-    isDragging: false,
-    dragStartX: 0,
-    dragStartY: 0,
-    initialized: false
-  },
+  mountain3D: {},
   canvasEngine: null,
   sports: {
     initialized: false,

@@ -165,34 +165,122 @@ export function renderOverviewTab() {
   // Feature 10B: Dynamische Himmelsfarben & Alpenglühen
   updateAlpineSkyIllumination(w, state.currentLocation.elevation);
 
-  // Exact Temperature
+  // Exact Temperature (harmonisiert & dynamisch bias-korrigiert inkl. adiabatischer Höhenanpassung)
   const finalTemp = (m && state.currentLocation.isMountain) ? m.microWeather.temperature10m : cur.temperature_2m;
-  document.getElementById('hero-current-temp').innerText = Math.round(convertTemp(finalTemp));
+  const heroTempEl = document.getElementById('hero-current-temp');
+  if (heroTempEl) {
+    heroTempEl.innerText = Math.round(convertTemp(finalTemp));
+  }
 
-  // Bright Sky Current (DWD-Station) bevorzugt, Fallback auf Modell
-  (async () => {
-    try {
-      const loc = state.currentLocation;
-      if (!loc || !MicroEngine.fetchBrightSkyCurrent) return;
-      const station = await MicroEngine.fetchBrightSkyCurrent(loc.lat, loc.lon);
-      if (station && typeof station.temperature === 'number') {
-        const el = document.getElementById('hero-current-temp');
-        if (el) el.innerText = Math.round(convertTemp(station.temperature));
-        const cond = document.getElementById('hero-condition-text');
-        // Englische Station-Condition nicht übernehmen – deutsche Bezeichnung bleibt erhalten
-        // if (cond && station.condition) cond.innerText = station.condition;
-        const src = document.getElementById('hero-source-badge');
-        if (src) src.innerText = 'DWD-Station';
-      }
-    } catch (_) {}
-  })();
-  // Cloud-Cover in die Bedingung einbeziehen (Hero und Karte konsistent)
-  const cloud = cur.cloud_cover !== undefined ? cur.cloud_cover : (w.hourly && w.hourly.cloud_cover ? w.hourly.cloud_cover[0] : 0);
+  // Datenquelle transparent setzen (DWD-Station mit Bias-Korrektur oder regionaler Modell-Konsens)
+  const src = document.getElementById('hero-source-badge');
+  if (src) {
+    if (m && m.biasCorrection && m.biasCorrection.stationApplied) {
+      const stName = m.biasCorrection.stationName || 'Bodenstation';
+      const net = m.biasCorrection.stationNetwork || 'Station';
+      src.innerText = `${stName} (${net})`;
+    } else if (state.multiModel && state.multiModel.activeRegionalModel) {
+      src.innerText = `${state.multiModel.activeRegionalModel} / ECMWF`;
+    } else if (m && m.regionalModelName) {
+      src.innerText = `${m.regionalModelName} / ECMWF`;
+    } else {
+      src.innerText = 'ICON-EU / ECMWF';
+    }
+  }
+  // Präzise Bestimmung von Niederschlagstyp (Schnee/Schneeregen/Regen) und Schneefallgrenze / 0°C-Niveau
+  const curPrecip = (m && m.microWeather && m.microWeather.precipitationMm !== undefined)
+    ? m.microWeather.precipitationMm
+    : (cur.precipitation || (w.hourly && w.hourly.precipitation ? w.hourly.precipitation[0] : 0));
+  const isPrecipWmo = (cur.weather_code >= 51 && cur.weather_code <= 99);
+  const isPrecip = curPrecip >= 0.05 || isPrecipWmo;
+
+  // Schneefallgrenze (Wet-Bulb) und 0°C-Niveau aus MicroEngine oder Modell
+  const snowLevel = (m && m.atmosphere && m.atmosphere.snowLevelMeters) ||
+    (m && m.microWeather && m.microWeather.snowLevelMeters) ||
+    (w.hourly && w.hourly.freezing_level_height ? w.hourly.freezing_level_height[0] : null);
+  const freezingLevel = (m && m.atmosphere && m.atmosphere.freezingLevelMeters) ||
+    (m && m.microWeather && m.microWeather.freezingLevelMeters) ||
+    (w.hourly && w.hourly.freezing_level_height ? w.hourly.freezing_level_height[0] : null);
+
   let conditionLabel = code.label;
-  if (cloud >= 75) conditionLabel = 'Bedeckt';
-  else if (cloud >= 50) conditionLabel = 'Wolkig';
-  else if (cloud >= 25) conditionLabel = 'Teilweise bewölkt';
-  else if (cloud < 15 && (cur.weather_code === 0 || cur.weather_code === 1)) conditionLabel = 'Klar / Wolkenlos';
+
+  if (isPrecip) {
+    let precipType = (m && m.microWeather && m.microWeather.precipType && m.microWeather.precipType !== 'Trocken')
+      ? m.microWeather.precipType
+      : null;
+
+    if (!precipType) {
+      if ((cur.weather_code >= 71 && cur.weather_code <= 77) || [85, 86].includes(cur.weather_code)) {
+        precipType = 'Schnee';
+      } else if ([56, 57, 66, 67].includes(cur.weather_code)) {
+        precipType = 'Schneeregen';
+      } else {
+        const rh = cur.relative_humidity_2m !== undefined ? cur.relative_humidity_2m : 75;
+        const t = cur.temperature_2m !== undefined ? cur.temperature_2m : 10;
+        const tw = t * Math.atan(0.151977 * Math.pow(rh + 8.313659, 0.5)) + Math.atan(t + rh) - Math.atan(rh - 1.676331) + 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh) - 4.686035;
+        if (tw <= 0.5) precipType = 'Schnee';
+        else if (tw <= 1.8) precipType = 'Schneeregen';
+        else precipType = 'Regen';
+      }
+    }
+
+    if (precipType === 'Schnee') {
+      if (curPrecip >= 2.5 || cur.weather_code === 75 || cur.weather_code === 86) conditionLabel = 'Starker Schneefall';
+      else if (curPrecip >= 0.6 || cur.weather_code === 73) conditionLabel = 'Schneefall';
+      else conditionLabel = 'Leichter Schneefall';
+    } else if (precipType === 'Schneeregen') {
+      conditionLabel = 'Schneeregen';
+    } else {
+      if (cur.weather_code >= 95) {
+        conditionLabel = code.label;
+      } else if (curPrecip >= 4.0 || cur.weather_code === 65 || cur.weather_code === 82) {
+        conditionLabel = 'Kräftiger Regen';
+      } else if (curPrecip >= 1.0 || cur.weather_code === 63 || cur.weather_code === 81) {
+        conditionLabel = 'Mäßiger Regen';
+      } else {
+        conditionLabel = 'Leichter Regen';
+      }
+    }
+
+    if (snowLevel && (state.currentLocation.isMountain || snowLevel < 3500)) {
+      conditionLabel += ` (SFG: ~${Math.round(snowLevel).toLocaleString('de-DE')} m)`;
+    }
+  } else {
+    // Trocken: Cloud-Cover in die Bedingung einbeziehen (Hero und Karte konsistent)
+    const cloud = cur.cloud_cover !== undefined ? cur.cloud_cover : (w.hourly && w.hourly.cloud_cover ? w.hourly.cloud_cover[0] : 0);
+    if (cloud >= 75) conditionLabel = 'Bedeckt';
+    else if (cloud >= 50) conditionLabel = 'Wolkig';
+    else if (cloud >= 25) conditionLabel = 'Teilweise bewölkt';
+    else if (cloud < 15 && (cur.weather_code === 0 || cur.weather_code === 1)) conditionLabel = 'Klar / Wolkenlos';
+    else conditionLabel = code.label;
+
+    if (state.currentLocation.isMountain && freezingLevel) {
+      conditionLabel += ` (0°C: ~${Math.round(freezingLevel).toLocaleString('de-DE')} m)`;
+    }
+  }
+
+  // Föhn- & Talwind-Status im Hero anzeigen
+  if (state.currentLocation.isMountain && m && m.microWeather) {
+    if (m.microWeather.foehn && m.microWeather.foehn.active) {
+      conditionLabel += ` · 💨 ${m.microWeather.foehn.label || m.microWeather.foehn.type}`;
+    } else if (m.microWeather.valleyWind && m.microWeather.valleyWind.active) {
+      const vIcon = m.microWeather.valleyWind.type === 'Anabatic' ? '☀️' : '🌙';
+      conditionLabel += ` · ${vIcon} ${m.microWeather.valleyWind.label}`;
+    }
+
+    const elevPill = document.getElementById('hero-elevation-pill');
+    if (elevPill) {
+      let pillText = `🏔️ ${state.currentLocation.elevation.toLocaleString('de-DE')} m`;
+      if (m.microWeather.foehn && m.microWeather.foehn.active) {
+        pillText += ` · 💨 ${m.microWeather.foehn.type}`;
+      } else if (m.microWeather.valleyWind && m.microWeather.valleyWind.active) {
+        const vIcon = m.microWeather.valleyWind.type === 'Anabatic' ? '☀️' : '🌙';
+        pillText += ` · ${vIcon} ${m.microWeather.valleyWind.type}`;
+      }
+      elevPill.innerText = pillText;
+    }
+  }
+
   document.getElementById('hero-condition-text').innerText = conditionLabel;
 
   if (daily && daily.temperature_2m_max && daily.temperature_2m_max.length > 0) {
@@ -675,8 +763,8 @@ export function render10DayForecast(daily, hourly) {
     const syn = MicroEngine.computeRepresentativeDailyCondition(i, daily, hourly, isToday, state.weatherData?.current);
     const condIcon = syn.icon;
     const condLabel = syn.label;
-    const pop = daily.precipitation_probability_max ? Math.round(daily.precipitation_probability_max[i]) : 0;
-    const rainSum = daily.precipitation_sum ? daily.precipitation_sum[i] : 0;
+    const pop = daily.precipitation_probability_max ? Math.round(daily.precipitation_probability_max[i] || 0) : 0;
+    const rainSum = (daily.precipitation_sum && daily.precipitation_sum[i] != null) ? Number(daily.precipitation_sum[i]) : 0;
     const windSpd = Math.round(daily.wind_speed_10m_max ? daily.wind_speed_10m_max[i] : 12);
     const windGusts = Math.round(daily.wind_gusts_10m_max ? daily.wind_gusts_10m_max[i] : windSpd * 1.4);
     const uvMax = daily.uv_index_max ? Math.round(daily.uv_index_max[i]) : 1;
@@ -808,7 +896,7 @@ export function render10DayForecast(daily, hourly) {
               <span>🌅 Aufgang: <strong>${sunriseStr}</strong></span>
               <span>🌇 Untergang: <strong>${sunsetStr}</strong></span>
               <span>💨 Max. Böen: <strong>${windGusts} km/h</strong></span>
-              <span>💧 24h Regen: <strong>${rainSum.toFixed(1)} mm</strong></span>
+              <span>💧 24h Regen: <strong>${(rainSum || 0).toFixed(1)} mm</strong></span>
             </div>
             <button class="inline-modal-launch-btn" data-day-index="${i}">
               Vollständige Analyse ↗
@@ -859,7 +947,13 @@ export function renderMultiModelComparison() {
   if (!mm) return;
 
   const consensusText = document.getElementById('model-consensus-text');
-  if (consensusText) consensusText.innerText = `${mm.consensusText} (${mm.consensusScore}%)`;
+  if (consensusText) {
+    if (mm.activeRegionalModel) {
+      consensusText.innerText = `${mm.activeRegionalModel} priorisiert (${mm.consensusScore}%)`;
+    } else {
+      consensusText.innerText = `${mm.consensusText} (${mm.consensusScore}%)`;
+    }
+  }
 
   const ecTemp = document.getElementById('ecmwf-temp-val');
   const ecPrecip = document.getElementById('ecmwf-precip-val');
@@ -894,7 +988,10 @@ export function renderMultiModelComparison() {
   const dPrecip = Math.abs(mm.ecmwf.precip24h - mm.gfs.precip24h);
   if (deltaPrecip) deltaPrecip.innerText = `Δ ${dPrecip.toFixed(1)} mm`;
 
-  if (confidencePct) confidencePct.innerText = `${mm.consensusScore}% Konfidenz`;
+  const regWeightPct = (mm.weights && typeof mm.weights.regional === 'number') ? Math.round(mm.weights.regional * 100) : 55;
+  const regName = mm.regional ? mm.regional.name : (mm.activeRegionalModel || 'High-Res Modell');
+
+  if (confidencePct) confidencePct.innerText = `${mm.consensusScore}% • ${regName}`;
   if (stabilityVal) {
     stabilityVal.innerText = mm.consensusScore >= 85 ? 'Sehr stabil (Hohe Sicherheit)' : mm.consensusScore >= 70 ? 'Stabil (Geringe Abweichung)' : 'Volatil (Diskrepanz vorhanden)';
     stabilityVal.style.color = mm.consensusScore >= 80 ? '#30d158' : mm.consensusScore >= 65 ? '#ffd166' : '#ff9f0a';
@@ -902,11 +999,11 @@ export function renderMultiModelComparison() {
 
   if (verdictText) {
     if (mm.consensusScore >= 85) {
-      verdictText.innerText = 'ECMWF IFS und GFS prognostizieren ein nahezu identisches Wetterfenster.';
+      verdictText.innerText = `${regName} (${regWeightPct}% Gewicht) & ECMWF prognostizieren ein stabiles, konsistentes Wetterfenster.`;
     } else if (dPrecip > 3) {
-      verdictText.innerText = `Niederschlags-Diskrepanz: ${mm.ecmwf.precip24h > mm.gfs.precip24h ? 'ECMWF berechnet stärkere Schauer' : 'GFS berechnet höhere Niederschlagsmengen'}.`;
+      verdictText.innerText = `Niederschlags-Diskrepanz: ${mm.ecmwf.precip24h > mm.gfs.precip24h ? 'ECMWF berechnet stärkere Schauer' : `${regName} berechnet lokale Schauer`}.`;
     } else {
-      verdictText.innerText = 'Leichte Differenzen bei Temperaturverlauf oder Windspitzen.';
+      verdictText.innerText = `${regName} mit ${regWeightPct}% Gewicht vor globalem ECMWF priorisiert.`;
     }
   }
 
@@ -951,7 +1048,9 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
 
   if (metric === 'temp') {
     unit = state.unit === 'fahrenheit' ? '°F' : '°C';
-    const rawIcon = rawH.temperature_2m || [];
+    const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyTemp) && mm.regional.hourlyTemp.length > 0)
+      ? mm.regional.hourlyTemp
+      : (rawH.temperature_2m || []);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyTemp) ? mm.ecmwf.hourlyTemp : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyTemp) ? mm.gfs.hourlyTemp : [];
 
@@ -966,7 +1065,9 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
     }
   } else if (metric === 'precip') {
     unit = 'mm';
-    const rawIcon = rawH.precipitation || [];
+    const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyPrecip) && mm.regional.hourlyPrecip.length > 0)
+      ? mm.regional.hourlyPrecip
+      : (rawH.precipitation || []);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyPrecip) ? mm.ecmwf.hourlyPrecip : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyPrecip) ? mm.gfs.hourlyPrecip : [];
 
@@ -981,7 +1082,9 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
     }
   } else if (metric === 'wind') {
     unit = 'km/h';
-    const rawIcon = rawH.wind_speed_10m || [];
+    const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyWind) && mm.regional.hourlyWind.length > 0)
+      ? mm.regional.hourlyWind
+      : (rawH.wind_speed_10m || []);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyWind) ? mm.ecmwf.hourlyWind : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyWind) ? mm.gfs.hourlyWind : [];
 
@@ -994,6 +1097,12 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
       ecmwfData.push(Math.round(ecVal));
       gfsData.push(Math.round(gfsVal));
     }
+  }
+
+  // Aktualisiere Legende auf das tatsächliche regionale High-Res Modell
+  const iconLeg = document.querySelector('.m-legend-item .icon')?.parentElement;
+  if (iconLeg && mm && mm.activeRegionalModel) {
+    iconLeg.innerHTML = `<span class="m-leg-dot icon"></span> ${mm.activeRegionalModel}`;
   }
 
   // Min- und Max-Werte für Skalierung
@@ -1333,8 +1442,9 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
   const appMin = daily.apparent_temperature_min ? Math.round(convertTemp(daily.apparent_temperature_min[dayIndex])) : minT;
   document.getElementById('modal-apparent-range').innerText = `Gefühlt: ${appMin}° bis ${appMax}°`;
 
-  const popMax = daily.precipitation_probability_max ? daily.precipitation_probability_max[dayIndex] : 0;
-  const precipSum = (daily.precipitation_sum ? daily.precipitation_sum[dayIndex] : 0).toFixed(1);
+  const popMax = daily.precipitation_probability_max ? (daily.precipitation_probability_max[dayIndex] || 0) : 0;
+  const rawSum = (daily.precipitation_sum && daily.precipitation_sum[dayIndex] != null) ? Number(daily.precipitation_sum[dayIndex]) : 0;
+  const precipSum = rawSum.toFixed(1);
   const precipHours = daily.precipitation_hours ? Math.round(daily.precipitation_hours[dayIndex]) : 0;
   document.getElementById('modal-pop').innerText = `${popMax}%`;
   document.getElementById('modal-precip-sum').innerText = `Menge: ${precipSum} mm ${precipHours > 0 ? `• ~${precipHours} h Dauer` : '• Trocken'}`;
@@ -1576,7 +1686,7 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
 export function generateOutdoorRecommendations(daily, hourly, dayIndex, loc) {
   const code = daily.weather_code[dayIndex];
   const maxGust = Math.round(daily.wind_gusts_10m_max ? daily.wind_gusts_10m_max[dayIndex] : 20);
-  const rainSum = daily.precipitation_sum ? daily.precipitation_sum[dayIndex] : 0;
+  const rainSum = (daily.precipitation_sum && daily.precipitation_sum[dayIndex] != null) ? Number(daily.precipitation_sum[dayIndex]) : 0;
   const pop = daily.precipitation_probability_max ? daily.precipitation_probability_max[dayIndex] : 0;
   const maxT = Math.round(daily.temperature_2m_max[dayIndex]);
   const minT = Math.round(daily.temperature_2m_min[dayIndex]);
@@ -1658,8 +1768,21 @@ export function renderBentoGrid(cur, daily, hourly) {
     document.getElementById('daylight-hours-val').innerText = `${diffHours} h Licht`;
   }
 
-  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum.length > 0) ? daily.precipitation_sum[0] : 0;
+  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum[0] != null) ? Number(daily.precipitation_sum[0]) : 0;
   document.getElementById('precip-total-val').innerHTML = `${pSum.toFixed(1)} <small>mm</small>`;
+  const pHintEl = document.getElementById('precip-forecast-hint');
+  if (pHintEl) {
+    if (pSum > 0) {
+      const fl = (hourly && hourly.freezing_level_height && hourly.freezing_level_height.length) ? hourly.freezing_level_height[0] : null;
+      if (fl) {
+        pHintEl.innerText = `Niederschlag aktiv • Schneefallgrenze bei ca. ${Math.round(fl).toLocaleString('de-DE')} m`;
+      } else {
+        pHintEl.innerText = `24h Niederschlagssumme ca. ${pSum.toFixed(1)} mm`;
+      }
+    } else {
+      pHintEl.innerText = 'Kein wesentlicher Niederschlag erwartet.';
+    }
+  }
 
   const rh = Math.round(cur.relative_humidity_2m || 0);
   const dew = (cur.temperature_2m - ((100 - rh) / 5)).toFixed(1);

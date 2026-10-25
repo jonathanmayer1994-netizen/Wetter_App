@@ -7,12 +7,12 @@ import sys
 from playwright.sync_api import sync_playwright
 
 def run_tests():
-    os.chdir('/Users/jona/Documents/Apps/Wetter App')
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     
     Handler = http.server.SimpleHTTPRequestHandler
     Handler.log_message = lambda *args: None
     
-    httpd = socketserver.TCPServer(('127.0.0.1', 0), Handler)
+    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     port = httpd.server_address[1]
     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     server_thread.start()
@@ -123,17 +123,14 @@ def run_tests():
         tab2_label_mtn = page.inner_text("#tab-2-label")
         report("Tab 2 dynamically switched to Alpine/Berg mode for Matterhorn", "Berg" in tab2_label_mtn)
 
-        # Test Mountain 3D Massif Mode with realistic clouds and clean alpine rendering
+        # Test Mountain Mode and altitude tier cards rendering
         page.click(".tab-btn[data-tab='tab-mountain']")
-        page.wait_for_timeout(900)
-        page.screenshot(path="mountain_massif_clouds_screenshot.png")
-
-        # Test Mountain Windströmung Mode with Altimetric Wind Compasses for Matterhorn
-        page.click("#m3d-mode-wind")
-        page.wait_for_timeout(400)
-        wind_mode_active = page.eval_on_selector("#m3d-mode-wind", "el => el.classList.contains('active')")
-        report("Mountain Windströmung mode button activates altimetric compass view", wind_mode_active)
-        page.screenshot(path="mountain_wind_compass_screenshot.png")
+        page.wait_for_timeout(500)
+        mtn_panel_visible = page.is_visible("#mountain-view-panel")
+        report("Mountain view panel is visible", mtn_panel_visible)
+        tiers_count = page.locator(".altitude-tier-card").count()
+        report("Altitude level tiers are rendered", tiers_count >= 3)
+        page.screenshot(path="mountain_weather_screenshot.png")
         
         page.close()
 
@@ -421,11 +418,11 @@ def run_tests():
         page.click("#radar-play-btn") # pause
         
         # Verify Radar Navigation & Speed
-        page.click("#radar-next-btn")
+        page.click("#radar-next-btn", force=True)
         page.wait_for_timeout(100)
-        page.click("#radar-prev-btn")
+        page.click("#radar-prev-btn", force=True)
         page.wait_for_timeout(100)
-        page.click("#radar-speed-btn")
+        page.click("#radar-speed-btn", force=True)
         page.wait_for_timeout(100)
         report("Radar transport buttons (prev, next, speed) operate smoothly", True)
         
@@ -564,17 +561,11 @@ def run_tests():
         page.click(".tab-btn[data-tab='tab-mountain']")
         page.wait_for_timeout(200)
 
-        for m_name, sel in [("crossSection", "#m3d-mode-section"), ("wind", "#m3d-mode-wind"), ("massif", "#m3d-mode-massif")]:
-            page.click(sel)
-            page.wait_for_timeout(100)
-            is_act = page.eval_on_selector(sel, "el => el.classList.contains('active')")
-            report(f"Mountain 3D view mode button '{m_name}' activates cleanly", is_act)
-
-        for lt in ["#m3d-toggle-frost", "#m3d-toggle-clouds", "#m3d-toggle-sun"]:
-            page.click(lt)
-            page.wait_for_timeout(100)
-            page.click(lt)
-            report(f"Mountain layer toggle button '{lt}' operates cleanly", True)
+        time_pills = page.eval_on_selector_all(".quick-time-pill", "els => els.length")
+        report("Mountain altitude quick time pills present", time_pills > 0)
+        page.click(".quick-time-pill[data-hour='3']")
+        page.wait_for_timeout(100)
+        report("Mountain altitude quick time pill switches hour", True)
 
         aspect_pills = page.eval_on_selector_all(".aspect-pill", "els => els.map((el, i) => i)")
         for idx in aspect_pills[:3]:

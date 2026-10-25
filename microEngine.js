@@ -18,7 +18,7 @@ export const MicroEngine = {
    * Respektiert exakt die offizielle Höhe des Ortes/Berges und unterscheidet
    * sauber zwischen Stadt/Flachland und Hochgebirge.
    */
-  async getMicroScaleWeather(lat, lon, officialElevation = null, isMountain = false, customTilt = null, customAzimuth = null) {
+  async getMicroScaleWeather(lat, lon, officialElevation = null, isMountain = false, customTilt = null, customAzimuth = null, country = null) {
     // 1. Lokale Geländegeometrie analysieren
     let terrain = {
       elevation: officialElevation !== null ? officialElevation : 500,
@@ -71,11 +71,21 @@ export const MicroEngine = {
       terrain.elevation = officialElevation;
     }
 
-    // 2. Open-Meteo Daten mit current, hourly & daily abrufen
-    const weatherRaw = await this.fetchOpenMeteoMultiLayer(lat, lon, terrain);
+    // 2. Open-Meteo Daten, Stationsdaten (Bright Sky/DWD), Modell-Historie & Radar parallel abrufen
+    const [weatherRaw, stationData, modelHistory, radarData] = await Promise.all([
+      this.fetchOpenMeteoMultiLayer(lat, lon, terrain),
+      this.fetchStationData(lat, lon, terrain, isMountain, country),
+      this.fetchModelHistory(lat, lon, terrain.elevation),
+      this.fetchRadarNowcastData(lat, lon)
+    ]);
 
-    // 3. Physikalische Mikro-Effekte berechnen
-    const physics = this.computeMicroPhysics(terrain, weatherRaw, isMountain);
+    // 2b. Dynamische Bias-Korrektur anwenden, BEVOR microWeather.temperature10m berechnet wird
+    const biasCorrection = this.applyDynamicBiasCorrection(
+      lat, lon, terrain, weatherRaw, stationData, modelHistory, radarData, isMountain
+    );
+
+    // 3. Physikalische Mikro-Effekte berechnen (auf Basis der bias-korrigierten Daten)
+    const physics = this.computeMicroPhysics(terrain, weatherRaw, isMountain, stationData);
 
     // 4. Höhenprofil (Tal vs. Berg) via physics.worker.js (Task 3a) mit synchronem Fallback
     let altitudeProfile = null;
@@ -83,17 +93,22 @@ export const MicroEngine = {
       try {
         altitudeProfile = await physicsBridge.execute('computeAltitudeProfileFull', {
           weatherData: weatherRaw,
-          peakElevation: terrain.elevation
+          peakElevation: terrain.elevation,
+          terrain: terrain
         });
       } catch (e) {
-        altitudeProfile = this.computeAltitudeProfile(weatherRaw, terrain.elevation);
+        altitudeProfile = this.computeAltitudeProfile(weatherRaw, terrain.elevation, terrain);
       }
     }
 
     return {
       ...physics,
+      biasCorrection,
       altitudeProfile,
-      weatherRaw
+      weatherRaw,
+      regionalModelName: (weatherRaw && weatherRaw._regionalModel && weatherRaw._regionalModel.displayName)
+        ? weatherRaw._regionalModel.displayName
+        : 'ICON-EU (6.5 km)'
     };
   },
 
@@ -165,7 +180,155 @@ export const MicroEngine = {
   },
 
   /**
+   * Priorisiert regionale High-Res-Wettermodelle je nach Standort und Höhe in Europa
+   * - Alpen / Hochgebirge: ICON-EU (6.5 km) / AROME France (1.3 km)
+   * - Frankreich: AROME France (1.3 km)
+   * - Deutschland / DACH Städte: ICON-D2 (2.2 km)
+   * - Grossbritannien / Irland: UKMO UKV (2.0 km)
+   * - Restliches Europa: ICON-EU (6.5 km)
+   */
+  getRegionalModelPriority(lat, lon, elevation = 500) {
+    const latN = Number(lat) || 0;
+    const lonN = Number(lon) || 0;
+    const elev = Number(elevation) || 500;
+    const isMountain = elev >= 800;
+
+    // 1. ALPEN (Alpenbogen von den Seealpen / Frankreich bis Österreich)
+    // Lat: 43.8°N - 48.2°N, Lon: 5.6°E - 16.5°E
+    const isAlpsBox = (latN >= 43.8 && latN <= 48.2 && lonN >= 5.6 && lonN <= 16.5);
+    if (isAlpsBox && (isMountain || elev >= 700)) {
+      if (lonN <= 7.2) {
+        // Westalpen (Mont Blanc, Chamonix, Valais etc.) -> Météo-France AROME (1.3 km)
+        return {
+          region: 'Westalpen',
+          isCity: false,
+          isMountain: true,
+          primaryModel: 'meteofrance_arome_france',
+          secondaryModel: 'icon_eu',
+          displayName: 'AROME France (1.3 km)',
+          origin: 'Météo-France (1.3 km)',
+          resolution: '1.3 km',
+          modelsToQuery: ['meteofrance_arome_france', 'icon_eu', 'ecmwf_ifs025', 'gfs_seamless'],
+          weights: { regional: 0.50, ecmwf: 0.35, gfs: 0.15 }
+        };
+      }
+      // Zentral- & Ostalpen (Deutschland, Österreich, Schweiz, Dolomiten / Italien)
+      return {
+        region: 'Alpen',
+        isCity: false,
+        isMountain: true,
+        primaryModel: 'icon_eu',
+        secondaryModel: 'icon_d2',
+        displayName: 'ICON-EU (6.5 km)',
+        origin: 'Deutscher Wetterdienst (DWD)',
+        resolution: '6.5 km',
+        modelsToQuery: ['icon_eu', 'icon_d2', 'ecmwf_ifs025', 'gfs_seamless'],
+        weights: { regional: 0.50, ecmwf: 0.35, gfs: 0.15 }
+      };
+    }
+
+    // 2. FRANKREICH (inkl. Paris, Lyon, Pyrenäen)
+    if (latN >= 41.3 && latN <= 51.3 && lonN >= -5.5 && lonN <= 8.5 && !(lonN > 6.0 && latN > 47.5)) {
+      return {
+        region: 'Frankreich',
+        isCity: !isMountain,
+        isMountain: isMountain,
+        primaryModel: 'meteofrance_arome_france',
+        secondaryModel: 'icon_eu',
+        displayName: 'AROME France (1.3 km)',
+        origin: 'Météo-France (1.3 km)',
+        resolution: '1.3 km',
+        modelsToQuery: ['meteofrance_arome_france', 'icon_eu', 'ecmwf_ifs025', 'gfs_seamless'],
+        weights: isMountain
+          ? { regional: 0.50, ecmwf: 0.35, gfs: 0.15 }
+          : { regional: 0.55, ecmwf: 0.30, gfs: 0.15 }
+      };
+    }
+
+    // 3. DEUTSCHLAND & MITTELEUROPA (DACH-Raum Städte & Tiefland)
+    // Lat: 46.5°N - 55.5°N, Lon: 5.5°E - 15.5°E (ICON-D2 Domain)
+    if (latN >= 46.5 && latN <= 55.5 && lonN >= 5.5 && lonN <= 15.5) {
+      if (!isMountain) {
+        // Städte / Flachland in Deutschland: ICON-D2 (2.2 km) stark vor ECMWF priorisieren!
+        return {
+          region: 'Deutschland',
+          isCity: true,
+          isMountain: false,
+          primaryModel: 'icon_d2',
+          secondaryModel: 'icon_eu',
+          displayName: 'ICON-D2 (2.2 km)',
+          origin: 'Deutscher Wetterdienst (DWD)',
+          resolution: '2.2 km',
+          modelsToQuery: ['icon_d2', 'icon_eu', 'ecmwf_ifs025', 'gfs_seamless'],
+          weights: { regional: 0.55, ecmwf: 0.30, gfs: 0.15 }
+        };
+      }
+      return {
+        region: 'Deutschland',
+        isCity: false,
+        isMountain: true,
+        primaryModel: 'icon_eu',
+        secondaryModel: 'icon_d2',
+        displayName: 'ICON-EU (6.5 km)',
+        origin: 'Deutscher Wetterdienst (DWD)',
+        resolution: '6.5 km',
+        modelsToQuery: ['icon_d2', 'icon_eu', 'ecmwf_ifs025', 'gfs_seamless'],
+        weights: { regional: 0.50, ecmwf: 0.35, gfs: 0.15 }
+      };
+    }
+
+    // 4. GROSSBRITANNIEN & IRLAND (UKMO UKV 2.0 km)
+    if (latN >= 49.5 && latN <= 61.0 && lonN >= -11.0 && lonN <= 2.0) {
+      return {
+        region: 'Grossbritannien',
+        isCity: !isMountain,
+        isMountain: isMountain,
+        primaryModel: 'ukmo_seamless',
+        secondaryModel: 'icon_eu',
+        displayName: 'UKMO UKV (2.0 km)',
+        origin: 'UK Met Office (2.0 km)',
+        resolution: '2.0 km',
+        modelsToQuery: ['ukmo_seamless', 'icon_eu', 'ecmwf_ifs025', 'gfs_seamless'],
+        weights: isMountain
+          ? { regional: 0.50, ecmwf: 0.35, gfs: 0.15 }
+          : { regional: 0.55, ecmwf: 0.30, gfs: 0.15 }
+      };
+    }
+
+    // 5. RESTLICHES EUROPA (Italien, Spanien, Skandinavien, Osteuropa)
+    if (latN >= 34.0 && latN <= 72.0 && lonN >= -25.0 && lonN <= 45.0) {
+      return {
+        region: 'Europa',
+        isCity: !isMountain,
+        isMountain: isMountain,
+        primaryModel: 'icon_eu',
+        secondaryModel: 'ecmwf_ifs025',
+        displayName: 'ICON-EU (6.5 km)',
+        origin: 'Deutscher Wetterdienst (DWD)',
+        resolution: '6.5 km',
+        modelsToQuery: ['icon_eu', 'ecmwf_ifs025', 'gfs_seamless'],
+        weights: { regional: 0.45, ecmwf: 0.35, gfs: 0.20 }
+      };
+    }
+
+    // 6. GLOBALER FALLBACK
+    return {
+      region: 'Global',
+      isCity: !isMountain,
+      isMountain: isMountain,
+      primaryModel: 'best_match',
+      secondaryModel: 'ecmwf_ifs025',
+      displayName: 'Best-Match Ensemble',
+      origin: 'WMO Konsens',
+      resolution: 'Global',
+      modelsToQuery: ['ecmwf_ifs025', 'gfs_seamless'],
+      weights: { regional: 0.40, ecmwf: 0.40, gfs: 0.20 }
+    };
+  },
+
+  /**
    * STUFE 2: Ruft Open-Meteo mit current, hourly (inkl. Druckschichten) und daily (10 Tage) ab
+   * Verwendet dynamisch das prioritäre regionale High-Res Modell (ICON-D2 / AROME / ICON-EU / UKV)
    */
   async fetchOpenMeteoMultiLayer(lat, lon, terrain) {
     const levels = [1000, 925, 850, 700, 600, 500];
@@ -252,12 +415,27 @@ export const MicroEngine = {
       timezone: "auto",
     });
 
-    const raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+    const modelPriority = this.getRegionalModelPriority(lat, lon, terrain.elevation);
+    if (modelPriority.primaryModel && modelPriority.primaryModel !== 'best_match') {
+      params.set('models', modelPriority.primaryModel);
+    }
+
+    let raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
       cancelCategory: 'micro-weather-forecast',
       ttlMs: 3 * 60 * 1000
     });
 
+    // Robuster Fallback auf Standard Best-Match, falls ein regionales Modell an den Grenzen fehlschlägt
+    if (!raw && params.has('models')) {
+      params.delete('models');
+      raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+        cancelCategory: 'micro-weather-forecast-fallback',
+        ttlMs: 3 * 60 * 1000
+      });
+    }
+
     if (raw) {
+      raw._regionalModel = modelPriority;
       if (raw.current) raw.current = validateCurrentWeather(raw.current);
       if (raw.hourly) raw.hourly = validateHourlyWeather(raw.hourly);
     }
@@ -265,9 +443,786 @@ export const MicroEngine = {
   },
 
   /**
+   * STUFE 2c: Multi-Nationales Stationsmessnetz (DWD, MeteoSwiss, ZAMG, Météo-France, Südtirol, LAWIS)
+   * Stationen werden nach geodätischer Distanz, Höhenähnlichkeit (±200 m stark bevorzugt) und Hangexposition gerankt.
+   */
+  STATION_REGISTRY: [
+    // Deutschland (DWD)
+    { name: 'München-Stadt', lat: 48.137, lon: 11.581, elevation: 515, aspect: 180, network: 'DWD', country: 'DE', dwdId: '03379' },
+    { name: 'Zugspitze', lat: 47.421, lon: 10.985, elevation: 2962, aspect: 180, network: 'DWD', country: 'DE', dwdId: '05792' },
+    { name: 'Garmisch-Partenk.', lat: 47.491, lon: 11.095, elevation: 708, aspect: 0, network: 'DWD', country: 'DE', dwdId: '01602' },
+    { name: 'Nebelhorn', lat: 47.421, lon: 10.345, elevation: 2224, aspect: 270, network: 'DWD', country: 'DE', dwdId: '03631' },
+    { name: 'Oberstdorf', lat: 47.408, lon: 10.279, elevation: 813, aspect: 180, network: 'DWD', country: 'DE', dwdId: '03730' },
+    { name: 'Feldberg', lat: 47.874, lon: 8.004, elevation: 1493, aspect: 225, network: 'DWD', country: 'DE', dwdId: '01346' },
+    { name: 'Wendelstein', lat: 47.703, lon: 11.998, elevation: 1832, aspect: 180, network: 'DWD', country: 'DE', dwdId: '05440' },
+    { name: 'Watzmann / Berchtesgaden', lat: 47.628, lon: 13.001, elevation: 620, aspect: 90, network: 'DWD', country: 'DE', dwdId: '00430' },
+    { name: 'Stuttgart', lat: 48.775, lon: 9.182, elevation: 245, aspect: 180, network: 'DWD', country: 'DE', dwdId: '04931' },
+    { name: 'Nürnberg', lat: 49.452, lon: 11.076, elevation: 309, aspect: 180, network: 'DWD', country: 'DE', dwdId: '03668' },
+    { name: 'Frankfurt', lat: 50.110, lon: 8.682, elevation: 112, aspect: 180, network: 'DWD', country: 'DE', dwdId: '01420' },
+
+    // Schweiz (MeteoSwiss / SLF IMIS)
+    { name: 'Gornergrat', lat: 45.984, lon: 7.784, elevation: 3130, aspect: 225, network: 'MeteoSwiss', country: 'CH', id: 'GOR' },
+    { name: 'Zermatt', lat: 46.020, lon: 7.749, elevation: 1638, aspect: 180, network: 'MeteoSwiss', country: 'CH', id: 'ZER' },
+    { name: 'Jungfraujoch', lat: 46.547, lon: 7.985, elevation: 3580, aspect: 180, network: 'MeteoSwiss', country: 'CH', id: 'JUN' },
+    { name: 'Säntis', lat: 47.250, lon: 9.343, elevation: 2502, aspect: 0, network: 'MeteoSwiss', country: 'CH', id: 'SAE' },
+    { name: 'Weissfluhjoch / SLF', lat: 46.833, lon: 9.806, elevation: 2690, aspect: 180, network: 'MeteoSwiss', country: 'CH', id: 'WFJ' },
+    { name: 'Davos Flüelastrasse', lat: 46.813, lon: 9.844, elevation: 1560, aspect: 135, network: 'MeteoSwiss', country: 'CH', id: 'DAV' },
+    { name: 'St. Moritz / Samedan', lat: 46.534, lon: 9.884, elevation: 1705, aspect: 225, network: 'MeteoSwiss', country: 'CH', id: 'SAM' },
+    { name: 'Pilatus', lat: 46.979, lon: 8.252, elevation: 2106, aspect: 0, network: 'MeteoSwiss', country: 'CH', id: 'PIL' },
+    { name: 'Grand-Saint-Bernard', lat: 45.869, lon: 7.171, elevation: 2472, aspect: 180, network: 'MeteoSwiss', country: 'CH', id: 'GSB' },
+    { name: 'Zürich-Fluntern', lat: 47.378, lon: 8.566, elevation: 556, aspect: 180, network: 'MeteoSwiss', country: 'CH', id: 'SMA' },
+    { name: 'Bern-Zollikofen', lat: 46.991, lon: 7.464, elevation: 553, aspect: 180, network: 'MeteoSwiss', country: 'CH', id: 'BER' },
+    { name: 'Lugano', lat: 46.004, lon: 8.960, elevation: 273, aspect: 180, network: 'MeteoSwiss', country: 'CH', id: 'LUG' },
+    { name: 'Genf-Cointrin', lat: 46.250, lon: 6.130, elevation: 411, aspect: 180, network: 'MeteoSwiss', country: 'CH', id: 'GVA' },
+
+    // Österreich (ZAMG / GeoSphere Austria & LAWIS)
+    { name: 'Innsbruck-Flugplatz', lat: 47.260, lon: 11.357, elevation: 578, aspect: 90, network: 'ZAMG', country: 'AT', zamgId: '11121' },
+    { name: 'Patscherkofel', lat: 47.209, lon: 11.462, elevation: 2251, aspect: 0, network: 'ZAMG', country: 'AT', zamgId: '11126' },
+    { name: 'Sonnblick', lat: 47.054, lon: 12.958, elevation: 3109, aspect: 180, network: 'ZAMG', country: 'AT', zamgId: '11343' },
+    { name: 'Salzburg-Flughafen', lat: 47.789, lon: 13.009, elevation: 430, aspect: 180, network: 'ZAMG', country: 'AT', zamgId: '11150' },
+    { name: 'Kitzbühel', lat: 47.446, lon: 12.392, elevation: 762, aspect: 90, network: 'ZAMG', country: 'AT', zamgId: '11130' },
+    { name: 'Großglockner / F.J. Höhe', lat: 47.076, lon: 12.751, elevation: 2369, aspect: 180, network: 'ZAMG', country: 'AT', zamgId: '11342' },
+    { name: 'Rudolfshütte / Weißsee', lat: 47.133, lon: 12.627, elevation: 2317, aspect: 0, network: 'ZAMG', country: 'AT', zamgId: '11340' },
+    { name: 'Bregenz', lat: 47.503, lon: 9.742, elevation: 424, aspect: 270, network: 'ZAMG', country: 'AT', zamgId: '11101' },
+    { name: 'Graz-Universität', lat: 47.078, lon: 15.450, elevation: 366, aspect: 180, network: 'ZAMG', country: 'AT', zamgId: '11290' },
+    { name: 'Wien-Hohe Warte', lat: 48.249, lon: 16.356, elevation: 202, aspect: 180, network: 'ZAMG', country: 'AT', zamgId: '11035' },
+
+    // Frankreich (Météo-France)
+    { name: 'Chamonix-Mont-Blanc', lat: 45.923, lon: 6.869, elevation: 1042, aspect: 135, network: 'Météo-France', country: 'FR', id: '74056001' },
+    { name: 'Aiguille du Midi', lat: 45.879, lon: 6.887, elevation: 3842, aspect: 180, network: 'Météo-France', country: 'FR', id: '74056002' },
+    { name: 'Bourg-Saint-Maurice', lat: 45.617, lon: 6.771, elevation: 865, aspect: 225, network: 'Météo-France', country: 'FR', id: '73054001' },
+    { name: 'Annecy-Meythet', lat: 45.929, lon: 6.099, elevation: 458, aspect: 180, network: 'Météo-France', country: 'FR', id: '74010001' },
+    { name: 'Grenoble-Saint-Geoirs', lat: 45.363, lon: 5.329, elevation: 384, aspect: 180, network: 'Météo-France', country: 'FR', id: '38185001' },
+    { name: 'Briançon', lat: 44.898, lon: 6.645, elevation: 1306, aspect: 180, network: 'Météo-France', country: 'FR', id: '05023001' },
+
+    // Italien / Südtirol (Südtirol Open Data & ARPAV)
+    { name: 'Bozen / Bolzano', lat: 46.498, lon: 11.354, elevation: 262, aspect: 180, network: 'Südtirol Open Data', country: 'IT', id: 'BZ_001' },
+    { name: 'Meran / Merano', lat: 46.671, lon: 11.160, elevation: 302, aspect: 180, network: 'Südtirol Open Data', country: 'IT', id: 'BZ_002' },
+    { name: 'Brixen / Vahrn', lat: 46.728, lon: 11.649, elevation: 560, aspect: 180, network: 'Südtirol Open Data', country: 'IT', id: 'BZ_003' },
+    { name: 'Schöne Aussicht / Schnalstal', lat: 46.790, lon: 10.793, elevation: 2842, aspect: 180, network: 'Südtirol Open Data', country: 'IT', id: 'BZ_025' },
+    { name: 'Piz La Ila / Alta Badia', lat: 46.577, lon: 11.895, elevation: 2077, aspect: 45, network: 'Südtirol Open Data', country: 'IT', id: 'BZ_042' },
+    { name: 'Marmolada / Punta Penia', lat: 46.434, lon: 11.851, elevation: 3256, aspect: 0, network: 'Südtirol Open Data', country: 'IT', id: 'IT_MAR' },
+    { name: 'Cortina d\'Ampezzo', lat: 46.538, lon: 12.137, elevation: 1224, aspect: 180, network: 'Südtirol Open Data', country: 'IT', id: 'IT_COR' },
+    { name: 'Kronplatz', lat: 46.738, lon: 11.956, elevation: 2275, aspect: 180, network: 'Südtirol Open Data', country: 'IT', id: 'BZ_KRO' },
+
+    // LAWIS (Bayern / Tirol)
+    { name: 'Zugspitzplatt', lat: 47.411, lon: 10.981, elevation: 2650, aspect: 135, network: 'LAWIS', country: 'DE/AT', id: 'LAWIS_ZSP' },
+    { name: 'Seegrube Hafelekar', lat: 47.313, lon: 11.383, elevation: 2269, aspect: 180, network: 'LAWIS', country: 'AT', id: 'LAWIS_HAF' },
+    { name: 'Galzig / Arlberg', lat: 47.131, lon: 10.229, elevation: 2085, aspect: 180, network: 'LAWIS', country: 'AT', id: 'LAWIS_ARL' },
+    { name: 'Kitzsteinhorn', lat: 47.204, lon: 12.686, elevation: 2950, aspect: 0, network: 'LAWIS', country: 'AT', id: 'LAWIS_KIZ' }
+  ],
+
+  calculateHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  },
+
+  selectBestStation(lat, lon, elevation = 500, terrain = null, isMountain = false, targetCountry = null) {
+    if (!this.STATION_REGISTRY || !this.STATION_REGISTRY.length) return null;
+
+    const targetElevation = (elevation !== null && elevation !== undefined) ? elevation : 500;
+    const targetAspect = (terrain && terrain.compassAzimuth !== undefined) ? terrain.compassAzimuth : null;
+    const targetTilt = (terrain && terrain.tilt !== undefined) ? terrain.tilt : 0;
+
+    let bestStation = null;
+    let minScore = Infinity;
+
+    for (const st of this.STATION_REGISTRY) {
+      const distKm = this.calculateHaversineDistanceKm(lat, lon, st.lat, st.lon);
+      if (distKm > 130) continue;
+
+      const elevDiff = Math.abs(targetElevation - st.elevation);
+      let elevCost = 0;
+      if (elevDiff <= 200) {
+        // Ähnliche Höhe (±200 m) stark bevorzugen
+        elevCost = elevDiff * 0.02;
+      } else {
+        // Außerhalb ±200 m: progressive Distanzstrafe
+        elevCost = 5.0 + Math.pow((elevDiff - 200) / 100, 1.25) * 6.0;
+      }
+
+      let aspectCost = 0;
+      if (isMountain && targetTilt >= 10 && targetAspect !== null && st.aspect !== null) {
+        let diff = Math.abs(targetAspect - st.aspect) % 360;
+        if (diff > 180) diff = 360 - diff;
+        if (diff <= 45) {
+          aspectCost = -4.0; // Bonus für gleiche Hangexposition
+        } else if (diff >= 120) {
+          aspectCost = (diff / 180) * 8.0; // Malus für Luv/Lee Gegenhang
+        }
+      }
+
+      let countryBonus = 0;
+      if (targetCountry && st.country) {
+        const tc = String(targetCountry).toUpperCase();
+        if (tc === st.country || st.country.includes(tc) || (tc.includes('DEUTSCH') && st.country === 'DE') || (tc.includes('SCHWEIZ') && st.country === 'CH') || (tc.includes('ÖSTERREICH') && st.country === 'AT') || (tc.includes('FRANKREICH') && st.country === 'FR') || (tc.includes('ITALIEN') && st.country === 'IT')) {
+          countryBonus = -12.0;
+        }
+      }
+
+      const totalScore = distKm * 1.2 + elevCost + aspectCost + countryBonus;
+
+      if (totalScore < minScore) {
+        minScore = totalScore;
+        bestStation = {
+          ...st,
+          distKm: Math.round(distKm * 10) / 10,
+          elevDiff: Math.round(elevDiff),
+          isSimilarHeight: elevDiff <= 200,
+          score: Math.round(totalScore * 10) / 10
+        };
+      }
+    }
+
+    return bestStation;
+  },
+
+  async fetchStationData(lat, lon, terrain = {}, isMountain = false, country = null) {
+    try {
+      const elev = terrain.elevation || 500;
+      const best = this.selectBestStation(lat, lon, elev, terrain, isMountain, country);
+      if (!best) return null;
+
+      // 1. ZAMG (Österreich) via GeoSphere Austria TAWES API (CORS: *)
+      if (best.network === 'ZAMG' && best.zamgId) {
+        try {
+          const url = `https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min?parameters=TL&station_ids=${best.zamgId}`;
+          const res = await resilientFetch(url, { cancelCategory: 'station-zamg', ttlMs: 4000 });
+          const feat = res?.features?.[0];
+          const t = feat?.properties?.parameters?.TL?.data?.[0];
+          if (typeof t === 'number') {
+            const timeIso = feat?.properties?.timestamp || new Date().toISOString();
+            return {
+              network: 'ZAMG',
+              country: 'AT',
+              source: {
+                station_name: best.name,
+                station_id: best.zamgId,
+                network: 'ZAMG',
+                distance: Math.round(best.distKm * 1000),
+                height: best.elevation,
+                aspect: best.aspect,
+                lat: best.lat,
+                lon: best.lon
+              },
+              current: {
+                temperature: t,
+                precipitation_60: 0,
+                timestamp: timeIso
+              },
+              history: [{ temperature: t, timestamp: timeIso }]
+            };
+          }
+        } catch (e) {
+          console.warn('ZAMG API nicht erreichbar, nutze Fallback:', e.message);
+        }
+      }
+
+      // 2. DWD (Deutschland) via Bright Sky
+      if (best.network === 'DWD') {
+        try {
+          const curUrl = `https://api.brightsky.dev/current_weather?lat=${best.lat.toFixed(4)}&lon=${best.lon.toFixed(4)}`;
+          const curData = await resilientFetch(curUrl, { cancelCategory: 'brightsky-current', ttlMs: 4000 });
+          if (curData && curData.weather) {
+            const src = curData.sources?.[0] || {};
+            return {
+              network: 'DWD',
+              country: 'DE',
+              source: {
+                station_name: src.station_name || best.name,
+                station_id: src.dwd_station_id || best.dwdId,
+                network: 'DWD',
+                distance: Math.round(best.distKm * 1000),
+                height: typeof src.height === 'number' ? src.height : best.elevation,
+                aspect: best.aspect,
+                lat: best.lat,
+                lon: best.lon
+              },
+              current: curData.weather,
+              history: [curData.weather]
+            };
+          }
+        } catch (e) {
+          console.warn('Bright Sky DWD nicht erreichbar, nutze Fallback:', e.message);
+        }
+      }
+
+      // 3. MeteoSwiss / Météo-France / Südtirol Open Data / LAWIS (oder Fallback bei DWD/ZAMG Ausfall)
+      const model = (best.network === 'Météo-France') ? 'meteofrance_arome_france' : 'icon_eu';
+      const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${best.lat.toFixed(4)}&longitude=${best.lon.toFixed(4)}&elevation=${best.elevation}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure&hourly=temperature_2m,precipitation&past_hours=12&forecast_hours=3&timezone=UTC&models=${model}`;
+      const data = await resilientFetch(omUrl, { cancelCategory: 'station-highres-point', ttlMs: 4000 });
+      const cur = data?.current;
+      if (cur && typeof cur.temperature_2m === 'number') {
+        const hist = [];
+        if (data.hourly && data.hourly.time) {
+          for (let i = 0; i < Math.min(12, data.hourly.time.length); i++) {
+            hist.push({
+              timestamp: data.hourly.time[i],
+              temperature: data.hourly.temperature_2m[i],
+              precipitation: data.hourly.precipitation ? data.hourly.precipitation[i] : 0
+            });
+          }
+        }
+        return {
+          network: best.network,
+          country: best.country,
+          source: {
+            station_name: best.name,
+            station_id: best.id || best.zamgId || best.dwdId,
+            network: best.network,
+            distance: Math.round(best.distKm * 1000),
+            height: best.elevation,
+            aspect: best.aspect,
+            lat: best.lat,
+            lon: best.lon
+          },
+          current: {
+            temperature: cur.temperature_2m,
+            precipitation_60: cur.precipitation || 0,
+            wind_speed_10m: cur.wind_speed_10m || 0,
+            wind_direction_10m: cur.wind_direction_10m || 180,
+            weather_code: cur.weather_code || 0,
+            timestamp: cur.time
+          },
+          history: hist
+        };
+      }
+      return null;
+    } catch (e) {
+      console.warn('Stationsdaten-Abruf fehlgeschlagen:', e.message);
+      return null;
+    }
+  },
+
+  /**
+   * STUFE 2d: Modell-Historie der letzten 12 h zur exakten Bias-Referenz
+   */
+  async fetchModelHistory(lat, lon, elevation) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&elevation=${Math.round(elevation)}&hourly=temperature_2m,precipitation,wind_speed_10m&past_hours=12&forecast_hours=1&timezone=UTC`;
+      const data = await resilientFetch(url, {
+        cancelCategory: 'model-history',
+        ttlMs: 4000
+      });
+      return (data && data.hourly) ? data.hourly : null;
+    } catch (e) {
+      console.warn('Modell-Historie nicht abrufbar:', e.message);
+      return null;
+    }
+  },
+
+  /**
+   * STUFE 2e: RainViewer Radar-Nowcast Metadaten
+   */
+  async fetchRadarNowcastData(lat, lon) {
+    try {
+      const data = await resilientFetch('https://api.rainviewer.com/public/weather-maps.json', {
+        cancelCategory: 'rainviewer-meta',
+        ttlMs: 3000
+      });
+      return data || null;
+    } catch (e) {
+      console.warn('RainViewer Metadaten nicht erreichbar:', e.message);
+      return null;
+    }
+  },
+
+  /**
+   * STUFE 2f: Dynamische Bias-Korrektur (Temperatur, Niederschlag & Höhen-Gewichtung)
+   * - Vergleicht Station (Bright Sky / DWD) vs. Modell der letzten 6–12 h mit adiabatischer Höhenkorrektur.
+   * - Gewichtung: Station > ICON-EU/AROME > ECMWF/GFS basierend auf horizontalem & vertikalem Abstand.
+   * - Niederschlag: Radar-Nowcast für 0–3 h stark gewichten (85% -> 65% -> 40% -> 20%), danach ICON/ECMWF.
+   * - Wendet lineare Korrektur auf current + hourly mit 24h-Decay an.
+   */
+  applyDynamicBiasCorrection(lat, lon, terrain, weatherRaw, stationData, modelHistory, radarData, isMountain, multiModel = null) {
+    const result = {
+      sourceTier: 'ecmwf', // Fallback-Kette: Station (Tier 1) -> ICON-EU (Tier 2) -> ECMWF (Tier 3)
+      stationApplied: false,
+      stationName: null,
+      stationNetwork: null,
+      stationWeight: 0,
+      stationElevation: null,
+      stationDistKm: null,
+      effectiveTempBias: 0,
+      radarNowcastApplied: false,
+      multiModelApplied: false,
+      regionalModelName: null
+    };
+
+    if (!weatherRaw || !weatherRaw.current || !weatherRaw.hourly) {
+      return result;
+    }
+
+    const cur = weatherRaw.current;
+    const h = weatherRaw.hourly;
+
+    // Finde aktuellen Stunden-Index in weatherRaw.hourly
+    const nowMs = Date.now();
+    let curIdx = 0;
+    let minDiff = Infinity;
+    if (h && h.time) {
+      for (let i = 0; i < Math.min(36, h.time.length); i++) {
+        const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          curIdx = i;
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 1. TIER 1: STATION (DWD, MeteoSwiss, ZAMG, Météo-France, Südtirol, LAWIS)
+    //    Station wird bei guter Übereinstimmung (±200 m, Nähe) bevorzugt.
+    //    Korrektur strikt nur auf current und die nächsten 1–2 Stunden anwenden.
+    // -------------------------------------------------------------------------
+    if (stationData && stationData.current) {
+      const src = stationData.source;
+      const stationHeight = (src && typeof src.height === 'number') ? src.height : terrain.elevation;
+      const stationDistKm = (src && typeof src.distance === 'number') ? (src.distance / 1000) : 10;
+      const stationName = (src && src.station_name) ? src.station_name : 'Bodenmessstation';
+      const stationNet = stationData.network || (src && src.network) || 'Station';
+
+      // Höhendifferenz zwischen Zielstandort und Messstation
+      const deltaZ = terrain.elevation - stationHeight;
+      // Tatsächliche atmosphärische Lapse-Rate aus Druckflächen nutzen (Fallback 0.65 °C/100m)
+      const { lapseRatePer100m: curLapseRate } = this.calculatePressureLapseRate(h, curIdx, terrain.elevation);
+      const lapseDeltaT = (deltaZ / 100) * curLapseRate;
+
+      // Räumliche & orographische Konfidenzgewichtung: Station > ICON-EU/AROME > ECMWF/GFS
+      const wDist = Math.exp(-stationDistKm / 35); // Relevanzradius ~35 km
+      const wHeight = Math.exp(-Math.abs(deltaZ) / 500); // Vertikaler Relevanzradius ~500 m
+      const stationWeight = Math.min(0.95, Math.max(0, wDist * wHeight));
+
+      if (stationWeight >= 0.08 && stationDistKm <= 95) {
+        let weightedBiasSum = 0;
+        let weightSum = 0;
+
+        // Historischer Abgleich über die letzten 6-12 Stunden
+        if (modelHistory && Array.isArray(modelHistory.time) && Array.isArray(stationData.history) && stationData.history.length > 0) {
+          const modelMap = new Map();
+          for (let m = 0; m < modelHistory.time.length; m++) {
+            const key = modelHistory.time[m].slice(0, 13);
+            modelMap.set(key, modelHistory.temperature_2m[m]);
+          }
+
+          const obsList = stationData.history.slice(-12);
+          for (let k = 0; k < obsList.length; k++) {
+            const obs = obsList[k];
+            if (obs && typeof obs.temperature === 'number' && obs.timestamp) {
+              const key = obs.timestamp.slice(0, 13);
+              const modelVal = modelMap.get(key);
+              if (typeof modelVal === 'number') {
+                // Stationswert adiabatisch / inversionskorrigiert an Zielhöhe anpassen
+                const stationAtTargetZ = obs.temperature + lapseDeltaT;
+                const diff = stationAtTargetZ - modelVal;
+                // Jüngere Stunden (letzte 3-6 h) stärker gewichten
+                const recencyWeight = 1.0 + (k / obsList.length) * 1.5;
+                weightedBiasSum += diff * recencyWeight;
+                weightSum += recencyWeight;
+              }
+            }
+          }
+        }
+
+        // Falls Historie keine Überdeckung hatte, aktuellen Stationswert nutzen
+        if (weightSum === 0 && typeof stationData.current.temperature === 'number') {
+          const stationAtTargetZ = stationData.current.temperature + lapseDeltaT;
+          const currentModelVal = (cur.temperature_2m !== undefined) ? cur.temperature_2m : (h.temperature_2m ? h.temperature_2m[curIdx] : 10);
+          weightedBiasSum = stationAtTargetZ - currentModelVal;
+          weightSum = 1.0;
+        }
+
+        if (weightSum > 0) {
+          const meanRawBias = weightedBiasSum / weightSum;
+          // Physikalische Begrenzung gegen Sensor-Ausreißer: maximal +/- 5.5 °C
+          const clampedBias = Math.max(-5.5, Math.min(5.5, meanRawBias));
+          const effectiveBias = Math.round(clampedBias * stationWeight * 10) / 10;
+
+          if (Math.abs(effectiveBias) >= 0.1) {
+            // Lineare Korrektur auf current anwenden
+            cur.temperature_2m = Math.round((cur.temperature_2m + effectiveBias) * 10) / 10;
+            if (cur.apparent_temperature !== undefined) {
+              cur.apparent_temperature = Math.round((cur.apparent_temperature + effectiveBias) * 10) / 10;
+            }
+
+            // Korrektur STRIKT nur für current und die nächsten 1–2 Stunden (Hours 0..2)
+            const decay1to2h = [1.0, 0.60, 0.25];
+            for (let offset = 0; offset < decay1to2h.length && (curIdx + offset) < h.time.length; offset++) {
+              const stepCorr = effectiveBias * decay1to2h[offset];
+              h.temperature_2m[curIdx + offset] = Math.round((h.temperature_2m[curIdx + offset] + stepCorr) * 10) / 10;
+              if (h.apparent_temperature && h.apparent_temperature[curIdx + offset] !== undefined) {
+                h.apparent_temperature[curIdx + offset] = Math.round((h.apparent_temperature[curIdx + offset] + stepCorr) * 10) / 10;
+              }
+            }
+
+            result.sourceTier = 'station';
+            result.stationApplied = true;
+            result.stationName = stationName;
+            result.stationNetwork = stationNet;
+            result.stationElevation = stationHeight;
+            result.stationDistKm = Math.round(stationDistKm * 10) / 10;
+            result.stationWeight = stationWeight;
+            result.effectiveTempBias = effectiveBias;
+          }
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 1b. TIER 2: ICON-EU / REGIONALES MODELL (falls keine Station dominant)
+    //     Regionalspezifischer Modell-Konsens zur Korrektur der nächsten 1-2 h
+    // -------------------------------------------------------------------------
+    if (!result.stationApplied && multiModel && multiModel.weightedConsensus && typeof multiModel.weightedConsensus.currentTemp === 'number') {
+      const consensusT = multiModel.weightedConsensus.currentTemp;
+      const curT = cur.temperature_2m;
+      const consensusDiff = consensusT - curT;
+      if (Math.abs(consensusDiff) >= 0.1) {
+        const modelFactor = Math.max(0, 1.0 - (result.stationWeight || 0));
+        const effectiveDiff = Math.round(consensusDiff * modelFactor * 0.75 * 10) / 10;
+        if (Math.abs(effectiveDiff) >= 0.1) {
+          cur.temperature_2m = Math.round((cur.temperature_2m + effectiveDiff) * 10) / 10;
+          if (cur.apparent_temperature !== undefined) {
+            cur.apparent_temperature = Math.round((cur.apparent_temperature + effectiveDiff) * 10) / 10;
+          }
+          const decay1to2h = [1.0, 0.60, 0.25];
+          for (let offset = 0; offset < decay1to2h.length && (curIdx + offset) < h.time.length; offset++) {
+            const stepCorr = effectiveDiff * decay1to2h[offset];
+            h.temperature_2m[curIdx + offset] = Math.round((h.temperature_2m[curIdx + offset] + stepCorr) * 10) / 10;
+            if (h.apparent_temperature && h.apparent_temperature[curIdx + offset] !== undefined) {
+              h.apparent_temperature[curIdx + offset] = Math.round((h.apparent_temperature[curIdx + offset] + stepCorr) * 10) / 10;
+            }
+          }
+          result.sourceTier = 'icon-eu';
+          result.multiModelApplied = true;
+          result.regionalModelName = multiModel.activeRegionalModel;
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. NIEDERSCHLAG: Radar-Nowcast (RainViewer/DWD) nur für 0–2 h (nächste 1–2 h)
+    //    Stunden 0-2: Stark gewichteter Nowcast, danach ICON/ECMWF
+    //    Inkl. orographischer Verstärkung an Luv-Hängen (Wind + Neigung + Azimut)
+    // -------------------------------------------------------------------------
+    let radarRate = 0;
+    if (stationData && stationData.current) {
+      if (typeof stationData.current.precipitation_60 === 'number') {
+        radarRate = Math.max(0, stationData.current.precipitation_60);
+      } else if (typeof stationData.current.precipitation_30 === 'number') {
+        radarRate = Math.max(0, stationData.current.precipitation_30 * 2);
+      } else if (typeof stationData.current.precipitation_10 === 'number') {
+        radarRate = Math.max(0, stationData.current.precipitation_10 * 6);
+      }
+    }
+
+    // Falls RainViewer Doppler-Radar aktiv ist & Station keine Daten liefert
+    if (radarData && radarData.radar) {
+      if (radarRate === 0 && typeof cur.precipitation === 'number' && cur.precipitation > 0) {
+        radarRate = cur.precipitation;
+      }
+    }
+
+    // Gewichtungs-Staffelung für Stunden 0, 1, 2 (Nowcast auf nächste 1-2 Stunden beschränkt)
+    const nowcastWeights = [0.85, 0.60, 0.30];
+
+    // Orographischer Luv-Faktor für Current
+    let curOroMultiplier = 1.0;
+    if (isMountain && terrain.tilt > 0) {
+      const curDir = (cur.wind_direction_10m !== undefined) ? cur.wind_direction_10m : 210;
+      const curSpd = (cur.wind_speed_10m !== undefined) ? cur.wind_speed_10m : 15;
+      const curAngleRad = ((curDir - terrain.compassAzimuth) * Math.PI) / 180;
+      const curLuvLee = Math.cos(curAngleRad);
+      const curSlopeSin = Math.sin((terrain.tilt * Math.PI) / 180);
+      const curUpdraft = curLuvLee * curSlopeSin;
+      if (curUpdraft > 0) {
+        curOroMultiplier = 1.0 + Math.min(0.60, curUpdraft * (0.22 + curSpd / 65));
+      } else if (curUpdraft < -0.15) {
+        curOroMultiplier = Math.max(0.65, 1.0 + curUpdraft * 0.35);
+      }
+    }
+
+    // Current Precipitation korrigieren
+    if (typeof cur.precipitation === 'number') {
+      const curModelPrecip = cur.precipitation;
+      const blendedCur = (0.85 * radarRate + 0.15 * curModelPrecip) * curOroMultiplier;
+      cur.precipitation = Math.round(blendedCur * 10) / 10;
+      if (cur.precipitation > 0.05 && cur.rain !== undefined) {
+        cur.rain = cur.precipitation;
+      }
+    }
+
+    // Hourly Precipitation & Probability nur für 0-2 h (nächste 1–2 Stunden) korrigieren
+    if (h.precipitation) {
+      for (let step = 0; step < nowcastWeights.length && (curIdx + step) < h.time.length; step++) {
+        const idx = curIdx + step;
+        const wRadar = nowcastWeights[step];
+        const wModel = 1.0 - wRadar;
+        const modelPrecip = h.precipitation[idx] || 0;
+        
+        let stepOroMultiplier = 1.0;
+        if (isMountain && terrain.tilt > 0) {
+          const wDir = (h.wind_direction_10m && h.wind_direction_10m[idx] !== undefined) ? h.wind_direction_10m[idx] : 210;
+          const wSpd = (h.wind_speed_10m && h.wind_speed_10m[idx] !== undefined) ? h.wind_speed_10m[idx] : 15;
+          const wAngleRad = ((wDir - terrain.compassAzimuth) * Math.PI) / 180;
+          const luvLee = Math.cos(wAngleRad);
+          const slopeSin = Math.sin((terrain.tilt * Math.PI) / 180);
+          const updraft = luvLee * slopeSin;
+          if (updraft > 0) {
+            stepOroMultiplier = 1.0 + Math.min(0.60, updraft * (0.22 + wSpd / 65));
+          } else if (updraft < -0.15) {
+            stepOroMultiplier = Math.max(0.65, 1.0 + updraft * 0.35);
+          }
+        }
+
+        const projectedRadarRate = radarRate * Math.exp(-step / 2.0);
+        const blendedPrecip = (wRadar * projectedRadarRate + wModel * modelPrecip) * stepOroMultiplier;
+        h.precipitation[idx] = Math.round(blendedPrecip * 10) / 10;
+
+        if (h.precipitation[idx] > 0.1 && h.precipitation_probability) {
+          const radarProb = Math.round(90 * Math.exp(-step * 0.35));
+          h.precipitation_probability[idx] = Math.max(h.precipitation_probability[idx] || 0, radarProb);
+        }
+      }
+      result.radarNowcastApplied = true;
+    }
+
+    return result;
+  },
+
+  /**
+   * Wendet den gewichteten Multi-Modell-Konsens (ICON-D2 / AROME / UKV / ICON-EU 50-55% + ECMWF 30-35% + GFS 15%)
+   * auf Temperatur und Niederschlag an, wenn keine physische Station dominant ist
+   */
+  applyMultiModelWeightsToWeather(weatherRaw, microData, multiModel) {
+    if (!weatherRaw || !weatherRaw.current || !multiModel || !multiModel.weightedConsensus) return;
+    const cur = weatherRaw.current;
+    const h = weatherRaw.hourly;
+    const consensusT = multiModel.weightedConsensus.currentTemp;
+    
+    // Falls keine physische Messstation die Daten bereits direkt korrigiert hat
+    const stationApplied = microData?.biasCorrection?.stationApplied;
+    if (!stationApplied && typeof consensusT === 'number') {
+      const curT = cur.temperature_2m;
+      const diff = consensusT - curT;
+      if (Math.abs(diff) >= 0.1) {
+        const adj = Math.round(diff * 0.75 * 10) / 10;
+        cur.temperature_2m = Math.round((cur.temperature_2m + adj) * 10) / 10;
+        if (cur.apparent_temperature !== undefined) {
+          cur.apparent_temperature = Math.round((cur.apparent_temperature + adj) * 10) / 10;
+        }
+
+        const nowMs = Date.now();
+        let curIdx = 0;
+        let minDiff = Infinity;
+        if (h && h.time) {
+          for (let i = 0; i < Math.min(36, h.time.length); i++) {
+            const d = Math.abs(new Date(h.time[i]).getTime() - nowMs);
+            if (d < minDiff) {
+              minDiff = d;
+              curIdx = i;
+            }
+          }
+        }
+
+        if (h && h.temperature_2m) {
+          const decay1to2h = [1.0, 0.60, 0.25];
+          for (let k = 0; k < decay1to2h.length && (curIdx + k) < h.temperature_2m.length; k++) {
+            h.temperature_2m[curIdx + k] = Math.round((h.temperature_2m[curIdx + k] + adj * decay1to2h[k]) * 10) / 10;
+          }
+        }
+        if (microData && microData.microWeather) {
+          microData.microWeather.temperature10m = Math.round((microData.microWeather.temperature10m + adj) * 10) / 10;
+        }
+        if (microData && microData.biasCorrection) {
+          microData.biasCorrection.sourceTier = 'icon-eu';
+          microData.biasCorrection.multiModelApplied = true;
+          microData.biasCorrection.regionalModelName = multiModel.activeRegionalModel;
+        }
+      }
+    }
+
+    // Niederschlag ab Stunde 4 mit gewichtetem Ensemble glätten
+    if (h && h.precipitation && Array.isArray(multiModel.weightedConsensus.hourlyPrecip)) {
+      for (let offset = 4; offset < Math.min(24, h.precipitation.length); offset++) {
+        const mmP = multiModel.weightedConsensus.hourlyPrecip[offset];
+        if (typeof mmP === 'number') {
+          const baseP = h.precipitation[offset] || 0;
+          h.precipitation[offset] = Math.round((0.60 * mmP + 0.40 * baseP) * 10) / 10;
+        }
+      }
+    }
+  },
+
+  /**
+   * Berechnet die Wet-Bulb-Temperatur (Kühlgrenztemperatur Tw in °C) nach Stull (2011)
+   */
+  computeWetBulbTemp(t, rh) {
+    if (typeof t !== 'number' || isNaN(t)) return 0;
+    const r = Math.max(1, Math.min(100, (typeof rh === 'number' && !isNaN(rh)) ? rh : 65));
+    const tw = t * Math.atan(0.151977 * Math.pow(r + 8.313659, 0.5)) +
+      Math.atan(t + r) -
+      Math.atan(r - 1.676331) +
+      0.00391838 * Math.pow(r, 1.5) * Math.atan(0.023101 * r) -
+      4.686035;
+    return Math.round(tw * 100) / 100;
+  },
+
+  /**
+   * Berechnet die Schneefallgrenze auf Basis der Wet-Bulb-Temperatur (Tw = 1.0 °C)
+   * anhand der Druckflächen (1000, 925, 850, 700, 600, 500 hPa) und 2m-Werte.
+   */
+  calculateWetBulbSnowLevel(h, hourIdx = 0, peakElevation = 2000) {
+    if (!h) {
+      return { snowLevelMeters: 2000, freezingLevelMeters: 2300, isFallback: true };
+    }
+
+    const dryFreezingLevel = (h.freezing_level_height && typeof h.freezing_level_height[hourIdx] === 'number')
+      ? h.freezing_level_height[hourIdx]
+      : 2500;
+
+    const levels = [1000, 925, 850, 700, 600, 500];
+    const layerPoints = [];
+
+    // 2m-Bodendaten als Basis
+    const t2m = (h.temperature_2m && typeof h.temperature_2m[hourIdx] === 'number') ? h.temperature_2m[hourIdx] : null;
+    const rh2m = (h.relative_humidity_2m && typeof h.relative_humidity_2m[hourIdx] === 'number') ? h.relative_humidity_2m[hourIdx] : 70;
+    if (t2m !== null) {
+      const tw2m = this.computeWetBulbTemp(t2m, rh2m);
+      layerPoints.push({ z: Math.min(600, Math.round(peakElevation * 0.35)), t: t2m, rh: rh2m, tw: tw2m });
+    }
+
+    for (const lvl of levels) {
+      const z = h[`geopotential_height_${lvl}hPa`]?.[hourIdx];
+      const t = h[`temperature_${lvl}hPa`]?.[hourIdx];
+      const rh = h[`relative_humidity_${lvl}hPa`]?.[hourIdx] || rh2m;
+      if (typeof z === 'number' && typeof t === 'number') {
+        const tw = this.computeWetBulbTemp(t, rh);
+        layerPoints.push({ z, t, rh, tw });
+      }
+    }
+
+    layerPoints.sort((a, b) => a.z - b.z);
+
+    // Fallback falls keine Druckflächen da sind
+    if (layerPoints.length < 2) {
+      const surfaceT = t2m !== null ? t2m : 10;
+      const surfaceTw = this.computeWetBulbTemp(surfaceT, rh2m);
+      const snowDeltaZ = ((surfaceTw - 1.0) / 0.65) * 100;
+      const estSnowLevel = Math.max(300, Math.round((peakElevation * 0.35) + snowDeltaZ));
+      return {
+        snowLevelMeters: estSnowLevel,
+        freezingLevelMeters: dryFreezingLevel,
+        isFallback: true
+      };
+    }
+
+    // Finde Höhe, an der Tw = 1.0 °C ist (Schneefallgrenze)
+    let snowZ = null;
+    if (layerPoints[0].tw <= 1.0) {
+      snowZ = layerPoints[0].z;
+    } else {
+      for (let i = 0; i < layerPoints.length - 1; i++) {
+        const p1 = layerPoints[i];
+        const p2 = layerPoints[i + 1];
+        if (p1.tw >= 1.0 && p2.tw <= 1.0) {
+          const dTw = p1.tw - p2.tw;
+          const frac = dTw > 0.01 ? (p1.tw - 1.0) / dTw : 0.5;
+          snowZ = Math.round(p1.z + frac * (p2.z - p1.z));
+          break;
+        }
+      }
+    }
+
+    if (snowZ === null) {
+      const top = layerPoints[layerPoints.length - 1];
+      if (top.tw > 1.0) {
+        snowZ = Math.round(top.z + ((top.tw - 1.0) / 0.65) * 100);
+      } else {
+        snowZ = Math.round(layerPoints[0].z);
+      }
+    }
+
+    snowZ = Math.max(200, Math.min(5000, snowZ));
+
+    return {
+      snowLevelMeters: snowZ,
+      freezingLevelMeters: dryFreezingLevel,
+      isFallback: false
+    };
+  },
+
+  /**
+   * Berechnet die tatsächliche atmosphärische Lapse-Rate (°C / 100m) aus den Druckflächen
+   * temperature_850hPa, temperature_700hPa, temperature_500hPa.
+   * Sign-Konvention: Normaler Temperaturrückgang mit der Höhe ist negativ (z. B. -0.65 °C/100m).
+   * Inversion (Temperaturanstieg mit der Höhe) ist positiv (Lapse-Rate > 0).
+   * Fallback auf -0.65 °C/100m nur wenn keine Druckflächen vorhanden sind.
+   */
+  calculatePressureLapseRate(h, hourIdx = 0, targetElevation = null) {
+    if (!h) {
+      return { lapseRatePer100m: -0.65, isInversion: false, isFallback: true };
+    }
+
+    const t850 = (h.temperature_850hPa && typeof h.temperature_850hPa[hourIdx] === 'number') ? h.temperature_850hPa[hourIdx] : null;
+    const t700 = (h.temperature_700hPa && typeof h.temperature_700hPa[hourIdx] === 'number') ? h.temperature_700hPa[hourIdx] : null;
+    const t500 = (h.temperature_500hPa && typeof h.temperature_500hPa[hourIdx] === 'number') ? h.temperature_500hPa[hourIdx] : null;
+
+    const z850 = (h.geopotential_height_850hPa && typeof h.geopotential_height_850hPa[hourIdx] === 'number') ? h.geopotential_height_850hPa[hourIdx] : 1457;
+    const z700 = (h.geopotential_height_700hPa && typeof h.geopotential_height_700hPa[hourIdx] === 'number') ? h.geopotential_height_700hPa[hourIdx] : 3012;
+    const z500 = (h.geopotential_height_500hPa && typeof h.geopotential_height_500hPa[hourIdx] === 'number') ? h.geopotential_height_500hPa[hourIdx] : 5574;
+
+    let lapseRate = null;
+
+    // Wenn targetElevation gegeben ist, die passende atmosphärische Schicht bevorzugen
+    if (targetElevation !== null) {
+      if (targetElevation >= z700 && t700 !== null && t500 !== null) {
+        const dz = Math.max(100, z500 - z700);
+        lapseRate = ((t500 - t700) / dz) * 100;
+      } else if (targetElevation < z700 && t850 !== null && t700 !== null) {
+        const dz = Math.max(100, z700 - z850);
+        lapseRate = ((t700 - t850) / dz) * 100;
+      }
+    }
+
+    // Allgemeine alpine Schicht (850 -> 700 -> 500 hPa)
+    if (lapseRate === null) {
+      if (t850 !== null && t700 !== null) {
+        const dz = Math.max(100, z700 - z850);
+        lapseRate = ((t700 - t850) / dz) * 100;
+      } else if (t700 !== null && t500 !== null) {
+        const dz = Math.max(100, z500 - z700);
+        lapseRate = ((t500 - t700) / dz) * 100;
+      } else if (t850 !== null && t500 !== null) {
+        const dz = Math.max(100, z500 - z850);
+        lapseRate = ((t500 - t850) / dz) * 100;
+      }
+    }
+
+    // Fallback auf 0,65 nur wenn keine Druckflächen vorhanden
+    if (lapseRate === null || isNaN(lapseRate)) {
+      return {
+        lapseRatePer100m: -0.65,
+        isInversion: false,
+        isFallback: true
+      };
+    }
+
+    return {
+      lapseRatePer100m: Math.round(lapseRate * 100) / 100,
+      isInversion: lapseRate > 0,
+      isFallback: false
+    };
+  },
+
+  /**
    * STUFE 3: Berechnet Mikrowetter-Physik
    */
-  computeMicroPhysics(terrain, weatherData, isMountain) {
+  computeMicroPhysics(terrain, weatherData, isMountain, stationData = null) {
     const h = weatherData.hourly;
     const cur = weatherData.current;
 
@@ -285,21 +1240,64 @@ export const MicroEngine = {
       }
     }
 
+    // 1. Tatsächliche Lapse-Rate aus Druckflächen (850 / 700 / 500 hPa) berechnen
+    const { lapseRatePer100m, isInversion } = this.calculatePressureLapseRate(h, idx, terrain.elevation);
+
     if (!isMountain) {
-      // Stadt-Modus: Keine Felswand, normales 2m Wetter
+      // Stadt-Modus: Keine Felswand, normales 2m Wetter mit orographischem Inversionsabgleich
+      let cityTemp = cur ? cur.temperature_2m : (h ? h.temperature_2m[idx] : 15);
+      const cityWind = cur ? cur.wind_speed_10m : 10;
+      const windDampener = 1 / (1 + cityWind / 12);
+
+      // Bei Inversion (Lapse-Rate > 0) und Kessel/Mulde (TPI < 0): Cold Pool im Tal
+      if (isInversion && terrain.tpi < 0) {
+        const poolDepth = 1.2 + (lapseRatePer100m * 1.5) + (Math.abs(terrain.tpi) / 20);
+        cityTemp -= Math.min(4.0, poolDepth) * windDampener;
+        cityTemp = Math.round(cityTemp * 10) / 10;
+      }
+
+      const { snowLevelMeters, freezingLevelMeters } = this.calculateWetBulbSnowLevel(h, idx, terrain.elevation);
+      const curRh = (cur && typeof cur.relative_humidity_2m === 'number') ? cur.relative_humidity_2m : (h.relative_humidity_2m ? h.relative_humidity_2m[idx] : 70);
+      const localWetBulb = this.computeWetBulbTemp(cityTemp, curRh);
+      const cityPrecip = (cur && typeof cur.precipitation === 'number') ? cur.precipitation : (h && h.precipitation ? (h.precipitation[idx] || 0) : 0);
+
+      let precipType = 'Trocken';
+      let precipIcon = '☀️';
+      if (cityPrecip > 0.05 || (cur && cur.weather_code >= 51 && cur.weather_code <= 99)) {
+        if (localWetBulb <= 0.5 || cityTemp <= 0.0 || terrain.elevation >= snowLevelMeters) {
+          precipType = 'Schnee';
+          precipIcon = '❄️';
+        } else if (localWetBulb <= 1.8) {
+          precipType = 'Schneeregen';
+          precipIcon = '🌨️';
+        } else {
+          precipType = 'Regen';
+          precipIcon = '🌧️';
+        }
+      }
+
       return {
         timestamp: h && h.time ? h.time[idx] : new Date().toISOString(),
         terrain10m: terrain,
         atmosphere: {
-          lapseRatePer100m: -0.65,
-          inversionActive: false,
-          freezingLevelMeters: h && h.freezing_level_height ? h.freezing_level_height[idx] : 2500,
+          lapseRatePer100m: lapseRatePer100m,
+          inversionActive: isInversion,
+          freezingLevelMeters: Math.round(freezingLevelMeters),
+          snowLevelMeters: Math.round(snowLevelMeters),
+          wetBulbTemp: localWetBulb,
         },
         microWeather: {
-          temperature10m: cur ? cur.temperature_2m : (h ? h.temperature_2m[idx] : 15),
-          feltTemp: cur ? cur.apparent_temperature : 15,
-          modelStandardTemp2m: cur ? cur.temperature_2m : 15,
-          freeAirTempAtElevation: cur ? cur.temperature_2m : 15,
+          temperature10m: cityTemp,
+          feltTemp: cur ? cur.apparent_temperature : cityTemp,
+          wetBulbTemp: localWetBulb,
+          precipitationMm: cityPrecip,
+          orographicMultiplier: 1.0,
+          precipType: precipType,
+          precipIcon: precipIcon,
+          snowLevelMeters: Math.round(snowLevelMeters),
+          freezingLevelMeters: Math.round(freezingLevelMeters),
+          modelStandardTemp2m: cur ? cur.temperature_2m : cityTemp,
+          freeAirTempAtElevation: cur ? cur.temperature_2m : cityTemp,
           slopeSolarIrradianceW_m2: h && h.shortwave_radiation ? h.shortwave_radiation[idx] : 300,
           flatSolarIrradianceW_m2: h && h.shortwave_radiation ? h.shortwave_radiation[idx] : 300,
           windSpeedKmH: cur ? Math.round(cur.wind_speed_10m) : 10,
@@ -307,6 +1305,9 @@ export const MicroEngine = {
           windDirectionDeg: cur ? cur.wind_direction_10m : 180,
           snowCondition: 'Schneefrei / Stadtgebiet',
           slopeWindExposure: 'Boden- / Straßenniveau (Ebene)',
+          regionalModelName: (weatherData && weatherData._regionalModel && weatherData._regionalModel.displayName)
+            ? weatherData._regionalModel.displayName
+            : 'ICON-D2 (2.2 km)',
         },
       };
     }
@@ -325,46 +1326,121 @@ export const MicroEngine = {
       .filter(l => l.z !== undefined && l.temp !== undefined)
       .sort((a, b) => a.z - b.z);
 
-    let lowerLayer = layerStack[0] || { z: 500, temp: 10, windSpeed: 10, windDir: 180 };
-    let upperLayer = layerStack[layerStack.length - 1] || { z: 3000, temp: -5, windSpeed: 25, windDir: 180 };
+    const defaultWindSpeed = (h && h.wind_speed_10m && typeof h.wind_speed_10m[idx] === 'number') ? h.wind_speed_10m[idx] : 10;
+    const defaultWindDir = (h && h.wind_direction_10m && typeof h.wind_direction_10m[idx] === 'number') ? h.wind_direction_10m[idx] : 180;
+    const defaultTemp = (h && h.temperature_2m && typeof h.temperature_2m[idx] === 'number') ? h.temperature_2m[idx] : 10;
 
-    for (let i = 0; i < layerStack.length - 1; i++) {
-      if (
-        terrain.elevation >= layerStack[i].z &&
-        terrain.elevation <= layerStack[i + 1].z
-      ) {
-        lowerLayer = layerStack[i];
-        upperLayer = layerStack[i + 1];
-        break;
+    let freeAirTemp = defaultTemp;
+    let freeAirWindSpeed = defaultWindSpeed;
+    let freeAirWindDir = defaultWindDir;
+
+    if (layerStack.length >= 2) {
+      if (terrain.elevation < layerStack[0].z) {
+        // Unterhalb unterster Druckfläche (z. B. Talboden): Extrapolieren mit Lapse-Rate
+        const baseLayer = layerStack[0];
+        const dz = terrain.elevation - baseLayer.z;
+        freeAirTemp = baseLayer.temp + (dz / 100) * lapseRatePer100m;
+        const lowW = (typeof baseLayer.windSpeed === 'number') ? baseLayer.windSpeed : defaultWindSpeed;
+        freeAirWindSpeed = Math.max(2, lowW * (1 + dz / 3000));
+        freeAirWindDir = (typeof baseLayer.windDir === 'number') ? baseLayer.windDir : defaultWindDir;
+      } else if (terrain.elevation > layerStack[layerStack.length - 1].z) {
+        // Oberhalb oberster Druckfläche: Extrapolieren mit Lapse-Rate
+        const topLayer = layerStack[layerStack.length - 1];
+        const dz = terrain.elevation - topLayer.z;
+        freeAirTemp = topLayer.temp + (dz / 100) * lapseRatePer100m;
+        freeAirWindSpeed = (typeof topLayer.windSpeed === 'number') ? topLayer.windSpeed : defaultWindSpeed;
+        freeAirWindDir = (typeof topLayer.windDir === 'number') ? topLayer.windDir : defaultWindDir;
+      } else {
+        // Zwischen zwei Druckflächen: Lineare Interpolation
+        let lowerLayer = layerStack[0];
+        let upperLayer = layerStack[layerStack.length - 1];
+        for (let i = 0; i < layerStack.length - 1; i++) {
+          if (
+            terrain.elevation >= layerStack[i].z &&
+            terrain.elevation <= layerStack[i + 1].z
+          ) {
+            lowerLayer = layerStack[i];
+            upperLayer = layerStack[i + 1];
+            break;
+          }
+        }
+        const dzLayer = Math.max(1, upperLayer.z - lowerLayer.z);
+        const weight = Math.max(0, Math.min(1, (terrain.elevation - lowerLayer.z) / dzLayer));
+
+        freeAirTemp = lowerLayer.temp + weight * (upperLayer.temp - lowerLayer.temp);
+        const lWind = (typeof lowerLayer.windSpeed === 'number') ? lowerLayer.windSpeed : defaultWindSpeed;
+        const uWind = (typeof upperLayer.windSpeed === 'number') ? upperLayer.windSpeed : lWind;
+        freeAirWindSpeed = lWind + weight * (uWind - lWind);
+        const lDir = (typeof lowerLayer.windDir === 'number') ? lowerLayer.windDir : defaultWindDir;
+        const uDir = (typeof upperLayer.windDir === 'number') ? upperLayer.windDir : lDir;
+        freeAirWindDir = this.interpolateWindDirection(lDir, uDir, weight);
       }
+    } else if (layerStack.length === 1) {
+      const baseLayer = layerStack[0];
+      const dz = terrain.elevation - baseLayer.z;
+      freeAirTemp = baseLayer.temp + (dz / 100) * lapseRatePer100m;
+      freeAirWindSpeed = (typeof baseLayer.windSpeed === 'number') ? baseLayer.windSpeed : defaultWindSpeed;
+      freeAirWindDir = (typeof baseLayer.windDir === 'number') ? baseLayer.windDir : defaultWindDir;
+    } else {
+      // Keine Druckflächen vorhanden: Fallback mit Lapse-Rate auf Basis von 2m-Temperatur
+      freeAirTemp = defaultTemp + ((terrain.elevation - 500) / 100) * lapseRatePer100m;
+      freeAirWindSpeed = defaultWindSpeed;
+      freeAirWindDir = defaultWindDir;
     }
 
-    const dzLayer = Math.max(1, upperLayer.z - lowerLayer.z);
-    const weight = Math.max(0, Math.min(1, (terrain.elevation - lowerLayer.z) / dzLayer));
-    const lapseRatePer100m = ((upperLayer.temp - lowerLayer.temp) / dzLayer) * 100;
-
-    const freeAirTemp = lowerLayer.temp + weight * (upperLayer.temp - lowerLayer.temp);
-    const freeAirWindSpeed = lowerLayer.windSpeed + weight * (upperLayer.windSpeed - lowerLayer.windSpeed);
-    const freeAirWindDir = this.interpolateWindDirection(lowerLayer.windDir, upperLayer.windDir, weight);
+    // Verfeinerung Bergwind: Bernoulli/Venturi Grat-Beschleunigung + Kessel-Abschirmung
+    const crestBernoulli = (terrain.tpi > 0)
+      ? Math.min(0.40, (terrain.tpi / 45) * (terrain.tilt / 60) * 0.35)
+      : 0;
+    const basinShelter = (terrain.tpi < -5)
+      ? Math.max(-0.40, (terrain.tpi / 50) * 0.30)
+      : 0;
+    const tpiFactor = Math.max(-0.50, Math.min(0.70, (terrain.tpi / 60) + crestBernoulli + basinShelter));
 
     const windToSlopeAngleRad = ((freeAirWindDir - terrain.compassAzimuth) * Math.PI) / 180;
     const luvLeeAlignment = Math.cos(windToSlopeAngleRad);
-
-    const tpiFactor = Math.max(-0.45, Math.min(0.55, terrain.tpi / 65));
-    const slopeSensitivity = Math.min(1, terrain.tilt / 35);
+    const slopeSensitivity = Math.min(1.2, terrain.tilt / 30);
     const luvLeeFactor = luvLeeAlignment < 0
-      ? luvLeeAlignment * 0.4 * slopeSensitivity
-      : luvLeeAlignment * 0.15 * slopeSensitivity;
+      ? luvLeeAlignment * 0.40 * slopeSensitivity
+      : luvLeeAlignment * 0.20 * slopeSensitivity;
 
-    const highAlpineBlend = Math.max(0, Math.min(1, (terrain.elevation - 1200) / 1200));
+    const highAlpineBlend = Math.max(0, Math.min(1, (terrain.elevation - 1000) / 1400));
     const baseWind = (h.wind_speed_10m ? h.wind_speed_10m[idx] : 10) * (1 - highAlpineBlend) + freeAirWindSpeed * highAlpineBlend;
 
-    const microWindSpeed = Math.max(2, baseWind * (1 + tpiFactor + luvLeeFactor));
-    const rotorTurbulenceBoost = luvLeeAlignment < -0.3 && terrain.tilt > 25 ? 1.45 : 1.0;
-    const microWindGusts = Math.max(
-      microWindSpeed * 1.25,
+    let microWindSpeed = Math.max(2, baseWind * (1 + tpiFactor + luvLeeFactor));
+    const rotorTurbulenceBoost = luvLeeAlignment < -0.3 && terrain.tilt > 25 ? 1.50 : 1.0;
+    let microWindGusts = Math.max(
+      microWindSpeed * 1.30,
       (h.wind_gusts_10m ? h.wind_gusts_10m[idx] : 15) * (1 + Math.max(0, tpiFactor)) * rotorTurbulenceBoost
     );
+
+    // Berg-Station Wind-Fusion (z. B. Zugspitze-Messstation bei Berggipfel)
+    if (stationData && stationData.current && stationData.source) {
+      const sDistKm = (stationData.source.distance || 0) / 1000;
+      const sDz = Math.abs(terrain.elevation - (stationData.source.height || terrain.elevation));
+      if (sDistKm < 25 && sDz < 350) {
+        const stnWind = (typeof stationData.current.wind_speed_60 === 'number')
+          ? stationData.current.wind_speed_60
+          : stationData.current.wind_speed_10;
+        const stnGusts = (typeof stationData.current.wind_gust_speed_60 === 'number')
+          ? stationData.current.wind_gust_speed_60
+          : stationData.current.wind_gust_speed_10;
+        const stnDir = (typeof stationData.current.wind_direction_60 === 'number')
+          ? stationData.current.wind_direction_60
+          : stationData.current.wind_direction_10;
+
+        if (typeof stnWind === 'number' && stnWind >= 0) {
+          const stnWeight = Math.min(0.88, Math.exp(-sDistKm / 15) * Math.exp(-sDz / 220));
+          microWindSpeed = Math.round(microWindSpeed * (1 - stnWeight) + stnWind * stnWeight);
+          if (typeof stnGusts === 'number' && stnGusts >= 0) {
+            microWindGusts = Math.round(microWindGusts * (1 - stnWeight) + stnGusts * stnWeight);
+          }
+          if (typeof stnDir === 'number') {
+            freeAirWindDir = this.interpolateWindDirection(freeAirWindDir, stnDir, stnWeight);
+          }
+        }
+      }
+    }
 
     const ghi = h.shortwave_radiation ? (h.shortwave_radiation[idx] || 0) : 0;
     const gti = h.global_tilted_irradiance ? (h.global_tilted_irradiance[idx] || 0) : 0;
@@ -373,17 +1449,179 @@ export const MicroEngine = {
     const windMixingDampener = 1 / (1 + microWindSpeed / 18);
     const radiationTempOffset = (irradianceDelta / 220) * windMixingDampener;
 
-    const isClearAndDark = (h.cloud_cover ? h.cloud_cover[idx] : 50) < 35 && gti < 80;
-    const coldPoolOffset = isClearAndDark && terrain.tpi < -10
-      ? Math.max(-3.5, (terrain.tpi / 15) * windMixingDampener)
-      : 0;
+    // Separate Korrektur für Talboden / Hang / Gipfel auf Basis von TPI und Elevation
+    let topoInversionOffset = 0;
+    if (isInversion) {
+      // INVERSION AKTIV (Lapse-Rate > 0): Cold Pool im Tal (TPI < 0), wärmer am Hang und Grat
+      if (terrain.tpi < -8 || terrain.elevation <= 900) {
+        // Talboden / Senke / Kessel
+        const poolDepth = 1.5 + (lapseRatePer100m * 1.8) + (Math.abs(Math.min(0, terrain.tpi)) / 20);
+        topoInversionOffset = -Math.min(5.5, poolDepth) * windMixingDampener;
+      } else if (terrain.tpi > 8 || terrain.elevation >= 2200) {
+        // Gipfel / Grat: Wärmer am Grat
+        const ridgeWarmth = (lapseRatePer100m * 1.5) + (Math.max(0, terrain.tpi) / 35);
+        topoInversionOffset = +Math.min(4.0, Math.max(0.2, ridgeWarmth));
+      } else {
+        // Hang / Mittelstation: Warme Hangzone / Thermal Belt
+        topoInversionOffset = +Math.min(2.5, Math.max(0.1, lapseRatePer100m * 1.1));
+      }
+    } else {
+      // NORMALE SCHICHTUNG (Lapse-Rate <= 0):
+      // Nächtlicher Kaltluftsee bei klarem Himmel & schwachem Wind in Mulden (TPI < -8)
+      const isClearAndDark = (h.cloud_cover ? h.cloud_cover[idx] : 50) < 35 && gti < 80;
+      if (isClearAndDark && terrain.tpi < -8) {
+        topoInversionOffset = Math.max(-3.5, (terrain.tpi / 15) * windMixingDampener);
+      }
+    }
 
     const baseTemp = (h.temperature_2m ? h.temperature_2m[idx] : 10) * 0.5 + freeAirTemp * 0.5;
-    const microTemp = baseTemp + radiationTempOffset + coldPoolOffset;
+    let microTemp = baseTemp + radiationTempOffset + topoInversionOffset;
+
+    // -------------------------------------------------------------------------
+    // FÖHN- & TALWIND-HEURISTIK (nur bei isMountain === true und elevation > 800 m)
+    // -------------------------------------------------------------------------
+    let foehn = { active: false, type: null, tempDelta: 0, humidityDelta: 0, windBoost: 0, label: null };
+    let valleyWind = { active: false, type: null, windDelta: 0, tempDelta: 0, label: null };
+
+    let curRh = (cur && typeof cur.relative_humidity_2m === 'number')
+      ? cur.relative_humidity_2m
+      : (h.relative_humidity_2m ? h.relative_humidity_2m[idx] : 70);
+
+    if (isMountain && terrain.elevation > 800) {
+      // 1. FÖHN-ERKENNUNG:
+      // Windrichtung: Süd (140°..230°) oder Nord (320°..40°)
+      const isSouthWind = (freeAirWindDir >= 140 && freeAirWindDir <= 230);
+      const isNorthWind = (freeAirWindDir >= 320 || freeAirWindDir <= 40);
+      const windSpeedSufficient = freeAirWindSpeed >= 18 || microWindSpeed >= 20;
+
+      // Druckgradient: Überströmungsantrieb / Bodendruckgradient / Höhenwind
+      const hasPressureGradient = (cur && typeof cur.surface_pressure === 'number')
+        ? (Math.abs(cur.surface_pressure - 1013.25) >= 4)
+        : windSpeedSufficient;
+
+      // Feuchtigkeitsabfall: Trockenadiabatische Absinkung im Lee (RH <= 58% oder trocken)
+      const isDryAir = curRh <= 58;
+
+      if ((isSouthWind || isNorthWind) && (hasPressureGradient || windSpeedSufficient) && isDryAir) {
+        // Lee-Prüfung: Liegt Hang/Tal im Lee des Gebirgskamms?
+        const windToSlopeRad = ((freeAirWindDir - terrain.compassAzimuth) * Math.PI) / 180;
+        const luvLee = Math.cos(windToSlopeRad);
+        const isLee = luvLee <= -0.10 || (isSouthWind && (terrain.compassAzimuth >= 300 || terrain.compassAzimuth <= 60)) || (isNorthWind && (terrain.compassAzimuth >= 120 && terrain.compassAzimuth <= 240));
+
+        if (isLee) {
+          const foehnType = isSouthWind ? 'Südföhn' : 'Nordföhn';
+          const rhDeficit = Math.max(0, 65 - curRh);
+          const tBoost = Math.min(4.5, Math.max(1.5, 1.2 + (microWindSpeed / 25) * 1.5 + (rhDeficit / 25) * 1.5));
+          const rhDrop = Math.min(30, Math.max(12, 10 + (tBoost * 4)));
+          const wBoost = Math.min(30, Math.max(10, Math.round(microWindSpeed * 0.40 + 8)));
+
+          foehn = {
+            active: true,
+            type: foehnType,
+            tempDelta: Math.round(tBoost * 10) / 10,
+            humidityDelta: -Math.round(rhDrop),
+            windBoost: wBoost,
+            label: `${foehnType} im Lee (+${Math.round(tBoost * 10) / 10} °C)`
+          };
+
+          microTemp += foehn.tempDelta;
+          microWindSpeed += foehn.windBoost;
+          microWindGusts = Math.max(microWindGusts + 15, microWindSpeed * 1.45);
+          curRh = Math.max(15, curRh + foehn.humidityDelta);
+        }
+      }
+
+      // 2. TALWIND-HEURISTIK: Anabatic (tags) / Katabatic (nachts)
+      // Bei klarem Himmel (cloud_cover <= 45%) und Hangneigung (tilt >= 10°)
+      const cloudCover = (cur && cur.cloud_cover !== undefined) ? cur.cloud_cover : (h.cloud_cover ? h.cloud_cover[idx] : 50);
+      const isClearSky = cloudCover <= 45;
+      const hasSlope = terrain.tilt >= 10;
+
+      if (!foehn.active && isClearSky && hasSlope) {
+        const isDay = (cur && cur.is_day !== undefined) ? (cur.is_day === 1) : (gti > 60);
+
+        if (isDay && gti >= 100) {
+          // ANABATIC (tags): Thermischer Hangaufwind durch Sonneneinstrahlung
+          const anabaticWind = Math.min(16, Math.max(4, Math.round((gti / 120) * (terrain.tilt / 30) * 8)));
+          const anabaticTemp = Math.min(1.8, Math.max(0.4, Math.round((gti / 280) * 0.8 * 10) / 10));
+
+          valleyWind = {
+            active: true,
+            type: 'Anabatic',
+            windDelta: anabaticWind,
+            tempDelta: anabaticTemp,
+            label: `Hangaufwind (+${anabaticWind} km/h)`
+          };
+
+          microWindSpeed += anabaticWind;
+          microWindGusts += Math.round(anabaticWind * 1.25);
+          microTemp += anabaticTemp;
+        } else if (!isDay || gti < 30) {
+          // KATABATIC (nachts): Nächtlicher Hangabwind durch Kaltluftabfluss
+          const katabaticWind = Math.min(14, Math.max(4, Math.round(5 + (terrain.tilt / 30) * 5)));
+          const katabaticTemp = -Math.min(2.5, Math.max(0.6, Math.round((1.0 + (terrain.tilt / 35) * 1.0) * 10) / 10));
+
+          valleyWind = {
+            active: true,
+            type: 'Katabatic',
+            windDelta: katabaticWind,
+            tempDelta: katabaticTemp,
+            label: `Hangabwind (+${katabaticWind} km/h)`
+          };
+
+          microWindSpeed += katabaticWind;
+          microWindGusts += Math.round(katabaticWind * 1.15);
+          microTemp += katabaticTemp;
+        }
+      }
+    }
+
+    // Wet-Bulb Schneefallgrenze & 0°C Trocken-Isotherme
+    const { snowLevelMeters, freezingLevelMeters } = this.calculateWetBulbSnowLevel(h, idx, terrain.elevation);
+    const localWetBulb = this.computeWetBulbTemp(microTemp, curRh);
+
+    // Orographische Niederschlags-Verstärkung an Luv-Hängen (Wind + Hangneigung + Azimut)
+    let orographicMultiplier = 1.0;
+    if (terrain.tilt > 0) {
+      const windToSlopeRad = ((freeAirWindDir - terrain.compassAzimuth) * Math.PI) / 180;
+      const luvLee = Math.cos(windToSlopeRad);
+      const slopeSin = Math.sin((terrain.tilt * Math.PI) / 180);
+      const updraft = luvLee * slopeSin;
+
+      if (updraft > 0) {
+        // Luv-Hang: Forcierte Hebung & Kondensationsverstärkung
+        const windBoost = Math.min(0.60, 0.20 + (microWindSpeed / 60));
+        orographicMultiplier = 1.0 + Math.min(0.65, updraft * windBoost);
+      } else if (updraft < -0.15) {
+        // Lee-Hang: Absinkende Luft, Regenschatten
+        orographicMultiplier = Math.max(0.65, 1.0 + updraft * 0.35);
+      }
+    }
+
+    const basePrecip = (cur && typeof cur.precipitation === 'number')
+      ? cur.precipitation
+      : (h && h.precipitation ? (h.precipitation[idx] || 0) : 0);
+    const localPrecip = Math.round(basePrecip * orographicMultiplier * 10) / 10;
+
+    // Präziser Niederschlagstyp (Schnee / Schneeregen / Regen) nach Wet-Bulb
+    let precipType = 'Trocken';
+    let precipIcon = '☀️';
+    const isPrecip = localPrecip > 0.05 || (cur && cur.weather_code >= 51 && cur.weather_code <= 99);
+    if (isPrecip) {
+      if (localWetBulb <= 0.5 || microTemp <= 0.0 || terrain.elevation >= snowLevelMeters) {
+        precipType = 'Schnee';
+        precipIcon = '❄️';
+      } else if (localWetBulb <= 1.8) {
+        precipType = 'Schneeregen';
+        precipIcon = '🌨️';
+      } else {
+        precipType = 'Regen';
+        precipIcon = '🌧️';
+      }
+    }
 
     let snowCondition = 'Schneefrei / Fels';
-    const freezingLevel = h.freezing_level_height ? h.freezing_level_height[idx] : 2500;
-    if (terrain.elevation >= freezingLevel) {
+    if (terrain.elevation >= snowLevelMeters || localWetBulb <= 0.5) {
       if (terrain.compassAzimuth >= 315 || terrain.compassAzimuth <= 45) {
         snowCondition = '❄️ Kalter Pulverschnee / Firneis';
       } else if (terrain.compassAzimuth >= 135 && terrain.compassAzimuth <= 225) {
@@ -397,13 +1635,25 @@ export const MicroEngine = {
       timestamp: h.time[idx],
       terrain10m: terrain,
       atmosphere: {
-        lapseRatePer100m: lapseRatePer100m,
-        inversionActive: lapseRatePer100m > 0,
-        freezingLevelMeters: freezingLevel,
+        lapseRatePer100m: Math.round(lapseRatePer100m * 100) / 100,
+        inversionActive: isInversion,
+        freezingLevelMeters: Math.round(freezingLevelMeters),
+        snowLevelMeters: Math.round(snowLevelMeters),
+        wetBulbTemp: localWetBulb,
       },
       microWeather: {
         temperature10m: Math.round(microTemp * 10) / 10,
-        feltTemp: Math.round(h.apparent_temperature ? h.apparent_temperature[idx] : microTemp),
+        feltTemp: Math.round(h.apparent_temperature ? (h.apparent_temperature[idx] + (microTemp - baseTemp)) : microTemp),
+        wetBulbTemp: localWetBulb,
+        relativeHumidity: Math.round(curRh),
+        foehn: foehn,
+        valleyWind: valleyWind,
+        precipitationMm: localPrecip,
+        orographicMultiplier: Math.round(orographicMultiplier * 100) / 100,
+        precipType: precipType,
+        precipIcon: precipIcon,
+        snowLevelMeters: Math.round(snowLevelMeters),
+        freezingLevelMeters: Math.round(freezingLevelMeters),
         modelStandardTemp2m: h.temperature_2m ? h.temperature_2m[idx] : microTemp,
         freeAirTempAtElevation: Math.round(freeAirTemp * 10) / 10,
         slopeSolarIrradianceW_m2: Math.round(gti),
@@ -412,6 +1662,9 @@ export const MicroEngine = {
         windGustsKmH: Math.round(microWindGusts),
         windDirectionDeg: Math.round(freeAirWindDir),
         snowCondition: snowCondition,
+        regionalModelName: (weatherData && weatherData._regionalModel && weatherData._regionalModel.displayName)
+          ? weatherData._regionalModel.displayName
+          : 'ICON-EU (6.5 km)',
         slopeWindExposure:
           luvLeeAlignment > 0.25
             ? "Luv (Direkte Windanströmung)"
@@ -435,20 +1688,26 @@ export const MicroEngine = {
     const highZ = Math.round(peakElevation + 800);
 
     const steps = [
-      { name: 'Talboden', z: valleyZ, icon: '🏡' },
-      { name: 'Mittelstation', z: midZ, icon: '🌲' },
-      { name: 'Gipfel / Grat', z: peakZ, icon: '🏔️' },
-      { name: 'Freie Atmosphäre', z: highZ, icon: '🦅' }
+      { name: 'Talboden', z: valleyZ, icon: '🏡', tpi: -25 },
+      { name: 'Mittelstation', z: midZ, icon: '🌲', tpi: 0 },
+      { name: 'Gipfel / Grat', z: peakZ, icon: '🏔️', tpi: 25 },
+      { name: 'Freie Atmosphäre', z: highZ, icon: '🦅', tpi: 15 }
     ];
 
     const hourlyProfiles = [];
     for (let i = 0; i < Math.min(24, h.time.length); i++) {
       const timeStr = h.time[i];
+      const { lapseRatePer100m, isInversion } = this.calculatePressureLapseRate(h, i, peakElevation);
+      const { snowLevelMeters, freezingLevelMeters } = this.calculateWetBulbSnowLevel(h, i, peakElevation);
+
       const hourObj = {
         time: timeStr,
         hour: new Date(timeStr).getHours(),
-        freezingLevel: h.freezing_level_height ? h.freezing_level_height[i] : 2500,
+        freezingLevel: freezingLevelMeters,
+        snowLevel: snowLevelMeters,
         precip: h.precipitation ? h.precipitation[i] : 0,
+        lapseRatePer100m,
+        inversionActive: isInversion,
         levels: []
       };
 
@@ -458,41 +1717,139 @@ export const MicroEngine = {
         z: h[`geopotential_height_${hpa}hPa`]?.[i],
         temp: h[`temperature_${hpa}hPa`]?.[i],
         wind: h[`wind_speed_${hpa}hPa`]?.[i],
-        dir: h[`wind_direction_${hpa}hPa`]?.[i]
+        dir: h[`wind_direction_${hpa}hPa`]?.[i],
+        rh: h[`relative_humidity_${hpa}hPa`]?.[i]
       })).filter(l => l.z !== undefined && l.temp !== undefined);
 
       for (const step of steps) {
         let t = 0;
         let w = 0;
         let d = 250;
+        const defaultWind = (h.wind_speed_10m && h.wind_speed_10m[i] !== undefined) ? h.wind_speed_10m[i] : 10;
+        const defaultTemp = (h.temperature_2m && h.temperature_2m[i] !== undefined) ? h.temperature_2m[i] : 10;
+        const defaultDir = (h.wind_direction_10m && h.wind_direction_10m[i] !== undefined) ? h.wind_direction_10m[i] : 210;
+        let stepRh = (h.relative_humidity_2m && h.relative_humidity_2m[i] !== undefined) ? h.relative_humidity_2m[i] : 70;
+
         if (stack.length >= 2) {
-          let low = stack[0];
-          let up = stack[stack.length - 1];
-          for (let k = 0; k < stack.length - 1; k++) {
-            if (step.z >= stack[k].z && step.z <= stack[k + 1].z) {
-              low = stack[k];
-              up = stack[k + 1];
-              break;
+          if (step.z < stack[0].z) {
+            const low = stack[0];
+            const dz = step.z - low.z;
+            t = low.temp + (dz / 100) * lapseRatePer100m;
+            w = (typeof low.wind === 'number') ? low.wind : (defaultWind * (1 + (step.z / 2000)));
+            d = (typeof low.dir === 'number') ? low.dir : defaultDir;
+            stepRh = (typeof low.rh === 'number') ? low.rh : stepRh;
+          } else if (step.z > stack[stack.length - 1].z) {
+            const up = stack[stack.length - 1];
+            const dz = step.z - up.z;
+            t = up.temp + (dz / 100) * lapseRatePer100m;
+            w = (typeof up.wind === 'number') ? up.wind : (defaultWind * (1 + (step.z / 2000)));
+            d = (typeof up.dir === 'number') ? up.dir : defaultDir;
+            stepRh = (typeof up.rh === 'number') ? up.rh : stepRh;
+          } else {
+            let low = stack[0];
+            let up = stack[stack.length - 1];
+            for (let k = 0; k < stack.length - 1; k++) {
+              if (step.z >= stack[k].z && step.z <= stack[k + 1].z) {
+                low = stack[k];
+                up = stack[k + 1];
+                break;
+              }
             }
-          }
-          const weight = Math.max(0, Math.min(1, (step.z - low.z) / Math.max(1, up.z - low.z)));
-          t = low.temp + weight * (up.temp - low.temp);
-          w = low.wind + weight * (up.wind - low.wind);
-          if (low.dir !== undefined && up.dir !== undefined) {
-            let diff = ((up.dir - low.dir + 180) % 360) - 180;
-            d = (low.dir + weight * diff + 360) % 360;
-          } else if (low.dir !== undefined) {
-            d = low.dir;
+            const weight = Math.max(0, Math.min(1, (step.z - low.z) / Math.max(1, up.z - low.z)));
+            t = low.temp + weight * (up.temp - low.temp);
+            const lowW = (typeof low.wind === 'number') ? low.wind : defaultWind;
+            const upW = (typeof up.wind === 'number') ? up.wind : lowW;
+            w = lowW + weight * (upW - lowW);
+            const lowD = (typeof low.dir === 'number') ? low.dir : defaultDir;
+            const upD = (typeof up.dir === 'number') ? up.dir : lowD;
+            let diff = ((upD - lowD + 180) % 360) - 180;
+            d = (lowD + weight * diff + 360) % 360;
+            const lowRh = (typeof low.rh === 'number') ? low.rh : stepRh;
+            const upRh = (typeof up.rh === 'number') ? up.rh : lowRh;
+            stepRh = lowRh + weight * (upRh - lowRh);
           }
         } else {
-          const baseT = (h.temperature_2m && h.temperature_2m[i] !== undefined) ? h.temperature_2m[i] : 10;
-          t = baseT - ((step.z - valleyZ) * 0.0065);
-          w = (h.wind_speed_10m ? h.wind_speed_10m[i] : 10) * (1 + (step.z / 2000));
-          const baseDir = (h.wind_direction_10m && h.wind_direction_10m[i] !== undefined) ? h.wind_direction_10m[i] : 210;
-          d = (baseDir + Math.min(65, (step.z / 4000) * 65)) % 360;
+          t = defaultTemp + ((step.z - valleyZ) / 100) * lapseRatePer100m;
+          w = defaultWind * (1 + (step.z / 2000));
+          d = (defaultDir + Math.min(65, (step.z / 4000) * 65)) % 360;
         }
 
-        const isSnow = step.z >= hourObj.freezingLevel;
+        // Orographische Korrektur für Talboden / Hang / Gipfel (insbesondere bei Inversion)
+        const windDampener = 1 / (1 + Math.max(0, w) / 16);
+        if (isInversion) {
+          if (step.tpi < -8) {
+            // Talboden: Kaltluftsee sammelt sich
+            const poolDepth = 1.5 + (lapseRatePer100m * 1.8) + (Math.abs(step.tpi) / 20);
+            t -= Math.min(5.5, poolDepth) * windDampener;
+          } else if (step.tpi > 8 && step.name.includes('Gipfel')) {
+            // Grat / Gipfel: Liegt über der Inversions-Obergrenze, deutlich wärmer
+            const ridgeWarmth = (lapseRatePer100m * 1.5) + (step.tpi / 35);
+            t += Math.min(4.0, Math.max(0.2, ridgeWarmth));
+          } else if (step.tpi === 0) {
+            // Mittelstation / Hang: Warme Hangzone / Thermal Belt
+            t += Math.min(2.5, Math.max(0.1, lapseRatePer100m * 1.1));
+          }
+        }
+
+        // FÖHN- & TALWIND-HEURISTIK im Höhenprofil (nur bei peakElevation > 800 m)
+        let stepFoehn = false;
+        let stepFoehnNote = null;
+        let stepWindNote = null;
+
+        if (peakElevation > 800) {
+          // Föhn: Bei Südwind (140..230°) oder Nordwind (320..40°), trockenadiabatischer Föhneffekt im Lee (Talboden & Mittelstation)
+          const isSouthWind = (d >= 140 && d <= 230);
+          const isNorthWind = (d >= 320 || d <= 40);
+          const isDry = stepRh <= 60;
+          const isWindy = w >= 16;
+
+          if ((isSouthWind || isNorthWind) && isDry && isWindy) {
+            if (step.z < peakElevation) {
+              const foehnBoostT = Math.min(4.0, Math.max(1.8, 1.8 + (w / 35) * 1.5));
+              const foehnBoostW = Math.min(25, Math.max(8, Math.round(w * 0.35 + 8)));
+              t += foehnBoostT;
+              w += foehnBoostW;
+              stepRh = Math.max(15, stepRh - 20);
+              stepFoehn = true;
+              stepFoehnNote = `${isSouthWind ? 'Südföhn' : 'Nordföhn'} (+${Math.round(foehnBoostT * 10) / 10}°C)`;
+              hourObj.foehnActive = true;
+            }
+          }
+
+          // Talwind (Anabatic/Katabatic): Bei klarem Himmel (cloud_cover <= 45%)
+          const cloudVal = (h.cloud_cover && h.cloud_cover[i] !== undefined) ? h.cloud_cover[i] : 50;
+          if (!stepFoehn && cloudVal <= 45) {
+            const hHour = hourObj.hour;
+            if (hHour >= 8 && hHour <= 18 && (step.name.includes('Mittelstation') || step.name.includes('Talboden'))) {
+              w += 8;
+              t += 0.8;
+              stepWindNote = 'Hangaufwind';
+            } else if ((hHour < 6 || hHour > 20) && step.name.includes('Talboden')) {
+              w += 6;
+              t -= 1.2;
+              stepWindNote = 'Hangabwind';
+            }
+          }
+        }
+
+        // Wet-Bulb Temperatur & präzise Schneefallgrenze
+        const tw = this.computeWetBulbTemp(t, stepRh);
+        let precipType = 'Regen';
+        let precipIcon = '💧';
+        let isSnow = false;
+        if (tw <= 0.5 || t <= 0.0 || step.z >= hourObj.snowLevel) {
+          precipType = 'Schnee';
+          precipIcon = '❄️';
+          isSnow = true;
+        } else if (tw <= 1.8) {
+          precipType = 'Schneeregen';
+          precipIcon = '🌨️';
+          isSnow = false;
+        } else {
+          precipType = 'Regen';
+          precipIcon = '💧';
+          isSnow = false;
+        }
         
         // Windchill-Berechnung
         let felt = t;
@@ -505,7 +1862,7 @@ export const MicroEngine = {
         // Barometrischer Druck in dieser Höhe (hPa)
         const pressHpa = Math.round(1013.25 * Math.pow(1 - (0.0065 * step.z) / 288.15, 5.255));
         const gusts = Math.round(w * 1.35);
-        const freezingDiff = Math.round(step.z - hourObj.freezingLevel);
+        const freezingDiff = Math.round(step.z - hourObj.snowLevel);
         const compassDirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
         const dirIndex = Math.floor((Math.round(d) / 22.5) + 0.5) % 16;
         const dirLabel = compassDirs[dirIndex];
@@ -516,14 +1873,20 @@ export const MicroEngine = {
           z: step.z,
           temp: Math.round(t * 10) / 10,
           feltTemp: Math.round(felt),
+          wetBulbTemp: Math.round(tw * 10) / 10,
           wind: Math.round(w),
           gusts: gusts,
           windDir: Math.round(d),
           windDirText: dirLabel,
           pressureHpa: pressHpa,
           freezingDiff: freezingDiff,
-          precipType: isSnow ? 'Schnee' : 'Regen',
-          isAboveFreezing: !isSnow
+          precipType: precipType,
+          precipIcon: precipIcon,
+          isAboveFreezing: t > 0,
+          isSnow: isSnow,
+          foehnActive: stepFoehn,
+          foehnNote: stepFoehnNote,
+          windNote: stepWindNote
         });
       }
 
@@ -534,16 +1897,30 @@ export const MicroEngine = {
   },
 
   /**
-   * STUFE 5: Multi-Modell-Vergleich (ECMWF IFS 0.25° vs. GFS Seamless)
-   * Ermöglicht hochpräzise Ensemble-Analysen und Konsens-Bewertungen
+   * STUFE 5: Multi-Modell-Vergleich & Ensemble-Konsens
+   * Priorisiert dynamisch regionale High-Res-Modelle (ICON-D2 / AROME / UKV / ICON-EU)
+   * und gewichtet diese in Städten (55%) und Bergen (50%) stärker als ECMWF (30-35%) und GFS (15%)
    */
-  async fetchMultiModelComparison(lat, lon) {
+  async fetchMultiModelComparison(lat, lon, elevation = 500, isMountain = false) {
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,precipitation,wind_speed_10m&models=ecmwf_ifs025,gfs_seamless&forecast_days=10`;
-      const data = await resilientFetch(url, {
+      const strategy = this.getRegionalModelPriority(lat, lon, elevation);
+      const queryModels = Array.from(new Set(strategy.modelsToQuery || ['icon_eu', 'ecmwf_ifs025', 'gfs_seamless'])).join(',');
+      let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,precipitation,wind_speed_10m&models=${queryModels}&forecast_days=10`;
+
+      let data = await resilientFetch(url, {
         cancelCategory: 'multi-model-forecast',
         ttlMs: 5 * 60 * 1000
       });
+
+      // Robuster Fallback auf Standard ECMWF + GFS falls regionale Modelle an Randgrenzen fehlschlagen
+      if (!data || !data.hourly) {
+        url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,precipitation,wind_speed_10m&models=ecmwf_ifs025,gfs_seamless&forecast_days=10`;
+        data = await resilientFetch(url, {
+          cancelCategory: 'multi-model-forecast-fallback',
+          ttlMs: 5 * 60 * 1000
+        });
+      }
+
       const h = data ? data.hourly : null;
       if (!h || !h.time) return null;
 
@@ -561,39 +1938,133 @@ export const MicroEngine = {
 
       // 24h Summen & Schnitte
       const next24 = Math.min(24, h.time.length - idx);
-      let ecmwfPrecipSum = 0;
-      let gfsPrecipSum = 0;
-      let ecmwfMaxWind = 0;
-      let gfsMaxWind = 0;
+      const maxSlice = 240; // 10 Tage stündlich
 
+      // 1. Regionales High-Res Modell (ICON-D2 / AROME / UKV / ICON-EU)
+      const regKey = [strategy.primaryModel, strategy.secondaryModel, 'icon_eu', 'icon_d2', 'meteofrance_arome_france', 'ukmo_seamless']
+        .find(k => k && h[`temperature_2m_${k}`] !== undefined);
+
+      let regPrecipSum = 0;
+      let regMaxWind = 0;
+      let regHourlyTemp = [];
+      let regHourlyPrecip = [];
+      let regHourlyWind = [];
+
+      if (regKey) {
+        regHourlyTemp = (h[`temperature_2m_${regKey}`] || []).slice(idx, idx + maxSlice);
+        regHourlyPrecip = (h[`precipitation_${regKey}`] || []).slice(idx, idx + maxSlice);
+        regHourlyWind = (h[`wind_speed_10m_${regKey}`] || []).slice(idx, idx + maxSlice);
+        for (let j = 0; j < next24; j++) {
+          const i = idx + j;
+          regPrecipSum += h[`precipitation_${regKey}`] ? (h[`precipitation_${regKey}`][i] || 0) : 0;
+          const w = h[`wind_speed_10m_${regKey}`] ? (h[`wind_speed_10m_${regKey}`][i] || 0) : 0;
+          if (w > regMaxWind) regMaxWind = w;
+        }
+      }
+
+      // 2. Globales ECMWF IFS 0.25°
+      let ecmwfPrecipSum = 0;
+      let ecmwfMaxWind = 0;
       for (let j = 0; j < next24; j++) {
         const i = idx + j;
         ecmwfPrecipSum += h.precipitation_ecmwf_ifs025 ? (h.precipitation_ecmwf_ifs025[i] || 0) : 0;
-        gfsPrecipSum += h.precipitation_gfs_seamless ? (h.precipitation_gfs_seamless[i] || 0) : 0;
-
         const eW = h.wind_speed_10m_ecmwf_ifs025 ? (h.wind_speed_10m_ecmwf_ifs025[i] || 0) : 0;
-        const gW = h.wind_speed_10m_gfs_seamless ? (h.wind_speed_10m_gfs_seamless[i] || 0) : 0;
         if (eW > ecmwfMaxWind) ecmwfMaxWind = eW;
+      }
+
+      // 3. Globales GFS Seamless
+      let gfsPrecipSum = 0;
+      let gfsMaxWind = 0;
+      for (let j = 0; j < next24; j++) {
+        const i = idx + j;
+        gfsPrecipSum += h.precipitation_gfs_seamless ? (h.precipitation_gfs_seamless[i] || 0) : 0;
+        const gW = h.wind_speed_10m_gfs_seamless ? (h.wind_speed_10m_gfs_seamless[i] || 0) : 0;
         if (gW > gfsMaxWind) gfsMaxWind = gW;
       }
 
-      const ecmwfTemp = h.temperature_2m_ecmwf_ifs025 ? h.temperature_2m_ecmwf_ifs025[idx] : null;
-      const gfsTemp = h.temperature_2m_gfs_seamless ? h.temperature_2m_gfs_seamless[idx] : null;
+      const ecmwfTemp = (h.temperature_2m_ecmwf_ifs025 && h.temperature_2m_ecmwf_ifs025[idx] !== undefined)
+        ? h.temperature_2m_ecmwf_ifs025[idx] : null;
+      const gfsTemp = (h.temperature_2m_gfs_seamless && h.temperature_2m_gfs_seamless[idx] !== undefined)
+        ? h.temperature_2m_gfs_seamless[idx] : null;
+      const regTemp = (regKey && h[`temperature_2m_${regKey}`] && h[`temperature_2m_${regKey}`][idx] !== undefined)
+        ? h[`temperature_2m_${regKey}`][idx] : (ecmwfTemp ?? gfsTemp);
+
+      // Gewichte dynamisch zuweisen:
+      // Für Städte: Regionales Modell (ICON-D2 / AROME / UKV) mit 55% vor ECMWF (30%) gewichtet!
+      // Für Berge: ICON-EU / AROME mit 50% vor ECMWF (35%)
+      const wReg = regKey ? strategy.weights.regional : 0;
+      const wEc = strategy.weights.ecmwf;
+      const wGfs = strategy.weights.gfs;
+      const wTotal = (wReg + wEc + wGfs) || 1;
+
+      // Gewichteter Multi-Modell Konsens
+      const weightedCurrentTemp = Math.round((((regTemp ?? 10) * wReg + (ecmwfTemp ?? 10) * wEc + (gfsTemp ?? 10) * wGfs) / wTotal) * 10) / 10;
+      const weightedPrecip24h = Math.round(((regPrecipSum * wReg + ecmwfPrecipSum * wEc + gfsPrecipSum * wGfs) / wTotal) * 10) / 10;
+      const weightedMaxWind = Math.round((regMaxWind * wReg + ecmwfMaxWind * wEc + gfsMaxWind * wGfs) / wTotal);
+
+      // Stündlicher gewichteter Vektor
+      const sliceLen = Math.min(maxSlice, h.time.length - idx);
+      const weightedHourlyTemp = [];
+      const weightedHourlyPrecip = [];
+      const weightedHourlyWind = [];
+      for (let s = 0; s < sliceLen; s++) {
+        const i = idx + s;
+        const rT = regHourlyTemp[s] ?? ecmwfTemp ?? 10;
+        const eT = (h.temperature_2m_ecmwf_ifs025 ? h.temperature_2m_ecmwf_ifs025[i] : ecmwfTemp) ?? 10;
+        const gT = (h.temperature_2m_gfs_seamless ? h.temperature_2m_gfs_seamless[i] : gfsTemp) ?? 10;
+        weightedHourlyTemp.push(Math.round(((rT * wReg + eT * wEc + gT * wGfs) / wTotal) * 10) / 10);
+
+        const rP = regHourlyPrecip[s] ?? 0;
+        const eP = (h.precipitation_ecmwf_ifs025 ? h.precipitation_ecmwf_ifs025[i] : 0) || 0;
+        const gP = (h.precipitation_gfs_seamless ? h.precipitation_gfs_seamless[i] : 0) || 0;
+        weightedHourlyPrecip.push(Math.round(((rP * wReg + eP * wEc + gP * wGfs) / wTotal) * 10) / 10);
+
+        const rW = regHourlyWind[s] ?? 10;
+        const eW = (h.wind_speed_10m_ecmwf_ifs025 ? h.wind_speed_10m_ecmwf_ifs025[i] : 10) || 10;
+        const gW = (h.wind_speed_10m_gfs_seamless ? h.wind_speed_10m_gfs_seamless[i] : 10) || 10;
+        weightedHourlyWind.push(Math.round((rW * wReg + eW * wEc + gW * wGfs) / wTotal));
+      }
 
       // Modell-Konsens / Unsicherheit (50 bis 99%)
       const tempDiff = Math.abs((ecmwfTemp !== null ? ecmwfTemp : 0) - (gfsTemp !== null ? gfsTemp : 0));
       const precipDiff = Math.abs(ecmwfPrecipSum - gfsPrecipSum);
-      const consensus = Math.max(50, Math.min(99, Math.round(100 - (tempDiff * 8 + precipDiff * 4))));
+      const consensus = Math.max(50, Math.min(99, Math.round(100 - (tempDiff * 7 + precipDiff * 3))));
 
-      const maxSlice = 240; // 10 Tage stündlich
+      const regName = strategy.displayName;
+
       return validateMultiModel({
         timestamp: h.time[idx],
         consensusScore: consensus,
         consensusText: consensus >= 88 ? 'Sehr hohe Modell-Einigkeit' : consensus >= 75 ? 'Gute Modell-Übereinstimmung' : 'Erhöhte Modell-Diskrepanz',
+        strategy: strategy,
+        weights: { regional: wReg, ecmwf: wEc, gfs: wGfs },
+        activeRegionalModel: regName,
+        regional: regKey ? {
+          id: regKey,
+          name: regName,
+          origin: strategy.origin,
+          resolution: strategy.resolution,
+          weight: wReg,
+          currentTemp: regTemp !== null ? Math.round(regTemp * 10) / 10 : null,
+          precip24h: Math.round(regPrecipSum * 10) / 10,
+          maxWind24h: Math.round(regMaxWind),
+          hourlyTemp: regHourlyTemp,
+          hourlyPrecip: regHourlyPrecip,
+          hourlyWind: regHourlyWind
+        } : null,
+        weightedConsensus: {
+          currentTemp: weightedCurrentTemp,
+          precip24h: weightedPrecip24h,
+          maxWind24h: weightedMaxWind,
+          hourlyTemp: weightedHourlyTemp,
+          hourlyPrecip: weightedHourlyPrecip,
+          hourlyWind: weightedHourlyWind
+        },
         hourlyTime: (h.time || []).slice(idx, idx + maxSlice),
         ecmwf: {
           name: 'ECMWF IFS 0.25°',
           origin: 'Europäisches Zentrum für mittelfristige Wettervorhersage (Reading)',
+          weight: wEc,
           currentTemp: ecmwfTemp !== null ? Math.round(ecmwfTemp * 10) / 10 : null,
           precip24h: Math.round(ecmwfPrecipSum * 10) / 10,
           maxWind24h: Math.round(ecmwfMaxWind),
@@ -604,6 +2075,7 @@ export const MicroEngine = {
         gfs: {
           name: 'GFS Seamless',
           origin: 'US National Oceanic & Atmospheric Administration (NOAA)',
+          weight: wGfs,
           currentTemp: gfsTemp !== null ? Math.round(gfsTemp * 10) / 10 : null,
           precip24h: Math.round(gfsPrecipSum * 10) / 10,
           maxWind24h: Math.round(gfsMaxWind),
@@ -2528,15 +4000,25 @@ export const MicroEngine = {
   }
 ,
 
-  async fetchBrightSkyCurrent(lat, lon) {
+  async fetchBrightSkyCurrent(lat, lon, elevation = 500, isMountain = false, country = null) {
     try {
+      const stationRes = await this.fetchStationData(lat, lon, { elevation, isMountain }, isMountain, country);
+      if (stationRes && stationRes.current) {
+        return {
+          ...stationRes.current,
+          station_name: stationRes.source?.station_name || 'Bodenstation',
+          network: stationRes.network || stationRes.source?.network,
+          distance: stationRes.source?.distance,
+          source: stationRes.source
+        };
+      }
       const url = `https://api.brightsky.dev/current_weather?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`;
       const res = await fetch(url);
       if (!res.ok) return null;
       const data = await res.json();
       return data.weather || null;
     } catch (e) {
-      console.warn("Bright Sky nicht erreichbar:", e.message);
+      console.warn("Stationsabruf nicht erreichbar:", e.message);
       return null;
     }
   },

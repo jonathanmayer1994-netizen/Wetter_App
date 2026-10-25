@@ -24,7 +24,25 @@ export function updateGeoRoutingNetworks() {
     if (n) n.style.borderColor = 'rgba(255, 255, 255, 0.08)';
   });
 
-  if (lat >= 47.05 && lat <= 48.0 && lon >= 9.5 && lon <= 13.5) {
+  const activeNet = state.microData?.biasCorrection?.stationNetwork;
+  const activeStation = state.microData?.biasCorrection?.stationName;
+
+  if (activeNet === 'LAWIS') {
+    if (netLawis) netLawis.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = `Geo-Routing: LAWIS (${activeStation || 'Alpen-Messnetz'}) aktiv`;
+  } else if (activeNet === 'Südtirol Open Data') {
+    if (netSuedtirol) netSuedtirol.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = `Geo-Routing: Open Data Hub Südtirol (${activeStation || 'Dolomiten'}) aktiv`;
+  } else if (activeNet === 'MeteoSwiss') {
+    if (netSlf) netSlf.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = `Geo-Routing: MeteoSwiss / SLF (${activeStation || 'Schweiz'}) aktiv`;
+  } else if (activeNet === 'Météo-France') {
+    if (netSlf) netSlf.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = `Geo-Routing: Météo-France (${activeStation || 'Frankreich'}) aktiv`;
+  } else if (activeNet === 'ZAMG') {
+    if (netLawis) netLawis.style.borderColor = 'var(--ios-cyan)';
+    if (routingBadge) routingBadge.innerText = `Geo-Routing: ZAMG GeoSphere Austria (${activeStation || 'Österreich'}) aktiv`;
+  } else if (lat >= 47.05 && lat <= 48.0 && lon >= 9.5 && lon <= 13.5) {
     if (netLawis) netLawis.style.borderColor = 'var(--ios-cyan)';
     if (netDwd) netDwd.style.borderColor = 'var(--ios-cyan)';
     if (routingBadge) routingBadge.innerText = 'Geo-Routing: LAWIS Bayern / Tirol + DWD aktiv';
@@ -36,7 +54,7 @@ export function updateGeoRoutingNetworks() {
     if (routingBadge) routingBadge.innerText = 'Geo-Routing: SLF IMIS Schweiz aktiv';
   } else {
     if (netDwd) netDwd.style.borderColor = 'var(--ios-cyan)';
-    if (routingBadge) routingBadge.innerText = 'Geo-Routing: DWD MOSMIX & Open-Meteo aktiv';
+    if (routingBadge) routingBadge.innerText = activeStation ? `Geo-Routing: DWD (${activeStation}) aktiv` : 'Geo-Routing: DWD MOSMIX & Open-Meteo aktiv';
   }
 }
 
