@@ -6577,14 +6577,19 @@ body {
 }
 
 .swt-rel-wind-badge {
-  display: inline-block;
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 3px;
   font-size: 10px;
   font-family: var(--font-mono);
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 6px;
   white-space: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .swt-rel-wind-badge.headwind {
@@ -6606,17 +6611,22 @@ body {
 }
 
 .swt-descent-badge {
-  display: inline-block;
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 3px;
   font-size: 10px;
   font-family: var(--font-mono);
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 6px;
   background: rgba(100, 210, 255, 0.16);
   border: 1px solid rgba(100, 210, 255, 0.45);
   color: #64d2ff;
   white-space: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Sportart-Auswahl (Apple-Style Glass Pills - Legacy & Helper) */
@@ -7269,11 +7279,11 @@ body {
 .swt-header,
 .swt-row {
   display: grid;
-  grid-template-columns: 180px 110px 100px 160px 120px 130px 110px;
+  grid-template-columns: minmax(180px, 1.25fr) 100px 125px 125px 115px minmax(225px, 1.4fr) 110px;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  min-width: 900px;
+  gap: 14px;
+  padding: 12px 18px;
+  min-width: 1040px;
 }
 
 .swt-header {
@@ -7283,13 +7293,13 @@ body {
   font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
 }
 
 .swt-row {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   font-size: 13px;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
   cursor: pointer;
 }
 
@@ -7307,30 +7317,244 @@ body {
   color: #fff;
 }
 
-.swt-col-time {
+.swt-col-dist-ele {
   font-family: var(--font-mono);
   color: var(--ios-cyan);
   font-weight: 600;
 }
 
-.swt-col-ele {
+.swt-col-time {
   font-family: var(--font-mono);
   color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .swt-col-cond {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .swt-col-temp {
   font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.swt-col-wind {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.swt-col-precip {
+  font-weight: 700;
+  color: var(--text-secondary);
 }
 
 .swt-row.active-waypoint {
   background: rgba(0, 229, 255, 0.16) !important;
   border-left: 3px solid var(--ios-cyan) !important;
+}
+
+/* Individual Cell Formats */
+.swt-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.swt-cell.swt-milestone {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.swt-type-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+}
+
+.swt-type-tag.tag-wpt {
+  color: var(--text-secondary);
+}
+
+.swt-type-tag.tag-start {
+  color: var(--ios-cyan);
+}
+
+.swt-type-tag.tag-finish {
+  color: #ff9f0a;
+}
+
+.swt-type-tag.tag-peak {
+  color: #bf5af2;
+}
+
+.swt-m-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swt-m-coords {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  letter-spacing: 0.2px;
+}
+
+.swt-cell.swt-dist-ele {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swt-dist {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.swt-ele {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.swt-cell.swt-time {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swt-time-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.swt-arr-time {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.swt-arr-date {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.swt-cell.swt-weather {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swt-w-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.swt-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.swt-cond {
+  font-size: 13px;
+  color: #ffffff;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swt-cell.swt-temp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swt-temp-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.swt-temp-felt {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.swt-cell.swt-wind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.swt-wind-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.swt-gusts {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.swt-cell.swt-precip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.swt-precip-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.swt-precip-mm {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.swt-snow-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(100, 210, 255, 0.18);
+  border: 1px solid rgba(100, 210, 255, 0.4);
+  color: #64d2ff;
+  width: fit-content;
 }
 
 .swt-empty-notice {

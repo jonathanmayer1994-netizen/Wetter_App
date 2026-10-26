@@ -1629,16 +1629,42 @@ export function renderSportsWaypointsTable(timeline) {
     row.dataset.idx = m.index !== undefined ? m.index : idx;
     row.dataset.km = m.distFromStartKm;
 
+    const isStart = idx === 0 || m.distFromStartKm === 0;
+    const isEnd = m.distFromStartKm >= timeline.totalDistanceKm - 0.05 || idx === visibleMilestones.length - 1;
     const isPeak = m.ele === timeline.maxElevationM;
+
     let typeTag = '📍 Wegpunkt';
+    let tagClass = 'tag-wpt';
+    let labelText = `km ${m.distFromStartKm.toFixed(1)}`;
+
     if (isCompleted) {
-      typeTag = m.distFromStartKm === 0 ? '✓ Tourstart' : '✓ Passiert';
+      typeTag = isStart ? '✓ Tourstart' : '✓ Passiert';
+      tagClass = 'tag-completed';
+      if (isStart) labelText = 'Startpunkt';
+      else if (isPeak) labelText = `Passhöhe (${Math.round(m.ele)} m)`;
+      else if (isEnd) labelText = `Zielankunft (${m.distFromStartKm.toFixed(1)} km)`;
+      else labelText = `Streckenabschnitt ${m.distFromStartKm.toFixed(1)} km`;
     } else if (isNext) {
       typeTag = '➡️ Nächster Halt';
-    } else if (m.distFromStartKm >= timeline.totalDistanceKm - 0.05) {
-      typeTag = '🏁 Zielankunft';
+      tagClass = 'tag-next';
+      if (isStart) labelText = 'Startpunkt';
+      else if (isPeak) labelText = `Passhöhe (${Math.round(m.ele)} m)`;
+      else if (isEnd) labelText = `Zielankunft (${m.distFromStartKm.toFixed(1)} km)`;
+      else labelText = `Streckenabschnitt ${m.distFromStartKm.toFixed(1)} km`;
     } else if (isPeak) {
       typeTag = '🏔️ Scheitelpunkt';
+      tagClass = 'tag-peak';
+      labelText = `Passhöhe (${Math.round(m.ele)} m)`;
+    } else if (isEnd) {
+      typeTag = '🏁 Zielankunft';
+      tagClass = 'tag-finish';
+      labelText = `Streckenende (${m.distFromStartKm.toFixed(1)} km)`;
+    } else if (isStart) {
+      typeTag = '🏁 Tourstart';
+      tagClass = 'tag-start';
+      labelText = 'Startpunkt';
+    } else {
+      labelText = `Streckenabschnitt ${m.distFromStartKm.toFixed(1)} km`;
     }
 
     let deltaHtml = '';
@@ -1647,27 +1673,46 @@ export function renderSportsWaypointsTable(timeline) {
       deltaHtml = `<span class="swt-time-delta ${dMin > 0 ? 'delta-late' : 'delta-early'}">${dMin > 0 ? '+' : ''}${dMin} min</span>`;
     }
 
+    const feltT = m.feltTempC !== undefined ? m.feltTempC : Math.round(m.tempC);
+
     row.innerHTML = `
+      <!-- 1. Streckenabschnitt -->
       <div class="swt-cell swt-milestone">
-        <span class="swt-type-tag ${isCompleted ? 'swt-completed-tag' : (isNext ? 'swt-live-next-tag' : '')}">${escapeHtml(typeTag)}</span>
-        <span class="swt-m-name">${escapeHtml(m.label)}</span>
+        <span class="swt-type-tag ${tagClass} ${isCompleted ? 'swt-completed-tag' : (isNext ? 'swt-live-next-tag' : '')}">${escapeHtml(typeTag)}</span>
+        <span class="swt-m-name">${escapeHtml(labelText)}</span>
         <span class="swt-m-coords">${m.lat.toFixed(4)}°, ${m.lon.toFixed(4)}°</span>
       </div>
+
+      <!-- 2. Distanz & Höhe -->
       <div class="swt-cell swt-dist-ele">
         <strong class="swt-dist">${m.distFromStartKm.toFixed(1)} km</strong>
         <span class="swt-ele text-cyan">${Math.round(m.ele)} m</span>
       </div>
+
+      <!-- 3. Durchgangszeit -->
       <div class="swt-cell swt-time">
-        <strong class="swt-arr-time">${escapeHtml(m.arrivalTimeStr)} ${deltaHtml}</strong>
+        <div class="swt-time-top">
+          <strong class="swt-arr-time">${escapeHtml(m.arrivalTimeStr)}</strong>
+          ${deltaHtml}
+        </div>
         <span class="swt-arr-date">${escapeHtml(m.arrivalDateStr)}</span>
       </div>
+
+      <!-- 4. Wetterlage -->
       <div class="swt-cell swt-weather">
         <div class="swt-w-top">
           <span class="swt-icon">${m.weatherIcon}</span>
-          <strong class="swt-temp">${m.tempC}°C</strong>
+          <span class="swt-cond">${escapeHtml(m.weatherCondition)}</span>
         </div>
-        <span class="swt-cond">${escapeHtml(m.weatherCondition)}</span>
       </div>
+
+      <!-- 5. Temperatur (Gefühlt) -->
+      <div class="swt-cell swt-temp">
+        <strong class="swt-temp-val">${m.tempC}°C</strong>
+        <span class="swt-temp-felt">Gefühlt ${feltT}°C</span>
+      </div>
+
+      <!-- 6. Wind & Vektor -->
       <div class="swt-cell swt-wind">
         <div class="swt-wind-top">
           <strong>${m.windKmH} km/h</strong>
@@ -1676,9 +1721,13 @@ export function renderSportsWaypointsTable(timeline) {
         ${m.relWindBadge ? `<span class="swt-rel-wind-badge ${m.relWindType || ''}">${escapeHtml(m.relWindBadge)}</span>` : ''}
         ${m.descentWindchillC !== undefined && m.descentWindchillC <= 10 && (state.sports.category === 'bike' || m.distFromStartKm > 0) ? `<span class="swt-descent-badge">🥶 Abfahrt RealFeel ${m.descentWindchillC}°C</span>` : ''}
       </div>
+
+      <!-- 7. Niederschlag -->
       <div class="swt-cell swt-precip">
-        <strong class="${m.popPercent >= 50 ? 'text-red' : (m.popPercent >= 25 ? 'text-yellow' : '')}">${m.popPercent}%</strong>
-        <span class="swt-precip-mm">${m.precipMm > 0 ? `${m.precipMm.toFixed(1)} mm` : '0 mm'}</span>
+        <div class="swt-precip-top">
+          <strong class="${m.popPercent >= 50 ? 'text-red' : (m.popPercent >= 25 ? 'text-yellow' : '')}">${m.popPercent}%</strong>
+          <span class="swt-precip-mm">${m.precipMm > 0 ? `${m.precipMm.toFixed(1)} mm` : '0 mm'}</span>
+        </div>
         ${m.isSnow ? '<span class="swt-snow-badge">❄️ Frost</span>' : ''}
       </div>
     `;
