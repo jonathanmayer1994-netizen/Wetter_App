@@ -1927,8 +1927,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-width: 60px;
+  gap: 2px;
+  min-width: 64px;
   padding: 8px 6px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
@@ -1957,18 +1957,30 @@ body {
 }
 
 .profile-hour-pill .php-time {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.1;
+  letter-spacing: -0.2px;
 }
 
-.profile-hour-pill.active .php-time {
-  color: #ffffff;
+.profile-hour-pill .php-offset {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.profile-hour-pill.active .php-offset {
+  color: #64d2ff;
+  font-weight: 700;
 }
 
 .profile-hour-pill .php-icon {
-  font-size: 18px;
-  line-height: 1.2;
+  font-size: 17px;
+  line-height: 1.1;
+  margin: 1px 0;
 }
 
 .profile-hour-pill .php-peak-temp {

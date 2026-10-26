@@ -378,11 +378,49 @@ export function setupWallSelector() {
 // VERTIKALES HÖHENPROFIL (TAL VS. BERG: 4 HÖHENSTUFEN + SMARTE ZEITSTEUERUNG)
 // =============================================================================
 
+/**
+ * Stellt sicher, dass das Höhenprofil immer bei der aktuellen Stunde beginnt
+ * (schützt auch bei veraltetem Cache oder ungefilterten API-Rohdaten)
+ */
+export function getAlignedAltitudeProfiles() {
+  if (!state.microData || !state.microData.altitudeProfile || !Array.isArray(state.microData.altitudeProfile)) {
+    return [];
+  }
+  const profiles = state.microData.altitudeProfile;
+  if (profiles.length === 0) return [];
+
+  const nowMs = Date.now();
+  const firstTime = profiles[0]?.time ? new Date(profiles[0].time).getTime() : 0;
+  // Falls die erste Stunde mehr als 45 Minuten von jetzt abweicht (z. B. Start bei 00:00 Uhr):
+  if (firstTime > 0 && Math.abs(firstTime - nowMs) > 2700000) {
+    let bestIdx = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < profiles.length; i++) {
+      if (profiles[i]?.time) {
+        const diff = Math.abs(new Date(profiles[i].time).getTime() - nowMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestIdx = i;
+        }
+      }
+    }
+    if (bestIdx > 0) {
+      const aligned = profiles.slice(bestIdx);
+      state.microData.altitudeProfile = aligned;
+      return aligned;
+    }
+  }
+
+  return profiles;
+}
+
 export function renderAltitudeChart() {
   const container = document.getElementById('altitude-levels-container');
-  if (!container || !state.microData || !state.microData.altitudeProfile) return;
+  if (!container || !state.microData) return;
 
-  const profiles = state.microData.altitudeProfile;
+  const profiles = getAlignedAltitudeProfiles();
+  if (!profiles || profiles.length === 0) return;
+
   const currentProfile = profiles[state.selectedAltitudeHour] || profiles[0];
 
   container.innerHTML = '';
@@ -547,14 +585,15 @@ export function setupMountainControls() {
 // Abwärtskompatibler Alias
 export const setupMountain3DControls = setupMountainControls;
 
-// 24h Interaktiver Mini-Stundenstreifen mit realer fortlaufender Uhrzeit
+// 24h Interaktiver Mini-Stundenstreifen mit realer fortlaufender Uhrzeit und (+1h) darunter
 export function renderAltitudeHoursScroller() {
   const scroller = document.getElementById('profile-hours-scroller');
-  if (!scroller || !state.microData || !state.microData.altitudeProfile) return;
+  if (!scroller || !state.microData) return;
 
-  const profiles = state.microData.altitudeProfile;
+  const profiles = getAlignedAltitudeProfiles();
+  if (!profiles || profiles.length === 0) return;
+
   const hRaw = state.weatherData ? state.weatherData.hourly : null;
-
   scroller.innerHTML = '';
 
   profiles.forEach((p, idx) => {
@@ -566,6 +605,7 @@ export function renderAltitudeHoursScroller() {
     const timeDate = new Date(p.time);
     const hourNum = timeDate.getHours();
     const timeStr = `${String(hourNum).padStart(2, '0')}:00`;
+    const offsetStr = idx === 0 ? '(Jetzt)' : `(+${idx}h)`;
 
     // Wetter-Icon für die jeweilige Stunde (präzise WMO / Day / Night Zuordnung)
     let icon = '⛅';
@@ -584,6 +624,7 @@ export function renderAltitudeHoursScroller() {
 
     pill.innerHTML = `
       <span class="php-time">${timeStr}</span>
+      <span class="php-offset">${offsetStr}</span>
       <span class="php-icon">${icon}</span>
       <span class="php-peak-temp">${peakFormatted}</span>
     `;
@@ -600,8 +641,10 @@ export function renderAltitudeHoursScroller() {
 
 // Zentrale Stundenauswahl-Funktion
 export function selectAltitudeHour(hourIndex, shouldScroll = true) {
-  if (!state.microData || !state.microData.altitudeProfile) return;
-  const profiles = state.microData.altitudeProfile;
+  if (!state.microData) return;
+  const profiles = getAlignedAltitudeProfiles();
+  if (!profiles || profiles.length === 0) return;
+
   const maxHour = Math.max(0, profiles.length - 1);
 
   // Clampen zwischen 0 und maxHour

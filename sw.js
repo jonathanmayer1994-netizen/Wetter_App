@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.2.0-nordic';
+const CACHE_NAME = 'best-weather-v2.3.1-alpine-hours';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 

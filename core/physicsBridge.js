@@ -14,7 +14,7 @@ class PhysicsBridge {
   init() {
     if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
       try {
-        this.worker = new Worker('./physics.worker.js');
+        this.worker = new Worker('./physics.worker.js?v=2.3.1');
         this.worker.onmessage = (e) => {
           const { id, status, data, error } = e.data || {};
           const handler = this.pending.get(id);
