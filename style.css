@@ -860,6 +860,49 @@ body {
   font-size: 24px;
   font-weight: 700;
   color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.hero-snowline-row {
+  margin-top: -2px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+}
+
+/* Stadt-Wetter: Dezent, weniger prominent, unaufdringlich */
+.hero-snowline-city {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  opacity: 0.78;
+  letter-spacing: 0.2px;
+}
+
+/* Berg-Wetter: Deutlicher (alpine Glass-Pill), aber kompakt und nicht riesig */
+.hero-snowline-mountain {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(100, 210, 255, 0.16);
+  border: 1px solid rgba(100, 210, 255, 0.38);
+  color: #64d2ff;
+  letter-spacing: 0.2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  width: fit-content;
+}
+
+.hero-snowline-mountain.freezing {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .hero-high-low {
@@ -1906,6 +1949,11 @@ body {
   background: rgba(10, 132, 255, 0.25);
   border-color: var(--ios-blue);
   box-shadow: 0 0 14px rgba(10, 132, 255, 0.45);
+}
+
+.profile-hour-pill.is-now:not(.active) {
+  border-color: rgba(10, 132, 255, 0.35);
+  background: rgba(10, 132, 255, 0.08);
 }
 
 .profile-hour-pill .php-time {

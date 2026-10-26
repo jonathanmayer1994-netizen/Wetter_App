@@ -241,10 +241,6 @@ export function renderOverviewTab() {
         conditionLabel = 'Leichter Regen';
       }
     }
-
-    if (snowLevel && (state.currentLocation.isMountain || snowLevel < 3500)) {
-      conditionLabel += ` (SFG: ~${Math.round(snowLevel).toLocaleString('de-DE')} m)`;
-    }
   } else {
     // Trocken: Cloud-Cover in die Bedingung einbeziehen (Hero und Karte konsistent)
     const cloud = cur.cloud_cover !== undefined ? cur.cloud_cover : (w.hourly && w.hourly.cloud_cover ? w.hourly.cloud_cover[0] : 0);
@@ -253,10 +249,6 @@ export function renderOverviewTab() {
     else if (cloud >= 25) conditionLabel = 'Teilweise bewölkt';
     else if (cloud < 15 && (cur.weather_code === 0 || cur.weather_code === 1)) conditionLabel = 'Klar / Wolkenlos';
     else conditionLabel = code.label;
-
-    if (state.currentLocation.isMountain && freezingLevel) {
-      conditionLabel += ` (0°C: ~${Math.round(freezingLevel).toLocaleString('de-DE')} m)`;
-    }
   }
 
   // Föhn- & Talwind-Status im Hero anzeigen
@@ -282,6 +274,31 @@ export function renderOverviewTab() {
   }
 
   document.getElementById('hero-condition-text').innerText = conditionLabel;
+
+  // Schneefallgrenze & Nullgradgrenze darstellen:
+  // - Vollständig ausgeschrieben ("Schneefallgrenze: ~1.422 m")
+  // - Bei Stadtwetter dezent & weniger prominent
+  // - Bei Bergwetter deutlicher (alpine Pill), aber nicht riesig
+  const snowlineEl = document.getElementById('hero-snowline-row');
+  if (snowlineEl) {
+    const isMountain = !!state.currentLocation.isMountain;
+    if (isPrecip && snowLevel && (isMountain || snowLevel < 3500)) {
+      const sfgVal = Math.round(snowLevel).toLocaleString('de-DE');
+      snowlineEl.style.display = 'flex';
+      if (isMountain) {
+        snowlineEl.innerHTML = `<span class="hero-snowline-mountain">❄️ Schneefallgrenze: ~${sfgVal} m</span>`;
+      } else {
+        snowlineEl.innerHTML = `<span class="hero-snowline-city">❄️ Schneefallgrenze: ~${sfgVal} m</span>`;
+      }
+    } else if (!isPrecip && isMountain && freezingLevel) {
+      const flVal = Math.round(freezingLevel).toLocaleString('de-DE');
+      snowlineEl.style.display = 'flex';
+      snowlineEl.innerHTML = `<span class="hero-snowline-mountain freezing">🧊 Nullgradgrenze: ~${flVal} m</span>`;
+    } else {
+      snowlineEl.style.display = 'none';
+      snowlineEl.innerHTML = '';
+    }
+  }
 
   if (daily && daily.temperature_2m_max && daily.temperature_2m_max.length > 0) {
     document.getElementById('hero-temp-max').innerText = `${Math.round(convertTemp(daily.temperature_2m_max[0]))}°`;

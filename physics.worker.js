@@ -299,15 +299,34 @@ function computeAltitudeProfileFull({ weatherData, peakElevation }) {
     { name: 'Freie Atmosphäre', z: highZ, icon: '🦅', tpi: 15 }
   ];
 
+  // Finde den Index der aktuellen Stunde
+  const nowMs = Date.now();
+  let startIdx = 0;
+  let minDiff = Infinity;
+  for (let i = 0; i < Math.min(48, h.time.length); i++) {
+    const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
+    if (diff < minDiff) {
+      minDiff = diff;
+      startIdx = i;
+    }
+  }
+
+  const maxSteps = Math.min(25, h.time.length - startIdx);
   const hourlyProfiles = [];
-  for (let i = 0; i < Math.min(24, h.time.length); i++) {
+  for (let step = 0; step < maxSteps; step++) {
+    const i = startIdx + step;
     const timeStr = h.time[i];
     const { lapseRatePer100m, isInversion } = calculatePressureLapseRate(h, i, peakElevation);
     const { snowLevelMeters, freezingLevelMeters } = calculateWetBulbSnowLevel(h, i, peakElevation);
 
+    const hourNum = new Date(timeStr).getHours();
     const hourObj = {
+      offset: step,
+      rawIndex: i,
       time: timeStr,
-      hour: new Date(timeStr).getHours(),
+      hour: hourNum,
+      weatherCode: (h.weather_code && h.weather_code[i] !== undefined) ? h.weather_code[i] : null,
+      isDay: (h.is_day && h.is_day[i] !== undefined) ? h.is_day[i] === 1 : (hourNum >= 6 && hourNum <= 20),
       freezingLevel: freezingLevelMeters,
       snowLevel: snowLevelMeters,
       precip: h.precipitation ? h.precipitation[i] : 0,

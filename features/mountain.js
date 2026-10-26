@@ -547,7 +547,7 @@ export function setupMountainControls() {
 // Abwärtskompatibler Alias
 export const setupMountain3DControls = setupMountainControls;
 
-// 24h Interaktiver Mini-Stundenstreifen
+// 24h Interaktiver Mini-Stundenstreifen mit realer fortlaufender Uhrzeit
 export function renderAltitudeHoursScroller() {
   const scroller = document.getElementById('profile-hours-scroller');
   if (!scroller || !state.microData || !state.microData.altitudeProfile) return;
@@ -559,19 +559,22 @@ export function renderAltitudeHoursScroller() {
 
   profiles.forEach((p, idx) => {
     const pill = document.createElement('button');
-    pill.className = `profile-hour-pill ${idx === state.selectedAltitudeHour ? 'active' : ''}`;
+    pill.className = `profile-hour-pill ${idx === state.selectedAltitudeHour ? 'active' : ''} ${idx === 0 ? 'is-now' : ''}`;
     pill.type = 'button';
     pill.dataset.hour = idx;
 
     const timeDate = new Date(p.time);
     const hourNum = timeDate.getHours();
-    const timeStr = idx === 0 ? 'Jetzt' : `${String(hourNum).padStart(2, '0')}:00`;
+    const timeStr = `${String(hourNum).padStart(2, '0')}:00`;
 
-    // Wetter-Icon für die jeweilige Stunde
+    // Wetter-Icon für die jeweilige Stunde (präzise WMO / Day / Night Zuordnung)
     let icon = '⛅';
-    if (hRaw && hRaw.weather_code && hRaw.weather_code[idx] !== undefined) {
-      const codeInfo = WMO_CODES[hRaw.weather_code[idx]];
-      if (codeInfo) icon = codeInfo.icon;
+    const rawIdx = p.rawIndex !== undefined ? p.rawIndex : idx;
+    const code = (p.weatherCode !== null && p.weatherCode !== undefined) ? p.weatherCode : (hRaw?.weather_code?.[rawIdx] ?? 0);
+    const codeInfo = WMO_CODES[code];
+    if (codeInfo) {
+      const isDay = p.isDay !== undefined ? p.isDay : (hourNum >= 6 && hourNum <= 20);
+      icon = isDay ? codeInfo.icon : (codeInfo.iconNight || codeInfo.icon);
     }
 
     // Gipfeltemperatur für diese Stunde
@@ -584,6 +587,8 @@ export function renderAltitudeHoursScroller() {
       <span class="php-icon">${icon}</span>
       <span class="php-peak-temp">${peakFormatted}</span>
     `;
+
+    pill.title = idx === 0 ? `Jetzt (${timeStr} Uhr)` : (idx === 24 ? `Morgen (${timeStr} Uhr)` : `+${idx} Std. (${timeStr} Uhr)`);
 
     pill.addEventListener('click', () => {
       selectAltitudeHour(idx, true);
@@ -616,17 +621,24 @@ export function selectAltitudeHour(hourIndex, shouldScroll = true) {
     const t = new Date(curProfile.time);
     const timeStr = `${String(t.getHours()).padStart(2, '0')}:00 Uhr`;
     if (timeLabel) {
-      timeLabel.innerText = h === 0 ? `Jetzt (${timeStr})` : `+${h} Std. (${timeStr})`;
+      if (h === 0) {
+        timeLabel.innerText = `Jetzt (${timeStr})`;
+      } else if (h === 24 || (h >= 23 && h === maxHour)) {
+        timeLabel.innerText = `Morgen (${timeStr})`;
+      } else {
+        timeLabel.innerText = `+${h} Std. (${timeStr})`;
+      }
     }
   } else if (timeLabel) {
-    timeLabel.innerText = h === 0 ? 'Jetzt' : `+${h} Stunden`;
+    timeLabel.innerText = h === 0 ? 'Jetzt' : (h === 24 ? 'Morgen' : `+${h} Stunden`);
   }
 
   // 2. Schnellauswahl-Pills synchronisieren
   const quickPills = document.querySelectorAll('#profile-quick-times-bar .quick-time-pill');
   quickPills.forEach(pill => {
     const pillHour = parseInt(pill.dataset.hour);
-    if (pillHour === h) {
+    const isMatch = (pillHour === h) || (pillHour >= 23 && h >= 23 && (pillHour === 23 || pillHour === 24) && (h === 24 || h === maxHour));
+    if (isMatch) {
       pill.classList.add('active');
     } else {
       pill.classList.remove('active');
@@ -674,8 +686,12 @@ export function setupAltitudeTimeControls() {
     quickBar.addEventListener('click', (e) => {
       const pill = e.target.closest('.quick-time-pill');
       if (!pill) return;
-      const targetHour = parseInt(pill.dataset.hour);
+      let targetHour = parseInt(pill.dataset.hour);
       if (!isNaN(targetHour)) {
+        if (state.microData && state.microData.altitudeProfile) {
+          const maxH = state.microData.altitudeProfile.length - 1;
+          if (targetHour >= 23 && targetHour > maxH) targetHour = maxH;
+        }
         selectAltitudeHour(targetHour, true);
       }
     });
