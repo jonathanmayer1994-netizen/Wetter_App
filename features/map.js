@@ -1848,13 +1848,20 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
         </div>
       `;
 
+      let gustTooltipColor = color;
+      if (gust >= 80) gustTooltipColor = '#6b21a8';
+      else if (gust >= 60) gustTooltipColor = '#b91c1c';
+      else if (gust >= 40) gustTooltipColor = '#c2410c';
+      else if (spd >= 25) gustTooltipColor = '#0369a1';
+      else gustTooltipColor = '#047857';
+
       const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [48, 12] });
       const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
       m.bindTooltip(`
-        <div style="font-family:sans-serif; color:#0f172a; padding:4px;">
-          <strong>${st.name} • ${st.isMountain ? '🏔️ Gipfel' : '🏡 Tal'} (${st.elevation} m)</strong><br>
-          Wind: <b>${spd} km/h</b> • Spitzenböen: <b style="color:${color}">${gust} km/h</b><br>
-          Richtung: <b>${dir}°</b> • ${bftClass}
+        <div style="color:#0f172a; padding:2px; line-height:1.45;">
+          <strong style="color:#000000; font-size:12.5px;">${st.name} • ${st.isMountain ? '🏔️ Gipfel' : '🏡 Tal'} (${st.elevation} m)</strong><br>
+          Wind: <b>${spd} km/h</b> • Spitzenböen: <b style="color:${gustTooltipColor}; font-weight:800;">${gust} km/h</b><br>
+          Richtung: <b>${dir}°</b> • <span>${bftClass}</span>
         </div>
       `, { direction: 'top', offset: [0, -10] });
       m.on('click', () => selectExactLocation(st));
@@ -1931,7 +1938,12 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
             iconAnchor: [12, 12]
           });
           const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
-          m.bindTooltip(`⚠️ <strong>${st.name} (+${frame.hoursFromNow}h)</strong><br>Konvektives Gewitterrisiko • Niederschlag: ${st.precip} mm/h`);
+          m.bindTooltip(`
+            <div style="color:#0f172a; padding:2px; line-height:1.45;">
+              ⚠️ <strong style="color:#b91c1c; font-size:12.5px;">${st.name} (+${frame.hoursFromNow}h)</strong><br>
+              Konvektives Gewitterrisiko • Niederschlag: <b>${st.precip} mm/h</b>
+            </div>
+          `, { direction: 'top', offset: [0, -10] });
         }
       });
 
@@ -1978,7 +1990,12 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
         icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [38, 12] })
       }).addTo(state.map.weatherLayerGroup);
 
-      m.bindTooltip(`<strong>${st.name} (${st.elevation} m)</strong><br>${desc} (${c}% Wolkenbedeckung)`);
+      m.bindTooltip(`
+        <div style="color:#0f172a; padding:2px; line-height:1.45;">
+          <strong style="color:#000000; font-size:12.5px;">${st.name} (${st.elevation} m)</strong><br>
+          ${desc} (<b>${c}%</b> Wolkenbedeckung)
+        </div>
+      `, { direction: 'top', offset: [0, -10] });
       m.on('click', () => selectExactLocation(st));
     });
 
@@ -2030,7 +2047,20 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
         icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [42, 12] })
       }).addTo(state.map.weatherLayerGroup);
 
-      m.bindTooltip(`<strong>${st.name} (${st.elevation} m)</strong><br>Temperatur: <b>${tVal.toFixed(1)}°C</b> • ${isFrost ? '❄️ Frostgrenze (< 0°C)' : '💧 Tauwetter (> 0°C)'}`);
+      let tempTooltipColor = color;
+      if (tVal < -5) tempTooltipColor = '#1d4ed8';
+      else if (tVal <= 0) tempTooltipColor = '#0284c7';
+      else if (tVal >= 25) tempTooltipColor = '#b91c1c';
+      else if (tVal >= 18) tempTooltipColor = '#c2410c';
+      else if (tVal >= 10) tempTooltipColor = '#b45309';
+      else tempTooltipColor = '#15803d';
+
+      m.bindTooltip(`
+        <div style="color:#0f172a; padding:2px; line-height:1.45;">
+          <strong style="color:#000000; font-size:12.5px;">${st.name} (${st.elevation} m)</strong><br>
+          Temperatur: <b style="color:${tempTooltipColor}; font-weight:800;">${tVal.toFixed(1)}°C</b> • ${isFrost ? '❄️ Frostgrenze (< 0°C)' : '💧 Tauwetter (> 0°C)'}
+        </div>
+      `, { direction: 'top', offset: [0, -10] });
       m.on('click', () => selectExactLocation(st));
     });
 
@@ -2076,7 +2106,11 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
         icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [44, 12] })
       }).addTo(state.map.weatherLayerGroup);
 
-      m.bindTooltip(`<strong>${st.name}</strong>: ${p.toFixed(1)} hPa QNH (${tag})`);
+      m.bindTooltip(`
+        <div style="color:#0f172a; padding:2px; line-height:1.45;">
+          <strong style="color:#000000; font-size:12.5px;">${st.name}</strong>: <b>${p.toFixed(1)} hPa QNH</b> (${tag})
+        </div>
+      `, { direction: 'top', offset: [0, -10] });
       m.on('click', () => selectExactLocation(st));
     });
 
