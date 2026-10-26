@@ -390,25 +390,22 @@ export function getAlignedAltitudeProfiles() {
   if (profiles.length === 0) return [];
 
   const nowMs = Date.now();
-  const firstTime = profiles[0]?.time ? new Date(profiles[0].time).getTime() : 0;
-  // Falls die erste Stunde mehr als 45 Minuten von jetzt abweicht (z. B. Start bei 00:00 Uhr):
-  if (firstTime > 0 && Math.abs(firstTime - nowMs) > 2700000) {
-    let bestIdx = 0;
-    let minDiff = Infinity;
-    for (let i = 0; i < profiles.length; i++) {
-      if (profiles[i]?.time) {
-        const diff = Math.abs(new Date(profiles[i].time).getTime() - nowMs);
-        if (diff < minDiff) {
-          minDiff = diff;
-          bestIdx = i;
-        }
+  let bestIdx = 0;
+  let minDiff = Infinity;
+  for (let i = 0; i < profiles.length; i++) {
+    if (profiles[i]?.time) {
+      const diff = Math.abs(new Date(profiles[i].time).getTime() - nowMs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestIdx = i;
       }
     }
-    if (bestIdx > 0) {
-      const aligned = profiles.slice(bestIdx);
-      state.microData.altitudeProfile = aligned;
-      return aligned;
-    }
+  }
+
+  if (bestIdx > 0) {
+    const aligned = profiles.slice(bestIdx);
+    state.microData.altitudeProfile = aligned;
+    return aligned;
   }
 
   return profiles;
@@ -748,5 +745,31 @@ export function setupAltitudeSlider() {
 
 export function updateAltitudeSliderLabel() {
   selectAltitudeHour(state.selectedAltitudeHour, false);
+}
+
+// Dynamische automatische Anpassung an die Jetzt-Zeit (fortlaufend in die Zukunft)
+if (typeof window !== 'undefined') {
+  let lastCheckedHour = new Date().getHours();
+  setInterval(() => {
+    const curH = new Date().getHours();
+    if (curH !== lastCheckedHour) {
+      lastCheckedHour = curH;
+      if (state.currentTab === 'tab-mountain' && state.microData) {
+        renderAltitudeHoursScroller();
+        selectAltitudeHour(state.selectedAltitudeHour || 0, false);
+      }
+    }
+  }, 30000);
+
+  window.addEventListener('focus', () => {
+    const curH = new Date().getHours();
+    if (curH !== lastCheckedHour) {
+      lastCheckedHour = curH;
+      if (state.currentTab === 'tab-mountain' && state.microData) {
+        renderAltitudeHoursScroller();
+        selectAltitudeHour(state.selectedAltitudeHour || 0, false);
+      }
+    }
+  });
 }
 
