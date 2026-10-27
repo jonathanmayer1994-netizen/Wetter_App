@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.3.4-no-zoom-input';
+const CACHE_NAME = 'best-weather-v2.3.5-mobile-sports-fix';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 
