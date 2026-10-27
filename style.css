@@ -2763,6 +2763,15 @@ body {
   box-shadow: none;
 }
 
+/* Dedicated Mobile Fullscreen Close Button (Hidden on Desktop by default) */
+.map-mobile-close-btn {
+  display: none;
+}
+
+.mpw-mobile-toggle-btn {
+  display: none;
+}
+
 .fullscreen-map-wrapper {
   position: relative;
   width: 100%;
@@ -5291,93 +5300,560 @@ body {
     gap: 8px;
   }
 
-  .fullscreen-map-wrapper {
-    height: 580px;
-    min-height: 540px;
+  /* =============================================================================
+   * MOBILE FULLSCREEN MAP MODE & 100% ERGONOMIC CONTROLS
+   * ============================================================================= */
+
+  /* Wenn die Vollbild-Karte mobil aktiv ist: Menüleiste & Header vollständig ausblenden */
+  body.mobile-map-fullscreen-active {
+    overflow: hidden !important;
+    touch-action: pan-x pan-y !important;
   }
 
+  body.mobile-map-fullscreen-active .mobile-bottom-nav,
+  body.mobile-map-fullscreen-active .app-header,
+  body.mobile-map-fullscreen-active .main-tab-bar,
+  body.mobile-map-fullscreen-active #hero-hazard-alert,
+  body.mobile-map-fullscreen-active .spotlight-banner {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+
+  body.mobile-map-fullscreen-active .main-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  body.mobile-map-fullscreen-active #tab-map {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+    z-index: 99990 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    background: #0f172a !important;
+  }
+
+  body.mobile-map-fullscreen-active .map-view-card {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+  }
+
+  body.mobile-map-fullscreen-active .map-view-card > .card-header {
+    display: none !important;
+  }
+
+  body.mobile-map-fullscreen-active .fullscreen-map-wrapper {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    z-index: 99995 !important;
+  }
+
+  body.mobile-map-fullscreen-active #interactive-map {
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+  }
+
+  /* Dedicated Mobile Close "X" Button */
+  .map-mobile-close-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top, 10px));
+    right: 10px;
+    z-index: 100005;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.90);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 12px rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .map-mobile-close-btn:active {
+    transform: scale(0.90);
+    background: rgba(239, 68, 68, 0.45);
+    border-color: rgba(239, 68, 68, 0.8);
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+  }
+
+  .map-mobile-close-btn .mmcb-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  /* 1. Mobile Floating Topbar (Wetter-Overlays & Basiskarten) */
   .map-floating-topbar {
-    top: 10px;
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top, 10px));
     left: 10px;
-    right: 10px;
-    padding: 6px 10px;
-    gap: 8px;
-  }
-
-  .map-legend-card {
-    top: 60px;
-    right: 10px;
-    padding: 6px 10px;
-  }
-
-  .legend-gradient-bar {
-    width: 130px;
-  }
-
-  .modern-radar-player {
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
-    padding: 10px 12px;
-    gap: 8px;
-  }
-
-  .radar-time-banner {
-    font-size: 11px;
-  }
-
-  .radar-jump-btn {
-    font-size: 9px;
-    padding: 2px 6px;
-  }
-
-  .map-floating-zoom-dock {
-    top: auto;
-    bottom: 95px;
-    right: 10px;
-    padding: 4px;
-    gap: 3px;
-  }
-
-  .map-zoom-action-btn {
-    width: 32px;
-    height: 32px;
-  }
-
-  .map-left-hud-stack {
-    top: 58px;
-    left: 10px;
-    max-width: calc(100% - 20px);
+    right: 64px; /* Lässt exakt 54px Freiraum für den 44px Schließen-Button */
+    z-index: 100002;
+    padding: 5px 8px;
     gap: 6px;
+    background: rgba(15, 23, 42, 0.90);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 24px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
+  .map-floating-topbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mft-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .mft-label {
+    font-size: 9.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    letter-spacing: 0.4px;
+    margin-right: 2px;
+  }
+
+  .map-overlay-btn,
+  .map-base-btn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    min-height: 32px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .map-overlay-btn.active,
+  .map-base-btn.active {
+    background: rgba(56, 189, 248, 0.28);
+    border-color: rgba(56, 189, 248, 0.7);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+  }
+
+  /* 2. Floating HUD: Windkompass (Oben links) & Point Weather Card (Unten links über Player) */
+  .map-left-hud-stack {
+    display: contents !important;
+  }
+
+  /* Windkompass — 100% Perfekt auf Mobile abgestimmt (Weder zu groß noch zu klein!) */
   .map-wind-compass-widget {
-    top: auto;
-    left: auto;
-    padding: 8px 12px;
-    gap: 10px;
-    max-width: 100%;
-  }
-
-  .map-point-weather-card {
-    padding: 8px 10px;
-  }
-
-  .mpw-temp-val {
-    font-size: 18px;
-  }
-
-  .mpw-condition-icon {
-    font-size: 22px;
+    position: fixed !important;
+    top: calc(max(10px, env(safe-area-inset-top, 10px)) + 50px) !important;
+    left: 10px !important;
+    z-index: 100001 !important;
+    width: fit-content !important;
+    min-width: unset !important;
+    max-width: 240px !important;
+    padding: 6px 10px !important;
+    gap: 10px !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   }
 
   .mwc-compass-dial {
     width: 44px;
     height: 44px;
+    flex-shrink: 0;
+  }
+
+  .mwc-outer-ring {
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  }
+
+  .mwc-cardinal {
+    font-size: 7.5px;
+    font-weight: 800;
+  }
+
+  .mwc-needle-arrow {
+    font-size: 13px;
+    color: #38bdf8;
+    filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.8));
+  }
+
+  .mwc-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .mwc-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mwc-badge {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+  }
+
+  .mwc-dir-chip {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .mwc-speed-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
   }
 
   .mwc-speed-val {
-    font-size: 18px;
+    font-size: 19px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .mwc-speed-unit {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .mwc-gust-box {
+    margin-left: 6px;
+    font-size: 9.5px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .mwc-desc {
+    font-size: 9.5px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+
+  /* Tipp auf Windkompass wechselt in kompakten Modus */
+  .map-wind-compass-widget.compact .mwc-desc,
+  .map-wind-compass-widget.compact .mwc-header {
+    display: none;
+  }
+  .map-wind-compass-widget.compact {
+    padding: 5px 10px;
+    gap: 8px;
+  }
+
+  /* Point Weather Card on Mobile — Sitzt ergonomisch unten links über dem Player */
+  .map-point-weather-card {
+    position: fixed !important;
+    top: auto !important;
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 195px) !important;
+    left: 10px !important;
+    z-index: 100001 !important;
+    width: fit-content !important;
+    min-width: unset !important;
+    max-width: calc(100vw - 75px) !important;
+    background: rgba(15, 23, 42, 0.90) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 16px !important;
+    padding: 6px 10px !important;
+    gap: 5px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  .mpw-header {
+    padding-bottom: 4px;
+  }
+
+  .mpw-name {
+    font-size: 12px;
+    font-weight: 700;
+    max-width: 120px;
+  }
+
+  .mpw-badge {
+    font-size: 8.5px;
+    padding: 1px 5px;
+  }
+
+  .mpw-elevation-chip {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+
+  .mpw-time-badge {
+    font-size: 8.5px;
+    padding: 1px 5px;
+  }
+
+  .mpw-mobile-toggle-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 2px;
+  }
+
+  .mpw-temp-val {
+    font-size: 17px;
+  }
+
+  .mpw-condition-icon {
+    font-size: 20px;
+  }
+
+  .mpw-condition-label {
+    font-size: 9.5px;
+    max-width: 80px;
+  }
+
+  .mpw-metric-pill {
+    font-size: 9.5px;
+    padding: 2px 4px;
+  }
+
+  .mpw-front-motion {
+    padding: 3px 6px;
+    font-size: 9.5px;
+  }
+
+  /* Auf Mobile standardmäßig als ultra-kompakte Kapsel; per Klick aufklappbar */
+  .map-point-weather-card.collapsed .mpw-body,
+  .map-point-weather-card.collapsed .mpw-front-motion {
+    display: none !important;
+  }
+  .map-point-weather-card.collapsed {
+    padding: 5px 10px;
+  }
+  .map-point-weather-card.collapsed .mpw-header {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  /* 3. Floating Zoom Dock (Rechte Seite über dem Player verankert — KEINE Kollision) */
+  .map-floating-zoom-dock {
+    position: fixed !important;
+    top: auto !important;
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 195px) !important;
+    right: 10px !important;
+    z-index: 100001 !important;
+    padding: 3px !important;
+    gap: 4px !important;
+    border-radius: 16px !important;
+    background: rgba(15, 23, 42, 0.88) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  .map-zoom-action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+  }
+
+  .map-zoom-action-btn:active {
+    transform: scale(0.92);
+    background: rgba(56, 189, 248, 0.3);
+  }
+
+  /* 4. Niederschlags- & Farb-Legende (Auf Mobile ausgeblendet, um den Screen nicht zu überfrachten) */
+  .map-legend-card {
+    display: none !important;
+  }
+
+  .legend-title {
+    font-size: 8.5px;
+    font-weight: 700;
+  }
+
+  .legend-gradient-bar {
+    width: 95px;
+    height: 5px;
+    margin: 3px 0;
+  }
+
+  .legend-scale-labels {
+    font-size: 7.5px;
+    width: 95px;
+  }
+
+  /* 5. 48h Radar Timeline Player (Unten verankert) */
+  .modern-radar-player {
+    position: fixed;
+    bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    left: 10px;
+    right: 10px;
+    z-index: 100002;
+    padding: 8px 10px;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 18px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+
+  .radar-mode-chip {
+    font-size: 9.5px;
+    padding: 2px 7px;
+  }
+
+  .radar-time-banner {
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+
+  .radar-slider-container {
+    padding: 2px 4px;
+  }
+
+  .radar-timeline-markers {
+    font-size: 8.5px;
+    padding: 0 4px;
+    margin-top: 2px;
+  }
+
+  .radar-transport-btns {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .radar-play-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 14px;
+    border-radius: 50%;
+  }
+
+  .radar-transport-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+    border-radius: 50%;
+  }
+
+  .radar-speed-btn {
+    padding: 3px 8px;
+    font-size: 10px;
+    border-radius: 12px;
+  }
+
+  .radar-jump-pills-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex: 1;
+    min-width: 0;
+  }
+  .radar-jump-pills-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .radar-jump-pills {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .radar-jump-btn {
+    font-size: 9.5px;
+    font-weight: 600;
+    padding: 4px 8px;
+    min-height: 26px;
+    border-radius: 12px;
+    flex-shrink: 0;
   }
 }
 

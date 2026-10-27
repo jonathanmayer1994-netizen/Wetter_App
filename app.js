@@ -14,7 +14,7 @@ import { validateLocation } from './core/contracts.js';
 // Domain Feature Modules (Task 1a)
 import { setupLocationTypeToggle, updateLocationHeaderUI, updateAlpineSkyIllumination, renderOverviewTab, setupExpertModeToggle, renderMultiModelComparison, renderAirQualityAndUV, setupMeteogramControls, openDayDetailModal, convertTemp, setupHourlyGranularityToggle } from './features/overview.js';
 import { setupWallSelector, setupAltitudeSlider, setupMountainControls, setupMountain3DControls, setupWebcamModal, renderAdaptiveTab2 } from './features/mountain.js';
-import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard } from './features/map.js';
+import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard, enterMobileMapFullscreen, exitMobileMapFullscreen } from './features/map.js';
 import { setupGPXInspector, setupSportsTab } from './features/sports.js';
 import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers } from './features/search.js';
 import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandlers } from './features/favorites.js';
@@ -51,6 +51,9 @@ export function hydrateTab(tabId) {
 // TAB CONTROLLER & PAGE VISIBILITY
 // =============================================================================
 export function switchTab(tabId) {
+  if (state.activeTab && state.activeTab !== 'tab-map') {
+    state.previousTab = state.activeTab;
+  }
   state.activeTab = tabId;
   document.querySelectorAll('.tab-btn, .mbn-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === tabId));
@@ -60,20 +63,50 @@ export function switchTab(tabId) {
 
   if (tabId !== 'tab-map') {
     if (state.map?.radarPlaying) stopRadarAnimation();
+    exitMobileMapFullscreen();
   }
 
   if (tabId === 'tab-map') {
+    const isMobile = window.innerWidth <= 768 || window.matchMedia('(max-width: 768px)').matches;
+    if (isMobile) {
+      enterMobileMapFullscreen();
+    }
     setTimeout(() => {
       if (state.map.instance) {
         state.map.instance.invalidateSize();
         if (state.currentLocation) state.map.instance.panTo([state.currentLocation.lat, state.currentLocation.lon], { animate: false });
       }
-    }, 100);
+    }, 80);
+    setTimeout(() => {
+      if (state.map.instance) {
+        state.map.instance.invalidateSize();
+      }
+    }, 250);
   }
 }
 
 export function setupTabs() {
-  document.querySelectorAll('.tab-btn, .mbn-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+  document.querySelectorAll('.tab-btn, .mbn-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.dataset.tab;
+      if (tabId === 'tab-map' && btn.classList.contains('mbn-btn')) {
+        enterMobileMapFullscreen();
+      }
+      switchTab(tabId);
+    });
+  });
+
+  window.addEventListener('resize', () => {
+    if (state.activeTab === 'tab-map') {
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile && !document.body.classList.contains('mobile-map-fullscreen-active')) {
+        enterMobileMapFullscreen();
+      } else if (!isMobile && document.body.classList.contains('mobile-map-fullscreen-active')) {
+        exitMobileMapFullscreen();
+      }
+    }
+  });
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       if (state.canvasEngine) state.canvasEngine.pause();

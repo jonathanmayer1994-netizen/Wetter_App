@@ -10,9 +10,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Best Weather">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
-  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.3.2">
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2.3.2">
+  <link rel="manifest" href="manifest.json?v=2.3.2">
   <meta name="theme-color" content="#0d1b2a">
 
   <!-- Typography -->
@@ -1250,6 +1250,11 @@
             <div id="interactive-map"></div>
             <canvas id="wind-flow-canvas" class="wind-flow-canvas" role="img" aria-label="Animiertes Windströmungsfeld auf der Wetterkarte" style="display:none;"></canvas>
 
+            <!-- Dedicated Mobile Fullscreen Close Button (Tipp auf X schließt die Vollbild-Karte und kehrt zum Menü zurück) -->
+            <button class="map-mobile-close-btn" id="map-mobile-close-btn" type="button" title="Vollbild-Karte schließen" aria-label="Karte schließen">
+              <span class="mmcb-icon">✕</span>
+            </button>
+
             <!-- 1. SLEEK FLOATING TOP DOCK (WETTER-EBENEN, KARTENSTIL & ACTIONS) -->
             <div class="map-floating-topbar" id="map-floating-topbar">
               <!-- Overlay Switcher Pills -->
@@ -1321,6 +1326,7 @@
                   <div class="mpw-meta">
                     <span class="mpw-elevation-chip" id="mpw-elevation-chip">520 m</span>
                     <span class="mpw-time-badge live" id="mpw-time-badge">LIVE</span>
+                    <button class="mpw-mobile-toggle-btn" id="mpw-mobile-toggle-btn" type="button" aria-label="Details ein-/ausklappen" title="Details minimieren">▾</button>
                   </div>
                 </div>
                 <div class="mpw-body">
@@ -2530,7 +2536,7 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.3.1"></script>
+  <script type="module" src="app.js?v=2.3.2"></script>
 
   <!-- Service Worker Registration für Alpine Offline PWA -->
   <script>

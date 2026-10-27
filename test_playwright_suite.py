@@ -91,10 +91,16 @@ def run_tests():
             ("tab-overview", "tab-overview")
         ]
         for tab_attr, expected_pane_id in mbn_tabs:
+            if not mobile_page.is_visible(f".mbn-btn[data-tab='{tab_attr}']"):
+                if mobile_page.is_visible("#map-mobile-close-btn"):
+                    mobile_page.click("#map-mobile-close-btn")
+                    mobile_page.wait_for_timeout(200)
             mobile_page.click(f".mbn-btn[data-tab='{tab_attr}']")
             mobile_page.wait_for_timeout(200)
             is_active = mobile_page.eval_on_selector(f"#{expected_pane_id}", "el => el.classList.contains('active')")
             report(f"Mobile bottom nav '{tab_attr}' activates #{expected_pane_id}", is_active)
+            if tab_attr == "tab-map":
+                report("Mobile map entered full screen and close button is visible", mobile_page.is_visible("#map-mobile-close-btn"))
             
         mobile_page.close()
 

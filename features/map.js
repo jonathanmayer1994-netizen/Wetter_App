@@ -174,6 +174,112 @@ export function initLeafletMap() {
       }
     }, 100);
   });
+
+  // 12. Mobile Vollbild-Karte und Ergonomie Setup (Schließen-Button, Point-Weather & Windkompass Toggles)
+  setupMobileMapFullscreen();
+}
+
+/**
+ * Aktiviert den mobilen Vollbildmodus für die Karte:
+ * Versteckt die Menüleiste und Header, maximiert die Karte auf 100vw x 100dvh
+ * und passt die Leaflet-Größe dynamisch an.
+ */
+export function enterMobileMapFullscreen() {
+  document.body.classList.add('mobile-map-fullscreen-active');
+  const wrapper = document.getElementById('fullscreen-map-wrapper');
+  if (wrapper) wrapper.classList.add('is-fullscreen');
+
+  if (state.map?.instance) {
+    state.map.instance.invalidateSize();
+    setTimeout(() => {
+      if (state.map?.instance) state.map.instance.invalidateSize();
+    }, 80);
+    setTimeout(() => {
+      if (state.map?.instance) state.map.instance.invalidateSize();
+    }, 250);
+  }
+}
+
+/**
+ * Beendet den mobilen Vollbildmodus für die Karte.
+ */
+export function exitMobileMapFullscreen() {
+  document.body.classList.remove('mobile-map-fullscreen-active');
+  const wrapper = document.getElementById('fullscreen-map-wrapper');
+  if (wrapper) wrapper.classList.remove('is-fullscreen');
+
+  if (state.map?.instance) {
+    state.map.instance.invalidateSize();
+    setTimeout(() => {
+      if (state.map?.instance) state.map.instance.invalidateSize();
+    }, 100);
+  }
+}
+
+/**
+ * Schließt die Vollbild-Karte und wechselt zum vorherigen Tab (oder Übersicht).
+ */
+export function closeMobileMapFullscreen() {
+  exitMobileMapFullscreen();
+  const targetTab = (state.previousTab && state.previousTab !== 'tab-map') ? state.previousTab : 'tab-overview';
+  const targetBtn = document.querySelector(`.tab-btn[data-tab="${targetTab}"], .mbn-btn[data-tab="${targetTab}"]`);
+  if (targetBtn) {
+    targetBtn.click();
+  } else {
+    const overviewBtn = document.querySelector('[data-tab="tab-overview"]');
+    if (overviewBtn) overviewBtn.click();
+  }
+}
+
+/**
+ * Initialisiert Event-Listener für mobilen Vollbild-Schließen-Button und interaktive HUD-Toggles
+ */
+export function setupMobileMapFullscreen() {
+  const closeBtn = document.getElementById('map-mobile-close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeMobileMapFullscreen();
+    });
+  }
+
+  // Keyboard Escape listener
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('mobile-map-fullscreen-active')) {
+      closeMobileMapFullscreen();
+    }
+  });
+
+  // Mobile Point Weather Card toggle (minimieren / maximieren)
+  const pwCard = document.getElementById('map-point-weather-card');
+  const pwToggle = document.getElementById('mpw-mobile-toggle-btn');
+  if (pwCard) {
+    const header = pwCard.querySelector('.mpw-header');
+    const toggleHandler = (e) => {
+      if (window.innerWidth <= 768) {
+        e.stopPropagation();
+        pwCard.classList.toggle('collapsed');
+        const isCol = pwCard.classList.contains('collapsed');
+        if (pwToggle) {
+          pwToggle.innerText = isCol ? '▴' : '▾';
+          pwToggle.setAttribute('title', isCol ? 'Details vergrößern' : 'Details minimieren');
+        }
+      }
+    };
+    if (pwToggle) pwToggle.addEventListener('click', toggleHandler);
+    if (header) header.addEventListener('click', toggleHandler);
+  }
+
+  // Mobile Wind Compass tap toggle (compact mode)
+  const windWidget = document.getElementById('map-wind-compass-widget');
+  if (windWidget) {
+    windWidget.addEventListener('click', () => {
+      if (window.innerWidth <= 768) {
+        windWidget.classList.toggle('compact');
+      }
+    });
+  }
 }
 
 /**
