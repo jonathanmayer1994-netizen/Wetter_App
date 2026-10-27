@@ -8,11 +8,11 @@
   
   <!-- Apple Web App Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Best Weather">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.3.2">
-  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2.3.2">
-  <link rel="manifest" href="manifest.json?v=2.3.2">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.3.3">
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2.3.3">
+  <link rel="manifest" href="manifest.json?v=2.3.3">
   <meta name="theme-color" content="#0d1b2a">
 
   <!-- Typography -->
@@ -26,12 +26,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.3.3">
 </head>
 <body class="weather-clear-day">
   <!-- Dynamic Atmospheric Background Canvas -->
   <canvas id="weather-canvas" role="img" aria-label="Dynamischer Wetterhintergrund mit Partikelanimation"></canvas>
   <div id="ambient-glow" class="ambient-glow"></div>
+
+  <!-- iOS Safe Area Status Bar Guard to prevent content blur below Dynamic Island / status bar -->
+  <div class="ios-status-bar-guard" aria-hidden="true"></div>
 
   <!-- Main Responsive Layout Wrapper (Dynamic for iPhone, iPad & Desktop) -->
   <div class="app-layout">
@@ -39,7 +42,7 @@
     <!-- Top Global App Bar -->
     <header class="global-navbar">
       <div class="nav-brand">
-        <img src="apple-touch-icon.png" alt="Best Weather Logo" class="brand-logo">
+        <img src="apple-touch-icon.png?v=2.3.3" alt="Best Weather Logo" class="brand-logo" width="38" height="38">
         <div class="brand-text">
           <span class="brand-title">Best Weather</span>
           <span class="brand-badge" id="location-type-badge">📍 Ort</span>
