@@ -294,8 +294,17 @@ export function setupSearch(options = {}) {
   let debounceTimer = null;
 
   input.addEventListener('focus', () => {
+    if (window.scrollX !== 0) {
+      window.scrollTo(0, window.scrollY);
+    }
     if (input.value.trim().length < 2) {
       renderSearchRecentsAndPresetsDropdown();
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    if (window.scrollX !== 0) {
+      window.scrollTo(0, window.scrollY);
     }
   });
 

@@ -155,6 +155,8 @@ body {
   flex-direction: column;
   padding: max(20px, calc(env(safe-area-inset-top, 0px) + 20px)) 24px calc(60px + env(safe-area-inset-bottom, 0px)) 24px;
   gap: 20px;
+  box-sizing: border-box;
+  overflow-x: clip;
 }
 
 .main-container {
@@ -232,6 +234,7 @@ body {
 
 .search-input-box {
   width: 100%;
+  box-sizing: border-box;
   position: relative;
   display: flex;
   align-items: center;
@@ -271,7 +274,7 @@ body {
   outline: none;
   color: #ffffff;
   font-family: var(--font-main);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
 }
 
@@ -4973,10 +4976,17 @@ body {
   .search-input-box {
     height: 44px;
     padding: 0 14px;
+    box-sizing: border-box;
   }
 
   .search-input-box input {
-    font-size: 14px;
+    font-size: 16px !important;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 
   .header-gps-pill .hgp-text {
@@ -7011,7 +7021,7 @@ body {
   color: #ffffff;
   padding: 10px 14px;
   font-family: var(--font-main);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   outline: none;
   min-height: 44px;
@@ -7355,7 +7365,7 @@ body {
   color: #ffffff;
   padding: 8px 12px;
   font-family: var(--font-main);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   outline: none;
   min-height: 40px;
