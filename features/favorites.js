@@ -131,10 +131,10 @@ export function renderFavoritesTab() {
   const gpsCard = document.getElementById('favorites-gps-card');
   const gpsSub = document.getElementById('fgc-status-desc');
   if (gpsCard && gpsSub) {
-    const isCurrentGps = state.currentLocation && state.currentLocation.name === 'Mein Standort';
+    const isCurrentGps = state.currentLocation && (state.currentLocation.isGps || state.currentLocation.name.startsWith('Mein Standort'));
     gpsCard.classList.toggle('active-gps', !!isCurrentGps);
     if (isCurrentGps) {
-      gpsSub.innerText = `🟢 Aktiv ausgewählt (${state.currentLocation.elevation} m) • Tippen zum Aktualisieren`;
+      gpsSub.innerText = `🟢 Aktiv ausgewählt (${state.currentLocation.name} • ${state.currentLocation.elevation} m) • Tippen zum Aktualisieren`;
     } else {
       gpsSub.innerText = 'Gerätestandort & Berghöhe live per GPS ermitteln';
     }

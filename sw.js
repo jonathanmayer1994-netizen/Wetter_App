@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.6.0-consolidated-mountain-cockpit';
+const CACHE_NAME = 'best-weather-v2.7.0-default-gps-location';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 

@@ -6,14 +6,18 @@ import { dispatcher, ACTIONS } from './dispatcher.js';
 import { OFFICIAL_KNOWN_ELEVATIONS } from './constants.js';
 import { AlpineStorage } from '../storage.js';
 
+const LAST_GPS_KEY = 'best_weather_last_gps';
+const cachedGpsLocation = AlpineStorage.safeGetItem(LAST_GPS_KEY, null);
+
 export const state = {
-  currentLocation: {
-    name: 'München',
+  currentLocation: cachedGpsLocation || {
+    name: 'Mein Standort',
     lat: 48.1374,
     lon: 11.5755,
     elevation: 520,
     country: 'Deutschland',
-    isMountain: false
+    isMountain: false,
+    isGps: true
   },
   weatherData: null,
   microData: null,

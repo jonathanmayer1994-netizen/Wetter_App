@@ -220,12 +220,15 @@ export function determineIfMountain(name, featureCode, elevation) {
   return false;
 }
 
-export function triggerExactGps() {
+export function triggerExactGps(options = {}) {
+  const isStartup = !!(options && options.isStartup);
   const quickGpsBtn = document.getElementById('quick-gps-btn');
   const gpsBtn = document.getElementById('gps-btn');
 
   if (!('geolocation' in navigator)) {
-    alert('Geolocation wird von diesem Browser nicht unterstützt.');
+    if (!isStartup) {
+      alert('Geolocation wird von diesem Browser nicht unterstützt.');
+    }
     return;
   }
 
@@ -257,13 +260,42 @@ export function triggerExactGps() {
         }
       } catch(e) {}
 
-      selectExactLocation({
-        name: 'Mein Standort',
+      let locationName = 'Mein Standort';
+      try {
+        const revRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}&localityLanguage=de`);
+        if (revRes.ok) {
+          const revData = await revRes.json();
+          const place = revData.locality || revData.city || revData.principalSubdivision;
+          if (place) {
+            locationName = `Mein Standort (${place})`;
+          }
+        }
+      } catch (e) {}
+
+      const locObj = {
+        name: locationName,
         lat: lat,
         lon: lon,
         elevation: gpsElev,
-        isMountain: gpsElev >= 1000
-      });
+        isMountain: gpsElev >= 1000,
+        isGps: true
+      };
+
+      // In persistent storage sichern für sofortigen Start beim nächsten Öffnen
+      AlpineStorage.safeSetItem('best_weather_last_gps', locObj);
+
+      // Falls beim Start bereits fast identische Koordinaten geladen sind, nur Objekt aktualisieren
+      const isAlreadyLoaded = isStartup && state.weatherData &&
+        state.currentLocation &&
+        Math.abs(state.currentLocation.lat - lat) < 0.005 &&
+        Math.abs(state.currentLocation.lon - lon) < 0.005;
+
+      if (!isAlreadyLoaded) {
+        selectExactLocation(locObj);
+      } else {
+        state.currentLocation = locObj;
+        if (window.renderFavoritesTab) window.renderFavoritesTab();
+      }
     },
     (err) => {
       if (quickGpsBtn) {
@@ -272,8 +304,10 @@ export function triggerExactGps() {
         if (txt) txt.innerText = 'Mein Standort';
       }
       if (gpsBtn) gpsBtn.style.opacity = '1';
-      console.warn('GPS location error:', err);
-      alert('GPS-Standort konnte nicht ermittelt werden. Bitte Standortfreigabe prüfen.');
+      console.warn('GPS location notice:', err);
+      if (!isStartup) {
+        alert('GPS-Standort konnte nicht ermittelt werden. Bitte Standortfreigabe in den Geräteeinstellungen prüfen.');
+      }
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );

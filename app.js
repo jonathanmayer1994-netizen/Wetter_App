@@ -16,9 +16,10 @@ import { setupLocationTypeToggle, updateLocationHeaderUI, updateAlpineSkyIllumin
 import { setupWallSelector, setupAltitudeSlider, setupMountainControls, setupMountain3DControls, setupWebcamModal, renderAdaptiveTab2 } from './features/mountain.js';
 import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard, enterMobileMapFullscreen, exitMobileMapFullscreen } from './features/map.js';
 import { setupGPXInspector, setupSportsTab, initSportsTour } from './features/sports.js';
-import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers } from './features/search.js';
+import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers, triggerExactGps } from './features/search.js';
 import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandlers } from './features/favorites.js';
 import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/networks.js';
+import { AlpineStorage } from './storage.js';
 
 // Central Dispatcher Event Bus Subscriptions
 export function setupDispatcherSubscriptions() {
@@ -251,5 +252,16 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSourcesQuickNav();
   setupExpertModeToggle();
 
-  loadLocation(state.currentLocation);
+  // DEFAULT LOCATION: Beim Öffnen immer aktueller GPS-Standort des Geräts
+  const cachedGps = AlpineStorage.safeGetItem('best_weather_last_gps', null);
+  if (cachedGps) {
+    loadLocation(cachedGps);
+  } else {
+    loadLocation(state.currentLocation);
+  }
+
+  // Live-Standort via GPS ermitteln & synchronisieren
+  if ('geolocation' in navigator) {
+    triggerExactGps({ isStartup: true });
+  }
 });
