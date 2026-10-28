@@ -872,7 +872,7 @@
 
             <!-- Haupt-Kategorie Wähler (2 Sportarten: Rad & Berge) -->
             <div class="athlete-category-selector" id="athlete-category-selector">
-              <button type="button" class="athlete-cat-card active" id="sport-cat-bike" data-category="bike">
+              <button type="button" class="athlete-cat-card" id="sport-cat-bike" data-category="bike">
                 <div class="acc-icon-wrap">🚴</div>
                 <div class="acc-content">
                   <div class="acc-title-row">
@@ -882,7 +882,7 @@
                   <p class="acc-desc">Rennrad, Gravel, Mountainbike & E-Bike</p>
                 </div>
               </button>
-              <button type="button" class="athlete-cat-card" id="sport-cat-mountain" data-category="mountain">
+              <button type="button" class="athlete-cat-card active" id="sport-cat-mountain" data-category="mountain">
                 <div class="acc-icon-wrap">🏔️</div>
                 <div class="acc-content">
                   <div class="acc-title-row">
@@ -896,7 +896,7 @@
 
             <!-- Stufenlose Geschwindigkeits- & Höhenmeter-Steuerung (Slider & Stepper) -->
             <!-- RAD CONTROLS -->
-            <div class="athlete-tuning-panel" id="athlete-bike-controls">
+            <div class="athlete-tuning-panel" id="athlete-bike-controls" style="display: none;">
               <div class="atp-header">
                 <div class="atp-title">
                   <span class="atp-icon">🚴</span>
@@ -924,7 +924,7 @@
             </div>
 
             <!-- BERGE CONTROLS -->
-            <div class="athlete-tuning-panel" id="athlete-mountain-controls" style="display: none;">
+            <div class="athlete-tuning-panel" id="athlete-mountain-controls">
               <!-- Horizontale Marschgeschwindigkeit -->
               <div class="atp-subblock">
                 <div class="atp-header">
@@ -1052,6 +1052,9 @@
                   </div>
                   <input type="file" id="sports-file-input" accept=".gpx" style="display:none;">
                 </div>
+              </div>
+            </div>
+
             <!-- LIVE-TOUR & IN-FLIGHT TRACKING COCKPIT BAR -->
             <div class="sports-live-tracking-panel" id="sports-live-tracking-panel">
               <div class="sltp-main">
@@ -2574,7 +2577,7 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.3.2"></script>
+  <script type="module" src="app.js?v=2.4.0"></script>
 
   <!-- Service Worker Registration für Alpine Offline PWA -->
   <script>

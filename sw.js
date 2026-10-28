@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.3.5-mobile-sports-fix';
+const CACHE_NAME = 'best-weather-v2.4.0-allgaeu-presets';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 
@@ -24,6 +24,7 @@ const STATIC_ASSETS = [
   './core/state.js',
   './core/constants.js',
   './core/contracts.js',
+  './core/googleSheetsSync.js',
   './core/backgroundCanvas.js',
   './core/weatherTourCache.js',
   './core/physicsBridge.js',

@@ -3480,6 +3480,26 @@ export const MicroEngine = {
           status: '🟢 Live HD'
         }
       ],
+      'gruenten': [
+        {
+          id: 'cam-gr-gipfel',
+          title: 'Grünten Jägerdenkmal (1.738 m) • Allgäuer Wächter',
+          elevation: '1.738 m',
+          viewDir: 'Süd-Südwest (SSW)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/gruenten/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/gruenten/',
+          status: '🟢 Live HD'
+        },
+        {
+          id: 'cam-gr-nebelhorn',
+          title: 'Nebelhorn Gipfel (2.224 m) • Allgäuer Hochalpen',
+          elevation: '2.224 m',
+          viewDir: 'Südost (SO)',
+          thumbUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/current/720.jpg',
+          streamUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/',
+          status: '🟢 Live HD'
+        }
+      ],
       'grossglockner': [
         {
           id: 'cam-gg-freiwand',
@@ -3558,6 +3578,7 @@ export const MicroEngine = {
     if (key.includes('zugspitze') || key.includes('garmisch')) return registry['zugspitze'];
     if (key.includes('watzmann') || key.includes('berchtesgaden')) return registry['watzmann'];
     if (key.includes('nebelhorn') || key.includes('oberstdorf')) return registry['nebelhorn'];
+    if (key.includes('gruenten') || key.includes('grünten') || key.includes('rettenberg') || key.includes('burgberg')) return registry['gruenten'];
     if (key.includes('glockner')) return registry['grossglockner'];
     if (key.includes('wendelstein')) return registry['wendelstein'];
     if (key.includes('bozen') || key.includes('meran') || key.includes('dolomit') || key.includes('kronplatz')) return registry['kronplatz'];

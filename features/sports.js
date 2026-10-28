@@ -103,6 +103,7 @@ export function setupGPXInspector() {
       const tourId = btn.dataset.tour;
       const sample = MicroEngine.getSampleGPXTrack(tourId);
       processGPXTrack(sample.xml, sample.name);
+      loadSportsPresetTour(tourId);
     });
   });
 
@@ -292,7 +293,7 @@ export function renderGPXElevationSVG(parsed) {
 
   // Basis-Temperatur aus aktuellem Wetter (oder 12°C auf 500m)
   const baseT = state.weatherData ? (state.weatherData.current ? state.weatherData.current.temperature_2m : 12) : 12;
-  const baseElev = state.currentLocation.elevation || 500;
+  const baseElev = (state.currentLocation && state.currentLocation.elevation) ? state.currentLocation.elevation : 500;
 
   const getX = dKm => padL + (dKm / totalDist) * plotW;
   const getY = ele => padT + plotH - ((ele - minZ) / rangeZ) * plotH;
@@ -390,30 +391,35 @@ export function updateSportsStartTime(newDateStr, newTimeStr) {
   recomputeSportsTimeline();
 }
 
+export function setAthleteCategory(cat) {
+  state.sports.category = cat;
+  state.sports.sportType = cat === 'bike' ? 'road_bike' : 'hiking';
+
+  const catCards = document.querySelectorAll('.athlete-cat-card');
+  catCards.forEach(c => c.classList.toggle('active', c.dataset.category === cat));
+
+  const bikePanel = document.getElementById('athlete-bike-controls');
+  const mtnPanel = document.getElementById('athlete-mountain-controls');
+  if (bikePanel) bikePanel.style.display = cat === 'bike' ? 'block' : 'none';
+  if (mtnPanel) mtnPanel.style.display = cat === 'mountain' ? 'block' : 'none';
+
+  // Synchronisiere versteckte Legacy-Pills für Tests
+  document.querySelectorAll('.sport-pill').forEach(sp => {
+    sp.classList.toggle('active', sp.dataset.sport === state.sports.sportType);
+  });
+
+  updateSportPaceBadges();
+  recomputeSportsTimeline();
+}
+
 export function setupSportsTab() {
   // 1. ATHLETEN-KATEGORIE WÄHLER (Rad & Berge)
   const catCards = document.querySelectorAll('.athlete-cat-card');
-  const bikePanel = document.getElementById('athlete-bike-controls');
-  const mtnPanel = document.getElementById('athlete-mountain-controls');
 
   catCards.forEach(card => {
     card.addEventListener('click', () => {
-      catCards.forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
       const cat = card.dataset.category; // 'bike' oder 'mountain'
-      state.sports.category = cat;
-      state.sports.sportType = cat === 'bike' ? 'road_bike' : 'hiking';
-
-      if (bikePanel) bikePanel.style.display = cat === 'bike' ? 'block' : 'none';
-      if (mtnPanel) mtnPanel.style.display = cat === 'mountain' ? 'block' : 'none';
-
-      // Synchronisiere versteckte Legacy-Pills für Tests
-      document.querySelectorAll('.sport-pill').forEach(sp => {
-        sp.classList.toggle('active', sp.dataset.sport === state.sports.sportType);
-      });
-
-      updateSportPaceBadges();
-      recomputeSportsTimeline();
+      setAthleteCategory(cat);
     });
   });
 
@@ -863,12 +869,18 @@ export async function initSportsTour() {
   state.sports.initialized = true;
   // Feature 3B: Prüfe offline zwischengespeicherte Tour
   const cachedTour = await WeatherTourCache.getCachedTour();
-  if (cachedTour && cachedTour.gpxXml && cachedTour.tourName) {
-    loadAndComputeSportsTour(cachedTour.gpxXml, cachedTour.tourName);
+  const isValidAllgaeuTour = cachedTour && cachedTour.tourName && (
+    cachedTour.tourName.includes('Nebelhorn') || cachedTour.tourName.includes('Grünten')
+  );
+
+  if (cachedTour && cachedTour.gpxXml && cachedTour.tourName && isValidAllgaeuTour) {
+    state.sports.gpxName = cachedTour.tourName;
+    setAthleteCategory('mountain');
+    await loadAndComputeSportsTour(cachedTour.gpxXml, cachedTour.tourName);
   } else {
-    // Standard-Tour: Nebelhorn Gipfelsteig (Allgäu • 2.224 m)
+    // Standard-Tour: Nebelhorn Rundtour (Allgäu • 2.224 m)
     const defaultTour = 'nebelhorn-oberstdorf';
-    loadSportsPresetTour(defaultTour);
+    await loadSportsPresetTour(defaultTour);
   }
 }
 
@@ -877,6 +889,18 @@ export async function loadSportsPresetTour(tourId) {
   if (!sample) return;
   state.sports.activeTour = tourId;
   state.sports.gpxName = sample.name;
+
+  // Nebelhorn und Grünten sind alpine Bergtouren: automatisch Kategorie 'Berge' aktivieren
+  setAthleteCategory('mountain');
+
+  // Synchronisiere Buttons in beiden Ansichten (Sports-Tab & GPX-Modal)
+  document.querySelectorAll('.sports-route-preset').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tour === tourId);
+  });
+  document.querySelectorAll('.gpx-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tour === tourId);
+  });
+
   await loadAndComputeSportsTour(sample.xml, sample.name);
 }
 

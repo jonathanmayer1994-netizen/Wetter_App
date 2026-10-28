@@ -15,6 +15,7 @@ export const OFFICIAL_KNOWN_ELEVATIONS = {
   'feldberg': { elevation: 1493, isMountain: true, country: 'Deutschland' },
   'brocken': { elevation: 1141, isMountain: true, country: 'Deutschland' },
   'nebelhorn': { elevation: 2224, isMountain: true, country: 'Deutschland' },
+  'gruenten': { elevation: 1738, isMountain: true, country: 'Deutschland' },
 
   // Städte & Flachland
   'münchen': { elevation: 520, isMountain: false, country: 'Deutschland' },

@@ -51,8 +51,8 @@ export const state = {
   canvasEngine: null,
   sports: {
     initialized: false,
-    category: 'bike', // 'bike' oder 'mountain'
-    sportType: 'road_bike',
+    category: 'mountain', // 'bike' oder 'mountain' (Allgäuer Berg-Default)
+    sportType: 'hiking',
     fitnessLevel: 'normal',
     bikeSpeedKmH: 26.0,
     mountainSpeedKmH: 4.0,
@@ -70,7 +70,7 @@ export const state = {
     timeDeltaMinutes: 0,
     actualStartTimeMs: null,
     gpxText: null,
-    gpxName: 'Nebelhorn Gipfelsteig (2.224 m)',
+    gpxName: 'Nebelhorn Rundtour (2.224 m)',
     parsedGPX: null,
     timeline: null,
     hazards: null,

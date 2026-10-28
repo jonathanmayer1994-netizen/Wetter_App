@@ -66,8 +66,20 @@ export function switchTab(tabId) {
     exitMobileMapFullscreen();
   }
 
-  if (tabId === 'tab-sports' && !state.sports.initialized) {
-    initSportsTour();
+  if (tabId === 'tab-sports') {
+    if (!state.sports.initialized) {
+      initSportsTour();
+    }
+    setTimeout(() => {
+      if (state.sports.map) {
+        state.sports.map.invalidateSize();
+        if (state.sports.routeLine) {
+          try {
+            state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [35, 35] });
+          } catch (_) {}
+        }
+      }
+    }, 150);
   }
 
   if (tabId === 'tab-map') {
@@ -190,7 +202,8 @@ window.loadNamedMountain = (name) => {
     'mont blanc': { name: 'Mont Blanc', lat: 45.8326, lon: 6.8652, elevation: 4808, country: 'Frankreich', isMountain: true },
     'großglockner': { name: 'Großglockner', lat: 47.0742, lon: 12.6947, elevation: 3798, country: 'Österreich', isMountain: true },
     'grossglockner': { name: 'Großglockner', lat: 47.0742, lon: 12.6947, elevation: 3798, country: 'Österreich', isMountain: true },
-    'nebelhorn': { name: 'Nebelhorn', lat: 47.4219, lon: 10.3444, elevation: 2224, country: 'Deutschland', isMountain: true }
+    'nebelhorn': { name: 'Nebelhorn', lat: 47.4219, lon: 10.3444, elevation: 2224, country: 'Deutschland', isMountain: true },
+    'gruenten': { name: 'Grünten', lat: 47.5458, lon: 10.3168, elevation: 1738, country: 'Deutschland', isMountain: true }
   };
   const key = (name || '').toLowerCase().trim();
   const target = presets[key] || (state.favorites && state.favorites.find(f => f.name.toLowerCase().includes(key)));

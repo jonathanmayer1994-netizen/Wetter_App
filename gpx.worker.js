@@ -179,6 +179,13 @@ function parseGPXFast(xmlString) {
   // Adaptive Ramer-Douglas-Peucker Decimation: reduces 20.000+ points to ~400-800 key points
   const decimatedPoints = points.length > 500 ? rdpDecimate(points, 7.5) : points;
 
+  // SAC/DAV Marschzeit: 4 km/h flach + 400 Hm/h Anstieg
+  const distHours = (totalDistanceM / 1000) / 4.0;
+  const ascHours = totalAscentM / 400.0;
+  const totalHours = Math.max(distHours, ascHours) + 0.5 * Math.min(distHours, ascHours);
+  const hFormatted = Math.floor(totalHours);
+  const mFormatted = Math.round((totalHours - hFormatted) * 60);
+
   return {
     success: true,
     name: trackName,
@@ -189,6 +196,7 @@ function parseGPXFast(xmlString) {
     totalDescentM: Math.round(totalDescentM),
     minElevationM: Math.round(minEle),
     maxElevationM: Math.round(maxEle),
+    estimatedDuration: `${hFormatted} h ${mFormatted} min`,
     points,
     decimatedPoints
   };

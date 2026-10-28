@@ -47,14 +47,28 @@ export const GoogleSheetsSync = {
     if (!this.isConnected()) return { success: false, error: 'Keine gültige Google Apps Script URL konfiguriert.' };
 
     try {
-      const fetchUrl = `${url}${url.includes('?') ? '&' : '?'}action=get_all&_t=${Date.now()}`;
-      const res = await fetch(fetchUrl, {
-        method: 'GET',
-        redirect: 'follow'
-      });
+      let data = null;
+      try {
+        const fetchUrl = `${url}${url.includes('?') ? '&' : '?'}action=get_all&_t=${Date.now()}`;
+        const res = await fetch(fetchUrl, {
+          method: 'GET',
+          redirect: 'follow'
+        });
+        if (res.ok) data = await res.json();
+      } catch (_) {}
 
-      if (!res.ok) throw new Error(`HTTP Fehler ${res.status}`);
-      const data = await res.json();
+      // Fallback via POST falls GET durch Cross-Origin / Redirects geblockt wird
+      if (!data) {
+        try {
+          const postRes = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'get_all', timestamp: new Date().toISOString() }),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            redirect: 'follow'
+          });
+          if (postRes.ok) data = await postRes.json();
+        } catch (_) {}
+      }
 
       if (data && data.favoriten && Array.isArray(data.favoriten)) {
         // Favoriten synchronisieren
@@ -64,7 +78,6 @@ export const GoogleSheetsSync = {
       this.setLastSync();
       return { success: true, data };
     } catch (err) {
-      console.warn('Google Sheets Pull Fehler:', err);
       return { success: false, error: err.message };
     }
   },
