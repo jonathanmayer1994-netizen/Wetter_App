@@ -7,6 +7,7 @@
 import { state } from '../core/state.js';
 import { AlpineStorage } from '../storage.js';
 import { escapeHtml } from '../httpClient.js';
+import { GoogleSheetsSync } from '../core/googleSheetsSync.js';
 
 const STORAGE_KEY = 'best_weather_favorites_v4';
 
@@ -28,6 +29,45 @@ export function setupFavorites(options = {}) {
   if (addBtn) addBtn.addEventListener('click', toggleFavoriteCurrent);
   if (favToggle) favToggle.addEventListener('click', toggleFavoriteCurrent);
 
+  // Google Sheets Cloud Sync Handlers
+  const gsheetsInput = document.getElementById('gsheets-url-input');
+  const gsheetsSaveBtn = document.getElementById('gsheets-save-btn');
+  const gsheetsSyncBtn = document.getElementById('gsheets-sync-now-btn');
+
+  if (gsheetsSaveBtn && gsheetsInput) {
+    gsheetsSaveBtn.addEventListener('click', async () => {
+      const url = gsheetsInput.value.trim();
+      GoogleSheetsSync.setUrl(url);
+      if (GoogleSheetsSync.isConnected()) {
+        gsheetsSaveBtn.textContent = '⏳ Verbinde...';
+        const res = await GoogleSheetsSync.pullAll();
+        gsheetsSaveBtn.textContent = res.success ? '✅ Gespeichert' : '⚠️ Fehler';
+        setTimeout(() => { gsheetsSaveBtn.textContent = '💾 Speichern'; }, 2000);
+      } else {
+        GoogleSheetsSync.updateStatusUI();
+      }
+    });
+  }
+
+  if (gsheetsSyncBtn) {
+    gsheetsSyncBtn.addEventListener('click', async () => {
+      if (!GoogleSheetsSync.isConnected()) {
+        alert('Bitte gib zuerst eine gültige Google Apps Script Web-App URL ein.');
+        return;
+      }
+      gsheetsSyncBtn.textContent = '⏳ Synchronisiere...';
+      const res = await GoogleSheetsSync.pullAll();
+      gsheetsSyncBtn.textContent = res.success ? '✅ Synchronisiert' : '⚠️ Fehler';
+      setTimeout(() => { gsheetsSyncBtn.textContent = '🔄 Jetzt syncen'; }, 2000);
+    });
+  }
+
+  GoogleSheetsSync.updateStatusUI();
+  if (GoogleSheetsSync.isConnected()) {
+    // Stiller Sync im Hintergrund
+    GoogleSheetsSync.pullAll();
+  }
+
   renderFavoritesTab();
 }
 
@@ -35,23 +75,33 @@ export function toggleFavoriteCurrent() {
   const loc = state.currentLocation;
   if (!loc) return;
   const idx = state.favorites.findIndex(f => f.name.toLowerCase() === loc.name.toLowerCase());
+  let changedFav = null;
+  let isRemoved = false;
 
   if (idx >= 0) {
+    changedFav = state.favorites[idx];
+    isRemoved = true;
     state.favorites.splice(idx, 1);
   } else {
-    state.favorites.push({
+    changedFav = {
       name: loc.name,
       lat: loc.lat,
       lon: loc.lon,
       elevation: loc.elevation,
       country: loc.country,
       isMountain: loc.isMountain
-    });
+    };
+    state.favorites.push(changedFav);
   }
 
   AlpineStorage.safeSetItem(STORAGE_KEY, state.favorites);
   updateFavStarUI();
   renderFavoritesTab();
+
+  // Cloud Sync in Google Sheets im Hintergrund
+  if (changedFav && GoogleSheetsSync.isConnected()) {
+    GoogleSheetsSync.syncFavoriteChange(changedFav, isRemoved);
+  }
 }
 
 export function updateFavStarUI() {

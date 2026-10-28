@@ -1038,11 +1038,9 @@
             <!-- GPX Track Picker & Upload -->
             <div class="sports-gpx-section">
               <div class="sports-presets-row">
-                <span class="sp-preset-label">Alpine Referenz-Routen:</span>
-                <button type="button" class="sports-route-preset active" data-tour="matterhorn-hoernli">🏔️ Matterhorn Hörnligrat (4.478 m)</button>
-                <button type="button" class="sports-route-preset" data-tour="zugspitze-hoellental">🧗 Zugspitze Höllental (2.962 m)</button>
-                <button type="button" class="sports-route-preset" data-tour="watzmann-crossing">🥾 Watzmann Überschreitung (2.713 m)</button>
-                <button type="button" class="sports-route-preset" data-tour="grossglockner-bike">🚴 Großglockner Hochalpenstraße (48 km)</button>
+                <span class="sp-preset-label">Allgäuer Referenz-Routen:</span>
+                <button type="button" class="sports-route-preset active" data-tour="nebelhorn-oberstdorf">🏔️ Nebelhorn (2.224 m)</button>
+                <button type="button" class="sports-route-preset" data-tour="gruenten-waechter">⛰️ Grünten (1.738 m)</button>
               </div>
 
               <div class="sports-drop-zone" id="sports-drop-zone">
@@ -1174,6 +1172,16 @@
                 <button type="button" class="swt-filter-pill" data-wpt-filter="hazards">⚠️ Nur Warnungen</button>
                 <button type="button" class="swt-filter-pill" data-wpt-filter="peaks">🏔️ Pässe & Gipfel</button>
               </div>
+            </div>
+
+            <!-- Mobile Stage Navigation Stepper & Pagination HUD -->
+            <div class="swt-mobile-stepper" id="swt-mobile-stepper">
+              <button type="button" class="sms-nav-btn" id="sms-prev-btn" aria-label="Vorherige Etappe">‹</button>
+              <div class="sms-indicator" id="sms-indicator">
+                <span class="sms-step-badge" id="sms-step-badge">Etappe 1 von 6</span>
+                <span class="sms-swipe-hint">↔ Wischen oder tippen</span>
+              </div>
+              <button type="button" class="sms-nav-btn" id="sms-next-btn" aria-label="Nächste Etappe">›</button>
             </div>
 
             <div class="sports-waypoints-table-wrap">
@@ -1514,6 +1522,34 @@
 
           <div class="favorites-grid" id="favorites-grid">
             <!-- Dynamisch aus localStorage befüllt -->
+          </div>
+        </section>
+
+        <!-- GOOGLE SHEETS CLOUD-DATENBANK SYNC -->
+        <section class="glass-card gsheets-sync-card" style="margin-top: 14px;">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">📊</span>
+              <span>GOOGLE SHEETS CLOUD-DATENBANK</span>
+            </div>
+            <span class="card-tag" id="gsheets-status-badge">Nicht verbunden</span>
+          </div>
+
+          <p class="section-desc">
+            Synchronisiere deine Favoriten, Notizen und Alpin-Touren live mit deiner Google Sheet Tabelle als zentrale Datenbank.
+          </p>
+
+          <div class="gsheets-sync-box">
+            <div class="gsheets-input-row">
+              <input type="url" id="gsheets-url-input" class="stsp-glass-input" placeholder="Google Apps Script Web-App URL (https://script.google.com/macros/s/.../exec)">
+              <div class="gsheets-btn-group">
+                <button type="button" class="action-btn" id="gsheets-save-btn">💾 Speichern</button>
+                <button type="button" class="action-btn action-btn-secondary" id="gsheets-sync-now-btn">🔄 Jetzt syncen</button>
+              </div>
+            </div>
+            <div class="gsheets-footer-row">
+              <span class="gsheets-status-hint" id="gsheets-last-sync">Trage deine Web-App URL ein</span>
+            </div>
           </div>
         </section>
 
@@ -2386,10 +2422,9 @@
       <div class="modal-body">
         <!-- Preset Schnellstart-Touren -->
         <div class="gpx-presets-row">
-          <span class="gpx-p-label">Alpine Beispiel-Touren:</span>
-          <button class="gpx-preset-btn" data-tour="matterhorn-hoernli">🏔️ Matterhorn Hörnligrat (4.478 m)</button>
-          <button class="gpx-preset-btn" data-tour="zugspitze-hoellental">🧗 Zugspitze Höllental (2.962 m)</button>
-          <button class="gpx-preset-btn" data-tour="watzmann-crossing">🥾 Watzmann Überschreitung (2.713 m)</button>
+          <span class="gpx-p-label">Allgäuer Beispiel-Touren:</span>
+          <button class="gpx-preset-btn active" data-tour="nebelhorn-oberstdorf">🏔️ Nebelhorn (2.224 m)</button>
+          <button class="gpx-preset-btn" data-tour="gruenten-waechter">⛰️ Grünten (1.738 m)</button>
         </div>
 
         <!-- Drag and Drop Upload Zone -->

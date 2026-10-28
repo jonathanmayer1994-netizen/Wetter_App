@@ -4078,6 +4078,65 @@ body {
   gap: 14px;
 }
 
+/* Google Sheets Cloud DB Sync */
+.gsheets-sync-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gsheets-sync-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.gsheets-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.gsheets-input-row input {
+  flex: 1 1 280px;
+  min-width: 220px;
+}
+
+.gsheets-btn-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.gsheets-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 768px) {
+  .gsheets-input-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .gsheets-btn-group {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    width: 100% !important;
+  }
+
+  .gsheets-btn-group .action-btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+
 .favorite-card {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -6988,13 +7047,42 @@ body {
 
 @media (max-width: 768px) {
   .sports-tour-start-panel {
-    grid-template-columns: 100%;
-    gap: 14px;
-    padding: 14px 12px;
-    box-sizing: border-box;
-    width: 100%;
-    max-width: 100%;
-    overflow: hidden;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    margin: 8px 0 12px 0 !important;
+    border-radius: 16px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .stsp-divider {
+    display: none !important;
+  }
+
+  #sports-date-presets,
+  #sports-time-presets {
+    display: none !important;
+  }
+
+  .stsp-header {
+    gap: 4px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .stsp-label {
+    font-size: 11px !important;
+    letter-spacing: 0.2px !important;
+  }
+
+  .stsp-glass-input {
+    height: 40px !important;
+    padding: 6px 8px !important;
+    font-size: 14px !important;
+    text-align: center !important;
+    border-radius: 12px !important;
   }
 }
 
@@ -7522,6 +7610,130 @@ body {
   border-color: var(--ios-cyan);
   color: var(--ios-cyan);
   font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .sports-presets-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    padding: 2px 0 6px 0 !important;
+  }
+
+  .sp-preset-label {
+    grid-column: 1 / -1;
+    margin-bottom: 2px;
+  }
+
+  .sports-route-preset {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 8px 6px;
+    font-size: 12px;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  /* Compact iPhone Studio & Metrics Tuning */
+  .athlete-category-selector {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin: 6px 0 !important;
+  }
+
+  .athlete-cat-card {
+    padding: 6px 8px !important;
+    min-height: 48px !important;
+    border-radius: 14px !important;
+  }
+
+  .athlete-cat-card .acc-desc {
+    display: none !important;
+  }
+
+  .athlete-cat-card .acc-icon-wrap {
+    font-size: 18px !important;
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .athlete-cat-card .acc-title {
+    font-size: 12px !important;
+  }
+
+  .athlete-cat-card .acc-badge {
+    font-size: 9.5px !important;
+    padding: 1px 4px !important;
+  }
+
+  .atp-header {
+    margin-bottom: 2px !important;
+  }
+
+  .atp-title strong {
+    font-size: 11.5px !important;
+  }
+
+  .atp-stepper-wrap {
+    gap: 4px !important;
+  }
+
+  .atp-step-btn {
+    padding: 2px 7px !important;
+    font-size: 10.5px !important;
+  }
+
+  .atp-live-val {
+    font-size: 12px !important;
+  }
+
+  .atp-slider-row {
+    margin: 4px 0 !important;
+  }
+
+  .athlete-range-slider {
+    height: 5px !important;
+  }
+
+  .athlete-range-slider::-webkit-slider-thumb {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .sports-metrics-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 6px !important;
+    padding: 8px 4px !important;
+    margin: 6px 0 !important;
+  }
+
+  .sm-card {
+    padding: 6px 2px !important;
+    text-align: center !important;
+    border-radius: 10px !important;
+  }
+
+  .sm-label {
+    font-size: 9px !important;
+    letter-spacing: -0.2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .sm-val {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+  }
+
+  .atp-presets-row,
+  .atp-physics-note {
+    display: none !important;
+  }
 }
 
 .sports-drop-zone {
@@ -8155,6 +8367,222 @@ body {
   font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
+}
+
+/* ==========================================================================
+   IPHONE & MOBILE HORIZONTAL STAGE CAROUSEL (Anti-Vertical-Scroll Pattern)
+   ========================================================================== */
+.swt-mobile-stepper {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sports-waypoints-card {
+    padding: 12px 10px !important;
+  }
+
+  .swt-card-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .swt-filter-group {
+    width: 100% !important;
+    display: flex !important;
+    gap: 6px !important;
+  }
+
+  .swt-filter-pill {
+    flex: 1 !important;
+    text-align: center !important;
+    padding: 6px 4px !important;
+    font-size: 11px !important;
+    justify-content: center !important;
+  }
+
+  .swt-mobile-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    margin: 4px 0 8px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .sms-nav-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .sms-nav-btn:active {
+    transform: scale(0.92);
+    background: rgba(0, 229, 255, 0.25);
+  }
+
+  .sms-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .sms-step-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: #00e5ff;
+    letter-spacing: 0.2px;
+  }
+
+  .sms-swipe-hint {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .sports-waypoints-table-wrap {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin-top: 4px;
+  }
+
+  .swt-header {
+    display: none !important;
+  }
+
+  .swt-body {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 12px !important;
+    padding: 4px 4px 10px 4px !important;
+    scrollbar-width: none;
+  }
+
+  .swt-body::-webkit-scrollbar {
+    display: none;
+  }
+
+  .swt-row {
+    display: grid !important;
+    grid-template-areas:
+      "milestone time"
+      "weather weather"
+      "distele temp"
+      "wind wind"
+      "precip precip" !important;
+    grid-template-columns: 1fr auto !important;
+    row-gap: 8px !important;
+    column-gap: 8px !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    width: 82vw !important;
+    max-width: 320px !important;
+    flex: 0 0 calc(82vw - 12px) !important;
+    scroll-snap-align: center !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%), rgba(12, 19, 36, 0.8) !important;
+    backdrop-filter: blur(24px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-top: 1.5px solid rgba(255, 255, 255, 0.35) !important;
+    border-radius: 20px !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s, box-shadow 0.2s !important;
+  }
+
+  .swt-row.active-waypoint,
+  .swt-row.swt-row-active-live {
+    border-color: #00e5ff !important;
+    box-shadow: 0 12px 36px rgba(0, 229, 255, 0.35), inset 0 0 0 1px #00e5ff !important;
+    transform: scale(1.02);
+  }
+
+  .swt-cell.swt-milestone {
+    grid-area: milestone;
+    gap: 2px;
+  }
+
+  .swt-cell.swt-time {
+    grid-area: time;
+    text-align: right;
+    align-items: flex-end;
+  }
+
+  .swt-m-name {
+    font-size: 13px;
+    font-weight: 700;
+    max-width: 170px;
+  }
+
+  .swt-cell.swt-weather {
+    grid-area: weather;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .swt-cell.swt-dist-ele {
+    grid-area: distele;
+    flex-direction: row;
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  .swt-cell.swt-temp {
+    grid-area: temp;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .swt-temp-val {
+    font-size: 16px;
+    color: #00e5ff;
+  }
+
+  .swt-cell.swt-wind {
+    grid-area: wind;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    padding-top: 6px;
+    width: 100%;
+  }
+
+  .swt-cell.swt-precip {
+    grid-area: precip;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
 }
 
 /* Sports Map */

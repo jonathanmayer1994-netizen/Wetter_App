@@ -15,7 +15,7 @@ import { validateLocation } from './core/contracts.js';
 import { setupLocationTypeToggle, updateLocationHeaderUI, updateAlpineSkyIllumination, renderOverviewTab, setupExpertModeToggle, renderMultiModelComparison, renderAirQualityAndUV, setupMeteogramControls, openDayDetailModal, convertTemp, setupHourlyGranularityToggle } from './features/overview.js';
 import { setupWallSelector, setupAltitudeSlider, setupMountainControls, setupMountain3DControls, setupWebcamModal, renderAdaptiveTab2 } from './features/mountain.js';
 import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard, enterMobileMapFullscreen, exitMobileMapFullscreen } from './features/map.js';
-import { setupGPXInspector, setupSportsTab } from './features/sports.js';
+import { setupGPXInspector, setupSportsTab, initSportsTour } from './features/sports.js';
 import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers } from './features/search.js';
 import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandlers } from './features/favorites.js';
 import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/networks.js';
@@ -64,6 +64,10 @@ export function switchTab(tabId) {
   if (tabId !== 'tab-map') {
     if (state.map?.radarPlaying) stopRadarAnimation();
     exitMobileMapFullscreen();
+  }
+
+  if (tabId === 'tab-sports' && !state.sports.initialized) {
+    initSportsTour();
   }
 
   if (tabId === 'tab-map') {

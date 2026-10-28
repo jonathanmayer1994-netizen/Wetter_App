@@ -2545,66 +2545,43 @@ export const MicroEngine = {
   },
 
   /**
-   * 3 Korb-kuratierte Alpine GPX Sample-Tracks
+   * 2 Korb-kuratierte Allgäuer GPX Sample-Tracks (Nebelhorn & Grünten)
    */
   getSampleGPXTrack(tourId) {
     const samples = {
-      'matterhorn-hoernli': {
-        name: 'Matterhorn Hörnligrat (Normalweg)',
-        region: 'Wallis / Zermatt',
+      'nebelhorn-oberstdorf': {
+        name: 'Nebelhorn Rundtour (2.224 m)',
+        region: 'Oberstdorf / Allgäuer Alpen',
         points: [
-          { lat: 45.9765, lon: 7.7063, ele: 2583 }, // Schwarzsee
-          { lat: 45.9772, lon: 7.6951, ele: 2950 },
-          { lat: 45.9781, lon: 7.6834, ele: 3260 }, // Hörnlihütte
-          { lat: 45.9775, lon: 7.6740, ele: 3750 }, // Unterer Grat
-          { lat: 45.9770, lon: 7.6660, ele: 4003 }, // Solvay-Biwak
-          { lat: 45.9766, lon: 7.6610, ele: 4250 }, // Schulter
-          { lat: 45.9763, lon: 7.6586, ele: 4478 }  // Matterhorn Gipfel
+          { lat: 47.4080, lon: 10.2790, ele: 813 },   // Oberstdorf Talstation
+          { lat: 47.4105, lon: 10.2920, ele: 950 },   // Faltenbachtobel
+          { lat: 47.4125, lon: 10.3085, ele: 1280 },  // Seealpe
+          { lat: 47.4165, lon: 10.3220, ele: 1650 },  // Obergund Alpe
+          { lat: 47.4205, lon: 10.3350, ele: 1932 },  // Station Höfatsblick
+          { lat: 47.4223, lon: 10.3444, ele: 2224 },  // Nebelhorn Gipfel (2.224 m)
+          { lat: 47.4330, lon: 10.3290, ele: 1958 },  // Gaisalphorn Grat
+          { lat: 47.4380, lon: 10.3160, ele: 1508 },  // Unterer Gaisalpsee
+          { lat: 47.4420, lon: 10.3010, ele: 867 }    // Reichenbach Talziel
         ]
       },
-      'zugspitze-hoellental': {
-        name: 'Zugspitze Höllental (Klassiker)',
-        region: 'Wettersteingebirge / Bayern',
+      'gruenten-waechter': {
+        name: 'Grünten Überschreitung (1.738 m)',
+        region: 'Rettenberg / Allgäu',
         points: [
-          { lat: 47.4722, lon: 11.0435, ele: 758 },  // Hammersbach
-          { lat: 47.4560, lon: 11.0312, ele: 1045 }, // Höllentalklamm
-          { lat: 47.4420, lon: 11.0210, ele: 1387 }, // Höllentalangerhütte
-          { lat: 47.4310, lon: 11.0090, ele: 1950 }, // Leiter & Brett
-          { lat: 47.4240, lon: 10.9980, ele: 2300 }, // Höllentalferner
-          { lat: 47.4215, lon: 10.9855, ele: 2962 }  // Zugspitze Gipfel
-        ]
-      },
-      'watzmann-crossing': {
-        name: 'Watzmann Überschreitung',
-        region: 'Berchtesgadener Alpen',
-        points: [
-          { lat: 47.5910, lon: 12.9150, ele: 630 },  // Wimbachbrücke
-          { lat: 47.5720, lon: 12.9230, ele: 1390 }, // Falzalm
-          { lat: 47.5640, lon: 12.9240, ele: 1930 }, // Watzmannhaus
-          { lat: 47.5560, lon: 12.9230, ele: 2651 }, // Hocheck
-          { lat: 47.5540, lon: 12.9220, ele: 2713 }, // Mittelspitze
-          { lat: 47.5460, lon: 12.9210, ele: 2712 }, // Südspitze
-          { lat: 47.5350, lon: 12.8980, ele: 1320 }  // Wimbachgries
-        ]
-      },
-      'grossglockner-bike': {
-        name: 'Großglockner Hochalpenstraße (Rennrad)',
-        region: 'Hohe Tauern / Salzburg & Kärnten',
-        points: [
-          { lat: 47.1680, lon: 12.8250, ele: 805 },  // Fusch an der Glocknerstraße
-          { lat: 47.1420, lon: 12.8200, ele: 1145 }, // Ferleiten (Mautstelle)
-          { lat: 47.1180, lon: 12.8270, ele: 1540 }, // Piffkar
-          { lat: 47.1020, lon: 12.8310, ele: 1890 }, // Hexenküche
-          { lat: 47.0860, lon: 12.8270, ele: 2260 }, // Fuschertörl
-          { lat: 47.0780, lon: 12.8420, ele: 2428 }, // Fuscher Lacke
-          { lat: 47.0720, lon: 12.8440, ele: 2504 }, // Hochtor Pass (Scheitelpunkt)
-          { lat: 47.0610, lon: 12.8380, ele: 2135 }, // Schöneck
-          { lat: 47.0420, lon: 12.8430, ele: 1301 }  // Heiligenblut (Ziel)
+          { lat: 47.5380, lon: 10.2900, ele: 750 },   // Burgberg Wanderparkplatz
+          { lat: 47.5450, lon: 10.3020, ele: 880 },   // Starzlachklamm Eingang
+          { lat: 47.5490, lon: 10.3120, ele: 1080 },  // Alpe Topfen
+          { lat: 47.5515, lon: 10.3235, ele: 1535 },  // Grüntenhaus
+          { lat: 47.5458, lon: 10.3168, ele: 1738 },  // Jägerdenkmal Gipfel
+          { lat: 47.5450, lon: 10.3155, ele: 1738 },  // Übelhorn Sendeturm
+          { lat: 47.5570, lon: 10.3180, ele: 1115 },  // Alpe Kammeregg
+          { lat: 47.5680, lon: 10.3120, ele: 800 },   // Rettenberg Brauereidorf
+          { lat: 47.5750, lon: 10.2980, ele: 740 }    // Hasengarten Talabschluss
         ]
       }
     };
 
-    const s = samples[tourId] || samples['matterhorn-hoernli'];
+    const s = samples[tourId] || samples['nebelhorn-oberstdorf'];
     let xml = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><name>${s.name}</name><trkseg>`;
     s.points.forEach(p => {
       xml += `<trkpt lat="${p.lat}" lon="${p.lon}"><ele>${p.ele}</ele></trkpt>`;

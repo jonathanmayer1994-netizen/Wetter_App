@@ -73,7 +73,7 @@ export function setupGPXInspector() {
       modal.style.display = 'flex';
       // Standardmäßig sofort Tour laden, falls noch keine geladen ist
       if (!activeGPXData) {
-        const sample = MicroEngine.getSampleGPXTrack('matterhorn-hoernli');
+        const sample = MicroEngine.getSampleGPXTrack('nebelhorn-oberstdorf');
         processGPXTrack(sample.xml, sample.name);
       }
     });
@@ -714,6 +714,67 @@ export function setupSportsTab() {
     });
   }
 
+  // Mobile Stage Stepper Navigation
+  const smsPrevBtn = document.getElementById('sms-prev-btn');
+  const smsNextBtn = document.getElementById('sms-next-btn');
+  const swtList = document.getElementById('sports-waypoints-list');
+  const smsBadge = document.getElementById('sms-step-badge');
+
+  if (swtList) {
+    let scrollTimeout;
+    swtList.addEventListener('scroll', () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const rows = swtList.querySelectorAll('.swt-row');
+        if (rows.length === 0) return;
+        const center = swtList.scrollLeft + swtList.clientWidth / 2;
+        let bestIdx = 0;
+        let minDiff = Infinity;
+        rows.forEach((r, i) => {
+          const diff = Math.abs((r.offsetLeft + r.offsetWidth / 2) - center);
+          if (diff < minDiff) { minDiff = diff; bestIdx = i; }
+        });
+        if (smsBadge) smsBadge.innerText = `Etappe ${bestIdx + 1} von ${rows.length}`;
+      }, 50);
+    }, { passive: true });
+  }
+
+  if (smsPrevBtn && swtList) {
+    smsPrevBtn.addEventListener('click', () => {
+      const rows = swtList.querySelectorAll('.swt-row');
+      if (rows.length === 0) return;
+      const center = swtList.scrollLeft + swtList.clientWidth / 2;
+      let curr = 0;
+      let minDiff = Infinity;
+      rows.forEach((r, i) => {
+        const diff = Math.abs((r.offsetLeft + r.offsetWidth / 2) - center);
+        if (diff < minDiff) { minDiff = diff; curr = i; }
+      });
+      if (curr > 0) {
+        rows[curr - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        rows[curr - 1].click();
+      }
+    });
+  }
+
+  if (smsNextBtn && swtList) {
+    smsNextBtn.addEventListener('click', () => {
+      const rows = swtList.querySelectorAll('.swt-row');
+      if (rows.length === 0) return;
+      const center = swtList.scrollLeft + swtList.clientWidth / 2;
+      let curr = 0;
+      let minDiff = Infinity;
+      rows.forEach((r, i) => {
+        const diff = Math.abs((r.offsetLeft + r.offsetWidth / 2) - center);
+        if (diff < minDiff) { minDiff = diff; curr = i; }
+      });
+      if (curr < rows.length - 1) {
+        rows[curr + 1].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        rows[curr + 1].click();
+      }
+    });
+  }
+
   // Live-Tour Tracking Controls
   const trackToggleBtn = document.getElementById('sports-live-track-toggle');
   if (trackToggleBtn) {
@@ -805,8 +866,8 @@ export async function initSportsTour() {
   if (cachedTour && cachedTour.gpxXml && cachedTour.tourName) {
     loadAndComputeSportsTour(cachedTour.gpxXml, cachedTour.tourName);
   } else {
-    // Standard-Tour: Großglockner Hochalpenstraße (optimal für Rad & Bergsteiger)
-    const defaultTour = 'grossglockner-bike';
+    // Standard-Tour: Nebelhorn Gipfelsteig (Allgäu • 2.224 m)
+    const defaultTour = 'nebelhorn-oberstdorf';
     loadSportsPresetTour(defaultTour);
   }
 }
@@ -1749,6 +1810,10 @@ export function renderSportsWaypointsTable(timeline) {
   });
 
   container.replaceChildren(fragment);
+  const smsBadge = document.getElementById('sms-step-badge');
+  if (smsBadge && visibleMilestones.length > 0) {
+    smsBadge.innerText = `Etappe 1 von ${visibleMilestones.length}`;
+  }
 }
 
 export function renderSportsMap(timeline) {
@@ -2013,10 +2078,21 @@ export function updateSportsScrubber(km) {
     state.sports.scrubberMarker.setLatLng([closestPt.lat, closestPt.lon]);
   }
 
-  // Wegpunkt-Zeile in Tabelle hervorheben
-  document.querySelectorAll('.swt-row').forEach(row => {
+  // Wegpunkt-Zeile in Tabelle hervorheben & Mobile Stage Carousel synchronisieren
+  const rows = document.querySelectorAll('.swt-row');
+  const smsBadge = document.getElementById('sms-step-badge');
+  rows.forEach((row, i) => {
     const rIdx = parseInt(row.dataset.idx, 10);
-    row.classList.toggle('active-waypoint', rIdx === closestMsIdx);
+    const isActive = rIdx === closestMsIdx;
+    row.classList.toggle('active-waypoint', isActive);
+    if (isActive) {
+      if (smsBadge) {
+        smsBadge.innerText = `Etappe ${i + 1} von ${rows.length}`;
+      }
+      if (window.innerWidth <= 768) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
   });
 }
 
