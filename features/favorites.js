@@ -25,9 +25,18 @@ export function setupFavorites(options = {}) {
 
   const addBtn = document.getElementById('add-current-favorite-btn');
   const favToggle = document.getElementById('fav-toggle-btn');
+  const gpsCard = document.getElementById('favorites-gps-card');
 
   if (addBtn) addBtn.addEventListener('click', toggleFavoriteCurrent);
   if (favToggle) favToggle.addEventListener('click', toggleFavoriteCurrent);
+
+  if (gpsCard) {
+    gpsCard.addEventListener('click', () => {
+      if (window.triggerExactGps) window.triggerExactGps();
+      if (onSwitchTabCallback) onSwitchTabCallback('tab-overview');
+      else if (window.switchTab) window.switchTab('tab-overview');
+    });
+  }
 
   // Google Sheets Cloud Sync Handlers
   const gsheetsInput = document.getElementById('gsheets-url-input');
@@ -71,9 +80,8 @@ export function setupFavorites(options = {}) {
   renderFavoritesTab();
 }
 
-export function toggleFavoriteCurrent() {
-  const loc = state.currentLocation;
-  if (!loc) return;
+export function toggleFavoriteLocation(loc) {
+  if (!loc || !loc.name) return false;
   const idx = state.favorites.findIndex(f => f.name.toLowerCase() === loc.name.toLowerCase());
   let changedFav = null;
   let isRemoved = false;
@@ -85,11 +93,11 @@ export function toggleFavoriteCurrent() {
   } else {
     changedFav = {
       name: loc.name,
-      lat: loc.lat,
-      lon: loc.lon,
-      elevation: loc.elevation,
-      country: loc.country,
-      isMountain: loc.isMountain
+      lat: loc.lat || loc.latitude,
+      lon: loc.lon || loc.longitude,
+      elevation: loc.elevation || 500,
+      country: loc.country || '',
+      isMountain: !!loc.isMountain
     };
     state.favorites.push(changedFav);
   }
@@ -102,6 +110,12 @@ export function toggleFavoriteCurrent() {
   if (changedFav && GoogleSheetsSync.isConnected()) {
     GoogleSheetsSync.syncFavoriteChange(changedFav, isRemoved);
   }
+
+  return !isRemoved;
+}
+
+export function toggleFavoriteCurrent() {
+  return toggleFavoriteLocation(state.currentLocation);
 }
 
 export function updateFavStarUI() {
@@ -113,6 +127,20 @@ export function updateFavStarUI() {
 }
 
 export function renderFavoritesTab() {
+  // 1. Status der GPS-Option oberhalb der Favoriten aktualisieren
+  const gpsCard = document.getElementById('favorites-gps-card');
+  const gpsSub = document.getElementById('fgc-status-desc');
+  if (gpsCard && gpsSub) {
+    const isCurrentGps = state.currentLocation && state.currentLocation.name === 'Mein Standort';
+    gpsCard.classList.toggle('active-gps', !!isCurrentGps);
+    if (isCurrentGps) {
+      gpsSub.innerText = `🟢 Aktiv ausgewählt (${state.currentLocation.elevation} m) • Tippen zum Aktualisieren`;
+    } else {
+      gpsSub.innerText = 'Gerätestandort & Berghöhe live per GPS ermitteln';
+    }
+  }
+
+  // 2. Gespeicherte Favoriten aus Google Sheet / LocalStorage rendern
   const grid = document.getElementById('favorites-grid');
   if (!grid) return;
 
@@ -121,14 +149,8 @@ export function renderFavoritesTab() {
     grid.innerHTML = `
       <div class="empty-favorites-box">
         <span class="empty-fav-icon">⭐</span>
-        <div class="empty-fav-title">Noch keine Favoriten gespeichert</div>
-        <p class="empty-fav-desc">Speichere deine Lieblings-Alpengipfel oder Heimatorte per Klick auf den Stern oben rechts oder wähle einen alpinen Klassiker:</p>
-        <div class="empty-fav-presets">
-          <button class="preset-fav-chip" type="button" onclick="window.loadNamedMountain && window.loadNamedMountain('Zugspitze')">🏔️ Zugspitze (2.962 m)</button>
-          <button class="preset-fav-chip" type="button" onclick="window.loadNamedMountain && window.loadNamedMountain('Matterhorn')">🏔️ Matterhorn (4.478 m)</button>
-          <button class="preset-fav-chip" type="button" onclick="window.loadNamedMountain && window.loadNamedMountain('Großglockner')">🏔️ Großglockner (3.798 m)</button>
-          <button class="preset-fav-chip" type="button" onclick="window.loadNamedMountain && window.loadNamedMountain('Nebelhorn')">🏔️ Nebelhorn (2.224 m)</button>
-        </div>
+        <div class="empty-fav-title">Keine Favoriten gespeichert</div>
+        <p class="empty-fav-desc">Deine Liste zeigt ausschließlich die Orte an, die in deinem Google Sheet gespeichert sind. Suche oben nach einem Ort und tippe auf das Stern-Symbol (★), um ihn hinzuzufügen.</p>
       </div>
     `;
     return;
@@ -159,10 +181,13 @@ export function renderFavoritesTab() {
 
     card.querySelector('.fav-del-btn').addEventListener('click', (e) => {
       e.stopPropagation();
-      state.favorites.splice(i, 1);
+      const removed = state.favorites.splice(i, 1)[0];
       AlpineStorage.safeSetItem(STORAGE_KEY, state.favorites);
       renderFavoritesTab();
       updateFavStarUI();
+      if (removed && GoogleSheetsSync.isConnected()) {
+        GoogleSheetsSync.syncFavoriteChange(removed, true);
+      }
     });
 
     grid.appendChild(card);

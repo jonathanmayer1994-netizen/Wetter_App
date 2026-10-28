@@ -120,15 +120,16 @@ export const GoogleSheetsSync = {
   mergeFavorites(sheetFavs) {
     if (!Array.isArray(sheetFavs)) return;
 
+    const mapped = [];
     sheetFavs.forEach(sf => {
-      if (!sf.Name || !sf.Breitengrad || !sf.Laengengrad) return;
+      if (!sf.Name || sf.Breitengrad === undefined || sf.Laengengrad === undefined) return;
       const lat = parseFloat(sf.Breitengrad);
       const lon = parseFloat(sf.Laengengrad);
+      if (isNaN(lat) || isNaN(lon)) return;
       const ele = sf.Hoehe_m ? parseInt(sf.Hoehe_m, 10) : 500;
       const isMtn = sf.Typ ? (sf.Typ.toLowerCase().includes('berg') || sf.Typ.toLowerCase().includes('gipfel')) : (ele > 800);
 
-      const existingIdx = state.favorites.findIndex(f => f.name.toLowerCase() === sf.Name.toLowerCase());
-      const favObj = {
+      mapped.push({
         name: sf.Name,
         lat,
         lon,
@@ -136,15 +137,11 @@ export const GoogleSheetsSync = {
         country: sf.Land || 'Deutschland',
         isMountain: isMtn,
         notes: sf.Notizen || ''
-      };
-
-      if (existingIdx >= 0) {
-        state.favorites[existingIdx] = { ...state.favorites[existingIdx], ...favObj };
-      } else {
-        state.favorites.push(favObj);
-      }
+      });
     });
 
+    // Exakte Synchronisation: Die Favoritenliste spiegelt exakt die Google Sheets Datenbank wider
+    state.favorites = mapped;
     AlpineStorage.safeSetItem('best_weather_favorites_v4', state.favorites);
     updateFavStarUI();
     renderFavoritesTab();

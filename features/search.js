@@ -9,6 +9,7 @@ import { OFFICIAL_KNOWN_ELEVATIONS } from '../core/constants.js';
 import { AlpineStorage } from '../storage.js';
 import { resilientFetch, escapeHtml } from '../httpClient.js';
 import { MicroEngine } from '../microEngine.js';
+import { toggleFavoriteLocation } from './favorites.js';
 
 let onLoadLocationCallback = null;
 let onRenderOverviewCallback = null;
@@ -277,6 +278,7 @@ export function triggerExactGps() {
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
 }
+window.triggerExactGps = triggerExactGps;
 
 export function setupSearch(options = {}) {
   if (options.onLoadLocation) onLoadLocationCallback = options.onLoadLocation;
@@ -362,14 +364,38 @@ export function setupSearch(options = {}) {
 
             const icon = isMtn ? '🏔️' : '🏙️';
             const admin = [item.admin1, item.country].filter(Boolean).join(', ');
+            const isFav = state.favorites.some(f => f.name.toLowerCase() === item.name.toLowerCase());
 
             row.innerHTML = `
-              <div>
+              <div class="dd-info">
                 <div class="dropdown-city">${icon} ${escapeHtml(item.name)}</div>
                 <div class="dropdown-region">${escapeHtml(admin)}</div>
               </div>
-              <div class="dropdown-elevation">${officialElev.toLocaleString('de-DE')} m</div>
+              <div class="dd-right">
+                <span class="dropdown-elevation">${officialElev.toLocaleString('de-DE')} m</span>
+                <button type="button" class="search-item-star-btn ${isFav ? 'favorited' : ''}" title="${isFav ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}" aria-label="Favorit umschalten">
+                  ${isFav ? '★' : '☆'}
+                </button>
+              </div>
             `;
+
+            const starBtn = row.querySelector('.search-item-star-btn');
+            if (starBtn) {
+              starBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const nowFav = toggleFavoriteLocation({
+                  name: item.name,
+                  lat: item.latitude,
+                  lon: item.longitude,
+                  elevation: officialElev,
+                  country: item.country || '',
+                  isMountain: isMtn
+                });
+                starBtn.innerText = nowFav ? '★' : '☆';
+                starBtn.classList.toggle('favorited', nowFav);
+                starBtn.title = nowFav ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen';
+              });
+            }
 
             row.addEventListener('click', () => {
               selectExactLocation({
@@ -693,6 +719,8 @@ export function setupSpotlightAndQuickGps() {
             const icon = isMtn ? '🏔️' : '🏙️';
             const admin = [item.admin1, item.country].filter(Boolean).join(', ');
 
+            const isFav = state.favorites.some(f => f.name.toLowerCase() === item.name.toLowerCase());
+
             const row = document.createElement('div');
             row.className = `spotlight-item ${idx === 0 ? 'selected' : ''}`;
             row.innerHTML = `
@@ -703,8 +731,31 @@ export function setupSpotlightAndQuickGps() {
                   <span class="si-sub">${escapeHtml(admin)}</span>
                 </div>
               </div>
-              <div class="si-right">${officialElev.toLocaleString('de-DE')} m</div>
+              <div class="si-right">
+                <span>${officialElev.toLocaleString('de-DE')} m</span>
+                <button type="button" class="spotlight-fav-star-btn ${isFav ? 'favorited' : ''}" title="${isFav ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}" aria-label="Favorit umschalten">
+                  ${isFav ? '★' : '☆'}
+                </button>
+              </div>
             `;
+
+            const starBtn = row.querySelector('.spotlight-fav-star-btn');
+            if (starBtn) {
+              starBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const nowFav = toggleFavoriteLocation({
+                  name: item.name,
+                  lat: item.latitude,
+                  lon: item.longitude,
+                  elevation: officialElev,
+                  country: item.country || '',
+                  isMountain: isMtn
+                });
+                starBtn.innerText = nowFav ? '★' : '☆';
+                starBtn.classList.toggle('favorited', nowFav);
+                starBtn.title = nowFav ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen';
+              });
+            }
 
             row.addEventListener('click', () => {
               selectExactLocation({

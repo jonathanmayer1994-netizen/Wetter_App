@@ -796,6 +796,32 @@ export function setupSportsTab() {
     chartWrapper.addEventListener('pointercancel', stopChartDrag);
   }
 
+  // 1-Touch Alpine Cockpit Station Chips
+  const chipStart = document.getElementById('cockpit-chip-start');
+  const chipPeak = document.getElementById('cockpit-chip-peak');
+  const chipFinish = document.getElementById('cockpit-chip-finish');
+
+  if (chipStart) {
+    chipStart.addEventListener('click', () => {
+      updateSportsScrubber(0);
+    });
+  }
+  if (chipPeak) {
+    chipPeak.addEventListener('click', () => {
+      const tl = state.sports.timeline;
+      if (!tl) return;
+      const peakKm = tl.peakKm !== undefined ? tl.peakKm : (tl.maxElevationM ? (tl.milestones.find(m => m.ele === tl.maxElevationM)?.distFromStartKm || 0) : 0);
+      updateSportsScrubber(peakKm);
+    });
+  }
+  if (chipFinish) {
+    chipFinish.addEventListener('click', () => {
+      const tl = state.sports.timeline;
+      if (!tl) return;
+      updateSportsScrubber(tl.totalDistanceKm);
+    });
+  }
+
   // Window Resize: Scrubber & HUD Position neu synchronisieren
   window.addEventListener('resize', () => {
     if (state.sports && state.sports.timeline && state.sports.scrubberKm !== undefined) {
@@ -1503,6 +1529,15 @@ export function renderSportsElevationProfile(timeline) {
   const rangeZ = Math.max(20, maxZ - minZ);
   const totalDist = Math.max(0.1, timeline.totalDistanceKm);
 
+  // Cockpit Station-Labels dynamisch aktualisieren
+  const peakLabel = document.getElementById('cockpit-peak-label');
+  const finishLabel = document.getElementById('cockpit-finish-label');
+  if (peakLabel) peakLabel.innerText = `Gipfel (${Math.round(timeline.maxElevationM)} m)`;
+  if (finishLabel) finishLabel.innerText = `Ziel (${timeline.totalDistanceKm.toFixed(1)} km)`;
+
+  const peakMs = timeline.milestones ? timeline.milestones.find(m => m.ele === timeline.maxElevationM) : null;
+  timeline.peakKm = peakMs ? peakMs.distFromStartKm : (timeline.totalDistanceKm / 2);
+
   const pts = timeline.timedPoints;
   const count = pts.length;
   const getX = dKm => padL + (dKm / totalDist) * plotW;
@@ -2034,92 +2069,98 @@ export function updateSportsScrubber(km) {
     }
   }
 
-  // Scrubber Label & Badge
-  const pointLabel = document.getElementById('ss-current-point-label');
-  const timeBadge = document.getElementById('ss-current-time-badge');
-  if (pointLabel) {
-    pointLabel.innerText = `📍 km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m`;
-  }
-  if (timeBadge) {
-    const arrStr = closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    timeBadge.innerText = `⏱️ ${arrStr} Uhr`;
+  // --- 1. NEUER ALPINE COCKPIT WETTER-MONITOR (Unified & Mobile-Optimized) ---
+  const cockpitBadge = document.getElementById('cockpit-pos-badge');
+  if (cockpitBadge) {
+    cockpitBadge.innerText = `📍 km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m`;
   }
 
-  // HUD-Badge über SVG
+  // Bestimme Streckenpunkt-Typ (Start, Gipfel, Ziel, Abschnitt)
+  const isStart = clampedKm <= 0.25;
+  const isEnd = clampedKm >= totalDist - 0.25;
+  const isPeak = Math.abs(closestPt.ele - timeline.maxElevationM) <= 15;
+
+  let stationTitle = `Streckenabschnitt km ${closestPt.distFromStartKm.toFixed(1)}`;
+  let stationIcon = closestMs.weatherIcon || '⛅';
+  if (isStart) {
+    stationTitle = 'Tourstart / Tal';
+    stationIcon = '🟢';
+  } else if (isPeak) {
+    stationTitle = 'Passhöhe / Gipfel';
+    stationIcon = '🏔️';
+  } else if (isEnd) {
+    stationTitle = 'Zielankunft / Tour-Ende';
+    stationIcon = '🏁';
+  }
+
+  const cwcIcon = document.getElementById('cwc-icon');
+  const cwcTitle = document.getElementById('cwc-title');
+  const cwcSub = document.getElementById('cwc-sub');
+  const cwcTime = document.getElementById('cwc-time');
+  const cwcTemp = document.getElementById('cwc-temp');
+  const cwcFelt = document.getElementById('cwc-felt');
+  const cwcCond = document.getElementById('cwc-cond');
+  const cwcCondNote = document.getElementById('cwc-cond-note');
+  const cwcWind = document.getElementById('cwc-wind');
+  const cwcGusts = document.getElementById('cwc-gusts');
+  const cwcPrecip = document.getElementById('cwc-precip');
+  const cwcPop = document.getElementById('cwc-pop');
+  const cwcAlert = document.getElementById('cwc-alert-bar');
+  const cwcAlertText = document.getElementById('cwc-alert-text');
+
+  if (cwcIcon) cwcIcon.innerText = stationIcon;
+  if (cwcTitle) cwcTitle.innerText = stationTitle;
+  if (cwcSub) cwcSub.innerText = `km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m`;
+  if (cwcTime) {
+    const arrStr = closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    cwcTime.innerText = `⏱️ ${arrStr} Uhr`;
+  }
+  if (cwcTemp) cwcTemp.innerText = `${closestMs.tempC}°C`;
+  if (cwcFelt) {
+    const feltVal = closestMs.feltTempC !== undefined ? closestMs.feltTempC : closestMs.tempC;
+    cwcFelt.innerText = `Gefühlt ${feltVal}°C`;
+  }
+  if (cwcCond) cwcCond.innerText = `${closestMs.weatherIcon} ${closestMs.weatherCondition || 'Normal'}`;
+  if (cwcCondNote) {
+    if (closestMs.weatherCode >= 95) cwcCondNote.innerText = '⚡ Gewitterrisiko';
+    else if (closestMs.isSnow) cwcCondNote.innerText = '❄️ Frost/Schneelage';
+    else if (closestMs.precipMm >= 1) cwcCondNote.innerText = '🌧️ Regenphase';
+    else cwcCondNote.innerText = 'Bedingungen stabil';
+  }
+  if (cwcWind) cwcWind.innerText = `${closestMs.windKmH} km/h`;
+  if (cwcGusts) {
+    cwcGusts.innerText = `Böen ${closestMs.gustsKmH} km/h${closestMs.relWindBadge ? ' • ' + closestMs.relWindBadge : ''}`;
+  }
+  if (cwcPrecip) cwcPrecip.innerText = closestMs.precipMm > 0 ? `${closestMs.precipMm.toFixed(1)} mm` : '0 mm';
+  if (cwcPop) cwcPop.innerText = `${closestMs.popPercent}% Regenrisiko`;
+
+  // Warnungs-Banner bei alpinen Gefahren am Wegpunkt
+  if (cwcAlert && cwcAlertText) {
+    const hasHazard = closestMs.precipMm >= 1.0 || closestMs.gustsKmH >= 45 || closestMs.weatherCode >= 95 || closestMs.isSnow || (closestMs.tempC <= 0);
+    if (hasHazard) {
+      cwcAlert.style.display = 'flex';
+      if (closestMs.weatherCode >= 95) cwcAlertText.innerText = 'Achtung: Gewittergefahr zur berechneten Durchgangszeit!';
+      else if (closestMs.gustsKmH >= 45) cwcAlertText.innerText = `Sturmböen (${closestMs.gustsKmH} km/h) an exponierten Stellen erwartet!`;
+      else if (closestMs.isSnow || closestMs.tempC <= 0) cwcAlertText.innerText = 'Frostgefahr / Minustemperaturen auf diesem Streckenabschnitt!';
+      else if (closestMs.precipMm >= 1.0) cwcAlertText.innerText = `Regenrisiko: Erwartete Niederschlagsmenge ${closestMs.precipMm.toFixed(1)} mm.`;
+      else cwcAlertText.innerText = 'Alpine Wetterwarnung für diesen Streckenabschnitt.';
+    } else {
+      cwcAlert.style.display = 'none';
+    }
+  }
+
+  // 1-Touch Station-Chips aktiv schalten
+  const chipStart = document.getElementById('cockpit-chip-start');
+  const chipPeak = document.getElementById('cockpit-chip-peak');
+  const chipFinish = document.getElementById('cockpit-chip-finish');
+  if (chipStart) chipStart.classList.toggle('active', isStart);
+  if (chipPeak) chipPeak.classList.toggle('active', isPeak && !isStart && !isEnd);
+  if (chipFinish) chipFinish.classList.toggle('active', isEnd);
+
+  // Altes Schwebendes HUD-Badge ausblenden (wird durch Capsule sauber ersetzt)
   const hud = document.getElementById('sports-hud-badge');
   if (hud) {
-    hud.style.display = 'block';
-    const hIcon = document.getElementById('shb-icon');
-    const hTitle = document.getElementById('shb-title');
-    const hTime = document.getElementById('shb-time');
-    const hTemp = document.getElementById('shb-temp');
-    const hWind = document.getElementById('shb-wind');
-    const hCond = document.getElementById('shb-cond');
-    const hEle = document.getElementById('shb-ele');
-
-    if (hIcon) hIcon.innerText = closestMs.weatherIcon;
-    if (hTitle) hTitle.innerText = `km ${closestPt.distFromStartKm.toFixed(1)}`;
-    if (hTime) hTime.innerText = closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    if (hTemp) hTemp.innerText = `${closestMs.tempC}°C (Gefühlt ${closestMs.feltTempC}°C)${closestMs.descentWindchillC !== undefined && closestMs.descentWindchillC <= 10 ? ' • Abfahrt ' + closestMs.descentWindchillC + '°C' : ''}`;
-    if (hWind) hWind.innerText = `${closestMs.windKmH} km/h (Böen ${closestMs.gustsKmH})${closestMs.relWindBadge ? ' • ' + closestMs.relWindBadge : ''}`;
-    if (hCond) hCond.innerText = closestMs.weatherCondition;
-    if (hEle) hEle.innerText = `Höhe: ${Math.round(closestPt.ele)} m • Niederschlag: ${closestMs.precipMm} mm (${closestMs.popPercent}%)`;
-
-    // Dynamische Positionierung & Flip-Logik entlang des Höhenprofils:
-    // Sobald der Wegpunkt hinter der Information verschwinden würde oder der Scrubber
-    // die Wegpunkt-Mitte überschreitet, dockt das Info-Badge dynamisch LINKS vom Wegpunkt
-    // und beim Zurückbewegen wieder RECHTS, sodass Inhalte und Wegpunkte NIE überlappt werden.
-    const pct = clampedKm / totalDist;
-    const padL = 50;
-    const plotW = 900 - 50 - 35;
-    const targetSvgX = padL + pct * plotW;
-
-    const chartWrapper = document.getElementById('sports-chart-wrapper');
-    const wrapperWidth = (chartWrapper && chartWrapper.clientWidth > 0) ? chartWrapper.clientWidth : 900;
-    const badgeWidth = hud.offsetWidth || 270;
-    const currentXpx = (targetSvgX / 900) * wrapperWidth;
-    const gap = 14;
-    const edgeMargin = 10;
-
-    // Freiraum-Berechnung rechts und links vom aktuellen Wegpunkt
-    const fitsOnRight = (currentXpx + gap + badgeWidth) <= (wrapperWidth - edgeMargin);
-    const fitsOnLeft = (currentXpx - gap - badgeWidth) >= edgeMargin;
-
-    let dockSide = hud.dataset.dockSide || 'right';
-
-    if (dockSide === 'right') {
-      // Wenn rechts der Platz ausgeht (Wegpunkt würde dahinter verschwinden) ODER
-      // der Wegpunkt über 50% der Route liegt und links genügend Platz ist:
-      if (!fitsOnRight || (currentXpx > wrapperWidth * 0.50 && fitsOnLeft)) {
-        dockSide = 'left';
-      }
-    } else {
-      // Wenn der Nutzer nach links zurückfährt (< 48%) und rechts ausreichend Platz ist,
-      // oder falls links kein Platz mehr wäre:
-      const fitsComfortablyOnRight = (currentXpx + gap + badgeWidth) <= (wrapperWidth - edgeMargin - 12);
-      if ((currentXpx < wrapperWidth * 0.48 && fitsComfortablyOnRight) || !fitsOnLeft) {
-        dockSide = 'right';
-      }
-    }
-    hud.dataset.dockSide = dockSide;
-
-    let badgeLeftPx;
-    if (dockSide === 'left') {
-      // Links vom Wegpunkt anzeigen: Der aktuelle Wegpunkt und Strich liegen RECHTS vom Badge (nie verdeckt)
-      badgeLeftPx = currentXpx - gap - badgeWidth;
-      badgeLeftPx = Math.max(edgeMargin, Math.min(wrapperWidth - edgeMargin - badgeWidth, badgeLeftPx));
-      hud.classList.remove('hud-dock-right');
-      hud.classList.add('hud-dock-left');
-    } else {
-      // Rechts vom Wegpunkt anzeigen: Der aktuelle Wegpunkt und Strich liegen LINKS vom Badge (nie verdeckt)
-      badgeLeftPx = currentXpx + gap;
-      badgeLeftPx = Math.min(wrapperWidth - edgeMargin - badgeWidth, Math.max(edgeMargin, badgeLeftPx));
-      hud.classList.remove('hud-dock-left');
-      hud.classList.add('hud-dock-right');
-    }
-
-    hud.style.left = `${badgeLeftPx.toFixed(1)}px`;
-    hud.style.right = 'auto';
+    hud.style.display = 'none';
   }
 
   // SVG Scrubber Strich & Punkt bewegen

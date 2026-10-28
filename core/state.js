@@ -87,35 +87,37 @@ export const state = {
   }
 };
 
-// Initialize favorites with migration
+// Initialize favorites from storage or cloud (Startet leer, synchronisiert aus Google Sheets)
 const STORAGE_KEY = 'best_weather_favorites_v4';
+state.favorites = [];
 try {
   const saved = AlpineStorage.safeGetItem(STORAGE_KEY, []);
   if (Array.isArray(saved) && saved.length > 0) {
-    state.favorites = saved.map(fav => {
-      const lower = fav.name.toLowerCase();
-      if (OFFICIAL_KNOWN_ELEVATIONS[lower]) {
-        return {
-          ...fav,
-          elevation: OFFICIAL_KNOWN_ELEVATIONS[lower].elevation,
-          isMountain: OFFICIAL_KNOWN_ELEVATIONS[lower].isMountain,
-          country: fav.country || OFFICIAL_KNOWN_ELEVATIONS[lower].country
-        };
-      }
-      return fav;
-    });
+    // Migration: Entferne veraltete Dummy-Presets falls vorhanden
+    const isOldSeed = (
+      saved.length === 5 &&
+      saved.some(f => f.name === 'München') &&
+      saved.some(f => f.name === 'Zugspitze') &&
+      saved.some(f => f.name === 'Matterhorn')
+    );
+    if (!isOldSeed) {
+      state.favorites = saved.map(fav => {
+        const lower = fav.name.toLowerCase();
+        if (OFFICIAL_KNOWN_ELEVATIONS[lower]) {
+          return {
+            ...fav,
+            elevation: OFFICIAL_KNOWN_ELEVATIONS[lower].elevation,
+            isMountain: OFFICIAL_KNOWN_ELEVATIONS[lower].isMountain,
+            country: fav.country || OFFICIAL_KNOWN_ELEVATIONS[lower].country
+          };
+        }
+        return fav;
+      });
+    } else {
+      state.favorites = [];
+      AlpineStorage.safeSetItem(STORAGE_KEY, []);
+    }
   }
 } catch (e) {
   state.favorites = [];
-}
-
-if (!state.favorites || state.favorites.length === 0) {
-  state.favorites = [
-    { name: 'München', lat: 48.1374, lon: 11.5755, elevation: 520, country: 'Deutschland', isMountain: false },
-    { name: 'Zugspitze', lat: 47.4212, lon: 10.9864, elevation: 2962, country: 'Deutschland', isMountain: true },
-    { name: 'Matterhorn', lat: 45.9764, lon: 7.6586, elevation: 4478, country: 'Schweiz', isMountain: true },
-    { name: 'Berlin', lat: 52.5200, lon: 13.4050, elevation: 34, country: 'Deutschland', isMountain: false },
-    { name: 'Bozen', lat: 46.4983, lon: 11.3548, elevation: 262, country: 'Italien', isMountain: false }
-  ];
-  AlpineStorage.safeSetItem(STORAGE_KEY, state.favorites);
 }

@@ -400,6 +400,43 @@ body {
   border-radius: 8px;
 }
 
+.dd-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-item-star-btn,
+.spotlight-fav-star-btn {
+  background: transparent;
+  border: none;
+  font-size: 19px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, color 0.15s ease, filter 0.15s ease;
+  min-width: 32px;
+  min-height: 32px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.search-item-star-btn:hover,
+.spotlight-fav-star-btn:hover {
+  transform: scale(1.2);
+  color: #ffd166;
+}
+
+.search-item-star-btn.favorited,
+.spotlight-fav-star-btn.favorited {
+  color: #ffd166;
+  filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.65));
+}
+
 /* Zuletzt gesucht & Schnell-Presets */
 .recent-searches-box {
   display: flex;
@@ -4070,6 +4107,101 @@ body {
 
 .action-btn:hover {
   transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   AKTUELLE GPS-POSITION DES GERÄTS (Oberhalb der Favoritenliste)
+   ========================================================================== */
+.favorites-gps-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.16) 0%, rgba(48, 209, 88, 0.12) 100%);
+  border: 1.5px solid rgba(10, 132, 255, 0.35);
+  border-radius: 18px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.favorites-gps-card:hover {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.24) 0%, rgba(48, 209, 88, 0.18) 100%);
+  border-color: rgba(100, 210, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(10, 132, 255, 0.25);
+}
+
+.favorites-gps-card:active {
+  transform: scale(0.985);
+}
+
+.favorites-gps-card.active-gps {
+  border-color: #30d158;
+  background: linear-gradient(135deg, rgba(48, 209, 88, 0.22) 0%, rgba(10, 132, 255, 0.15) 100%);
+  box-shadow: 0 0 16px rgba(48, 209, 88, 0.3);
+}
+
+.fgc-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fgc-icon {
+  font-size: 26px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 8px rgba(0, 122, 255, 0.4));
+}
+
+.fgc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fgc-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.fgc-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.fgc-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fgc-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #30d158;
+  background: rgba(48, 209, 88, 0.16);
+  border: 1px solid rgba(48, 209, 88, 0.3);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.fgc-arrow {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.favorites-gps-card:hover .fgc-arrow {
+  color: #ffffff;
+  transform: translateX(3px);
 }
 
 .favorites-grid {
@@ -7963,6 +8095,208 @@ body {
 
 .sports-route-slider::-webkit-slider-thumb:hover {
   transform: scale(1.15);
+}
+
+/* ==========================================================================
+   KOMPAKTER ROUTEN- & HÖHENWETTER MONITOR (ONE-TOUCH ALPINE COCKPIT)
+   ========================================================================== */
+.sports-cockpit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cockpit-chart-container {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(10, 16, 28, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+.cockpit-chart-hint {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 3px 8px;
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 5;
+}
+
+.cockpit-quick-stations {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.cockpit-station-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cockpit-station-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.cockpit-station-chip:active {
+  transform: scale(0.97);
+}
+
+.cockpit-station-chip.active {
+  background: rgba(10, 132, 255, 0.25);
+  border-color: #0a84ff;
+  color: #64d2ff;
+  box-shadow: 0 0 14px rgba(10, 132, 255, 0.35);
+}
+
+.csc-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.csc-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Wetter-Kapsel unter dem Profil */
+.cockpit-weather-capsule {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.cwc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 10px;
+}
+
+.cwc-station-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cwc-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.cwc-title-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cwc-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.cwc-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.cwc-time-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.14);
+  border: 1px solid rgba(255, 209, 102, 0.3);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-family: var(--font-mono);
+}
+
+/* 4-Kachel Grid */
+.cwc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.cwc-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.cwc-tile-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cwc-tile-val {
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.cwc-tile-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Alert-Bar */
+.cwc-alert-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 69, 58, 0.16);
+  border: 1px solid rgba(255, 69, 58, 0.4);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #ff453a;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .sports-chart-wrapper {

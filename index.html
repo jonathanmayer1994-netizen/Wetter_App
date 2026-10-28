@@ -1121,76 +1121,85 @@
           </section>
 
 
-          <!-- 3. INTERAKTIVE STRECKEN-TIMELINE & HÖHENPROFIL -->
-          <section class="glass-card sports-timeline-card">
+          <!-- 3. KOMPAKTER ROUTEN- & HÖHENWETTER MONITOR (ONE-TOUCH ALPINE COCKPIT) -->
+          <section class="glass-card sports-cockpit-card" id="sports-cockpit-card">
             <div class="card-header">
               <div class="card-title">
-                <span class="card-icon">📈</span>
-                <span>INTERAKTIVES HÖHENPROFIL & ZEITVERLAUF ENTLANG DER ROUTE</span>
+                <span class="card-icon">🏔️</span>
+                <span>STRECKEN- & HÖHENWETTER</span>
               </div>
-              <span class="card-tag">Scrubber ziehen / berühren</span>
+              <span class="card-tag" id="cockpit-pos-badge">📍 km 0.0 • -- m</span>
             </div>
 
-            <!-- Interaktiver Strecken-Slider (Scrubber) -->
-            <div class="sports-scrubber-wrapper">
-              <div class="ss-info-row">
-                <span id="ss-current-point-label">📍 Startpunkt (km 0.0)</span>
-                <span id="ss-current-time-badge" class="ss-badge">⏱️ 08:00 Uhr</span>
-              </div>
-              <input type="range" id="sports-route-slider" min="0" max="100" value="0" step="1" class="sports-route-slider">
-            </div>
-
-            <!-- SVG Höhenprofil-Canvas mit Wetter-Farbverlauf -->
-            <div class="sports-chart-wrapper" id="sports-chart-wrapper">
+            <!-- Interaktives Höhenprofil: Direktes Streichen & Antippen -->
+            <div class="cockpit-chart-container" id="sports-chart-wrapper">
+              <div class="cockpit-chart-hint">👆 Profil berühren</div>
               <svg id="sports-elevation-svg" class="sports-elevation-svg" viewBox="0 0 900 240" preserveAspectRatio="none">
-                <!-- Dynamisch gerendertes Höhenprofil mit Wetterkurve -->
+                <!-- Dynamisch gerendertes Höhenprofil -->
               </svg>
-
-              <!-- Schwebendes Wegpunkt-Wetter-HUD -->
-              <div class="sports-hud-badge" id="sports-hud-badge" style="display:none;">
-                <div class="shb-top">
-                  <span id="shb-icon">⛅</span>
-                  <strong id="shb-title">km 0.0</strong>
-                  <span id="shb-time">08:00</span>
-                </div>
-                <div class="shb-metrics">
-                  <span id="shb-temp">--°C</span> • 
-                  <span id="shb-wind">-- km/h</span> • 
-                  <span id="shb-cond">Trocken</span>
-                </div>
-                <div class="shb-sub" id="shb-ele">Höhe: -- m</div>
-              </div>
-            </div>
-          </section>
-
-          <!-- 4. WEGPUNKT-WETTERTABELLE & ETAPPEN-INSPEKTOR -->
-          <section class="glass-card sports-waypoints-card">
-            <div class="card-header swt-card-header">
-              <div class="card-title">
-                <span class="card-icon">🧭</span>
-                <span>ETAPPEN-WETTERBERICHT ZUR GENAUEN DURCHGANGSZEIT</span>
-              </div>
-              <div class="swt-filter-group" id="swt-filter-group">
-                <button type="button" class="swt-filter-pill active" data-wpt-filter="all">🌐 Alle Wegpunkte</button>
-                <button type="button" class="swt-filter-pill" data-wpt-filter="hazards">⚠️ Nur Warnungen</button>
-                <button type="button" class="swt-filter-pill" data-wpt-filter="peaks">🏔️ Pässe & Gipfel</button>
-              </div>
             </div>
 
-            <!-- Fahrplan-Perlenkette & Etappen-Wetterbericht -->
+            <!-- Unsichtbarer Fallback-Slider für Abwärtskompatibilität -->
+            <input type="range" id="sports-route-slider" min="0" max="100" value="0" step="1" style="display:none;" aria-hidden="true">
 
-            <div class="sports-waypoints-table-wrap">
-              <div class="swt-header">
-                <span class="swt-col swt-col-pos">Streckenabschnitt</span>
-                <span class="swt-col swt-col-dist-ele">Distanz &amp; Höhe</span>
-                <span class="swt-col swt-col-time">Uhrzeit</span>
-                <span class="swt-col swt-col-cond">Wetterlage</span>
-                <span class="swt-col swt-col-temp">Temp (Gefühlt)</span>
-                <span class="swt-col swt-col-wind">Wind &amp; Vektor</span>
-                <span class="swt-col swt-col-precip">Niederschlag</span>
+            <!-- 1-Touch Schnellwahl-Stationen (Start, Scheitelpunkt/Gipfel, Ziel) -->
+            <div class="cockpit-quick-stations" id="cockpit-quick-stations">
+              <button type="button" class="cockpit-station-chip active" id="cockpit-chip-start" data-station="start">
+                <span class="csc-icon">🟢</span>
+                <span class="csc-label">Start (0 km)</span>
+              </button>
+              <button type="button" class="cockpit-station-chip" id="cockpit-chip-peak" data-station="peak">
+                <span class="csc-icon">🏔️</span>
+                <span class="csc-label" id="cockpit-peak-label">Gipfel (-- m)</span>
+              </button>
+              <button type="button" class="cockpit-station-chip" id="cockpit-chip-finish" data-station="finish">
+                <span class="csc-icon">🏁</span>
+                <span class="csc-label" id="cockpit-finish-label">Ziel (-- km)</span>
+              </button>
+            </div>
+
+            <!-- Smart Weather Capsule für den gewählten Punkt (Keine Überlappung) -->
+            <div class="cockpit-weather-capsule" id="cockpit-weather-capsule">
+              <div class="cwc-header">
+                <div class="cwc-station-info">
+                  <span class="cwc-icon" id="cwc-icon">⛅</span>
+                  <div class="cwc-title-col">
+                    <strong class="cwc-title" id="cwc-title">Startpunkt</strong>
+                    <span class="cwc-sub" id="cwc-sub">km 0.0 • -- m</span>
+                  </div>
+                </div>
+                <div class="cwc-time-badge" id="cwc-time">⏱️ --:-- Uhr</div>
               </div>
-              <div class="swt-body" id="sports-waypoints-list">
-                <!-- Dynamisch generierte Wegpunkt-Zeilen -->
+
+              <div class="cwc-grid">
+                <div class="cwc-tile">
+                  <span class="cwc-tile-label">🌡️ Temperatur</span>
+                  <div class="cwc-tile-val" id="cwc-temp">--°C</div>
+                  <span class="cwc-tile-sub" id="cwc-felt">Gefühlt --°C</span>
+                </div>
+
+                <div class="cwc-tile">
+                  <span class="cwc-tile-label">⛅ Wetterlage</span>
+                  <div class="cwc-tile-val" id="cwc-cond">--</div>
+                  <span class="cwc-tile-sub" id="cwc-cond-note">Bedingungen stabil</span>
+                </div>
+
+                <div class="cwc-tile">
+                  <span class="cwc-tile-label">💨 Wind</span>
+                  <div class="cwc-tile-val" id="cwc-wind">-- km/h</div>
+                  <span class="cwc-tile-sub" id="cwc-gusts">Böen -- km/h</span>
+                </div>
+
+                <div class="cwc-tile">
+                  <span class="cwc-tile-label">💧 Niederschlag</span>
+                  <div class="cwc-tile-val" id="cwc-precip">0 mm</div>
+                  <span class="cwc-tile-sub" id="cwc-pop">0% Risiko</span>
+                </div>
+              </div>
+
+              <div class="cwc-alert-bar" id="cwc-alert-bar" style="display: none;">
+                <span class="cwc-alert-icon">⚠️</span>
+                <span class="cwc-alert-text" id="cwc-alert-text">Warnung aktiv</span>
               </div>
             </div>
           </section>
@@ -1514,6 +1523,21 @@
           <p class="section-desc">
             Tippe auf einen gespeicherten Ort, um sofort alle meteorologischen und alpinen Daten metergenau zu laden.
           </p>
+
+          <!-- AKTUELLE GPS POSITION DES GERÄTS (Oberhalb der Favoriten) -->
+          <div class="favorites-gps-card" id="favorites-gps-card" role="button" tabindex="0" title="Aktuellen GPS-Standort des Geräts abfragen">
+            <div class="fgc-left">
+              <span class="fgc-icon">📍</span>
+              <div class="fgc-text">
+                <div class="fgc-title">Aktuelle GPS-Position des Geräts</div>
+                <span class="fgc-sub" id="fgc-status-desc">Gerätestandort & Berghöhe live per GPS ermitteln</span>
+              </div>
+            </div>
+            <div class="fgc-right">
+              <span class="fgc-badge">GPS Live</span>
+              <span class="fgc-arrow">➔</span>
+            </div>
+          </div>
 
           <div class="favorites-grid" id="favorites-grid">
             <!-- Dynamisch aus localStorage befüllt -->
