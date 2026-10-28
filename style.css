@@ -8059,6 +8059,18 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.swt-mobile-summary {
+  display: none;
+}
+
+.swt-accordion-pane {
+  display: none;
+}
+
+.swt-desktop-cells {
+  display: contents;
+}
+
 .swt-header,
 .swt-row {
   display: grid;
@@ -8468,120 +8480,306 @@ body {
     display: none !important;
   }
 
-  .swt-body {
-    display: flex !important;
-    flex-direction: row !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    scroll-snap-type: x mandatory !important;
-    -webkit-overflow-scrolling: touch !important;
-    gap: 12px !important;
-    padding: 4px 4px 10px 4px !important;
-    scrollbar-width: none;
+  .swt-desktop-cells {
+    display: none !important;
   }
 
-  .swt-body::-webkit-scrollbar {
-    display: none;
+  .swt-mobile-stepper {
+    display: none !important;
+  }
+
+  /* FAHRPLAN-PERLENKETTE (Vertikale Stationen-Liste) */
+  .swt-body {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    scroll-snap-type: none !important;
+    gap: 8px !important;
+    padding: 2px 0 10px 0 !important;
+    width: 100% !important;
   }
 
   .swt-row {
-    display: grid !important;
-    grid-template-areas:
-      "milestone time"
-      "weather weather"
-      "distele temp"
-      "wind wind"
-      "precip precip" !important;
-    grid-template-columns: 1fr auto !important;
-    row-gap: 8px !important;
-    column-gap: 8px !important;
-    align-items: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
     min-width: 0 !important;
-    width: 82vw !important;
-    max-width: 320px !important;
-    flex: 0 0 calc(82vw - 12px) !important;
-    scroll-snap-align: center !important;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%), rgba(12, 19, 36, 0.8) !important;
-    backdrop-filter: blur(24px) saturate(200%) !important;
-    -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    border-top: 1.5px solid rgba(255, 255, 255, 0.35) !important;
-    border-radius: 20px !important;
-    padding: 12px 14px !important;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+    flex: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 16px !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(15, 23, 42, 0.7) 100%), rgba(12, 19, 36, 0.75) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
+    overflow: hidden !important;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease !important;
     user-select: none;
     -webkit-user-select: none;
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s, box-shadow 0.2s !important;
   }
 
-  .swt-row.active-waypoint,
+  .swt-row:active {
+    transform: scale(0.99);
+  }
+
+  .swt-row.is-expanded {
+    border-color: rgba(0, 229, 255, 0.5) !important;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(15, 23, 42, 0.85) 100%) !important;
+    box-shadow: 0 6px 22px rgba(0, 229, 255, 0.2) !important;
+  }
+
   .swt-row.swt-row-active-live {
-    border-color: #00e5ff !important;
-    box-shadow: 0 12px 36px rgba(0, 229, 255, 0.35), inset 0 0 0 1px #00e5ff !important;
-    transform: scale(1.02);
+    border-left: 3px solid #00e5ff !important;
   }
 
-  .swt-cell.swt-milestone {
-    grid-area: milestone;
+  /* 1. COMPACT SUMMARY BAR (Fahrplan-Zeile) */
+  .swt-mobile-summary {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    gap: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .sms-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .sms-node-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .sms-node-badge.node-start {
+    background: rgba(48, 209, 88, 0.2);
+    border-color: #30d158;
+    color: #30d158;
+  }
+
+  .sms-node-badge.node-peak {
+    background: rgba(255, 209, 102, 0.25);
+    border-color: #ffd166;
+    color: #ffd166;
+    box-shadow: 0 0 10px rgba(255, 209, 102, 0.35);
+  }
+
+  .sms-node-badge.node-end {
+    background: rgba(100, 210, 255, 0.2);
+    border-color: #64d2ff;
+    color: #64d2ff;
+  }
+
+  .sms-node-badge.node-completed {
+    background: rgba(48, 209, 88, 0.25);
+    border-color: #30d158;
+    color: #30d158;
+    font-weight: 800;
+  }
+
+  .sms-node-badge.node-next {
+    background: rgba(0, 229, 255, 0.25);
+    border-color: #00e5ff;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+  }
+
+  .sms-text-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
     gap: 2px;
   }
 
-  .swt-cell.swt-time {
-    grid-area: time;
-    text-align: right;
-    align-items: flex-end;
+  .sms-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
   }
 
-  .swt-m-name {
+  .sms-name {
     font-size: 13px;
     font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     max-width: 170px;
   }
 
-  .swt-cell.swt-weather {
-    grid-area: weather;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 6px 10px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+  .sms-peak-badge {
+    font-size: 9.5px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: rgba(255, 209, 102, 0.2);
+    color: #ffd166;
+    border: 1px solid rgba(255, 209, 102, 0.4);
+    font-weight: 700;
   }
 
-  .swt-cell.swt-dist-ele {
-    grid-area: distele;
-    flex-direction: row;
+  .sms-warn-badge {
+    font-size: 9.5px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: rgba(255, 69, 58, 0.2);
+    color: #ff453a;
+    border: 1px solid rgba(255, 69, 58, 0.4);
+    font-weight: 700;
+  }
+
+  .sms-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  .sms-sep {
+    opacity: 0.35;
+  }
+
+  .sms-right {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    align-items: baseline;
+    flex-shrink: 0;
   }
 
-  .swt-cell.swt-temp {
-    grid-area: temp;
-    flex-direction: row;
-    align-items: baseline;
+  .sms-weather-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .sms-icon {
+    font-size: 15px;
+  }
+
+  .sms-temp {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .sms-chevron {
+    font-size: 14px;
+    color: var(--text-tertiary);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s;
+    user-select: none;
+  }
+
+  .swt-row.is-expanded .sms-chevron {
+    transform: rotate(180deg);
+    color: var(--ios-cyan);
+  }
+
+  /* 2. ACCORDION DETAILS PANE */
+  .swt-accordion-pane {
+    display: block !important;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    border-top: 1px solid transparent;
+  }
+
+  .swt-row.is-expanded .swt-accordion-pane {
+    max-height: 420px;
+    opacity: 1;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .sap-inner {
+    padding: 10px 12px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .sap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 6px;
-    justify-content: flex-end;
   }
 
-  .swt-temp-val {
-    font-size: 16px;
-    color: #00e5ff;
+  .sap-chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
-  .swt-cell.swt-wind {
-    grid-area: wind;
-    flex-direction: row;
-    justify-content: space-between;
+  .sap-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .sap-val {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.25;
+  }
+
+  .sap-sub {
+    font-size: 10.5px;
+    color: var(--text-secondary);
+    line-height: 1.2;
+  }
+
+  .sap-footer {
+    display: flex;
     align-items: center;
-    border-top: 1px dashed rgba(255, 255, 255, 0.08);
-    padding-top: 6px;
-    width: 100%;
+    justify-content: stretch;
+    margin-top: 2px;
   }
 
-  .swt-cell.swt-precip {
-    grid-area: precip;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
+  .sap-focus-btn {
     width: 100%;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(0, 229, 255, 0.12);
+    border: 1px solid rgba(0, 229, 255, 0.35);
+    color: var(--ios-cyan);
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: all 0.15s ease;
+  }
+
+  .sap-focus-btn:active {
+    background: rgba(0, 229, 255, 0.28);
+    transform: scale(0.98);
   }
 }
 

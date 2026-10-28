@@ -720,67 +720,6 @@ export function setupSportsTab() {
     });
   }
 
-  // Mobile Stage Stepper Navigation
-  const smsPrevBtn = document.getElementById('sms-prev-btn');
-  const smsNextBtn = document.getElementById('sms-next-btn');
-  const swtList = document.getElementById('sports-waypoints-list');
-  const smsBadge = document.getElementById('sms-step-badge');
-
-  if (swtList) {
-    let scrollTimeout;
-    swtList.addEventListener('scroll', () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        const rows = swtList.querySelectorAll('.swt-row');
-        if (rows.length === 0) return;
-        const center = swtList.scrollLeft + swtList.clientWidth / 2;
-        let bestIdx = 0;
-        let minDiff = Infinity;
-        rows.forEach((r, i) => {
-          const diff = Math.abs((r.offsetLeft + r.offsetWidth / 2) - center);
-          if (diff < minDiff) { minDiff = diff; bestIdx = i; }
-        });
-        if (smsBadge) smsBadge.innerText = `Etappe ${bestIdx + 1} von ${rows.length}`;
-      }, 50);
-    }, { passive: true });
-  }
-
-  if (smsPrevBtn && swtList) {
-    smsPrevBtn.addEventListener('click', () => {
-      const rows = swtList.querySelectorAll('.swt-row');
-      if (rows.length === 0) return;
-      const center = swtList.scrollLeft + swtList.clientWidth / 2;
-      let curr = 0;
-      let minDiff = Infinity;
-      rows.forEach((r, i) => {
-        const diff = Math.abs((r.offsetLeft + r.offsetWidth / 2) - center);
-        if (diff < minDiff) { minDiff = diff; curr = i; }
-      });
-      if (curr > 0) {
-        rows[curr - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        rows[curr - 1].click();
-      }
-    });
-  }
-
-  if (smsNextBtn && swtList) {
-    smsNextBtn.addEventListener('click', () => {
-      const rows = swtList.querySelectorAll('.swt-row');
-      if (rows.length === 0) return;
-      const center = swtList.scrollLeft + swtList.clientWidth / 2;
-      let curr = 0;
-      let minDiff = Infinity;
-      rows.forEach((r, i) => {
-        const diff = Math.abs((r.offsetLeft + r.offsetWidth / 2) - center);
-        if (diff < minDiff) { minDiff = diff; curr = i; }
-      });
-      if (curr < rows.length - 1) {
-        rows[curr + 1].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        rows[curr + 1].click();
-      }
-    });
-  }
-
   // Live-Tour Tracking Controls
   const trackToggleBtn = document.getElementById('sports-live-track-toggle');
   if (trackToggleBtn) {
@@ -1721,10 +1660,14 @@ export function renderSportsWaypointsTable(timeline) {
     let typeTag = '📍 Wegpunkt';
     let tagClass = 'tag-wpt';
     let labelText = `km ${m.distFromStartKm.toFixed(1)}`;
+    let nodeIcon = '📍';
+    let nodeClass = 'node-wpt';
 
     if (isCompleted) {
       typeTag = isStart ? '✓ Tourstart' : '✓ Passiert';
       tagClass = 'tag-completed';
+      nodeIcon = '✓';
+      nodeClass = 'node-completed';
       if (isStart) labelText = 'Startpunkt';
       else if (isPeak) labelText = `Passhöhe (${Math.round(m.ele)} m)`;
       else if (isEnd) labelText = `Zielankunft (${m.distFromStartKm.toFixed(1)} km)`;
@@ -1732,6 +1675,8 @@ export function renderSportsWaypointsTable(timeline) {
     } else if (isNext) {
       typeTag = '➡️ Nächster Halt';
       tagClass = 'tag-next';
+      nodeIcon = '⚡';
+      nodeClass = 'node-next';
       if (isStart) labelText = 'Startpunkt';
       else if (isPeak) labelText = `Passhöhe (${Math.round(m.ele)} m)`;
       else if (isEnd) labelText = `Zielankunft (${m.distFromStartKm.toFixed(1)} km)`;
@@ -1739,18 +1684,32 @@ export function renderSportsWaypointsTable(timeline) {
     } else if (isPeak) {
       typeTag = '🏔️ Scheitelpunkt';
       tagClass = 'tag-peak';
+      nodeIcon = '🏔️';
+      nodeClass = 'node-peak';
       labelText = `Passhöhe (${Math.round(m.ele)} m)`;
     } else if (isEnd) {
       typeTag = '🏁 Zielankunft';
       tagClass = 'tag-finish';
+      nodeIcon = '🏁';
+      nodeClass = 'node-end';
       labelText = `Streckenende (${m.distFromStartKm.toFixed(1)} km)`;
     } else if (isStart) {
       typeTag = '🏁 Tourstart';
       tagClass = 'tag-start';
+      nodeIcon = '🟢';
+      nodeClass = 'node-start';
       labelText = 'Startpunkt';
     } else {
       labelText = `Streckenabschnitt ${m.distFromStartKm.toFixed(1)} km`;
     }
+
+    const hasWarning = (
+      m.precipMm >= 0.5 ||
+      m.gustsKmH >= 45 ||
+      m.weatherCode >= 95 ||
+      m.isSnow ||
+      (m.weatherCondition && m.weatherCondition.includes('Gewitter'))
+    );
 
     let deltaHtml = '';
     if (!isCompleted && m.timeDeltaMinutes !== undefined && m.timeDeltaMinutes !== 0) {
@@ -1760,70 +1719,162 @@ export function renderSportsWaypointsTable(timeline) {
 
     const feltT = m.feltTempC !== undefined ? m.feltTempC : Math.round(m.tempC);
 
+    // Standardmäßig erstes oder nächstes Element aufgeklappt
+    if (isNext || (nextUncompletedIdx === -1 && idx === 0)) {
+      row.classList.add('is-expanded');
+    }
+
     row.innerHTML = `
-      <!-- 1. Streckenabschnitt -->
-      <div class="swt-cell swt-milestone">
-        <span class="swt-type-tag ${tagClass} ${isCompleted ? 'swt-completed-tag' : (isNext ? 'swt-live-next-tag' : '')}">${escapeHtml(typeTag)}</span>
-        <span class="swt-m-name">${escapeHtml(labelText)}</span>
-        <span class="swt-m-coords">${m.lat.toFixed(4)}°, ${m.lon.toFixed(4)}°</span>
-      </div>
-
-      <!-- 2. Distanz & Höhe -->
-      <div class="swt-cell swt-dist-ele">
-        <strong class="swt-dist">${m.distFromStartKm.toFixed(1)} km</strong>
-        <span class="swt-ele text-cyan">${Math.round(m.ele)} m</span>
-      </div>
-
-      <!-- 3. Durchgangszeit -->
-      <div class="swt-cell swt-time">
-        <div class="swt-time-top">
-          <strong class="swt-arr-time">${escapeHtml(m.arrivalTimeStr)}</strong>
-          ${deltaHtml}
+      <!-- 1. MOBILER COMPACT SUMMARY BAR (Apple-Wetter Fahrplan-Perlenkette) -->
+      <div class="swt-mobile-summary">
+        <div class="sms-left">
+          <span class="sms-node-badge ${nodeClass}">${nodeIcon}</span>
+          <div class="sms-text-col">
+            <div class="sms-title-row">
+              <strong class="sms-name">${escapeHtml(labelText)}</strong>
+              ${isPeak ? '<span class="sms-peak-badge">🏔️ Gipfel</span>' : ''}
+              ${hasWarning ? '<span class="sms-warn-badge">⚠️ Achtung</span>' : ''}
+            </div>
+            <div class="sms-sub-row">
+              <span class="sms-time text-yellow">⏱️ ${escapeHtml(m.arrivalTimeStr)}</span>
+              <span class="sms-sep">•</span>
+              <span class="sms-dist">${m.distFromStartKm.toFixed(1)} km</span>
+              <span class="sms-sep">•</span>
+              <span class="sms-ele text-cyan">${Math.round(m.ele)} m</span>
+            </div>
+          </div>
         </div>
-        <span class="swt-arr-date">${escapeHtml(m.arrivalDateStr)}</span>
-      </div>
 
-      <!-- 4. Wetterlage -->
-      <div class="swt-cell swt-weather">
-        <div class="swt-w-top">
-          <span class="swt-icon">${m.weatherIcon}</span>
-          <span class="swt-cond">${escapeHtml(m.weatherCondition)}</span>
+        <div class="sms-right">
+          <div class="sms-weather-chip">
+            <span class="sms-icon">${m.weatherIcon}</span>
+            <strong class="sms-temp">${m.tempC}°</strong>
+          </div>
+          <span class="sms-chevron">▾</span>
         </div>
       </div>
 
-      <!-- 5. Temperatur (Gefühlt) -->
-      <div class="swt-cell swt-temp">
-        <strong class="swt-temp-val">${m.tempC}°C</strong>
-        <span class="swt-temp-felt">Gefühlt ${feltT}°C</span>
+      <!-- 2. DESKTOP TABELLENZEILEN (Klassische Ansicht bei großen Monitoren) -->
+      <div class="swt-desktop-cells">
+        <div class="swt-cell swt-milestone">
+          <span class="swt-type-tag ${tagClass} ${isCompleted ? 'swt-completed-tag' : (isNext ? 'swt-live-next-tag' : '')}">${escapeHtml(typeTag)}</span>
+          <span class="swt-m-name">${escapeHtml(labelText)}</span>
+          <span class="swt-m-coords">${m.lat.toFixed(4)}°, ${m.lon.toFixed(4)}°</span>
+        </div>
+        <div class="swt-cell swt-dist-ele">
+          <strong class="swt-dist">${m.distFromStartKm.toFixed(1)} km</strong>
+          <span class="swt-ele text-cyan">${Math.round(m.ele)} m</span>
+        </div>
+        <div class="swt-cell swt-time">
+          <div class="swt-time-top">
+            <strong class="swt-arr-time">${escapeHtml(m.arrivalTimeStr)}</strong>
+            ${deltaHtml}
+          </div>
+          <span class="swt-arr-date">${escapeHtml(m.arrivalDateStr)}</span>
+        </div>
+        <div class="swt-cell swt-weather">
+          <div class="swt-w-top">
+            <span class="swt-icon">${m.weatherIcon}</span>
+            <span class="swt-cond">${escapeHtml(m.weatherCondition)}</span>
+          </div>
+        </div>
+        <div class="swt-cell swt-temp">
+          <strong class="swt-temp-val">${m.tempC}°C</strong>
+          <span class="swt-temp-felt">Gefühlt ${feltT}°C</span>
+        </div>
+        <div class="swt-cell swt-wind">
+          <div class="swt-wind-top">
+            <strong>${m.windKmH} km/h</strong>
+            <span class="swt-gusts text-orange">Böen ${m.gustsKmH}</span>
+          </div>
+          ${m.relWindBadge ? `<span class="swt-rel-wind-badge ${m.relWindType || ''}">${escapeHtml(m.relWindBadge)}</span>` : ''}
+          ${m.descentWindchillC !== undefined && m.descentWindchillC <= 10 && (state.sports.category === 'bike' || m.distFromStartKm > 0) ? `<span class="swt-descent-badge">🥶 Abfahrt RealFeel ${m.descentWindchillC}°C</span>` : ''}
+        </div>
+        <div class="swt-cell swt-precip">
+          <div class="swt-precip-top">
+            <strong class="${m.popPercent >= 50 ? 'text-red' : (m.popPercent >= 25 ? 'text-yellow' : '')}">${m.popPercent}%</strong>
+            <span class="swt-precip-mm">${m.precipMm > 0 ? `${m.precipMm.toFixed(1)} mm` : '0 mm'}</span>
+          </div>
+          ${m.isSnow ? '<span class="swt-snow-badge">❄️ Frost</span>' : ''}
+        </div>
       </div>
 
-      <!-- 6. Wind & Vektor -->
-      <div class="swt-cell swt-wind">
-        <div class="swt-wind-top">
-          <strong>${m.windKmH} km/h</strong>
-          <span class="swt-gusts text-orange">Böen ${m.gustsKmH}</span>
-        </div>
-        ${m.relWindBadge ? `<span class="swt-rel-wind-badge ${m.relWindType || ''}">${escapeHtml(m.relWindBadge)}</span>` : ''}
-        ${m.descentWindchillC !== undefined && m.descentWindchillC <= 10 && (state.sports.category === 'bike' || m.distFromStartKm > 0) ? `<span class="swt-descent-badge">🥶 Abfahrt RealFeel ${m.descentWindchillC}°C</span>` : ''}
-      </div>
+      <!-- 3. MOBILES INLINE-ACCORDION DETAILPANEL (Klappt per Daumentipp auf) -->
+      <div class="swt-accordion-pane">
+        <div class="sap-inner">
+          <div class="sap-grid">
+            <div class="sap-chip">
+              <span class="sap-label">🌡️ Wetterzustand & Gefühl</span>
+              <strong class="sap-val">${m.weatherIcon} ${escapeHtml(m.weatherCondition)}</strong>
+              <span class="sap-sub">Temperatur: <b>${m.tempC}°C</b> (Gefühlt <b>${feltT}°C</b>)</span>
+            </div>
 
-      <!-- 7. Niederschlag -->
-      <div class="swt-cell swt-precip">
-        <div class="swt-precip-top">
-          <strong class="${m.popPercent >= 50 ? 'text-red' : (m.popPercent >= 25 ? 'text-yellow' : '')}">${m.popPercent}%</strong>
-          <span class="swt-precip-mm">${m.precipMm > 0 ? `${m.precipMm.toFixed(1)} mm` : '0 mm'}</span>
+            <div class="sap-chip">
+              <span class="sap-label">💨 Wind & Windvektor</span>
+              <strong class="sap-val">${m.windKmH} km/h • Böen ${m.gustsKmH} km/h</strong>
+              <span class="sap-sub text-cyan">${escapeHtml(m.relWindBadge || 'Normaler Wind')}</span>
+            </div>
+
+            <div class="sap-chip">
+              <span class="sap-label">💧 Niederschlag & Frost</span>
+              <strong class="sap-val ${m.popPercent >= 50 ? 'text-red' : ''}">${m.popPercent}% Regenrisiko</strong>
+              <span class="sap-sub">${m.precipMm > 0 ? `${m.precipMm.toFixed(1)} mm erwartet` : 'Trockene Verhältnisse'} ${m.isSnow ? '• ❄️ Schneelage' : ''}</span>
+            </div>
+
+            <div class="sap-chip">
+              <span class="sap-label">🧭 Position & Ankunft</span>
+              <strong class="sap-val">${escapeHtml(m.arrivalTimeStr)} (${escapeHtml(m.arrivalDateStr)})</strong>
+              <span class="sap-sub">${m.lat.toFixed(4)}°, ${m.lon.toFixed(4)}° ${deltaHtml ? `• ${deltaHtml}` : ''}</span>
+            </div>
+          </div>
+
+          <div class="sap-footer">
+            <button type="button" class="sap-focus-btn" data-km="${m.distFromStartKm}">
+              <span>📍 Auf Karte zentrieren & Profil fokussieren</span>
+            </button>
+          </div>
         </div>
-        ${m.isSnow ? '<span class="swt-snow-badge">❄️ Frost</span>' : ''}
       </div>
     `;
 
-    row.addEventListener('click', () => {
+    row.addEventListener('click', (e) => {
+      const isExpanded = row.classList.contains('is-expanded');
+
+      // Wenn auf den Fokus-Button geklickt wurde, direkt zentrieren
+      if (e.target.closest('.sap-focus-btn')) {
+        e.stopPropagation();
+        const slider = document.getElementById('sports-route-slider');
+        if (slider) {
+          const pct = (m.distFromStartKm / timeline.totalDistanceKm) * 100;
+          slider.value = Math.round(pct);
+        }
+        updateSportsScrubber(m.distFromStartKm);
+        if (state.sports.map) {
+          state.sports.map.panTo([m.lat, m.lon], { animate: true });
+        }
+        return;
+      }
+
+      // Accordion Verhalten: Andere Zeilen auf Mobile schließen
+      const allRows = container.querySelectorAll('.swt-row');
+      allRows.forEach(r => {
+        if (r !== row) r.classList.remove('is-expanded');
+      });
+
+      if (isExpanded) {
+        row.classList.remove('is-expanded');
+      } else {
+        row.classList.add('is-expanded');
+      }
+
+      // Scrubber und Karte synchronisieren
       const slider = document.getElementById('sports-route-slider');
       if (slider) {
         const pct = (m.distFromStartKm / timeline.totalDistanceKm) * 100;
         slider.value = Math.round(pct);
       }
       updateSportsScrubber(m.distFromStartKm);
+
       // Wenn Live-Tracking aktiv oder bereits im In-Flight Modus: manuell auf Punkt springen
       if (state.sports.trackingActive || state.sports.currentProgressKm > 0) {
         updateInFlightProgress(m.distFromStartKm, true);
@@ -1834,10 +1885,6 @@ export function renderSportsWaypointsTable(timeline) {
   });
 
   container.replaceChildren(fragment);
-  const smsBadge = document.getElementById('sms-step-badge');
-  if (smsBadge && visibleMilestones.length > 0) {
-    smsBadge.innerText = `Etappe 1 von ${visibleMilestones.length}`;
-  }
 }
 
 export function renderSportsMap(timeline) {
@@ -2102,20 +2149,14 @@ export function updateSportsScrubber(km) {
     state.sports.scrubberMarker.setLatLng([closestPt.lat, closestPt.lon]);
   }
 
-  // Wegpunkt-Zeile in Tabelle hervorheben & Mobile Stage Carousel synchronisieren
+  // Wegpunkt-Zeile in Tabelle hervorheben & Accordion fokussieren
   const rows = document.querySelectorAll('.swt-row');
-  const smsBadge = document.getElementById('sms-step-badge');
   rows.forEach((row, i) => {
     const rIdx = parseInt(row.dataset.idx, 10);
     const isActive = rIdx === closestMsIdx;
     row.classList.toggle('active-waypoint', isActive);
-    if (isActive) {
-      if (smsBadge) {
-        smsBadge.innerText = `Etappe ${i + 1} von ${rows.length}`;
-      }
-      if (window.innerWidth <= 768) {
-        row.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      }
+    if (isActive && window.innerWidth <= 768) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   });
 }
