@@ -76,9 +76,16 @@ export function renderMountainPanel() {
   if (!m) return;
 
   const loc = state.currentLocation;
-  document.getElementById('mountain-title').innerText = `${loc.name} (${loc.elevation.toLocaleString('de-DE')} m)`;
-  document.getElementById('m-peak-elev').innerText = `${loc.elevation.toLocaleString('de-DE')} m`;
-  document.getElementById('m-landform').innerText = m.terrain10m.landform;
+  const w = m.microWeather;
+  const t = m.terrain10m;
+
+  const titleEl = document.getElementById('mountain-title');
+  if (titleEl) titleEl.innerText = `${loc.name} (${loc.elevation.toLocaleString('de-DE')} m)`;
+  const peakElevEl = document.getElementById('m-peak-elev');
+  if (peakElevEl) peakElevEl.innerText = `${loc.elevation.toLocaleString('de-DE')} m`;
+  const landformEl = document.getElementById('m-landform');
+  if (landformEl) landformEl.innerText = t.landform;
+
   const snowLevel = m.atmosphere.snowLevelMeters || m.atmosphere.freezingLevelMeters;
   const fl = m.atmosphere.freezingLevelMeters;
   const flEl = document.getElementById('m-freezing-level');
@@ -91,25 +98,68 @@ export function renderMountainPanel() {
   }
 
   const invElem = document.getElementById('m-inversion-status');
-  if (m.atmosphere.inversionActive) {
-    invElem.innerText = '⚠️ Inversion aktiv (Oben wärmer)';
-    invElem.style.color = '#ffd166';
-  } else {
-    invElem.innerText = '🟢 Normaler Berg-Gradient';
-    invElem.style.color = '#30d158';
+  if (invElem) {
+    if (m.atmosphere.inversionActive) {
+      invElem.innerText = '⚠️ Inversion aktiv (Oben wärmer)';
+      invElem.style.color = '#ffd166';
+    } else {
+      invElem.innerText = '🟢 Normaler Berg-Gradient';
+      invElem.style.color = '#30d158';
+    }
   }
 
-  // Update Wall Aspect Details
-  const w = m.microWeather;
-  const t = m.terrain10m;
+  // NEU: Live Gipfel-Wetter Hero Kacheln
+  const summitTempEl = document.getElementById('m-summit-temp');
+  const summitFeltEl = document.getElementById('m-summit-felt');
+  const summitWindEl = document.getElementById('m-summit-wind');
+  const summitGustsEl = document.getElementById('m-summit-gusts');
+  const summitCondEl = document.getElementById('m-summit-cond');
+  const summitBadgeEl = document.getElementById('mountain-badge');
+
+  if (summitTempEl && w) {
+    summitTempEl.innerText = `${Math.round(convertTemp(w.temperature10m))}°C`;
+  }
+  if (summitFeltEl && w) {
+    summitFeltEl.innerText = `Gefühlt ${Math.round(convertTemp(w.feltTemp))}°C`;
+  }
+  if (summitWindEl && w) {
+    summitWindEl.innerText = `${w.windSpeedKmH} km/h`;
+  }
+  if (summitGustsEl && w) {
+    summitGustsEl.innerText = `Böen ${w.windGustsKmH} km/h`;
+  }
+  if (summitCondEl && w) {
+    summitCondEl.innerText = w.snowCondition || 'Normal';
+  }
+  if (summitBadgeEl) {
+    if (m.atmosphere.inversionActive) {
+      summitBadgeEl.innerText = '⚠️ Inversion';
+      summitBadgeEl.style.color = '#ffd166';
+    } else if (snowLevel && snowLevel < loc.elevation) {
+      summitBadgeEl.innerText = `❄️ Schnee ab ${Math.round(snowLevel)} m`;
+      summitBadgeEl.style.color = '#64d2ff';
+    } else {
+      summitBadgeEl.innerText = '10m DEM';
+      summitBadgeEl.style.color = '';
+    }
+  }
+
+  // Update Wall Aspect Details (mit Null-Checks)
   const wallName = state.activeAspect.isAuto ? `${t.aspectName}` : getSelectedWallLabel();
-  document.getElementById('active-wall-name').innerText = `${wallName} (${t.tilt}° Neigung)`;
-  document.getElementById('active-wall-radiation').innerText = `Sonneneinstrahlung: ${w.slopeSolarIrradianceW_m2} W/m² (GTI)`;
-  document.getElementById('active-wall-temp').innerText = `${Math.round(convertTemp(w.temperature10m))}°C`;
-  document.getElementById('active-wall-temp-sub').innerText = `Gefühlt: ${Math.round(convertTemp(w.feltTemp))}°C`;
-  document.getElementById('active-wall-snow').innerText = w.snowCondition;
-  document.getElementById('active-wall-wind').innerText = w.slopeWindExposure;
-  document.getElementById('active-wall-wind-sub').innerText = `Gratwind: ${w.windSpeedKmH} km/h (Böen: ${w.windGustsKmH} km/h)`;
+  const actNameEl = document.getElementById('active-wall-name');
+  if (actNameEl) actNameEl.innerText = `${wallName} (${t.tilt}° Neigung)`;
+  const actRadEl = document.getElementById('active-wall-radiation');
+  if (actRadEl) actRadEl.innerText = `Sonneneinstrahlung: ${w.slopeSolarIrradianceW_m2} W/m² (GTI)`;
+  const actTempEl = document.getElementById('active-wall-temp');
+  if (actTempEl) actTempEl.innerText = `${Math.round(convertTemp(w.temperature10m))}°C`;
+  const actTempSubEl = document.getElementById('active-wall-temp-sub');
+  if (actTempSubEl) actTempSubEl.innerText = `Gefühlt: ${Math.round(convertTemp(w.feltTemp))}°C`;
+  const actSnowEl = document.getElementById('active-wall-snow');
+  if (actSnowEl) actSnowEl.innerText = w.snowCondition;
+  const actWindEl = document.getElementById('active-wall-wind');
+  if (actWindEl) actWindEl.innerText = w.slopeWindExposure;
+  const actWindSubEl = document.getElementById('active-wall-wind-sub');
+  if (actWindSubEl) actWindSubEl.innerText = `Gratwind: ${w.windSpeedKmH} km/h (Böen: ${w.windGustsKmH} km/h)`;
 
   // Rendere Lawinenlagebericht & Live-Webcams
   renderAvalancheReport();
@@ -471,57 +521,68 @@ export function renderAltitudeChart() {
       : 'precip-snow';
 
     card.innerHTML = `
-      <!-- 1. IDENTITÄT & HÖHE -->
-      <div class="tier-cell-identity">
-        <div class="tier-icon-box">${level.icon}</div>
-        <div class="tier-identity-info">
-          <div class="tier-name-row">
+      <!-- 1. KOMPAKTER HAUPTRIEGEL (SOFORT SICHTBAR) -->
+      <div class="tier-compact-bar">
+        <div class="tcb-identity">
+          <span class="tier-icon-box">${level.icon}</span>
+          <div class="tier-title-wrap">
             <span class="tier-name">${level.name}</span>
             <span class="tier-elevation-badge">${level.z.toLocaleString('de-DE')} m</span>
           </div>
-          <div class="tier-meta-sub">
-            <span class="tier-pressure-chip">${level.pressureHpa || Math.round(1013 * Math.exp(-level.z/8000))} hPa</span>
-            <span class="tier-zone-pill ${level.isAboveFreezing ? 'zone-thaw' : 'zone-frost'}">
-              ${level.isAboveFreezing ? 'Tauwetter' : 'Frostgrenze'}
-            </span>
-            ${level.foehnActive ? `<span class="tier-foehn-pill" style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,159,10,0.18);border:1px solid rgba(255,159,10,0.45);color:#ff9f0a;font-size:0.75rem;padding:2px 7px;border-radius:12px;font-weight:600;">💨 ${level.foehnNote || 'Föhn'}</span>` : (level.windNote ? `<span class="tier-valley-pill" style="display:inline-flex;align-items:center;gap:3px;background:rgba(90,200,250,0.18);border:1px solid rgba(90,200,250,0.45);color:#5ac8fa;font-size:0.75rem;padding:2px 7px;border-radius:12px;font-weight:600;">${level.windNote === 'Hangaufwind' ? '☀️' : '🌙'} ${level.windNote}</span>` : '')}
+        </div>
+
+        <div class="tcb-metrics">
+          <div class="tcb-temp-block" style="color: ${tempColor}">
+            <strong class="tcb-main-t">${tFormatted}</strong>
+            <span class="tcb-felt-t" style="color: ${feltColor}">(${feltFormatted})</span>
+          </div>
+
+          <div class="tcb-condition">
+            <span class="p-icon">${precipIcon}</span>
+            <span class="p-text">${precipType}</span>
+          </div>
+
+          <div class="tcb-wind">
+            <span class="tw-icon">💨</span>
+            <span class="tw-val">${level.wind} <small>km/h</small></span>
+          </div>
+
+          <span class="tcb-chevron" title="Details aufklappen">▾</span>
+        </div>
+      </div>
+
+      <!-- 2. BEI BEDARF AUSKLAPPBARE HINTERGRUND-INFOS -->
+      <div class="tier-drawer">
+        <div class="tier-drawer-grid">
+          <div class="td-item">
+            <span class="td-label">Luftdruck</span>
+            <strong class="td-val">${level.pressureHpa || Math.round(1013 * Math.exp(-level.z/8000))} hPa</strong>
+          </div>
+          <div class="td-item">
+            <span class="td-label">Schicht-Zustand</span>
+            <strong class="td-val tier-zone-pill ${level.isAboveFreezing ? 'zone-thaw' : 'zone-frost'}">
+              ${level.isAboveFreezing ? 'Tauwetterbereich' : 'Frostgrenze'}
+            </strong>
+          </div>
+          <div class="td-item">
+            <span class="td-label">0°C-Niveau Distanz</span>
+            <strong class="td-val ${freezingDiffClass}">${freezingDiffText}</strong>
+          </div>
+          <div class="td-item">
+            <span class="td-label">Spitzenböen / Föhn</span>
+            <strong class="td-val">
+              ${level.gusts || Math.round(level.wind * 1.35)} km/h
+              ${level.foehnActive ? '• 💨 Föhn' : ''}
+              ${level.windNote ? '• ' + level.windNote : ''}
+            </strong>
           </div>
         </div>
       </div>
-
-      <!-- 2. TEMPERATUR & WINDCHILL -->
-      <div class="tier-cell-temp">
-        <div class="tier-main-temp" style="color: ${tempColor}">
-          <span class="t-val">${tFormatted}</span>
-          <span class="t-sublabel">Luft</span>
-        </div>
-        <div class="tier-felt-block">
-          <span class="tf-label">Gefühlt</span>
-          <span class="tf-val" style="color: ${feltColor}">${feltFormatted}</span>
-        </div>
-      </div>
-
-      <!-- 3. WIND & BÖEN -->
-      <div class="tier-cell-wind">
-        <div class="tier-wind-row">
-          <span class="tw-icon">💨</span>
-          <span class="tw-val">${level.wind} <small>km/h</small></span>
-        </div>
-        <div class="tw-gusts">Böen: <strong>${level.gusts || Math.round(level.wind * 1.35)} km/h</strong></div>
-      </div>
-
-      <!-- 4. NIEDERSCHLAG & NULLGRADGRENZE -->
-      <div class="tier-cell-precip">
-        <div class="tier-precip-pill ${precipClass}">
-          <span class="p-icon">${precipIcon}</span>
-          <span class="p-text">${precipType}</span>
-        </div>
-        <div class="tier-freezing-info">
-          <span class="tfi-label">0°C-Niveau</span>
-          <span class="tfi-diff ${freezingDiffClass}">${freezingDiffText}</span>
-        </div>
-      </div>
     `;
+
+    card.addEventListener('click', () => {
+      card.classList.toggle('is-expanded');
+    });
 
     container.appendChild(card);
   });
@@ -735,6 +796,19 @@ export function setupAltitudeTimeControls() {
         }
         selectAltitudeHour(targetHour, true);
       }
+    });
+  }
+
+  // Toggle button für ausklappbare 24h-Stundendetails
+  const expandBtn = document.getElementById('hourly-expand-btn');
+  const scrollerWrap = document.getElementById('profile-hours-scroller-wrap');
+  if (expandBtn && scrollerWrap) {
+    expandBtn.addEventListener('click', () => {
+      const isVisible = scrollerWrap.style.display !== 'none';
+      scrollerWrap.style.display = isVisible ? 'none' : 'block';
+      expandBtn.classList.toggle('active', !isVisible);
+      const arrow = expandBtn.querySelector('.heb-arrow');
+      if (arrow) arrow.innerText = !isVisible ? '▴' : '▾';
     });
   }
 }

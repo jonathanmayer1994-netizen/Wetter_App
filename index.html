@@ -515,126 +515,168 @@
         
         <!-- BEREICH A: NUR FÜR BERGE & GIPFEL (z. B. Matterhorn, Zugspitze) -->
         <div id="mountain-view-panel" class="view-panel">
-          <!-- Mountain Overview Card -->
-          <section class="glass-card mountain-header-card">
+          <!-- 1. KONSOLIDIERTE ALPINE GIPFEL-ÜBERSICHT -->
+          <section class="glass-card mountain-header-card" id="mountain-header-card">
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">🏔️</span>
-                <span id="mountain-title">ALPINE GELÄNDE- & HÖHEN-ANALYSE</span>
+                <span id="mountain-title">ALPINE GIPFEL- &amp; WETTERLAGE</span>
               </div>
-              <span class="card-tag mountain-badge" id="mountain-badge">10m DEM + Druckflächen</span>
+              <span class="card-tag mountain-badge" id="mountain-badge">10m DEM</span>
             </div>
 
-            <div class="mountain-stats-row">
-              <div class="m-stat">
-                <span class="m-label">Offizielle Gipfelhöhe</span>
-                <span class="m-val text-accent" id="m-peak-elev">-- m</span>
+            <!-- Wesentliche Gipfel-Wetterkacheln (Sofort im Blick) -->
+            <div class="mountain-hero-grid">
+              <div class="mh-tile">
+                <span class="mh-label">🌡️ Gipfeltemperatur</span>
+                <div class="mh-val" id="m-summit-temp">--°C</div>
+                <span class="mh-sub" id="m-summit-felt">Gefühlt --°C</span>
               </div>
-              <div class="m-stat">
-                <span class="m-label">Geländeform</span>
-                <span class="m-val" id="m-landform">Wird analysiert...</span>
+              <div class="mh-tile">
+                <span class="mh-label">💨 Gratwind &amp; Böen</span>
+                <div class="mh-val" id="m-summit-wind">-- km/h</div>
+                <span class="mh-sub" id="m-summit-gusts">Böen -- km/h</span>
               </div>
-              <div class="m-stat">
-                <span class="m-label">0°C Schneefallgrenze</span>
-                <span class="m-val text-cyan" id="m-freezing-level">-- m</span>
+              <div class="mh-tile">
+                <span class="mh-label">❄️ Schneefallgrenze</span>
+                <div class="mh-val text-cyan" id="m-freezing-level">-- m</div>
+                <span class="mh-sub" id="m-freezing-sub">Frostgrenze</span>
               </div>
-              <div class="m-stat">
-                <span class="m-label">Inversion</span>
-                <span class="m-val" id="m-inversion-status">Prüfe Schichten...</span>
+              <div class="mh-tile">
+                <span class="mh-label">⛅ Wetterlage &amp; Sicht</span>
+                <div class="mh-val" id="m-summit-cond">--</div>
+                <span class="mh-sub" id="m-summit-cond-sub">Gipfelbereich</span>
               </div>
             </div>
+
+            <!-- Versteckte Detail-Infos nur bei Bedarf aufklappbar -->
+            <details class="alpine-drawer" id="alpine-terrain-drawer">
+              <summary class="alpine-drawer-summary">
+                <span>🔬 Alpin- &amp; Geländedetails (10m DEM, Inversion, Druck)</span>
+                <span class="drawer-arrow">▾</span>
+              </summary>
+              <div class="alpine-drawer-body">
+                <div class="alpine-details-grid">
+                  <div class="ad-item">
+                    <span class="ad-label">Offizielle Gipfelhöhe</span>
+                    <strong class="ad-val text-accent" id="m-peak-elev">-- m</strong>
+                  </div>
+                  <div class="ad-item">
+                    <span class="ad-label">Geländeform</span>
+                    <strong class="ad-val" id="m-landform">Wird analysiert...</strong>
+                  </div>
+                  <div class="ad-item">
+                    <span class="ad-label">Inversion &amp; Gradient</span>
+                    <strong class="ad-val" id="m-inversion-status">Prüfe Schichten...</strong>
+                  </div>
+                  <div class="ad-item">
+                    <span class="ad-label">Modellauflösung</span>
+                    <strong class="ad-val">10m Hochpräzisions-DEM</strong>
+                  </div>
+                </div>
+              </div>
+            </details>
           </section>
 
-          <!-- VERTIKALES WETTER-HÖHENPROFIL & HÖHENSTUFEN -->
+          <!-- 2. KONSOLIDIERTES HÖHENSTUFEN-WETTER -->
           <section class="glass-card altitude-chart-card">
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">🏔️</span>
-                <span>WETTER-HÖHENPROFIL & HÖHENSTUFEN</span>
+                <span>HÖHENSTUFEN-WETTER (TAL BIS GIPFEL)</span>
               </div>
-              
-              <!-- Smarte Zeitnavigation: Stepper & Badge -->
-              <div class="smart-time-nav">
-                <button class="time-step-btn" id="time-step-prev" title="1 Stunde zurück">‹</button>
-                <div class="time-badge" id="profile-time-badge">
-                  <span class="tb-icon">⏱️</span>
-                  <span class="tb-text" id="profile-time-label">Jetzt</span>
-                </div>
-                <button class="time-step-btn" id="time-step-next" title="1 Stunde vor">›</button>
+              <div class="time-badge" id="profile-time-badge">
+                <span class="tb-icon">⏱️</span>
+                <span class="tb-text" id="profile-time-label">Jetzt</span>
               </div>
             </div>
 
-            <!-- Schnellauswahl-Pills für Tageszeiten -->
-            <div class="profile-quick-times-bar" id="profile-quick-times-bar">
-              <button class="quick-time-pill active" data-hour="0">Jetzt</button>
-              <button class="quick-time-pill" data-hour="3">+3 Std.</button>
-              <button class="quick-time-pill" data-hour="6">+6 Std.</button>
-              <button class="quick-time-pill" data-hour="12">+12 Std.</button>
-              <button class="quick-time-pill" data-hour="18">+18 Std.</button>
-              <button class="quick-time-pill" data-hour="24">Morgen</button>
+            <!-- Schlanke 1-Zeilen Zeitsteuerung mit 24h-Detail-Toggle -->
+            <div class="altitude-time-row">
+              <div class="profile-quick-times-bar" id="profile-quick-times-bar">
+                <button type="button" class="quick-time-pill active" data-hour="0">Jetzt</button>
+                <button type="button" class="quick-time-pill" data-hour="3">+3 Std.</button>
+                <button type="button" class="quick-time-pill" data-hour="6">+6 Std.</button>
+                <button type="button" class="quick-time-pill" data-hour="12">+12 Std.</button>
+                <button type="button" class="quick-time-pill" data-hour="24">Morgen</button>
+              </div>
+              <button type="button" class="hourly-expand-btn" id="hourly-expand-btn" title="24h-Stundenscroller ein-/ausblenden">
+                <span>24h Details</span>
+                <span class="heb-arrow">▾</span>
+              </button>
             </div>
 
-            <!-- Interaktiver 24h Stunden-Scroller -->
-            <div class="profile-hours-scroller" id="profile-hours-scroller">
-              <!-- Dynamisch 24h Stunden-Pills mit Wetter-Icon -->
+            <!-- Ausklappbarer 24h Stunden-Scroller (Standardmäßig dezent eingeklappt) -->
+            <div class="profile-hours-scroller-wrap" id="profile-hours-scroller-wrap" style="display:none;">
+              <div class="profile-hours-scroller" id="profile-hours-scroller">
+                <!-- Dynamisch 24h Stunden-Pills mit Wetter-Icon -->
+              </div>
             </div>
 
-            <!-- Die 4 Höhenstufen als detailreiche Dashboard-Karten (KEINE LEEREN RIESEN-BALKEN!) -->
+            <!-- Unsichtbare Stepper für vollständige JS-Kompatibilität -->
+            <div style="display:none;" aria-hidden="true">
+              <button id="time-step-prev"></button>
+              <button id="time-step-next"></button>
+            </div>
+
+            <!-- Schlanke, antippbare Höhenstufen (Kompakt im Überblick, Klick für Details) -->
             <div class="altitude-levels-container" id="altitude-levels-container">
               <!-- Dynamisch generiert: Talboden, Mittelstation, Gipfel, Freie Atmosphäre -->
             </div>
 
             <div class="altitude-legend">
-              <span class="legend-chip blue">❄️ Schneefall- / Frostbereich</span>
-              <span class="legend-chip green">💧 Regen- / Tauwetterbereich</span>
-              <span class="legend-chip orange">💨 Wind & Böenspitzen auf Höhe</span>
+              <span class="legend-chip blue">❄️ Frostbereich</span>
+              <span class="legend-chip green">💧 Tauwetter</span>
+              <span class="legend-chip orange">💨 Wind &amp; Böen</span>
             </div>
           </section>
 
-          <!-- WAND-AUSRICHTUNG (PRO BERG ANPASSBAR: NORDWAND, SÜDGRAT, ETC.) -->
-          <section class="glass-card mountain-aspect-card">
-            <div class="card-header">
+          <!-- 3. WAND-AUSRICHTUNG (PRO BERG ANPASSBAR: NORDWAND, SÜDGRAT, ETC.) -->
+          <details class="glass-card mountain-aspect-card alpine-drawer" id="mountain-aspect-drawer">
+            <summary class="card-header alpine-drawer-summary" style="cursor: pointer;">
               <div class="card-title">
                 <span class="card-icon">🧭</span>
-                <span>WAND-EXPOSITION & HANGNEIGUNG ANPASSEN</span>
+                <span>WAND-EXPOSITION &amp; HANGNEIGUNG ANPASSEN</span>
               </div>
-              <span class="card-tag">Mikroklima pro Wand</span>
+              <span class="card-tag">Mikroklima pro Wand ▾</span>
+            </summary>
+
+            <div class="alpine-drawer-body">
+              <div class="aspect-selector-row">
+                <button class="aspect-pill active" data-tilt="45" data-azimuth="0">☀️ Südwand (45°)</button>
+                <button class="aspect-pill" data-tilt="75" data-azimuth="180">❄️ Nordwand (75°)</button>
+                <button class="aspect-pill" data-tilt="50" data-azimuth="-90">🌅 Ostwand (50°)</button>
+                <button class="aspect-pill" data-tilt="50" data-azimuth="90">🌇 Westwand (50°)</button>
+                <button class="aspect-pill" id="auto-aspect-pill" data-auto="true">📍 Automatisch (10m DEM)</button>
+              </div>
+
+              <div class="aspect-result-grid">
+                <div class="aspect-result-box">
+                  <div class="ar-label">Aktive Wand</div>
+                  <div class="ar-val" id="active-wall-name">Südwand (45° Neigung)</div>
+                  <div class="ar-sub" id="active-wall-radiation">Sonneneinstrahlung: -- W/m² (GTI)</div>
+                </div>
+
+                <div class="aspect-result-box">
+                  <div class="ar-label">Gefühlte Wand-Temperatur</div>
+                  <div class="ar-val text-accent" id="active-wall-temp">--°C</div>
+                  <div class="ar-sub" id="active-wall-temp-sub">vs. Schattwand: --</div>
+                </div>
+
+                <div class="aspect-result-box">
+                  <div class="ar-label">Schneebeschaffenheit</div>
+                  <div class="ar-val" id="active-wall-snow">Wird berechnet...</div>
+                  <div class="ar-sub" id="active-wall-snow-sub">Vereisung / Firn / Pulver</div>
+                </div>
+
+                <div class="aspect-result-box">
+                  <div class="ar-label">Windanströmung an der Wand</div>
+                  <div class="ar-val" id="active-wall-wind">Luv / Lee Analyse</div>
+                  <div class="ar-sub" id="active-wall-wind-sub">Windgeschw.: -- km/h</div>
+                </div>
+              </div>
             </div>
-
-            <div class="aspect-selector-row">
-              <button class="aspect-pill active" data-tilt="45" data-azimuth="0">☀️ Südwand (45°)</button>
-              <button class="aspect-pill" data-tilt="75" data-azimuth="180">❄️ Nordwand (75°)</button>
-              <button class="aspect-pill" data-tilt="50" data-azimuth="-90">🌅 Ostwand (50°)</button>
-              <button class="aspect-pill" data-tilt="50" data-azimuth="90">🌇 Westwand (50°)</button>
-              <button class="aspect-pill" id="auto-aspect-pill" data-auto="true">📍 Automatisch (10m DEM)</button>
-            </div>
-
-            <div class="aspect-result-grid">
-              <div class="aspect-result-box">
-                <div class="ar-label">Aktive Wand</div>
-                <div class="ar-val" id="active-wall-name">Südwand (45° Neigung)</div>
-                <div class="ar-sub" id="active-wall-radiation">Sonneneinstrahlung: -- W/m² (GTI)</div>
-              </div>
-
-              <div class="aspect-result-box">
-                <div class="ar-label">Gefühlte Wand-Temperatur</div>
-                <div class="ar-val text-accent" id="active-wall-temp">--°C</div>
-                <div class="ar-sub" id="active-wall-temp-sub">vs. Schattwand: --</div>
-              </div>
-
-              <div class="aspect-result-box">
-                <div class="ar-label">Schneebeschaffenheit</div>
-                <div class="ar-val" id="active-wall-snow">Wird berechnet...</div>
-                <div class="ar-sub" id="active-wall-snow-sub">Vereisung / Firn / Pulver</div>
-              </div>
-
-              <div class="aspect-result-box">
-                <div class="ar-label">Windanströmung an der Wand</div>
-                <div class="ar-val" id="active-wall-wind">Luv / Lee Analyse</div>
-                <div class="ar-sub" id="active-wall-wind-sub">Windgeschw.: -- km/h</div>
-              </div>
-            </div>
-          </section>
+          </details>
 
           <!-- =================================================================== -->
           <!-- LAWINENLAGEBERICHT & SCHNEESTABILITÄT (EAWS / ALPIN-SICHERHEIT) -->

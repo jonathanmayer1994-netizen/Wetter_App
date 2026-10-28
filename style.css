@@ -1628,6 +1628,134 @@ body {
   color: var(--ios-cyan);
 }
 
+/* KONSOLIDIERTE ALPINE GIPFEL-KACHELN & ACCORDION */
+.mountain-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.mh-tile {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mh-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+}
+
+.mh-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-top: 2px;
+  letter-spacing: -0.3px;
+}
+
+.mh-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Ausklappbare Drawer für Hintergrunddetails */
+.alpine-drawer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+  margin-top: 12px;
+}
+
+.alpine-drawer-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 6px 4px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.alpine-drawer-summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.alpine-drawer-summary::-webkit-details-marker {
+  display: none;
+}
+
+.alpine-drawer[open] .drawer-arrow {
+  transform: rotate(180deg);
+}
+
+.drawer-arrow {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.alpine-drawer-body {
+  padding-top: 10px;
+}
+
+.alpine-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.ad-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ad-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ad-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+@media (max-width: 650px) {
+  .mountain-hero-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .mh-tile {
+    padding: 10px 12px;
+  }
+  .mh-val {
+    font-size: 16px;
+  }
+  .alpine-details-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
 /* ==========================================================================
    MULTI-MODELL-ENSEMBLE (ECMWF IFS 0.25° VS. GFS SEAMLESS)
    ========================================================================== */
@@ -2130,28 +2258,74 @@ body {
   border-color: #f59e0b;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
-/* 4. Altitude Levels Container & Cards */
+/* 4. Altitude Levels Container & Cards (Konsolidiertes Akkordeon) */
+.altitude-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.hourly-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hourly-expand-btn:hover,
+.hourly-expand-btn.active {
+  background: rgba(10, 132, 255, 0.22);
+  border-color: #0a84ff;
+  color: #64d2ff;
+  box-shadow: 0 0 10px rgba(10, 132, 255, 0.25);
+}
+
+.heb-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.profile-hours-scroller-wrap {
+  margin-bottom: 12px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
 .altitude-levels-container {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 12px 0;
+  gap: 8px;
+  margin: 10px 0;
 }
 
 .altitude-tier-card {
-  display: grid;
-  grid-template-columns: 280px 145px 165px 1fr;
-  align-items: center;
-  gap: 16px;
-  background: rgba(16, 24, 38, 0.72);
+  display: flex;
+  flex-direction: column;
+  background: rgba(16, 24, 38, 0.78);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 14px;
-  padding: 12px 18px;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 10px 14px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .altitude-tier-card::before {
@@ -2174,10 +2348,140 @@ body {
 }
 
 .altitude-tier-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+/* Tier Compact Main Bar */
+.tier-compact-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.tcb-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tier-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tcb-metrics {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.tcb-temp-block {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.tcb-main-t {
+  font-size: 16px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.tcb-felt-t {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.tcb-condition {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tcb-wind {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tcb-chevron {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.altitude-tier-card.is-expanded .tcb-chevron {
+  transform: rotate(180deg);
+  color: #64d2ff;
+}
+
+/* Tier Drawer (nur bei Klick aufklappend) */
+.tier-drawer {
+  display: none;
+  padding-top: 10px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  animation: fadeIn 0.15s ease-in-out;
+}
+
+.altitude-tier-card.is-expanded .tier-drawer {
+  display: block;
+}
+
+.tier-drawer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.td-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.td-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.td-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+@media (max-width: 650px) {
+  .tcb-metrics {
+    gap: 8px;
+  }
+  .tcb-condition .p-text {
+    display: none;
+  }
+  .tcb-wind {
+    font-size: 11px;
+  }
+  .tier-drawer-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Tier Cell 1: Identity & Elevation */
@@ -5099,12 +5403,6 @@ body {
     gap: 12px;
   }
 
-  .altitude-tier-card {
-    grid-template-columns: 220px 130px 140px 1fr;
-    gap: 12px;
-    padding: 10px 14px;
-  }
-
   .bento-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 14px;
@@ -5288,22 +5586,6 @@ body {
     min-width: 0;
     font-size: 12px;
     padding: 6px 8px;
-  }
-
-  .altitude-tier-card {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    padding: 10px 12px;
-  }
-
-  .tier-cell-identity {
-    justify-content: space-between;
-  }
-
-  .tier-cell-temp,
-  .tier-cell-wind,
-  .tier-cell-precip {
-    width: 100%;
   }
 
   .aspect-result-grid {
