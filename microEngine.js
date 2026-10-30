@@ -106,6 +106,9 @@ export const MicroEngine = {
       biasCorrection,
       altitudeProfile,
       weatherRaw,
+      stationData,
+      modelHistory,
+      radarData,
       regionalModelName: (weatherRaw && weatherRaw._regionalModel && weatherRaw._regionalModel.displayName)
         ? weatherRaw._regionalModel.displayName
         : 'ICON-EU (6.5 km)'

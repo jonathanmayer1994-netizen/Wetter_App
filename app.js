@@ -19,6 +19,8 @@ import { setupGPXInspector, setupSportsTab, initSportsTour } from './features/sp
 import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers, triggerExactGps } from './features/search.js';
 import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandlers } from './features/favorites.js';
 import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/networks.js';
+import { ActualEngine } from './core/actualEngine.js';
+import { renderVerificationDashboard, setupVerificationUI, initVerificationHandlers } from './features/verificationUI.js';
 import { AlpineStorage } from './storage.js';
 
 // Central Dispatcher Event Bus Subscriptions
@@ -160,6 +162,32 @@ export async function loadLocation(loc) {
     state.multiModel = multiModel || microResult.multiModel;
     state.airQuality = airQuality;
 
+    // A.C.T.U.A.L. Engine: Verifikation (Soll vs. Ist) & Adaptive Vorhersage-Kalibrierung
+    try {
+      const verificationResult = ActualEngine.processVerificationAndCalibration({
+        lat: validLoc.lat,
+        lon: validLoc.lon,
+        elevation: validLoc.elevation,
+        isMountain: validLoc.isMountain,
+        weatherRaw: state.weatherData,
+        stationData: microResult.stationData,
+        multiModel: state.multiModel,
+        modelHistory: microResult.modelHistory,
+        radarData: microResult.radarData
+      });
+      state.actualVerification = verificationResult;
+
+      // Wenn Bayesianische Modellgewichte berechnet wurden, in multiModel übernehmen
+      if (verificationResult?.modelEvaluation?.models && state.multiModel?.weights) {
+        const evModels = verificationResult.modelEvaluation.models;
+        if (evModels.icon_d2?.weight) state.multiModel.weights.regional = evModels.icon_d2.weight;
+        if (evModels.ecmwf?.weight) state.multiModel.weights.ecmwf = evModels.ecmwf.weight;
+        if (evModels.gfs?.weight) state.multiModel.weights.gfs = evModels.gfs.weight;
+      }
+    } catch (e) {
+      console.warn('ActualEngine verification failed:', e);
+    }
+
     if (state.multiModel && state.multiModel.weightedConsensus) {
       MicroEngine.applyMultiModelWeightsToWeather(state.weatherData, state.microData, state.multiModel);
     }
@@ -170,6 +198,7 @@ export async function loadLocation(loc) {
     dispatcher.dispatch(ACTIONS.WEATHER_UPDATED, { weatherData: state.weatherData, microData: state.microData, multiModel: state.multiModel, airQuality: state.airQuality });
 
     renderOverviewTab();
+    renderVerificationDashboard();
     renderMultiModelComparison();
     renderAirQualityAndUV();
     renderAdaptiveTab2();
@@ -233,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
   state.canvasEngine = new BackgroundCanvasEngine('weather-canvas');
   initSearchHandlers({ onLoadLocation: loadLocation, onRenderOverview: renderOverviewTab, onRenderAdaptiveTab2: renderAdaptiveTab2 });
   initFavoritesHandlers({ onSelectLocation: selectExactLocation, onSwitchTab: switchTab });
+  initVerificationHandlers({ onReload: loadLocation });
 
   setupDispatcherSubscriptions();
   setupTabs();
@@ -242,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupAltitudeSlider();
   setupMountainControls();
   setupFavorites();
+  setupVerificationUI();
   setupLocationTypeToggle();
   setupHourlyGranularityToggle();
   setupMeteogramControls();

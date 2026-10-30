@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.7.0-default-gps-location';
+const CACHE_NAME = 'best-weather-v2.8.0-actual-engine';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 
@@ -28,6 +28,8 @@ const STATIC_ASSETS = [
   './core/backgroundCanvas.js',
   './core/weatherTourCache.js',
   './core/physicsBridge.js',
+  './core/verificationStore.js',
+  './core/actualEngine.js',
   './features/meteogram/meteogramCanvas.js',
   './features/overview.js',
   './features/mountain.js',
@@ -36,6 +38,7 @@ const STATIC_ASSETS = [
   './features/search.js',
   './features/favorites.js',
   './features/networks.js',
+  './features/verificationUI.js',
   './manifest.json',
   './favicon.png',
   './icon-192.png',

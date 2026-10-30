@@ -22,6 +22,7 @@ export const state = {
   weatherData: null,
   microData: null,
   multiModel: null,
+  actualVerification: null,
   airQuality: null,
   unit: 'celsius',
   activeTab: 'tab-overview',
