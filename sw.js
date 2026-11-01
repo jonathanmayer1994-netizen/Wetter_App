@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.8.0-actual-engine';
+const CACHE_NAME = 'best-weather-v2.9.0-clean-cockpit';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 
@@ -39,6 +39,7 @@ const STATIC_ASSETS = [
   './features/favorites.js',
   './features/networks.js',
   './features/verificationUI.js',
+  './features/bentoSheets.js',
   './manifest.json',
   './favicon.png',
   './icon-192.png',
@@ -60,7 +61,7 @@ async function putTileCacheWithQuota(req, res) {
         await cache.delete(keys[i]);
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // 1. Install Event: Precache All Essential Alpine Assets

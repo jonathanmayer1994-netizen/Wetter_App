@@ -131,153 +131,169 @@ export function renderVerificationDashboard() {
     `;
   }
 
+  const winnerModel = modelEvaluation && modelEvaluation.models && modelEvaluation.winnerKey ? modelEvaluation.models[modelEvaluation.winnerKey] : null;
+
   container.innerHTML = `
-    <section class="glass-card verification-card" id="verification-card">
-      <div class="card-header">
-        <div class="card-title">
-          <span class="card-icon">⚖️</span>
-          <span>PROGNOSE VS. REALITÄT (IST-ABGLEICH)</span>
+    <details class="glass-card verification-accordion" id="verification-card">
+      <summary class="verification-summary">
+        <div class="vs-summary-left">
+          <span class="vs-summary-icon">⚖️</span>
+          <div class="vs-summary-text">
+            <div class="vs-headline">
+              <span class="vs-title">PROGNOSE VS. REALITÄT (IST-ABGLEICH)</span>
+              <span class="card-tag vfy-live-tag">🟢 KI-Kalibriert</span>
+            </div>
+            <div class="vs-metrics-pill">
+              <span class="vs-stat-num">Real <b>${liveDelta.actualTemp !== null ? liveDelta.actualTemp : '--'}°</b> vs. Modell <b>${liveDelta.forecastTemp !== null ? liveDelta.forecastTemp : '--'}°</b></span>
+              <span class="vt-badge ${Math.abs(liveDelta.tempDelta) <= 1.0 ? 'badge-good' : 'badge-diff'}">Δ ${tempDeltaFormatted}</span>
+              ${winnerModel ? `<span class="vs-best-model">· 🏆 ${escapeHtml(winnerModel.name)} (${winnerModel.score}%)</span>` : ''}
+            </div>
+          </div>
         </div>
-        <span class="card-tag vfy-live-tag">🟢 KI-Kalibrierung aktiv</span>
+        <div class="vs-summary-right">
+          <span class="vs-toggle-btn">Details <span class="vs-arrow">▾</span></span>
+        </div>
+      </summary>
+
+      <div class="verification-details-body">
+        <!-- Ground Truth Station Banner -->
+        <div class="vfy-station-banner">
+          <span class="vsb-text">${stationDesc}</span>
+        </div>
+
+        <!-- 3 Hero Vergleichs-Kacheln -->
+        <div class="vfy-hero-grid">
+          <!-- 1. Temperatur Kachel -->
+          <div class="vfy-tile">
+            <div class="vt-label-row">
+              <span class="vt-label">🌡️ Temperatur</span>
+              <span class="vt-badge ${Math.abs(liveDelta.tempDelta) <= 1.0 ? 'badge-good' : 'badge-diff'}">
+                Δ ${tempDeltaFormatted}
+              </span>
+            </div>
+            <div class="vt-comparison">
+              <div class="vt-col">
+                <span class="vt-val-num text-accent">${liveDelta.actualTemp !== null ? liveDelta.actualTemp : '--'}°</span>
+                <span class="vt-val-sub">Real gemessen</span>
+              </div>
+              <div class="vt-divider">vs</div>
+              <div class="vt-col">
+                <span class="vt-val-num text-muted">${liveDelta.forecastTemp !== null ? liveDelta.forecastTemp : '--'}°</span>
+                <span class="vt-val-sub">Modell-Prognose</span>
+              </div>
+            </div>
+            <span class="vt-hint ${liveDelta.statusClass}">${escapeHtml(liveDelta.summaryText)}</span>
+          </div>
+
+          <!-- 2. Wind Kachel -->
+          <div class="vfy-tile">
+            <div class="vt-label-row">
+              <span class="vt-label">💨 Wind &amp; Böen</span>
+              <span class="vt-badge ${Math.abs(liveDelta.windDelta) <= 8 ? 'badge-good' : 'badge-diff'}">
+                Δ ${windDeltaFormatted}
+              </span>
+            </div>
+            <div class="vt-comparison">
+              <div class="vt-col">
+                <span class="vt-val-num">${liveDelta.actualWind !== null ? liveDelta.actualWind : '--'}</span>
+                <span class="vt-val-sub">km/h Ist</span>
+              </div>
+              <div class="vt-divider">vs</div>
+              <div class="vt-col">
+                <span class="vt-val-num text-muted">${liveDelta.forecastWind !== null ? liveDelta.forecastWind : '--'}</span>
+                <span class="vt-val-sub">km/h Prognose</span>
+              </div>
+            </div>
+            <span class="vt-hint">Gratwind ${liveDelta.actualWind >= 35 ? 'aktiv' : 'im Normalbereich'}</span>
+          </div>
+
+          <!-- 3. Wetterlage Kachel -->
+          <div class="vfy-tile">
+            <div class="vt-label-row">
+              <span class="vt-label">⛅ Wetterlage</span>
+              <span class="vt-badge badge-neutral">Zustand</span>
+            </div>
+            <div class="vt-comparison">
+              <div class="vt-col">
+                <span class="vt-icon">${actualWmo.icon}</span>
+                <span class="vt-val-sub">${escapeHtml(actualWmo.label)}</span>
+              </div>
+              <div class="vt-divider">vs</div>
+              <div class="vt-col">
+                <span class="vt-icon opacity-75">${forecastWmo.icon}</span>
+                <span class="vt-val-sub">${escapeHtml(forecastWmo.label)}</span>
+              </div>
+            </div>
+            <span class="vt-hint">${liveDelta.actualPrecip > 0 ? `${liveDelta.actualPrecip} mm Niederschlag` : 'Aktuell trocken'}</span>
+          </div>
+        </div>
+
+        <!-- Orographische Diskrepanz-Warnungen (z.B. Föhn, Kaltluftsee) -->
+        ${orographicAlertsHtml}
+
+        <!-- 24h Soll/Ist-Verlaufschart -->
+        <div class="vfy-chart-section">
+          <div class="vcs-header">
+            <span class="vcs-title">📈 24H-VERLAUF: PROGNOSE (SOLL) VS. REALITÄT (IST)</span>
+            <div class="vcs-legend">
+              <span class="vcs-leg-item"><span class="vcs-dot actual"></span> Reale Messung (Ist)</span>
+              <span class="vcs-leg-item"><span class="vcs-dot forecast"></span> Modell-Prognose (Soll)</span>
+            </div>
+          </div>
+          <div class="vfy-svg-container" id="vfy-svg-container">
+            <svg id="vfy-chart-svg" class="vfy-chart-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
+              <!-- Dynamisch generiertes 24h-Chart -->
+            </svg>
+            <div class="vfy-tooltip" id="vfy-tooltip" style="display:none;"></div>
+          </div>
+        </div>
+
+        <!-- Modell-Scorecard ("Wer hat aktuell recht?") -->
+        <div class="vfy-section-title">
+          <span>🏆 MODELL-TREFFSICHERHEIT &amp; BAYESIANISCHES ENSEMBLE-GEWICHT</span>
+        </div>
+        ${scorecardHtml}
+
+        <!-- 1-Tap Ist-Wetter Ground-Truth Melden -->
+        <div class="vfy-crowd-box">
+          <div class="vcb-header">
+            <div class="vcb-title">
+              <span>📍 Wetter vor Ort anders? Jetzt 1-Tap Feedback geben</span>
+            </div>
+            <span class="vcb-sub">Kalibriert das alpine Mikroklima unmittelbar für alle Tourengeher</span>
+          </div>
+          <div class="vcb-buttons-row" id="vcb-buttons-row">
+            <button type="button" class="vcb-btn" data-condition="clear">☀️ Sonnig</button>
+            <button type="button" class="vcb-btn" data-condition="partlyCloudy">⛅ Heiter</button>
+            <button type="button" class="vcb-btn" data-condition="fog">🌫️ Nebel</button>
+            <button type="button" class="vcb-btn" data-condition="rain">🌧️ Regen</button>
+            <button type="button" class="vcb-btn" data-condition="snow">❄️ Schnee</button>
+          </div>
+          <div class="vcb-feedback-msg" id="vcb-feedback-msg" style="display:none;"></div>
+          ${userFeedbackStatusHtml}
+        </div>
+
+        <!-- Ausklappbare Experten-Details (Kalman-Decay & Formeln) -->
+        <details class="vfy-expert-details">
+          <summary class="ved-summary">
+            <span>🔬 Details zur adaptiven KI-Kalibrierung &amp; Kalman-Filterung</span>
+            <span class="ved-arrow">▾</span>
+          </summary>
+          <div class="ved-content">
+            <div class="ved-grid">
+              <div class="ved-card">
+                <strong>Kalman Bias-Decay (0–12h)</strong>
+                <p>Aktiver Bias von <b>${tempDeltaFormatted}</b> wird mit einer alpinen Halbwertszeit von $\\tau = 4.0\\,\\text{h}$ kontinuierlich in die nächsten Stunden hineingerechnet.</p>
+              </div>
+              <div class="ved-card">
+                <strong>Bayesian Model Averaging (BMA)</strong>
+                <p>Das präziseste Modell (<b>${escapeHtml(modelEvaluation.winnerName)}</b>) steuert automatisch <b>${Math.round((modelEvaluation.models[modelEvaluation.winnerKey]?.weight || 0.5) * 100)}%</b> des Vorhersage-Konsenses.</p>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
-
-      <!-- Ground Truth Station Banner -->
-      <div class="vfy-station-banner">
-        <span class="vsb-text">${stationDesc}</span>
-      </div>
-
-      <!-- 3 Hero Vergleichs-Kacheln -->
-      <div class="vfy-hero-grid">
-        <!-- 1. Temperatur Kachel -->
-        <div class="vfy-tile">
-          <div class="vt-label-row">
-            <span class="vt-label">🌡️ Temperatur</span>
-            <span class="vt-badge ${Math.abs(liveDelta.tempDelta) <= 1.0 ? 'badge-good' : 'badge-diff'}">
-              Δ ${tempDeltaFormatted}
-            </span>
-          </div>
-          <div class="vt-comparison">
-            <div class="vt-col">
-              <span class="vt-val-num text-accent">${liveDelta.actualTemp !== null ? liveDelta.actualTemp : '--'}°</span>
-              <span class="vt-val-sub">Real gemessen</span>
-            </div>
-            <div class="vt-divider">vs</div>
-            <div class="vt-col">
-              <span class="vt-val-num text-muted">${liveDelta.forecastTemp !== null ? liveDelta.forecastTemp : '--'}°</span>
-              <span class="vt-val-sub">Modell-Prognose</span>
-            </div>
-          </div>
-          <span class="vt-hint ${liveDelta.statusClass}">${escapeHtml(liveDelta.summaryText)}</span>
-        </div>
-
-        <!-- 2. Wind Kachel -->
-        <div class="vfy-tile">
-          <div class="vt-label-row">
-            <span class="vt-label">💨 Wind &amp; Böen</span>
-            <span class="vt-badge ${Math.abs(liveDelta.windDelta) <= 8 ? 'badge-good' : 'badge-diff'}">
-              Δ ${windDeltaFormatted}
-            </span>
-          </div>
-          <div class="vt-comparison">
-            <div class="vt-col">
-              <span class="vt-val-num">${liveDelta.actualWind !== null ? liveDelta.actualWind : '--'}</span>
-              <span class="vt-val-sub">km/h Ist</span>
-            </div>
-            <div class="vt-divider">vs</div>
-            <div class="vt-col">
-              <span class="vt-val-num text-muted">${liveDelta.forecastWind !== null ? liveDelta.forecastWind : '--'}</span>
-              <span class="vt-val-sub">km/h Prognose</span>
-            </div>
-          </div>
-          <span class="vt-hint">Gratwind ${liveDelta.actualWind >= 35 ? 'aktiv' : 'im Normalbereich'}</span>
-        </div>
-
-        <!-- 3. Wetterlage Kachel -->
-        <div class="vfy-tile">
-          <div class="vt-label-row">
-            <span class="vt-label">⛅ Wetterlage</span>
-            <span class="vt-badge badge-neutral">Zustand</span>
-          </div>
-          <div class="vt-comparison">
-            <div class="vt-col">
-              <span class="vt-icon">${actualWmo.icon}</span>
-              <span class="vt-val-sub">${escapeHtml(actualWmo.label)}</span>
-            </div>
-            <div class="vt-divider">vs</div>
-            <div class="vt-col">
-              <span class="vt-icon opacity-75">${forecastWmo.icon}</span>
-              <span class="vt-val-sub">${escapeHtml(forecastWmo.label)}</span>
-            </div>
-          </div>
-          <span class="vt-hint">${liveDelta.actualPrecip > 0 ? `${liveDelta.actualPrecip} mm Niederschlag` : 'Aktuell trocken'}</span>
-        </div>
-      </div>
-
-      <!-- Orographische Diskrepanz-Warnungen (z.B. Föhn, Kaltluftsee) -->
-      ${orographicAlertsHtml}
-
-      <!-- 24h Soll/Ist-Verlaufschart -->
-      <div class="vfy-chart-section">
-        <div class="vcs-header">
-          <span class="vcs-title">📈 24H-VERLAUF: PROGNOSE (SOLL) VS. REALITÄT (IST)</span>
-          <div class="vcs-legend">
-            <span class="vcs-leg-item"><span class="vcs-dot actual"></span> Reale Messung (Ist)</span>
-            <span class="vcs-leg-item"><span class="vcs-dot forecast"></span> Modell-Prognose (Soll)</span>
-          </div>
-        </div>
-        <div class="vfy-svg-container" id="vfy-svg-container">
-          <svg id="vfy-chart-svg" class="vfy-chart-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
-            <!-- Dynamisch generiertes 24h-Chart -->
-          </svg>
-          <div class="vfy-tooltip" id="vfy-tooltip" style="display:none;"></div>
-        </div>
-      </div>
-
-      <!-- Modell-Scorecard ("Wer hat aktuell recht?") -->
-      <div class="vfy-section-title">
-        <span>🏆 MODELL-TREFFSICHERHEIT &amp; BAYESIANISCHES ENSEMBLE-GEWICHT</span>
-      </div>
-      ${scorecardHtml}
-
-      <!-- 1-Tap Ist-Wetter Ground-Truth Melden -->
-      <div class="vfy-crowd-box">
-        <div class="vcb-header">
-          <div class="vcb-title">
-            <span>📍 Wetter vor Ort anders? Jetzt 1-Tap Feedback geben</span>
-          </div>
-          <span class="vcb-sub">Kalibriert das alpine Mikroklima unmittelbar für alle Tourengeher</span>
-        </div>
-        <div class="vcb-buttons-row" id="vcb-buttons-row">
-          <button type="button" class="vcb-btn" data-condition="clear">☀️ Sonnig</button>
-          <button type="button" class="vcb-btn" data-condition="partlyCloudy">⛅ Heiter</button>
-          <button type="button" class="vcb-btn" data-condition="fog">🌫️ Nebel</button>
-          <button type="button" class="vcb-btn" data-condition="rain">🌧️ Regen</button>
-          <button type="button" class="vcb-btn" data-condition="snow">❄️ Schnee</button>
-        </div>
-        <div class="vcb-feedback-msg" id="vcb-feedback-msg" style="display:none;"></div>
-        ${userFeedbackStatusHtml}
-      </div>
-
-      <!-- Ausklappbare Experten-Details (Kalman-Decay & Formeln) -->
-      <details class="vfy-expert-details">
-        <summary class="ved-summary">
-          <span>🔬 Details zur adaptiven KI-Kalibrierung &amp; Kalman-Filterung</span>
-          <span class="ved-arrow">▾</span>
-        </summary>
-        <div class="ved-content">
-          <div class="ved-grid">
-            <div class="ved-card">
-              <strong>Kalman Bias-Decay (0–12h)</strong>
-              <p>Aktiver Bias von <b>${tempDeltaFormatted}</b> wird mit einer alpinen Halbwertszeit von $\\tau = 4.0\\,\\text{h}$ kontinuierlich in die nächsten Stunden hineingerechnet.</p>
-            </div>
-            <div class="ved-card">
-              <strong>Bayesian Model Averaging (BMA)</strong>
-              <p>Das präziseste Modell (<b>${escapeHtml(modelEvaluation.winnerName)}</b>) steuert automatisch <b>${Math.round((modelEvaluation.models[modelEvaluation.winnerKey]?.weight || 0.5) * 100)}%</b> des Vorhersage-Konsenses.</p>
-            </div>
-          </div>
-        </div>
-      </details>
-    </section>
+    </details>
   `;
 
   // Render SVG Chart
@@ -459,3 +475,4 @@ export function setupCrowdGroundTruthControls() {
     }
   });
 }
+

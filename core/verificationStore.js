@@ -225,3 +225,4 @@ export const VerificationStore = {
     return results;
   }
 };
+

@@ -212,14 +212,15 @@
           <!-- Dynamisch durch features/verificationUI.js gerendert -->
         </div>
 
-        <!-- BENTO DETAIL GRID -->
-        <section class="bento-grid">
+        <!-- BENTO DETAIL GRID (KOMPAKT-MATRIX MIT DETAIL-LAYER) -->
+        <section class="bento-grid" id="bento-grid">
           
-          <div class="glass-card bento-item uv-card">
+          <div class="glass-card bento-item bento-compact-card uv-card" data-bento="uv" role="button" tabindex="0" title="Tippen für UV-Schutz- &amp; Höhenanalyse">
             <div class="card-header">
               <div class="card-title"><span class="card-icon">☀️</span> UV-INDEX</div>
+              <span class="bento-open-pill">Details ›</span>
             </div>
-            <div class="bento-body">
+            <div class="bento-body bento-compact-body">
               <div class="bento-main-val" id="uv-index-val">--</div>
               <div class="bento-sub-title" id="uv-index-desc">Mittel</div>
               <div class="uv-bar-gauge">
@@ -229,12 +230,18 @@
             </div>
           </div>
 
-          <div class="glass-card bento-item wind-card">
+          <div class="glass-card bento-item bento-compact-card wind-card" data-bento="wind" role="button" tabindex="0" title="Tippen für Kompass &amp; Böenanalyse">
             <div class="card-header">
-              <div class="card-title"><span class="card-icon">💨</span> WIND & BÖEN</div>
+              <div class="card-title"><span class="card-icon">💨</span> WIND &amp; BÖEN</div>
+              <span class="bento-open-pill">Details ›</span>
             </div>
-            <div class="bento-body compass-body">
-              <div class="compass-wrapper">
+            <div class="bento-body bento-compact-body compass-body">
+              <div class="wind-info">
+                <div class="bento-main-val" id="wind-speed-val">-- <small>km/h</small></div>
+                <div class="bento-sub-title" id="wind-direction-text">Richtung --</div>
+                <div class="bento-hint" id="wind-gusts-text">Böen bis -- km/h</div>
+              </div>
+              <div class="compass-wrapper compact-compass-wrapper">
                 <div class="compass-dial">
                   <span class="compass-n">N</span>
                   <span class="compass-e">O</span>
@@ -243,22 +250,18 @@
                   <div class="compass-arrow" id="compass-arrow"></div>
                 </div>
               </div>
-              <div class="wind-info">
-                <div class="bento-main-val" id="wind-speed-val">-- <small>km/h</small></div>
-                <div class="bento-sub-title" id="wind-direction-text">Richtung --</div>
-                <div class="bento-hint" id="wind-gusts-text">Böen bis -- km/h</div>
-              </div>
             </div>
           </div>
 
-          <div class="glass-card bento-item sun-card">
+          <div class="glass-card bento-item bento-compact-card sun-card" data-bento="sun" role="button" tabindex="0" title="Tippen für Sonnenbogen &amp; Dämmerung">
             <div class="card-header">
               <div class="card-title"><span class="card-icon">🌅</span> SONNENSTAND</div>
+              <span class="bento-open-pill">Details ›</span>
             </div>
-            <div class="bento-body">
+            <div class="bento-body bento-compact-body">
               <div class="bento-main-val" id="sunset-time-val">--:--</div>
               <div class="bento-sub-title" id="sunset-label">Sonnenuntergang</div>
-              <div class="sun-arc-wrapper">
+              <div class="sun-arc-wrapper compact-sun-arc">
                 <svg class="sun-arc-svg" viewBox="0 0 100 40">
                   <path d="M 5 35 Q 50 5 95 35" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-dasharray="3,3" />
                   <path id="sun-arc-progress" d="M 5 35 Q 50 5 95 35" fill="none" stroke="#ffd166" stroke-width="2.5" />
@@ -272,33 +275,36 @@
             </div>
           </div>
 
-          <div class="glass-card bento-item precip-card">
+          <div class="glass-card bento-item bento-compact-card precip-card" data-bento="precip" role="button" tabindex="0" title="Tippen für Niederschlags- &amp; Schneeanalyse">
             <div class="card-header">
               <div class="card-title"><span class="card-icon">🌧️</span> NIEDERSCHLAG</div>
+              <span class="bento-open-pill">Details ›</span>
             </div>
-            <div class="bento-body">
-              <div class="bento-main-val" id="precip-total-val">0 <small>mm</small></div>
+            <div class="bento-body bento-compact-body">
+              <div class="bento-main-val text-cyan" id="precip-total-val">0 <small>mm</small></div>
               <div class="bento-sub-title">24h Gesamtsumme</div>
               <p class="bento-hint" id="precip-forecast-hint">Kein wesentlicher Niederschlag erwartet.</p>
             </div>
           </div>
 
-          <div class="glass-card bento-item humidity-card">
+          <div class="glass-card bento-item bento-compact-card humidity-card" data-bento="humidity" role="button" tabindex="0" title="Tippen für Taupunkt &amp; Kondensation">
             <div class="card-header">
-              <div class="card-title"><span class="card-icon">💧</span> FEUCHTIGKEIT & TAUPUNKT</div>
+              <div class="card-title"><span class="card-icon">💧</span> FEUCHTE &amp; TAU</div>
+              <span class="bento-open-pill">Details ›</span>
             </div>
-            <div class="bento-body">
+            <div class="bento-body bento-compact-body">
               <div class="bento-main-val" id="humidity-val">--%</div>
               <div class="bento-sub-title" id="dew-point-sub">Taupunkt: --°C</div>
               <p class="bento-hint" id="condensation-risk-hint">Kondensationsrisiko: Normal</p>
             </div>
           </div>
 
-          <div class="glass-card bento-item pressure-card">
+          <div class="glass-card bento-item bento-compact-card pressure-card" data-bento="pressure" role="button" tabindex="0" title="Tippen für Barometer &amp; Tendenz">
             <div class="card-header">
               <div class="card-title"><span class="card-icon">⏲️</span> LUFTPDRUCK</div>
+              <span class="bento-open-pill">Details ›</span>
             </div>
-            <div class="bento-body">
+            <div class="bento-body bento-compact-body">
               <div class="bento-main-val" id="pressure-val">-- <small>hPa</small></div>
               <div class="bento-sub-title" id="pressure-qfe">Stationsdruck: -- hPa</div>
               <p class="bento-hint" id="pressure-trend">Tendenz: Stabil</p>
@@ -2471,6 +2477,32 @@
       </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL / BOTTOM SHEET: BENTO QUICK-METRICS DETAIL-LAYER -->
+  <!-- =================================================================== -->
+  <div class="modal-overlay bento-modal-overlay" id="bento-detail-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="bdm-title">
+    <div class="modal-card glass-card bento-sheet-card">
+      <div class="bento-sheet-drag-handle" aria-hidden="true"></div>
+      
+      <div class="modal-header bdm-header">
+        <div class="modal-title-col">
+          <div class="modal-location-badge" id="bdm-location-badge">📍 München (519 m)</div>
+          <h2 class="modal-day-title" id="bdm-title">💨 Wind &amp; Böen — Detailanalyse</h2>
+          <span class="modal-condition" id="bdm-subtitle">Echtzeit-Messung &amp; orografische Gradienten</span>
+        </div>
+        <button id="bento-modal-close" class="close-modal-btn" title="Schließen (Esc)" aria-label="Details schließen">✕</button>
+      </div>
+
+      <div class="bdm-body" id="bdm-body">
+        <!-- Dynamischer Inhalt durch features/bentoSheets.js -->
+      </div>
+
+      <div class="modal-footer-actions">
+        <button type="button" class="action-btn action-btn-secondary" id="bento-modal-close-btn">✕ Schließen</button>
+      </div>
     </div>
   </div>
 

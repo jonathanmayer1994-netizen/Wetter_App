@@ -825,8 +825,9 @@ export function render10DayForecast(daily, hourly) {
     const sunriseStr = daily.sunrise && daily.sunrise[i] ? new Date(daily.sunrise[i]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
     const sunsetStr = daily.sunset && daily.sunset[i] ? new Date(daily.sunset[i]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
 
+    const isExtended = i >= 3;
     const wrapper = document.createElement('div');
-    wrapper.className = 'daily-item-wrapper';
+    wrapper.className = `daily-item-wrapper ${isExtended ? 'daily-extended-item is-collapsed' : ''}`;
     wrapper.id = `daily-item-${i}`;
 
     wrapper.innerHTML = `
@@ -950,6 +951,45 @@ export function render10DayForecast(daily, hourly) {
     }
 
     fragment.appendChild(wrapper);
+  }
+
+  // 3-Tage-Fokus: "Ganze 10 Tage anzeigen" Toggle Button
+  if (count > 3) {
+    const expandBtnWrapper = document.createElement('div');
+    expandBtnWrapper.className = 'daily-expand-bar';
+    expandBtnWrapper.innerHTML = `
+      <button type="button" class="daily-expand-toggle-btn" id="daily-expand-toggle-btn" aria-expanded="false">
+        <span class="det-icon">📅</span>
+        <span class="det-text">Ganze 10 Tage anzeigen (noch ${count - 3} Tage)</span>
+        <span class="det-arrow">▾</span>
+      </button>
+    `;
+
+    const toggleBtn = expandBtnWrapper.querySelector('#daily-expand-toggle-btn');
+    toggleBtn.addEventListener('click', () => {
+      const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+      const newExpanded = !isExpanded;
+      toggleBtn.setAttribute('aria-expanded', newExpanded ? 'true' : 'false');
+
+      const extendedItems = container.querySelectorAll('.daily-extended-item');
+      extendedItems.forEach(el => {
+        el.classList.toggle('is-collapsed', !newExpanded);
+      });
+
+      const detText = toggleBtn.querySelector('.det-text');
+      const detArrow = toggleBtn.querySelector('.det-arrow');
+      if (newExpanded) {
+        if (detText) detText.innerText = 'Weniger Tage anzeigen';
+        if (detArrow) detArrow.innerText = '▴';
+        toggleBtn.classList.add('active');
+      } else {
+        if (detText) detText.innerText = `Ganze 10 Tage anzeigen (noch ${count - 3} Tage)`;
+        if (detArrow) detArrow.innerText = '▾';
+        toggleBtn.classList.remove('active');
+      }
+    });
+
+    fragment.appendChild(expandBtnWrapper);
   }
 
   // Single-commit atomic DOM update (Task 4b)

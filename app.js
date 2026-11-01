@@ -21,6 +21,7 @@ import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandl
 import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/networks.js';
 import { ActualEngine } from './core/actualEngine.js';
 import { renderVerificationDashboard, setupVerificationUI, initVerificationHandlers } from './features/verificationUI.js';
+import { initBentoSheets } from './features/bentoSheets.js';
 import { AlpineStorage } from './storage.js';
 
 // Central Dispatcher Event Bus Subscriptions
@@ -282,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initLeafletMap();
   setupSourcesQuickNav();
   setupExpertModeToggle();
+  initBentoSheets();
 
   // DEFAULT LOCATION: Beim Öffnen immer aktueller GPS-Standort des Geräts
   const cachedGps = AlpineStorage.safeGetItem('best_weather_last_gps', null);
