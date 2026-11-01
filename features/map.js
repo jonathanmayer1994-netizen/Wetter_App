@@ -189,6 +189,13 @@ export function enterMobileMapFullscreen() {
   const wrapper = document.getElementById('fullscreen-map-wrapper');
   if (wrapper) wrapper.classList.add('is-fullscreen');
 
+  const pwCard = document.getElementById('map-point-weather-card');
+  const pwToggle = document.getElementById('mpw-mobile-toggle-btn');
+  if (pwCard && !pwCard.classList.contains('collapsed')) {
+    pwCard.classList.add('collapsed');
+    if (pwToggle) pwToggle.innerText = '▴';
+  }
+
   if (state.map?.instance) {
     state.map.instance.invalidateSize();
     setTimeout(() => {
@@ -631,9 +638,13 @@ export function updatePointWeatherCard(frame) {
   if (iconEl) iconEl.innerText = codeInfo.icon || '🌤️';
 
   const tempEl = document.getElementById('mpw-temp-val');
+  const quickTempEl = document.getElementById('mpw-quick-temp-chip');
   if (tempEl) {
     const tempVal = typeof locWeather.temp === 'number' ? Math.round(locWeather.temp) : 12;
     tempEl.innerText = `${tempVal}°`;
+    if (quickTempEl) {
+      quickTempEl.innerText = `${tempVal}° ${codeInfo.icon || '🌤️'}`;
+    }
   }
 
   const condLabel = document.getElementById('mpw-condition-label');

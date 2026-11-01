@@ -4758,6 +4758,14 @@ body {
   flex-shrink: 0;
 }
 
+.mft-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 .mft-label {
   font-size: 10px;
   font-weight: 800;
@@ -5062,6 +5070,58 @@ body {
   background: rgba(56, 189, 248, 0.2);
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.mpw-quick-temp-chip {
+  display: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.mpw-mobile-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 2px;
+  transition: all 0.2s ease;
+}
+
+.mpw-mobile-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.map-point-weather-card.collapsed .mpw-quick-temp-chip {
+  display: inline-flex;
+  align-items: center;
+}
+
+.map-point-weather-card.collapsed .mpw-body,
+.map-point-weather-card.collapsed .mpw-front-motion {
+  display: none !important;
+}
+
+.map-point-weather-card.collapsed {
+  padding: 6px 12px;
+  gap: 0;
+}
+
+.map-point-weather-card.collapsed .mpw-header {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .mpw-body {
@@ -7589,6 +7649,14 @@ body {
     flex-shrink: 0;
   }
 
+  .mft-divider {
+    width: 1px;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.15);
+    margin: 0 2px;
+    flex-shrink: 0;
+  }
+
   .mft-label {
     font-size: 9.5px;
     font-weight: 800;
@@ -7745,7 +7813,7 @@ body {
   .map-point-weather-card {
     position: fixed !important;
     top: auto !important;
-    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 195px) !important;
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 155px) !important;
     left: 10px !important;
     z-index: 100001 !important;
     width: fit-content !important;
@@ -7838,12 +7906,12 @@ body {
     padding-bottom: 0;
   }
 
-  /* 3. Floating Zoom Dock (Rechte Seite über dem Player verankert — KEINE Kollision) */
+  /* 3. Floating Zoom Dock (Rechte Seite unter dem Schließen-Button verankert — Ergonomisch & Zero-Kollision) */
   .map-floating-zoom-dock {
     position: fixed !important;
-    top: auto !important;
-    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 195px) !important;
-    right: 10px !important;
+    top: calc(env(safe-area-inset-top, 20px) + 68px) !important;
+    bottom: auto !important;
+    right: 12px !important;
     z-index: 100001 !important;
     padding: 3px !important;
     gap: 4px !important;
@@ -7853,6 +7921,21 @@ body {
     -webkit-backdrop-filter: blur(20px) !important;
     border: 1px solid rgba(255, 255, 255, 0.18) !important;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  /* Dynamische Positionierung der Point-Weather-Card bei eingeklapptem Player */
+  #fullscreen-map-wrapper:has(#radar-floating-controls.is-collapsed) .map-point-weather-card,
+  body.mobile-map-fullscreen-active:has(#radar-floating-controls.is-collapsed) .map-point-weather-card {
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 52px) !important;
+  }
+
+  /* Eingeklappter Radar-Player auf Mobile: Schlanke zentrierte Pill */
+  .modern-radar-player.is-collapsed {
+    padding: 6px 14px;
+    border-radius: 999px;
+    max-width: 320px;
+    margin: 0 auto;
+    bottom: max(10px, env(safe-area-inset-bottom, 10px));
   }
 
   .map-zoom-action-btn {

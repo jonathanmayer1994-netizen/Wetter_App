@@ -1409,9 +1409,6 @@
         </div>
       </div>
 
-        </div>
-      </div>
-
       <!-- =================================================================== -->
       <!-- TAB 3: LIVE-KARTE & RADAR (Vollwertige OSM-Karte mit Wetter-Overlays) -->
       <!-- =================================================================== -->
@@ -1440,7 +1437,7 @@
             <!-- 1. SLEEK FLOATING TOP DOCK (WETTER-EBENEN, KARTENSTIL & ACTIONS) -->
             <div class="map-floating-topbar" id="map-floating-topbar">
               <!-- Overlay Switcher Pills -->
-              <div class="mft-group">
+              <div class="mft-group mft-overlays">
                 <span class="mft-label">Wetter:</span>
                 <button class="map-overlay-btn active" data-overlay="precip" title="48-Stunden hochauflösender Niederschlags- & Schneefilm">🌧️❄️ 48h Radar</button>
                 <button class="map-overlay-btn" data-overlay="wind" title="Animierte Windströmung & Böen">💨 Wind</button>
@@ -1450,14 +1447,18 @@
                 <button class="map-overlay-btn" data-overlay="pressure" title="Luftdruck QNH & Isobaren">⏲️ Druck</button>
               </div>
 
+              <div class="mft-divider"></div>
+
               <!-- Basiskarten Switcher Pills -->
-              <div class="mft-group">
+              <div class="mft-group mft-bases">
                 <span class="mft-label">Karte:</span>
                 <button class="map-base-btn active" data-base="osm-standard" title="OpenStreetMap Standard — Kristallklare Detailtiefe">🗺️ Standard</button>
                 <button class="map-base-btn" data-base="osm-outdoor" title="OSM Topo — Höhenlinien, Schummerung & Alpinrelief">🏔️ Topo</button>
                 <button class="map-base-btn" data-base="osm-dark" title="OSM Dunkel — Nativer High-Contrast Nachtmodus">🌙 Dunkel</button>
                 <button class="map-base-btn" data-base="satellite" title="Satelliten-Luftbild mit OSM-Beschriftung">🛰️ Satellit</button>
               </div>
+
+              <div class="mft-divider"></div>
 
               <!-- Action Toggles -->
               <div class="mft-group mft-actions">
@@ -1507,6 +1508,7 @@
                   </div>
                   <div class="mpw-meta">
                     <span class="mpw-elevation-chip" id="mpw-elevation-chip">520 m</span>
+                    <span class="mpw-quick-temp-chip" id="mpw-quick-temp-chip">--°</span>
                     <span class="mpw-time-badge live" id="mpw-time-badge">LIVE</span>
                     <button class="mpw-mobile-toggle-btn" id="mpw-mobile-toggle-btn" type="button" aria-label="Details ein-/ausklappen" title="Details minimieren">▾</button>
                   </div>
