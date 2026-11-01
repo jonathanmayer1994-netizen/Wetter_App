@@ -645,7 +645,7 @@
           </section>
 
           <!-- 3. WAND-AUSRICHTUNG (PRO BERG ANPASSBAR: NORDWAND, SÜDGRAT, ETC.) -->
-          <details class="glass-card mountain-aspect-card alpine-drawer" id="mountain-aspect-drawer">
+          <details class="glass-card mountain-aspect-card alpine-drawer" id="mountain-aspect-drawer" open>
             <summary class="card-header alpine-drawer-summary" style="cursor: pointer;">
               <div class="card-title">
                 <span class="card-icon">🧭</span>
@@ -972,248 +972,29 @@
       <!-- =================================================================== -->
       <div class="tab-pane" id="tab-sports">
         <div class="view-panel" id="sports-view-panel">
-          
-          <!-- 1. SPORTART-, STARTZEIT- & GPX-SETUP -->
-          <!-- 1. ATHLETEN-STUDIO: 2 SPORTART-KATEGORIEN (RAD & BERGE) & SEPARATER TOURENSTART -->
-          <section class="glass-card sports-setup-card">
-            <div class="card-header">
-              <div class="card-title">
-                <span class="card-icon">⚡</span>
-                <span>ATHLETEN- & ROUTENSTUDIO (RAD & BERGE)</span>
-              </div>
-              <span class="card-tag">Stufenlose Dynamik & Relativ-Wind</span>
-            </div>
 
-            <!-- Haupt-Kategorie Wähler (2 Sportarten: Rad & Berge) -->
-            <div class="athlete-category-selector" id="athlete-category-selector">
-              <button type="button" class="athlete-cat-card" id="sport-cat-bike" data-category="bike">
-                <div class="acc-icon-wrap">🚴</div>
-                <div class="acc-content">
-                  <div class="acc-title-row">
-                    <span class="acc-title">Rad</span>
-                    <span class="acc-badge" id="acc-bike-badge">26.0 km/h</span>
-                  </div>
-                  <p class="acc-desc">Rennrad, Gravel, Mountainbike & E-Bike</p>
-                </div>
-              </button>
-              <button type="button" class="athlete-cat-card active" id="sport-cat-mountain" data-category="mountain">
-                <div class="acc-icon-wrap">🏔️</div>
-                <div class="acc-content">
-                  <div class="acc-title-row">
-                    <span class="acc-title">Berge</span>
-                    <span class="acc-badge" id="acc-mountain-badge">4.0 km/h • 400 Hm/h</span>
-                  </div>
-                  <p class="acc-desc">Wandern, Bergtour, Klettersteig & Trailrun</p>
-                </div>
-              </button>
-            </div>
-
-            <!-- Stufenlose Geschwindigkeits- & Höhenmeter-Steuerung (Slider & Stepper) -->
-            <!-- RAD CONTROLS -->
-            <div class="athlete-tuning-panel" id="athlete-bike-controls" style="display: none;">
-              <div class="atp-header">
-                <div class="atp-title">
-                  <span class="atp-icon">🚴</span>
-                  <strong>Stufenlose Rad-Grundgeschwindigkeit</strong>
-                </div>
-                <div class="atp-stepper-wrap">
-                  <button type="button" class="atp-step-btn" id="bike-speed-minus" title="0.5 km/h langsamer">− 0.5</button>
-                  <span class="atp-live-val text-accent" id="bike-speed-val">26.0 km/h</span>
-                  <button type="button" class="atp-step-btn" id="bike-speed-plus" title="0.5 km/h schneller">+ 0.5</button>
-                </div>
-              </div>
-              <div class="atp-slider-row">
-                <span class="slider-boundary">10 km/h</span>
-                <input type="range" id="bike-speed-slider" min="10" max="45" step="0.5" value="26.0" class="athlete-range-slider">
-                <span class="slider-boundary">45 km/h</span>
-              </div>
-              <div class="atp-presets-row" id="bike-presets-row">
-                <span class="atp-preset-hint">Pace-Vorschläge:</span>
-                <button type="button" class="atp-preset-btn" data-speed="18.0">☕ Genuss (18 km/h)</button>
-                <button type="button" class="atp-preset-btn active" data-speed="26.0">⚡ Ausdauer (26 km/h)</button>
-                <button type="button" class="atp-preset-btn" data-speed="32.0">🔥 Sportiv (32 km/h)</button>
-                <button type="button" class="atp-preset-btn" data-speed="38.0">🏆 Race (38 km/h)</button>
-              </div>
-              <p class="atp-physics-note">💡 <em>Flachland-Tempo: Steigung (Wattwiderstand) & Gefälle (Aero-Abfahrt) werden dynamisch für jeden GPX-Meter einberechnet.</em></p>
-            </div>
-
-            <!-- BERGE CONTROLS -->
-            <div class="athlete-tuning-panel" id="athlete-mountain-controls">
-              <!-- Horizontale Marschgeschwindigkeit -->
-              <div class="atp-subblock">
-                <div class="atp-header">
-                  <div class="atp-title">
-                    <span class="atp-icon">🚶</span>
-                    <strong>Horizontale Marschgeschwindigkeit</strong>
-                  </div>
-                  <div class="atp-stepper-wrap">
-                    <button type="button" class="atp-step-btn" id="mtn-speed-minus" title="0.1 km/h langsamer">− 0.1</button>
-                    <span class="atp-live-val text-cyan" id="mtn-speed-val">4.0 km/h</span>
-                    <button type="button" class="atp-step-btn" id="mtn-speed-plus" title="0.1 km/h schneller">+ 0.1</button>
+          <!-- 1. GLANCEABLE TOUR HERO & VITAL METRICS STRIP -->
+          <section class="glass-card sports-hero-card" id="sports-hero-card">
+            <div class="sports-hero-top-row">
+              <div class="sports-hero-title-group">
+                <div class="sports-hero-badge-wrap">
+                  <span class="sports-hero-icon" id="sports-hero-icon">🏔️</span>
+                  <div>
+                    <h2 class="sports-hero-title" id="sports-active-tour-title">Nebelhorn Rundtour (2.224 m)</h2>
+                    <p class="sports-hero-sub" id="sports-active-tour-sub">Allgäuer Alpen • Stufenlose SAC-Dynamik &amp; Relativ-Wind</p>
                   </div>
                 </div>
-                <div class="atp-slider-row">
-                  <span class="slider-boundary">1.5 km/h</span>
-                  <input type="range" id="mtn-speed-slider" min="1.5" max="8.0" step="0.1" value="4.0" class="athlete-range-slider">
-                  <span class="slider-boundary">8.0 km/h</span>
-                </div>
-                <div class="atp-presets-row" id="mtn-speed-presets">
-                  <span class="atp-preset-hint">Distanz-Pace:</span>
-                  <button type="button" class="atp-preset-btn" data-mtnspeed="3.0">3.0 km/h (Schweres Gelände)</button>
-                  <button type="button" class="atp-preset-btn active" data-mtnspeed="4.0">4.0 km/h (DAV/SAC-Norm)</button>
-                  <button type="button" class="atp-preset-btn" data-mtnspeed="5.5">5.5 km/h (Zügig)</button>
-                  <button type="button" class="atp-preset-btn" data-mtnspeed="7.0">7.0 km/h (Trailrunning)</button>
-                </div>
               </div>
 
-              <!-- Vertikale Aufstiegsleistung Hm/h -->
-              <div class="atp-subblock" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08);">
-                <div class="atp-header">
-                  <div class="atp-title">
-                    <span class="atp-icon">🧗</span>
-                    <strong>Vertikale Aufstiegsleistung (Höhenmeter / Stunde)</strong>
-                  </div>
-                  <div class="atp-stepper-wrap">
-                    <button type="button" class="atp-step-btn" id="mtn-ascent-minus" title="25 Hm/h weniger">− 25</button>
-                    <span class="atp-live-val text-yellow" id="mtn-ascent-val">400 Hm/h</span>
-                    <button type="button" class="atp-step-btn" id="mtn-ascent-plus" title="25 Hm/h mehr">+ 25</button>
-                  </div>
-                </div>
-                <div class="atp-slider-row">
-                  <span class="slider-boundary">150 Hm/h</span>
-                  <input type="range" id="mtn-ascent-slider" min="150" max="1200" step="25" value="400" class="athlete-range-slider">
-                  <span class="slider-boundary">1.200 Hm/h</span>
-                </div>
-                <div class="atp-presets-row" id="mtn-ascent-presets">
-                  <span class="atp-preset-hint">Höhenmeter-Pace:</span>
-                  <button type="button" class="atp-preset-btn" data-ascent="250">250 Hm/h (Gemütlich)</button>
-                  <button type="button" class="atp-preset-btn active" data-ascent="400">400 Hm/h (Alpenverein DIN)</button>
-                  <button type="button" class="atp-preset-btn" data-ascent="600">600 Hm/h (Sportlich)</button>
-                  <button type="button" class="atp-preset-btn" data-ascent="900">900+ Hm/h (Express / Wettkampf)</button>
-                </div>
-              </div>
-              <p class="atp-physics-note">💡 <em>Offizielle Schweizer Alpen-Club (SAC) & DAV Formel: Horizontale Zeit & Höhenzeit werden mit T = max(Th, Tv) + min(Th, Tv)/2 exakt verrechnet.</em></p>
-            </div>
-
-            <!-- TOURENSTART: SEPARATE DATUM- & UHRZEIT-SELEKTION IN SCHÖNEM APPLE LIQUID GLASS UI -->
-            <div class="sports-tour-start-panel">
-              <div class="stsp-col stsp-date-col">
-                <div class="stsp-header">
-                  <span class="stsp-icon">📅</span>
-                  <label for="sports-date-input" class="stsp-label">Tourendatum:</label>
-                </div>
-                <div class="stsp-input-wrap">
-                  <input type="date" id="sports-date-input" class="stsp-glass-input">
-                </div>
-                <div class="stsp-presets" id="sports-date-presets">
-                  <button type="button" class="stsp-preset-btn active" data-date-preset="today">Heute</button>
-                  <button type="button" class="stsp-preset-btn" data-date-preset="tomorrow">Morgen</button>
-                  <button type="button" class="stsp-preset-btn" data-date-preset="day-after">Übermorgen</button>
-                </div>
-              </div>
-
-              <div class="stsp-divider"></div>
-
-              <div class="stsp-col stsp-time-col">
-                <div class="stsp-header">
-                  <span class="stsp-icon">⏰</span>
-                  <label for="sports-time-input" class="stsp-label">Startuhrzeit:</label>
-                </div>
-                <div class="stsp-input-wrap">
-                  <input type="time" id="sports-time-input" class="stsp-glass-input" value="08:00">
-                </div>
-                <div class="stsp-presets" id="sports-time-presets">
-                  <button type="button" class="stsp-preset-btn" data-time-preset="now">🔴 Jetzt</button>
-                  <button type="button" class="stsp-preset-btn" data-time-preset="06:00">06:00 (Alpin)</button>
-                  <button type="button" class="stsp-preset-btn active" data-time-preset="08:00">08:00</button>
-                  <button type="button" class="stsp-preset-btn" data-time-preset="10:00">10:00</button>
-                  <button type="button" class="stsp-preset-btn" data-time-preset="13:00">13:00</button>
-                </div>
+              <!-- Quick Preset Switcher Pills -->
+              <div class="sports-quick-presets" id="sports-quick-presets">
+                <button type="button" class="sports-route-preset active" data-tour="nebelhorn-oberstdorf" title="Nebelhorn 2.224 m">🏔️ Nebelhorn</button>
+                <button type="button" class="sports-route-preset" data-tour="gruenten-waechter" title="Grünten 1.738 m">⛰️ Grünten</button>
+                <button type="button" class="sports-quick-gpx-btn" id="sports-custom-gpx-trigger" title="Eigene GPX-Datei laden">📂 Eigene GPX</button>
               </div>
             </div>
 
-            <!-- Kompatibilitäts-Container für bestehende Test-Suiten -->
-            <div style="display:none;" aria-hidden="true">
-              <input type="datetime-local" id="sports-start-time">
-              <div class="sports-type-bar">
-                <button class="sport-pill active" data-sport="hiking"></button>
-                <button class="sport-pill" data-sport="road_bike"></button>
-                <button class="sport-pill" data-sport="gravel_mtb"></button>
-                <button class="sport-pill" data-sport="trailrun"></button>
-              </div>
-              <div class="sports-fitness-bar">
-                <button class="fitness-pill" data-fitness="easy"></button>
-                <button class="fitness-pill active" data-fitness="normal"></button>
-                <button class="fitness-pill" data-fitness="sporty"></button>
-                <button class="fitness-pill" data-fitness="pro"></button>
-              </div>
-            </div>
-
-            <!-- GPX Track Picker & Upload -->
-            <div class="sports-gpx-section">
-              <div class="sports-presets-row">
-                <span class="sp-preset-label">Allgäuer Referenz-Routen:</span>
-                <button type="button" class="sports-route-preset active" data-tour="nebelhorn-oberstdorf">🏔️ Nebelhorn (2.224 m)</button>
-                <button type="button" class="sports-route-preset" data-tour="gruenten-waechter">⛰️ Grünten (1.738 m)</button>
-              </div>
-
-              <div class="sports-drop-zone" id="sports-drop-zone">
-                <div class="sdz-content">
-                  <span class="sdz-icon">📂</span>
-                  <div class="sdz-text">
-                    <strong>Eigene GPX-Route hier ablegen</strong> oder <button type="button" id="sports-browse-btn" class="sdz-browse-btn">Datei auswählen</button>
-                    <span class="sdz-sub">Unterstützt Komoot, Strava, Garmin, Outdooractive (.gpx)</span>
-                  </div>
-                  <input type="file" id="sports-file-input" accept=".gpx" style="display:none;">
-                </div>
-              </div>
-            </div>
-
-            <!-- LIVE-TOUR & IN-FLIGHT TRACKING COCKPIT BAR -->
-            <div class="sports-live-tracking-panel" id="sports-live-tracking-panel">
-              <div class="sltp-main">
-                <div class="sltp-status-col">
-                  <div class="sltp-beacon-wrap">
-                    <span class="sltp-beacon" id="sltp-beacon-dot"></span>
-                    <strong class="sltp-status-title" id="sltp-status-title">Live-Tour Tracking: Bereit</strong>
-                  </div>
-                  <span class="sltp-status-desc" id="sltp-status-desc">Aktiviere GPS oder klicke auf die Route, um Zeiten & Wetter für die Reststrecke live zu aktualisieren.</span>
-                </div>
-                <div class="sltp-actions">
-                  <button type="button" class="sltp-btn sltp-btn-start" id="sports-live-track-toggle" title="Live-Standortverfolgung per Smartphone-GPS starten">
-                    <span class="sltp-btn-icon" id="sltp-btn-icon">🟢</span>
-                    <span class="sltp-btn-text" id="sltp-toggle-text">Live-Tour starten</span>
-                  </button>
-                  <button type="button" class="sltp-btn sltp-btn-step" id="sports-sim-step-btn" title="Simuliert +5 km Fortschritt auf der Route für Testzwecke">
-                    <span>⏩ +5 km Fortschritt</span>
-                  </button>
-                  <button type="button" class="sltp-btn sltp-btn-reset" id="sports-reset-progress-btn" title="Tour-Fortschritt auf Start (0 km) zurücksetzen" style="display:none;">
-                    <span>🔄 Reset</span>
-                  </button>
-                </div>
-              </div>
-              <!-- Live-Tour Fortschritts- & Adaptiv-Status (aktiv wenn unterwegs) -->
-              <div class="sltp-in-flight-summary" id="sltp-in-flight-summary" style="display: none;">
-                <div class="sltp-metric-chip">
-                  <span class="smc-label">📍 Absolviert:</span>
-                  <strong class="smc-val text-accent" id="sltp-val-done">0.0 km (0%)</strong>
-                </div>
-                <div class="sltp-metric-chip">
-                  <span class="smc-label">🏁 Verbleibend:</span>
-                  <strong class="smc-val text-cyan" id="sltp-val-remaining">-- km</strong>
-                </div>
-                <div class="sltp-metric-chip">
-                  <span class="smc-label">⏱️ Adaptives Tempo:</span>
-                  <strong class="smc-val" id="sltp-val-pace">1.0× Plan (Im Zeitplan)</strong>
-                </div>
-                <div class="sltp-metric-chip">
-                  <span class="smc-label">⚡ Nächster Wegpunkt:</span>
-                  <strong class="smc-val text-yellow" id="sltp-val-next">--</strong>
-                </div>
-              </div>
-            </div>
-
-            <!-- Route Metrics Summary -->
+            <!-- Route Vital Metrics Summary (4 Cards) -->
             <div class="sports-metrics-grid" id="sports-metrics-grid">
               <div class="sm-card">
                 <span class="sm-label">Streckenlänge</span>
@@ -1234,13 +1015,12 @@
             </div>
           </section>
 
-
-          <!-- 3. KOMPAKTER ROUTEN- & HÖHENWETTER MONITOR (ONE-TOUCH ALPINE COCKPIT) -->
+          <!-- 2. ONE-TOUCH ALPINE ROUTE- & ELEVATION WEATHER COCKPIT -->
           <section class="glass-card sports-cockpit-card" id="sports-cockpit-card">
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">🏔️</span>
-                <span>STRECKEN- & HÖHENWETTER</span>
+                <span>STRECKEN- &amp; HÖHENWETTER</span>
               </div>
               <span class="card-tag" id="cockpit-pos-badge">📍 km 0.0 • -- m</span>
             </div>
@@ -1272,7 +1052,7 @@
               </button>
             </div>
 
-            <!-- Smart Weather Capsule für den gewählten Punkt (Keine Überlappung) -->
+            <!-- Smart Weather Capsule für den gewählten Punkt -->
             <div class="cockpit-weather-capsule" id="cockpit-weather-capsule">
               <div class="cwc-header">
                 <div class="cwc-station-info">
@@ -1318,12 +1098,282 @@
             </div>
           </section>
 
-          <!-- 5. INTERAKTIVE STRECKENKARTE -->
+          <!-- 3. LIVE-TOUR & IN-FLIGHT TRACKING COCKPIT BAR -->
+          <section class="glass-card sports-live-tracking-panel" id="sports-live-tracking-panel">
+            <div class="sltp-main">
+              <div class="sltp-status-col">
+                <div class="sltp-beacon-wrap">
+                  <span class="sltp-beacon" id="sltp-beacon-dot"></span>
+                  <strong class="sltp-status-title" id="sltp-status-title">Live-Tour Tracking: Bereit</strong>
+                </div>
+                <span class="sltp-status-desc" id="sltp-status-desc">Aktiviere GPS oder tippe auf das Profil, um Zeiten &amp; Wetter für die Reststrecke live zu aktualisieren.</span>
+              </div>
+              <div class="sltp-actions">
+                <button type="button" class="sltp-btn sltp-btn-start" id="sports-live-track-toggle" title="Live-Standortverfolgung per Smartphone-GPS starten">
+                  <span class="sltp-btn-icon" id="sltp-btn-icon">🟢</span>
+                  <span class="sltp-btn-text" id="sltp-toggle-text">Live-Tour starten</span>
+                </button>
+                <button type="button" class="sltp-btn sltp-btn-step" id="sports-sim-step-btn" title="Simuliert +5 km Fortschritt auf der Route für Testzwecke">
+                  <span>⏩ +5 km Fortschritt</span>
+                </button>
+                <button type="button" class="sltp-btn sltp-btn-reset" id="sports-reset-progress-btn" title="Tour-Fortschritt auf Start (0 km) zurücksetzen" style="display:none;">
+                  <span>🔄 Reset</span>
+                </button>
+              </div>
+            </div>
+            <!-- Live-Tour Fortschritts- & Adaptiv-Status (aktiv wenn unterwegs) -->
+            <div class="sltp-in-flight-summary" id="sltp-in-flight-summary" style="display: none;">
+              <div class="sltp-metric-chip">
+                <span class="smc-label">📍 Absolviert:</span>
+                <strong class="smc-val text-accent" id="sltp-val-done">0.0 km (0%)</strong>
+              </div>
+              <div class="sltp-metric-chip">
+                <span class="smc-label">🏁 Verbleibend:</span>
+                <strong class="smc-val text-cyan" id="sltp-val-remaining">-- km</strong>
+              </div>
+              <div class="sltp-metric-chip">
+                <span class="smc-label">⏱️ Adaptives Tempo:</span>
+                <strong class="smc-val" id="sltp-val-pace">1.0× Plan (Im Zeitplan)</strong>
+              </div>
+              <div class="sltp-metric-chip">
+                <span class="smc-label">⚡ Nächster Wegpunkt:</span>
+                <strong class="smc-val text-yellow" id="sltp-val-next">--</strong>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4. PROGRESSIVE DISCLOSURE: TOUR- & ATHLETEN-SETUP DRAWER -->
+          <details class="glass-card sports-setup-card alpine-drawer" id="sports-setup-drawer">
+            <summary class="card-header alpine-drawer-summary" style="cursor: pointer;">
+              <div class="card-title">
+                <span class="card-icon">⚡</span>
+                <span>TOUR- &amp; ATHLETEN-SETUP ANPASSEN</span>
+              </div>
+              <span class="card-tag">Pace • Startzeit • GPX-Upload ▾</span>
+            </summary>
+
+            <div class="alpine-drawer-body">
+              <!-- Haupt-Kategorie Wähler (2 Sportarten: Rad & Berge) -->
+              <div class="athlete-category-selector" id="athlete-category-selector">
+                <button type="button" class="athlete-cat-card" id="sport-cat-bike" data-category="bike">
+                  <div class="acc-icon-wrap">🚴</div>
+                  <div class="acc-content">
+                    <div class="acc-title-row">
+                      <span class="acc-title">Rad</span>
+                      <span class="acc-badge" id="acc-bike-badge">26.0 km/h</span>
+                    </div>
+                    <p class="acc-desc">Rennrad, Gravel, Mountainbike &amp; E-Bike</p>
+                  </div>
+                </button>
+                <button type="button" class="athlete-cat-card active" id="sport-cat-mountain" data-category="mountain">
+                  <div class="acc-icon-wrap">🏔️</div>
+                  <div class="acc-content">
+                    <div class="acc-title-row">
+                      <span class="acc-title">Berge</span>
+                      <span class="acc-badge" id="acc-mountain-badge">4.0 km/h • 400 Hm/h</span>
+                    </div>
+                    <p class="acc-desc">Wandern, Bergtour, Klettersteig &amp; Trailrun</p>
+                  </div>
+                </button>
+              </div>
+
+              <!-- Stufenlose Geschwindigkeits- & Höhenmeter-Steuerung (Slider & Stepper) -->
+              <!-- RAD CONTROLS -->
+              <div class="athlete-tuning-panel" id="athlete-bike-controls" style="display: none;">
+                <div class="atp-header">
+                  <div class="atp-title">
+                    <span class="atp-icon">🚴</span>
+                    <strong>Stufenlose Rad-Grundgeschwindigkeit</strong>
+                  </div>
+                  <div class="atp-stepper-wrap">
+                    <button type="button" class="atp-step-btn" id="bike-speed-minus" title="0.5 km/h langsamer">− 0.5</button>
+                    <span class="atp-live-val text-accent" id="bike-speed-val">26.0 km/h</span>
+                    <button type="button" class="atp-step-btn" id="bike-speed-plus" title="0.5 km/h schneller">+ 0.5</button>
+                  </div>
+                </div>
+                <div class="atp-slider-row">
+                  <span class="slider-boundary">10 km/h</span>
+                  <input type="range" id="bike-speed-slider" min="10" max="45" step="0.5" value="26.0" class="athlete-range-slider">
+                  <span class="slider-boundary">45 km/h</span>
+                </div>
+                <div class="atp-presets-row" id="bike-presets-row">
+                  <span class="atp-preset-hint">Pace-Vorschläge:</span>
+                  <button type="button" class="atp-preset-btn" data-speed="18.0">☕ Genuss (18 km/h)</button>
+                  <button type="button" class="atp-preset-btn active" data-speed="26.0">⚡ Ausdauer (26 km/h)</button>
+                  <button type="button" class="atp-preset-btn" data-speed="32.0">🔥 Sportiv (32 km/h)</button>
+                  <button type="button" class="atp-preset-btn" data-speed="38.0">🏆 Race (38 km/h)</button>
+                </div>
+                <p class="atp-physics-note">💡 <em>Flachland-Tempo: Steigung (Wattwiderstand) &amp; Gefälle (Aero-Abfahrt) werden dynamisch für jeden GPX-Meter einberechnet.</em></p>
+              </div>
+
+              <!-- BERGE CONTROLS -->
+              <div class="athlete-tuning-panel" id="athlete-mountain-controls">
+                <!-- Horizontale Marschgeschwindigkeit -->
+                <div class="atp-subblock">
+                  <div class="atp-header">
+                    <div class="atp-title">
+                      <span class="atp-icon">🚶</span>
+                      <strong>Horizontale Marschgeschwindigkeit</strong>
+                    </div>
+                    <div class="atp-stepper-wrap">
+                      <button type="button" class="atp-step-btn" id="mtn-speed-minus" title="0.1 km/h langsamer">− 0.1</button>
+                      <span class="atp-live-val text-cyan" id="mtn-speed-val">4.0 km/h</span>
+                      <button type="button" class="atp-step-btn" id="mtn-speed-plus" title="0.1 km/h schneller">+ 0.1</button>
+                    </div>
+                  </div>
+                  <div class="atp-slider-row">
+                    <span class="slider-boundary">1.5 km/h</span>
+                    <input type="range" id="mtn-speed-slider" min="1.5" max="8.0" step="0.1" value="4.0" class="athlete-range-slider">
+                    <span class="slider-boundary">8.0 km/h</span>
+                  </div>
+                  <div class="atp-presets-row" id="mtn-speed-presets">
+                    <span class="atp-preset-hint">Distanz-Pace:</span>
+                    <button type="button" class="atp-preset-btn" data-mtnspeed="3.0">3.0 km/h (Schweres Gelände)</button>
+                    <button type="button" class="atp-preset-btn active" data-mtnspeed="4.0">4.0 km/h (DAV/SAC-Norm)</button>
+                    <button type="button" class="atp-preset-btn" data-mtnspeed="5.5">5.5 km/h (Zügig)</button>
+                    <button type="button" class="atp-preset-btn" data-mtnspeed="7.0">7.0 km/h (Trailrunning)</button>
+                  </div>
+                </div>
+
+                <!-- Vertikale Aufstiegsleistung Hm/h -->
+                <div class="atp-subblock" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08);">
+                  <div class="atp-header">
+                    <div class="atp-title">
+                      <span class="atp-icon">🧗</span>
+                      <strong>Vertikale Aufstiegsleistung (Höhenmeter / Stunde)</strong>
+                    </div>
+                    <div class="atp-stepper-wrap">
+                      <button type="button" class="atp-step-btn" id="mtn-ascent-minus" title="25 Hm/h weniger">− 25</button>
+                      <span class="atp-live-val text-yellow" id="mtn-ascent-val">400 Hm/h</span>
+                      <button type="button" class="atp-step-btn" id="mtn-ascent-plus" title="25 Hm/h mehr">+ 25</button>
+                    </div>
+                  </div>
+                  <div class="atp-slider-row">
+                    <span class="slider-boundary">150 Hm/h</span>
+                    <input type="range" id="mtn-ascent-slider" min="150" max="1200" step="25" value="400" class="athlete-range-slider">
+                    <span class="slider-boundary">1.200 Hm/h</span>
+                  </div>
+                  <div class="atp-presets-row" id="mtn-ascent-presets">
+                    <span class="atp-preset-hint">Höhenmeter-Pace:</span>
+                    <button type="button" class="atp-preset-btn" data-ascent="250">250 Hm/h (Gemütlich)</button>
+                    <button type="button" class="atp-preset-btn active" data-ascent="400">400 Hm/h (Alpenverein DIN)</button>
+                    <button type="button" class="atp-preset-btn" data-ascent="600">600 Hm/h (Sportlich)</button>
+                    <button type="button" class="atp-preset-btn" data-ascent="900">900+ Hm/h (Express / Wettkampf)</button>
+                  </div>
+                </div>
+                <p class="atp-physics-note">💡 <em>Offizielle Schweizer Alpen-Club (SAC) &amp; DAV Formel: Horizontale Zeit &amp; Höhenzeit werden mit T = max(Th, Tv) + min(Th, Tv)/2 exakt verrechnet.</em></p>
+              </div>
+
+              <!-- TOURENSTART: SEPARATE DATUM- & UHRZEIT-SELEKTION -->
+              <div class="sports-tour-start-panel">
+                <div class="stsp-col stsp-date-col">
+                  <div class="stsp-header">
+                    <span class="stsp-icon">📅</span>
+                    <label for="sports-date-input" class="stsp-label">Tourendatum:</label>
+                  </div>
+                  <div class="stsp-input-wrap">
+                    <input type="date" id="sports-date-input" class="stsp-glass-input">
+                  </div>
+                  <div class="stsp-presets" id="sports-date-presets">
+                    <button type="button" class="stsp-preset-btn active" data-date-preset="today">Heute</button>
+                    <button type="button" class="stsp-preset-btn" data-date-preset="tomorrow">Morgen</button>
+                    <button type="button" class="stsp-preset-btn" data-date-preset="day-after">Übermorgen</button>
+                  </div>
+                </div>
+
+                <div class="stsp-divider"></div>
+
+                <div class="stsp-col stsp-time-col">
+                  <div class="stsp-header">
+                    <span class="stsp-icon">⏰</span>
+                    <label for="sports-time-input" class="stsp-label">Startuhrzeit:</label>
+                  </div>
+                  <div class="stsp-input-wrap">
+                    <input type="time" id="sports-time-input" class="stsp-glass-input" value="08:00">
+                  </div>
+                  <div class="stsp-presets" id="sports-time-presets">
+                    <button type="button" class="stsp-preset-btn" data-time-preset="now">🔴 Jetzt</button>
+                    <button type="button" class="stsp-preset-btn" data-time-preset="06:00">06:00 (Alpin)</button>
+                    <button type="button" class="stsp-preset-btn active" data-time-preset="08:00">08:00</button>
+                    <button type="button" class="stsp-preset-btn" data-time-preset="10:00">10:00</button>
+                    <button type="button" class="stsp-preset-btn" data-time-preset="13:00">13:00</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- GPX Track Dropzone & Upload -->
+              <div class="sports-gpx-section">
+                <div class="sports-drop-zone" id="sports-drop-zone">
+                  <div class="sdz-content">
+                    <span class="sdz-icon">📂</span>
+                    <div class="sdz-text">
+                      <strong>Eigene GPX-Route hier ablegen</strong> oder <button type="button" id="sports-browse-btn" class="sdz-browse-btn">Datei auswählen</button>
+                      <span class="sdz-sub">Unterstützt Komoot, Strava, Garmin, Outdooractive (.gpx)</span>
+                    </div>
+                    <input type="file" id="sports-file-input" accept=".gpx" style="display:none;">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Kompatibilitäts-Container für bestehende Test-Suiten -->
+              <div style="display:none;" aria-hidden="true">
+                <input type="datetime-local" id="sports-start-time">
+                <div class="sports-type-bar">
+                  <button class="sport-pill active" data-sport="hiking"></button>
+                  <button class="sport-pill" data-sport="road_bike"></button>
+                  <button class="sport-pill" data-sport="gravel_mtb"></button>
+                  <button class="sport-pill" data-sport="trailrun"></button>
+                </div>
+                <div class="sports-fitness-bar">
+                  <button class="fitness-pill" data-fitness="easy"></button>
+                  <button class="fitness-pill active" data-fitness="normal"></button>
+                  <button class="fitness-pill" data-fitness="sporty"></button>
+                  <button class="fitness-pill" data-fitness="pro"></button>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- 5. PROGRESSIVE DISCLOSURE: ETAPPEN-FAHRPLAN & WEGPUNKTE -->
+          <details class="glass-card sports-waypoints-card alpine-drawer" id="sports-waypoints-drawer">
+            <summary class="card-header alpine-drawer-summary" style="cursor: pointer;">
+              <div class="card-title">
+                <span class="card-icon">📋</span>
+                <span>ETAPPEN-FAHRPLAN &amp; WEGPUNKT-WETTER</span>
+              </div>
+              <span class="card-tag">Fahrplan &amp; Details ▾</span>
+            </summary>
+
+            <div class="alpine-drawer-body">
+              <div class="swt-filter-group" id="swt-filter-group">
+                <button type="button" class="swt-filter-pill active" data-wpt-filter="all">🌐 Alle Wegpunkte</button>
+                <button type="button" class="swt-filter-pill" data-wpt-filter="hazards">⚠️ Nur Warnungen</button>
+                <button type="button" class="swt-filter-pill" data-wpt-filter="peaks">🏔️ Pässe &amp; Gipfel</button>
+              </div>
+
+              <div class="sports-waypoints-table-wrap">
+                <div class="swt-header">
+                  <span class="swt-col swt-col-pos">Streckenabschnitt</span>
+                  <span class="swt-col swt-col-dist-ele">Distanz &amp; Höhe</span>
+                  <span class="swt-col swt-col-time">Uhrzeit</span>
+                  <span class="swt-col swt-col-cond">Wetterlage</span>
+                  <span class="swt-col swt-col-temp">Temp (Gefühlt)</span>
+                  <span class="swt-col swt-col-wind">Wind &amp; Vektor</span>
+                  <span class="swt-col swt-col-precip">Niederschlag</span>
+                </div>
+                <div class="swt-body" id="sports-waypoints-list">
+                  <!-- Dynamisch generierte Wegpunkt-Zeilen (swt-row) -->
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- 6. INTERAKTIVE STRECKENKARTE -->
           <section class="glass-card sports-map-card">
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">🗺️</span>
-                <span>ROUTENVERLAUF & GEFAHRENZONEN AUF DER KARTE</span>
+                <span>ROUTENVERLAUF &amp; GEFAHRENZONEN AUF DER KARTE</span>
               </div>
               <span class="card-tag">OSM Outdoor Relief</span>
             </div>
@@ -1333,12 +1383,12 @@
             </div>
           </section>
 
-          <!-- ROUTEN-GEFAHRENANALYSE & EXPOSITIONSSCHUTZ (Gefahren & Windchill-Warnungen ganz unten) -->
+          <!-- 7. ROUTEN-GEFAHRENANALYSE & EXPOSITIONSSCHUTZ -->
           <section class="glass-card sports-hazards-card" id="sports-hazards-card">
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">⚠️</span>
-                <span>ROUTEN-GEFAHRENANALYSE & EXPOSITIONSSCHUTZ</span>
+                <span>ROUTEN-GEFAHRENANALYSE &amp; EXPOSITIONSSCHUTZ</span>
               </div>
               <span class="card-tag" id="sports-hazard-status-tag">Wird geprüft...</span>
             </div>
@@ -1355,6 +1405,9 @@
               <!-- Dynamisch befüllt mit Warnungen vor Gewitter, Sturmböen, Frost etc. -->
             </div>
           </section>
+
+        </div>
+      </div>
 
         </div>
       </div>

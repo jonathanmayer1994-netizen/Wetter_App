@@ -681,6 +681,15 @@ export function setupSportsTab() {
   const browseBtn = document.getElementById('sports-browse-btn');
   const fileInput = document.getElementById('sports-file-input');
   const dropZone = document.getElementById('sports-drop-zone');
+  const customGpxTrigger = document.getElementById('sports-custom-gpx-trigger');
+
+  if (customGpxTrigger && fileInput) {
+    customGpxTrigger.addEventListener('click', () => {
+      const drawer = document.getElementById('sports-setup-drawer');
+      if (drawer) drawer.open = true;
+      fileInput.click();
+    });
+  }
 
   if (browseBtn && fileInput) {
     browseBtn.addEventListener('click', () => fileInput.click());
@@ -1003,6 +1012,19 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
   const startPt = parsed.points[0];
   const hourly = await fetchHourlyForRoute(startPt.lat, startPt.lon);
   state.sports.cachedForecast = hourly;
+
+  const heroTitleEl = document.getElementById('sports-active-tour-title');
+  const heroSubEl = document.getElementById('sports-active-tour-sub');
+  if (heroTitleEl) {
+    heroTitleEl.innerText = tourName || state.sports.gpxName || 'Aktive Tour';
+  }
+  if (heroSubEl) {
+    const isBike = state.sports.category === 'bike';
+    const paceTxt = isBike
+      ? `Rad • ${(state.sports.bikeSpeedKmH || 26).toFixed(1)} km/h Pace`
+      : `Berge • ${(state.sports.mountainSpeedKmH || 4).toFixed(1)} km/h • ${state.sports.mountainAscentHmH || 400} Hm/h`;
+    heroSubEl.innerText = `${paceTxt} • Stufenlose SAC-Dynamik & Relativ-Wind`;
+  }
 
   recomputeSportsTimeline();
 }
