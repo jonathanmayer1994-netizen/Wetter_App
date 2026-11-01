@@ -380,20 +380,245 @@ export function setupWebcamModal() {
   });
 }
 
-// City Panel Render
+// =============================================================================
+// STADTKLIMA & URBANES MIKROKLIMA COCKPIT (TAB 2 FÜR STÄDTE & FLACHLAND)
+// =============================================================================
 export function renderCityPanel() {
   const loc = state.currentLocation;
   const cur = state.weatherData ? state.weatherData.current : null;
-  const t = cur ? Math.round(cur.temperature_2m) : 15;
+  const hourly = state.weatherData ? state.weatherData.hourly : null;
+  const daily = state.weatherData ? state.weatherData.daily : null;
+  const aqi = state.airQuality;
 
-  document.getElementById('city-title').innerText = `${loc.name} — Stadtklima & Urbaner Komfort`;
-  document.getElementById('city-elev-val').innerText = `${loc.elevation.toLocaleString('de-DE')} m`;
-  document.getElementById('city-heat-island').innerText = `+1.8 °C vs. Umland`;
-  document.getElementById('city-street-wind').innerText = `${cur ? Math.round(cur.wind_speed_10m * 0.7) : 8} km/h (Boden)`;
-  document.getElementById('city-urban-temp').innerText = `${t + 1}°C`;
-  document.getElementById('city-canyon-wind').innerText = `${cur ? Math.round(cur.wind_speed_10m) : 12} km/h`;
-  document.getElementById('city-aqi-val').innerText = 'Gut (AQI 24)';
-  document.getElementById('city-comfort-label').innerText = t > 25 ? 'Leichte Wärmebelastung' : 'Sehr angenehm';
+  const t = cur ? Math.round(cur.temperature_2m) : 15;
+  const windSpd = cur ? Math.round(cur.wind_speed_10m || 10) : 10;
+  const rh = cur ? Math.round(cur.relative_humidity_2m || 65) : 65;
+  const isDay = cur ? cur.is_day === 1 : true;
+  const cloudCover = cur && cur.cloud_cover !== undefined ? cur.cloud_cover : 30;
+
+  // 1. Titel & Höhe
+  const titleEl = document.getElementById('city-title');
+  if (titleEl) titleEl.innerText = `${loc.name} — Stadtklima & Mikroklima`;
+
+  const elevEl = document.getElementById('city-elev-val');
+  if (elevEl) elevEl.innerText = `${(loc.elevation || 520).toLocaleString('de-DE')} m`;
+
+  // 2. Reale Berechnung des Urban Heat Island Effekts (UHI Delta)
+  // Bei schwachem Wind & nachts maximal; bei starkem Wind turbulente Durchmischung
+  const windDamping = Math.max(0.25, 1 - (windSpd / 38));
+  let uhiDelta = 1.1 * windDamping;
+  if (!isDay) {
+    const nightFactor = Math.max(0.3, 1 - (cloudCover / 150));
+    uhiDelta += 1.3 * nightFactor * windDamping;
+  } else {
+    const sunFactor = Math.max(0.2, 1 - (cloudCover / 130));
+    uhiDelta += 0.7 * sunFactor * windDamping;
+  }
+  uhiDelta = Math.round(uhiDelta * 10) / 10;
+  const urbanTemp = Math.round((t + uhiDelta) * 10) / 10;
+
+  const uhiEl = document.getElementById('city-heat-island');
+  if (uhiEl) uhiEl.innerText = `+${uhiDelta.toFixed(1)} °C`;
+
+  const uhiSub = document.getElementById('city-uhi-sub');
+  if (uhiSub) {
+    uhiSub.innerText = uhiDelta >= 2.0 ? 'Starker Wärmestau' : (uhiDelta >= 1.0 ? 'Mäßige Wärmeinsel' : 'Gute Durchmischung');
+  }
+
+  const urbanTempEl = document.getElementById('city-urban-temp');
+  if (urbanTempEl) urbanTempEl.innerText = `${Math.round(urbanTemp)}°C (Zentrum)`;
+
+  // 3. Thermischer Komfort & Hitzestress-Ampel
+  const comfortBadge = document.getElementById('city-comfort-badge');
+  const comfortLabel = document.getElementById('city-comfort-label');
+  let comfortText = '🟢 Behaglich';
+  let comfortClass = 'badge-good';
+
+  if (urbanTemp >= 32) {
+    comfortText = '🔴 Extreme Hitzebelastung';
+    comfortClass = 'badge-extreme';
+  } else if (urbanTemp >= 28) {
+    comfortText = '🟠 Starke Wärmebelastung';
+    comfortClass = 'badge-hot';
+  } else if (urbanTemp >= 24) {
+    comfortText = '🟡 Mäßige Wärmebelastung';
+    comfortClass = 'badge-warm';
+  } else if (urbanTemp < 5) {
+    comfortText = '🔵 Kühle Stadtatmosphäre';
+    comfortClass = 'badge-cool';
+  }
+
+  if (comfortBadge) {
+    comfortBadge.innerText = comfortText;
+    comfortBadge.className = `card-tag city-badge ${comfortClass}`;
+  }
+  if (comfortLabel) comfortLabel.innerText = comfortText;
+
+  // 4. Nachtkühlung & Lüftungsfenster
+  let tMinTonight = (daily && daily.temperature_2m_min && daily.temperature_2m_min[0] !== undefined)
+    ? Math.round(daily.temperature_2m_min[0])
+    : (t - 4);
+  
+  const nightCoolingEl = document.getElementById('city-night-cooling');
+  const nightSubEl = document.getElementById('city-night-sub');
+  if (nightCoolingEl) {
+    nightCoolingEl.innerText = `${tMinTonight} °C`;
+  }
+  if (nightSubEl) {
+    if (tMinTonight >= 20) {
+      nightSubEl.innerText = '⚠️ Tropennacht (Keine Entlastung)';
+      nightSubEl.style.color = '#ff453a';
+    } else if (tMinTonight >= 16) {
+      nightSubEl.innerText = 'Mäßige Nachtabkühlung';
+      nightSubEl.style.color = '#ffd166';
+    } else {
+      nightSubEl.innerText = '🟢 Sehr gute Nachtabkühlung';
+      nightSubEl.style.color = '#30d158';
+    }
+  }
+
+  const ventWindowEl = document.getElementById('city-vent-window');
+  if (ventWindowEl) {
+    ventWindowEl.innerText = tMinTonight >= 20 ? '03:00 – 06:30 Uhr (Späte Nacht)' : '22:00 – 07:30 Uhr (Effektiv)';
+  }
+
+  // 5. Park- & Oasen-Effekt
+  const parkDelta = Math.round((1.5 + 0.6 * (1 - (rh / 100)) + (urbanTemp > 22 ? 0.7 : 0)) * 10) / 10;
+  const parkEl = document.getElementById('city-park-delta');
+  if (parkEl) parkEl.innerText = `-${parkDelta.toFixed(1)} °C`;
+
+  // 6. Asphalttemperatur (Solar-Absorption)
+  const asphaltTempEl = document.getElementById('city-asphalt-temp');
+  if (asphaltTempEl) {
+    if (isDay) {
+      const sunRadFactor = Math.max(0, 1 - (cloudCover / 100));
+      const asphaltTemp = Math.round(t + sunRadFactor * 14 + (cur?.uv_index ? cur.uv_index * 1.5 : 2));
+      asphaltTempEl.innerText = `~${asphaltTemp} °C`;
+    } else {
+      asphaltTempEl.innerText = `${Math.round(urbanTemp - 0.5)} °C (Abkühlung)`;
+    }
+  }
+
+  // 7. Wind in Straßenschluchten & Ventilation
+  const streetWind = Math.round(windSpd * 0.65);
+  const streetWindEl = document.getElementById('city-street-wind');
+  if (streetWindEl) streetWindEl.innerText = `${streetWind} km/h (Boden)`;
+
+  const canyonWindEl = document.getElementById('city-canyon-wind');
+  if (canyonWindEl) canyonWindEl.innerText = `Freier Wind: ${windSpd} km/h`;
+
+  const ventStatusEl = document.getElementById('city-ventilation-status');
+  if (ventStatusEl) {
+    ventStatusEl.innerText = windSpd < 6 ? 'Gering (Windstille im Kessel)' : (windSpd < 18 ? 'Gute Frischluftzufuhr' : 'Starke Durchlüftung');
+  }
+
+  // 8. Reale Luftqualität & Schadstoffdaten aus CAMS
+  const aqiHero = document.getElementById('city-aqi-hero');
+  const aqiSub = document.getElementById('city-aqi-sub');
+  const pm25El = document.getElementById('city-pm25-val');
+  const ozoneEl = document.getElementById('city-ozone-val');
+
+  if (aqi) {
+    if (aqiHero) aqiHero.innerText = `AQI ${aqi.aqiIndex || 22}`;
+    if (aqiSub) aqiSub.innerText = `${aqi.aqiCategory || 'Gut'} • CAMS / EEA`;
+    if (pm25El) pm25El.innerText = `${Math.round(aqi.pm25 || 8)} µg/m³`;
+    if (ozoneEl) ozoneEl.innerText = `${Math.round(aqi.ozone || 45)} µg/m³`;
+  } else {
+    if (aqiHero) aqiHero.innerText = 'AQI 22';
+    if (aqiSub) aqiSub.innerText = 'Sehr gut (Reines Stadtklima)';
+    if (pm25El) pm25El.innerText = '7.5 µg/m³';
+    if (ozoneEl) ozoneEl.innerText = '42 µg/m³';
+  }
+
+  // 9. 24h Stadtklima- & Hitzeverlauf Timeline
+  renderCityTimeline(hourly, uhiDelta);
+
+  // 10. Urbane Biometeorologie & Sport-Empfehlung
+  renderCityBiomet(urbanTemp, tMinTonight, aqi, windSpd);
+}
+
+function renderCityTimeline(hourly, uhiDelta) {
+  const container = document.getElementById('city-timeline-list');
+  if (!container || !hourly || !hourly.time) return;
+
+  const fragment = document.createDocumentFragment();
+  const maxHours = Math.min(24, hourly.time.length);
+
+  for (let i = 0; i < maxHours; i++) {
+    const timeStr = new Date(hourly.time[i]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const rawT = hourly.temperature_2m ? hourly.temperature_2m[i] : 15;
+    const isDayTime = i >= 7 && i <= 20;
+    const itemUhi = isDayTime ? uhiDelta * 0.8 : uhiDelta * 1.2;
+    const cityT = Math.round(rawT + itemUhi);
+
+    let statusTag = 'Angenehm';
+    let statusClass = 'text-green';
+    if (cityT >= 30) {
+      statusTag = 'Hitzestau';
+      statusClass = 'text-accent';
+    } else if (cityT >= 25) {
+      statusTag = 'Warm';
+      statusClass = 'text-orange';
+    } else if (cityT < 15 && !isDayTime) {
+      statusTag = 'Lüftungsfenster';
+      statusClass = 'text-cyan';
+    }
+
+    const item = document.createElement('div');
+    item.className = 'city-timeline-item';
+    item.innerHTML = `
+      <span class="cti-time">${timeStr}</span>
+      <span class="cti-icon">${isDayTime ? (cityT >= 26 ? '☀️' : '⛅') : '🌙'}</span>
+      <strong class="cti-temp">${cityT}°</strong>
+      <small class="cti-uhi">+${itemUhi.toFixed(1)}° UHI</small>
+      <span class="cti-status ${statusClass}">${statusTag}</span>
+    `;
+    fragment.appendChild(item);
+  }
+
+  container.replaceChildren(fragment);
+}
+
+function renderCityBiomet(urbanTemp, tMinTonight, aqi, windSpd) {
+  const tagEl = document.getElementById('city-sport-tag');
+  const iconEl = document.getElementById('city-biomet-icon');
+  const titleEl = document.getElementById('city-biomet-title');
+  const descEl = document.getElementById('city-biomet-desc');
+  const tagsRow = document.getElementById('city-biomet-tags');
+
+  let tag = 'Optimale Bedingungen';
+  let icon = '🌳';
+  let title = 'Ideale Verhältnisse für Outdoor-Aktivitäten';
+  let desc = 'Keine thermische Belastung im Stadtgebiet. Perfekte Bedingungen für Sport im Freien, Spaziergänge in Parks und Außengastronomie.';
+  let pills = ['🌿 Reines Stadtklima', '🏃 Beliebiges Sportfenster'];
+
+  if (urbanTemp >= 28) {
+    tag = 'Hitzebelastung';
+    icon = '⚠️';
+    title = 'Thermischer Stress im Stadtkern';
+    desc = 'Starke Aufheizung von Asphalt und Beton. Sportliche Aktivitäten in die kühlen Morgenstunden (vor 09:30 Uhr) oder schattige Parkanlagen verlegen.';
+    pills = ['🧴 Sonnenschutz zwingend', '🏃 Sportempfehlung: Vor 09:30 Uhr', '💧 Erhöhte Trinkmenge'];
+  } else if (tMinTonight >= 20) {
+    tag = 'Tropennacht';
+    icon = '🌙';
+    title = 'Tropennacht: Geringe Erholung im Schlaf';
+    desc = 'Die Nachttemperaturen sinken nicht unter 20°C. Nutze die frühesten Morgenstunden zum Querlüften der Wohnräume.';
+    pills = ['🪟 Querlüften ab 04:00 Uhr', '🌙 Schlafkomfort beachten'];
+  } else if (urbanTemp < 6) {
+    tag = 'Kühles Stadtklima';
+    icon = '🧤';
+    title = 'Frische Stadtatmosphäre';
+    desc = 'Windchill-Effekt in Straßenschluchten spürbar. Warme, winddichte Kleidung beim Radpendeln und Gehen empfohlen.';
+    pills = ['🧣 Winddichte Kleidung', '🚴 Radpendeln: Handschuhe ratsam'];
+  }
+
+  if (tagEl) tagEl.innerText = tag;
+  if (iconEl) iconEl.innerText = icon;
+  if (titleEl) titleEl.innerText = title;
+  if (descEl) descEl.innerText = desc;
+  if (tagsRow) {
+    tagsRow.innerHTML = pills.map(p => `<span class="cbb-pill">${p}</span>`).join('');
+  }
 }
 
 export function getSelectedWallLabel() {

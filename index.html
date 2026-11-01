@@ -811,99 +811,158 @@
 
         <!-- BEREICH B: NUR FÜR STÄDTE & FLACHLAND (z. B. München, Berlin, Wien) -->
         <div id="city-view-panel" class="view-panel" style="display:none;">
-          <!-- Alpines Bergwetter Schnellzugriff-Banner -->
-          <section class="glass-card city-mountain-switch-card" id="city-mountain-switch-card">
-            <div class="cms-header">
-              <span class="cms-icon">🏔️</span>
-              <div class="cms-info">
-                <div class="cms-title">ALPINES BERGWETTER & HÖHENPROFIL</div>
-                <div class="cms-desc">Für diesen Ort (520 m) ist aktuell die Flachland-Analyse aktiv. Wechsle mit einem Klick zu einem Alpengipfel, um das alpine Höhenprofil mit 0°C-Schneegrenze, Inversion, Windgradient und Höhenstufen zu betrachten:</div>
-              </div>
-            </div>
-            <div class="cms-mountains-list">
-              <button class="cms-btn" type="button" data-mountain="Zugspitze">🏔️ Zugspitze (2.962 m)</button>
-              <button class="cms-btn" type="button" data-mountain="Matterhorn">⛰️ Matterhorn (4.478 m)</button>
-              <button class="cms-btn" type="button" data-mountain="Mont Blanc">🏔️ Mont Blanc (4.808 m)</button>
-              <button class="cms-btn" type="button" data-mountain="Großglockner">⛰️ Großglockner (3.798 m)</button>
-              <button class="cms-btn" type="button" data-mountain="Nebelhorn">🏔️ Nebelhorn (2.224 m)</button>
-              <button class="cms-btn cms-btn-toggle" type="button" id="cms-btn-toggle-mountain">🔄 Ort in Berg-Modus umschalten</button>
-            </div>
-          </section>
-
-          <section class="glass-card city-header-card">
+          
+          <!-- 1. KONSOLIDIERTE STADTKLIMA- & MIKROKLIMA-ÜBERSICHT -->
+          <section class="glass-card city-header-card" id="city-header-card">
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">🏙️</span>
-                <span id="city-title">STADTKLIMA & URBANER KOMFORT</span>
+                <span id="city-title">STADTKLIMA &amp; MIKROKLIMA-ANALYSE</span>
               </div>
-              <span class="card-tag">Stadtanalyse</span>
+              <span class="card-tag city-badge" id="city-comfort-badge">🟢 Behaglich</span>
             </div>
 
-            <div class="mountain-stats-row">
-              <div class="m-stat">
-                <span class="m-label">Offizielle Stadthöhe</span>
-                <span class="m-val text-accent" id="city-elev-val">520 m</span>
+            <!-- Wesentliche Stadtklima-Kacheln (Hero Grid) -->
+            <div class="city-hero-grid">
+              <!-- 1. Wärmeinseleffekt -->
+              <div class="ch-tile">
+                <span class="ch-label">🌡️ Wärmeinseleffekt (UHI)</span>
+                <div class="ch-val text-orange" id="city-heat-island">+1.8 °C</div>
+                <span class="ch-sub" id="city-uhi-sub">Zentrum vs. Umland</span>
               </div>
-              <div class="m-stat">
-                <span class="m-label">Urbaner Wärmeinseleffekt</span>
-                <span class="m-val text-orange" id="city-heat-island">+1.6 °C vs. Umland</span>
+
+              <!-- 2. Nachtkühlung & Lüften -->
+              <div class="ch-tile">
+                <span class="ch-label">🌙 Nachtkühlung</span>
+                <div class="ch-val" id="city-night-cooling">-- °C</div>
+                <span class="ch-sub" id="city-night-sub">Wird analysiert...</span>
               </div>
-              <div class="m-stat">
-                <span class="m-label">Bodenwind (Straßenschluchten)</span>
-                <span class="m-val" id="city-street-wind">-- km/h (Mäßig)</span>
+
+              <!-- 3. Park- & Oasen-Effekt -->
+              <div class="ch-tile">
+                <span class="ch-label">🌳 Park- &amp; Grün-Oase</span>
+                <div class="ch-val text-green" id="city-park-delta">-2.2 °C</div>
+                <span class="ch-sub">Kühler im Stadtgrün</span>
               </div>
-              <div class="m-stat">
-                <span class="m-label">Thermischer Komfort</span>
-                <span class="m-val text-green" id="city-comfort-label">Angenehm</span>
+
+              <!-- 4. Luftqualität & CAMS -->
+              <div class="ch-tile">
+                <span class="ch-label">🌿 Luftqualität (AQI)</span>
+                <div class="ch-val text-accent" id="city-aqi-hero">AQI 22</div>
+                <span class="ch-sub" id="city-aqi-sub">Sehr gut • CAMS</span>
+              </div>
+            </div>
+
+            <!-- Versteckte Detail-Infos nur bei Bedarf aufklappbar (Progressive Disclosure) -->
+            <details class="alpine-drawer city-drawer" id="city-details-drawer">
+              <summary class="alpine-drawer-summary">
+                <span>🔬 Detailanalyse: Schadstoffe, Biometeorologie &amp; Straßenschluchten</span>
+                <span class="drawer-arrow">▾</span>
+              </summary>
+              <div class="alpine-drawer-body">
+                <div class="city-details-grid">
+                  <div class="cd-item">
+                    <span class="cd-label">Offizielle Stadthöhe</span>
+                    <strong class="cd-val text-accent" id="city-elev-val">520 m</strong>
+                    <small class="cd-sub">Geprüfte Meereshöhe</small>
+                  </div>
+                  <div class="cd-item">
+                    <span class="cd-label">Bodenwind (Straßenschluchten)</span>
+                    <strong class="cd-val" id="city-street-wind">-- km/h</strong>
+                    <small class="cd-sub" id="city-wind-channeling">Gebäude-Reibung aktiv</small>
+                  </div>
+                  <div class="cd-item">
+                    <span class="cd-label">Lüftungsfenster</span>
+                    <strong class="cd-val text-cyan" id="city-vent-window">22:00 – 08:00 Uhr</strong>
+                    <small class="cd-sub">Beste Raumabkühlung</small>
+                  </div>
+                  <div class="cd-item">
+                    <span class="cd-label">Feinstaub PM2.5</span>
+                    <strong class="cd-val" id="city-pm25-val">-- µg/m³</strong>
+                    <small class="cd-sub">WHO-Richtwert: 15 µg/m³</small>
+                  </div>
+                  <div class="cd-item">
+                    <span class="cd-label">Bodennahes Ozon (O₃)</span>
+                    <strong class="cd-val" id="city-ozone-val">-- µg/m³</strong>
+                    <small class="cd-sub">Spitze am Nachmittag</small>
+                  </div>
+                  <div class="cd-item">
+                    <span class="cd-label">Asphalt-Oberflächentemp.</span>
+                    <strong class="cd-val text-orange" id="city-asphalt-temp">-- °C</strong>
+                    <small class="cd-sub">Direkte Strahlungsabsorption</small>
+                  </div>
+                  <div class="cd-item">
+                    <span class="cd-label">Stadt-Ventilation</span>
+                    <strong class="cd-val" id="city-ventilation-status">Ausreichend</strong>
+                    <small class="cd-sub">Frischluftschneise aktiv</small>
+                  </div>
+                  <div class="cd-item">
+                    <span class="cd-label">Innenstadt-Temperatur</span>
+                    <strong class="cd-val" id="city-urban-temp">--°C</strong>
+                    <small class="cd-sub" id="city-canyon-wind">-- km/h Wind</small>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </section>
+
+          <!-- 2. STÜNDLICHER STADTKLIMA- & HITZEVERLAUF (24h) -->
+          <section class="glass-card city-timeline-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">⏱️</span>
+                <span>24H-STADTKLIMA-VERLAUF &amp; HITZESTRESS</span>
+              </div>
+              <span class="card-tag">Tagesgang Innenstadt</span>
+            </div>
+            <div class="city-timeline-scroll" id="city-timeline-list">
+              <!-- Dynamisch durch renderCityPanel befüllt -->
+            </div>
+          </section>
+
+          <!-- 3. URBANE AKTIVITÄTS- & BIOMETEOROLOGIE-EMPFEHLUNG -->
+          <section class="glass-card city-biomet-card">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">🏃</span>
+                <span>URBANE SPORT- &amp; FREIZEIT-EMPFEHLUNG</span>
+              </div>
+              <span class="card-tag" id="city-sport-tag">Optimale Bedingungen</span>
+            </div>
+            <div class="city-biomet-body">
+              <div class="cbb-icon" id="city-biomet-icon">🌳</div>
+              <div class="cbb-text">
+                <h4 class="cbb-title" id="city-biomet-title">Optimale Verhältnisse für Outdoor-Aktivitäten</h4>
+                <p class="cbb-desc" id="city-biomet-desc">Keine thermische Belastung im Stadtgebiet. Ideale Bedingungen für Joggen, Radfahren und Außengastronomie.</p>
+                <div class="cbb-tags-row" id="city-biomet-tags">
+                  <span class="cbb-pill">🌿 Geringe Schadstoffe</span>
+                  <span class="cbb-pill">🏃 Bestes Sportfenster: Vormittags &amp; Abends</span>
+                </div>
               </div>
             </div>
           </section>
 
-          <!-- Urban Comfort & Air Quality Grid -->
-          <div class="bento-grid" style="margin-top:14px;">
-            <div class="glass-card bento-item">
-              <div class="card-header">
-                <div class="card-title"><span class="card-icon">🌡️</span> WÄRMEINSEL & MIKROKLIMA</div>
+          <!-- 4. DEZENTER ALPIN-WECHSLER AM SEITENENDE (FÜR DEN BEDARFSFALL) -->
+          <section class="glass-card city-mountain-switch-card-subtle" id="city-mountain-switch-card">
+            <div class="cmsc-row">
+              <div class="cmsc-left">
+                <span class="cmsc-icon">🏔️</span>
+                <div class="cmsc-text">
+                  <strong class="cmsc-title">Alpen- &amp; Bergwetter analysieren?</strong>
+                  <span class="cmsc-sub">0°C-Schneegrenze, Inversion &amp; Wand-Exposition für Alpengipfel</span>
+                </div>
               </div>
-              <div class="bento-body">
-                <div class="bento-main-val" id="city-urban-temp">--°C</div>
-                <div class="bento-sub-title">Temperatur Innenstadt</div>
-                <p class="bento-hint">Durch dichte Bebauung und Asphalt kühlt die Innenstadt nachts 1 bis 3 °C langsamer ab als grüne Vororte.</p>
+              <div class="cmsc-right">
+                <div class="cmsc-quick-peaks">
+                  <button type="button" class="cms-btn cmsc-peak-pill" data-mountain="Zugspitze">Zugspitze</button>
+                  <button type="button" class="cms-btn cmsc-peak-pill" data-mountain="Matterhorn">Matterhorn</button>
+                  <button type="button" class="cms-btn cmsc-peak-pill" data-mountain="Nebelhorn">Nebelhorn</button>
+                  <button type="button" class="cms-btn cms-btn-toggle cmsc-peak-pill" id="cms-btn-toggle-mountain">🔄 Ort in Berg-Modus</button>
+                </div>
               </div>
             </div>
+          </section>
 
-            <div class="glass-card bento-item">
-              <div class="card-header">
-                <div class="card-title"><span class="card-icon">🌬️</span> WIND IN STRASSENSCHLUCHTEN</div>
-              </div>
-              <div class="bento-body">
-                <div class="bento-main-val" id="city-canyon-wind">-- km/h</div>
-                <div class="bento-sub-title">Gemilderte Bodenströmung</div>
-                <p class="bento-hint">Gebäude bremsen den freien Wind ab. An Straßenkreuzungen können lokale Düseneffekte auftreten.</p>
-              </div>
-            </div>
-
-            <div class="glass-card bento-item">
-              <div class="card-header">
-                <div class="card-title"><span class="card-icon">🌿</span> LUFTQUALITÄT & FREIZEIT</div>
-              </div>
-              <div class="bento-body">
-                <div class="bento-main-val text-green" id="city-aqi-val">Gut (AQI 22)</div>
-                <div class="bento-sub-title">Geringe Schadstoffbelastung</div>
-                <p class="bento-hint">Optimale Bedingungen für Sport im Freien, Spaziergänge und Außengastronomie.</p>
-              </div>
-            </div>
-
-            <div class="glass-card bento-item">
-              <div class="card-header">
-                <div class="card-title"><span class="card-icon">💡</span> HINWEIS ZUR ALPIN-ENGINE</div>
-              </div>
-              <div class="bento-body">
-                <div class="bento-main-val" style="font-size:16px;">Flachland-Erkennung</div>
-                <p class="bento-hint" style="margin-top:4px;">Wand-Expositionen (Nordwand/Südwand) und vertikale Bergprofile existieren nur im Gebirge. Suche z. B. nach <strong>Zugspitze</strong> oder <strong>Matterhorn</strong>, um die Alpin-Engine live zu erleben!</p>
-              </div>
-            </div>
-          </div>
         </div>
 
       </div>
