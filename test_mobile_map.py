@@ -124,6 +124,53 @@ def run_mobile_tests():
         screenshot_path_2 = "mobile_map_fullscreen_wind.png"
         page.screenshot(path=screenshot_path_2)
         print(f"  📸 Captured screenshot: {screenshot_path_2}")
+
+        print("\n--- TEST: Zero-Collision Floating Cards & Streamlined Timeline Scrubber ---")
+        # Switch back to precip overlay
+        page.click(".map-overlay-btn[data-overlay='precip']")
+        page.wait_for_timeout(400)
+
+        # Trigger point weather card by tapping map center
+        page.mouse.click(190, 360)
+        page.wait_for_timeout(600)
+
+        # Ensure point weather card is visible
+        pwc_visible = page.is_visible("#map-point-weather-card")
+        report("Point Weather Card is rendered on mobile", pwc_visible)
+
+        # Expand point weather card to full height if collapsed
+        page.eval_on_selector("#map-point-weather-card", "el => el.classList.remove('collapsed')")
+        page.wait_for_timeout(300)
+
+        # Measure collision-free gap
+        pwc_box = page.locator("#map-point-weather-card").bounding_box()
+        radar_box = page.locator("#radar-floating-controls").bounding_box()
+        report("Both Point Weather Card and Radar Dock have valid bounding boxes", pwc_box is not None and radar_box is not None)
+
+        if pwc_box and radar_box:
+            vertical_gap = radar_box["y"] - (pwc_box["y"] + pwc_box["height"])
+            report(f"Zero collision between Point Weather Card and Radar Dock (gap: {vertical_gap:.1f}px >= 6px)", vertical_gap >= 6.0)
+
+        # Verify bottom transport bar and jump buttons are completely removed
+        report("Play button cleanly removed", page.query_selector("#radar-play-btn") is None)
+        report("Prev/Next buttons cleanly removed", page.query_selector("#radar-prev-btn") is None and page.query_selector("#radar-next-btn") is None)
+        report("Speed button cleanly removed", page.query_selector("#radar-speed-btn") is None)
+        report("Quick jump pills row cleanly removed", page.query_selector(".radar-jump-pills-wrap") is None)
+
+        # Verify complete date and time display without truncation
+        radar_time_text = page.inner_text("#radar-time-display")
+        report("Radar time display contains complete timestamp", len(radar_time_text) >= 10 and "Uhr" in radar_time_text)
+        report("Radar time display is not cut off with ellipsis", "..." not in radar_time_text and "…" not in radar_time_text)
+
+        # Verify slider scrubber is responsive and updates full date & time
+        page.eval_on_selector("#radar-time-slider", "el => { el.value = Math.floor(el.max * 0.7); el.dispatchEvent(new Event('input')); }")
+        page.wait_for_timeout(300)
+        scrubbed_time = page.inner_text("#radar-time-display")
+        report("Scrubbing slider updates full date/time cleanly", len(scrubbed_time) >= 10 and "Uhr" in scrubbed_time)
+
+        screenshot_path_clean_dock = "mobile_map_clean_dock.png"
+        page.screenshot(path=screenshot_path_clean_dock)
+        print(f"  📸 Captured screenshot: {screenshot_path_clean_dock}")
         
         print("\n--- TEST: Double-Tap & Double-Click on Map MUST NOT Exit Fullscreen ---")
         # Test double-click

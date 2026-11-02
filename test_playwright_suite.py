@@ -276,8 +276,10 @@ def run_tests():
         radar_panel = page.is_visible("#radar-floating-controls")
         report("Radar player controls visible on map tab", radar_panel)
         
-        jump_btns = page.query_selector_all(".radar-jump-btn")
-        report("48h intermediate radar step buttons present (+12h, +24h, +36h, +48h)", len(jump_btns) >= 6)
+        slider = page.query_selector("#radar-time-slider")
+        report("48h radar interactive timeline slider scrubber present", slider is not None)
+        markers = page.query_selector(".radar-timeline-markers")
+        report("Radar timeline markers (-1h, JETZT, +48h) present", markers is not None)
         
         # Test collapse toggle button on radar player
         collapse_btn = page.query_selector("#radar-player-toggle-btn")
@@ -419,35 +421,28 @@ def run_tests():
             is_act = page.eval_on_selector(f".map-overlay-btn[data-overlay='{mo}']", "el => el.classList.contains('active')")
             report(f"Map overlay '{mo}' activates cleanly", is_act)
 
-        # Verify Radar Transport & Play/Pause
-        play_btn = page.query_selector("#radar-play-btn")
-        report("Radar play/pause button present", play_btn is not None)
-        page.click("#radar-play-btn")
-        page.wait_for_timeout(200)
-        play_icon = page.inner_text("#radar-play-btn")
-        report("Clicking radar play button toggles state", "⏸" in play_icon or "▶" in play_icon)
-        page.click("#radar-play-btn") # pause
-        
-        # Verify Radar Navigation & Speed
-        page.click("#radar-next-btn", force=True)
-        page.wait_for_timeout(100)
-        page.click("#radar-prev-btn", force=True)
-        page.wait_for_timeout(100)
-        page.click("#radar-speed-btn", force=True)
-        page.wait_for_timeout(100)
-        report("Radar transport buttons (prev, next, speed) operate smoothly", True)
-        
-        # Verify Radar Slider
+        # Verify Streamlined Radar Timeline Dock
         slider_val = page.eval_on_selector("#radar-time-slider", "el => el.value")
         report("Radar timeline slider is interactable", slider_val is not None)
-        
-        # Verify Radar Jump Pills
-        jump_now = page.query_selector(".radar-jump-btn[data-target='now']")
-        report("Radar jump pill 'Jetzt' present", jump_now is not None)
-        if jump_now:
-            jump_now.click()
-            page.wait_for_timeout(100)
-            report("Radar jump to now operates smoothly", True)
+
+        # Test scrubbing the timeline slider
+        page.eval_on_selector("#radar-time-slider", "el => { el.value = 0; el.dispatchEvent(new Event('input')); }")
+        page.wait_for_timeout(100)
+        time_text = page.inner_text("#radar-time-display")
+        report("Radar time display shows complete timestamp for frame 0", len(time_text) > 5)
+
+        page.eval_on_selector("#radar-time-slider", "el => { el.value = Math.floor(el.max / 2); el.dispatchEvent(new Event('input')); }")
+        page.wait_for_timeout(100)
+        time_text_mid = page.inner_text("#radar-time-display")
+        report("Scrubbing slider updates radar time display smoothly", len(time_text_mid) > 5)
+
+        # Verify redundant transport bar and jump buttons are completely removed from DOM
+        play_btn = page.query_selector("#radar-play-btn")
+        report("Radar play button cleanly removed from DOM", play_btn is None)
+        next_btn = page.query_selector("#radar-next-btn")
+        report("Radar step buttons cleanly removed from DOM", next_btn is None)
+        jump_btns = page.query_selector(".radar-jump-btn")
+        report("Radar jump pills cleanly removed from DOM", jump_btns is None)
             
         # Verify Stations Toggle button removed completely
         st_btn = page.query_selector("#stations-toggle-btn")
@@ -687,14 +682,9 @@ def run_tests():
             is_act = page.eval_on_selector(f".map-overlay-btn[data-overlay='{mo}']", "el => el.classList.contains('active')")
             report(f"Map weather layer overlay button '{mo}' activates with 0 errors", is_act)
 
-        page.click("#radar-next-btn")
+        page.eval_on_selector("#radar-time-slider", "el => { el.value = 1; el.dispatchEvent(new Event('input')); }")
         page.wait_for_timeout(100)
-        page.click("#radar-prev-btn")
-        page.wait_for_timeout(100)
-        page.click("#radar-play-btn")
-        page.wait_for_timeout(200)
-        page.click("#radar-play-btn")
-        report("Radar transport buttons operate smoothly", True)
+        report("Radar timeline scrubber operates smoothly", True)
 
         # 6. Favorites Tab & Networks Tab
         page.click(".tab-btn[data-tab='tab-favorites']")

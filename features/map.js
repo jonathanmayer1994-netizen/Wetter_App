@@ -1824,30 +1824,37 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
         : getSynthesizedBaselineStations());
 
   const t = new Date((frame && frame.timestampMs) || Date.now());
-  const dayStr = t.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  const now = new Date();
+  const isToday = t.toDateString() === now.toDateString();
+  const tmrw = new Date(now.getTime() + 86400000);
+  const isTomorrow = t.toDateString() === tmrw.toDateString();
+  const dayStr = isToday ? 'Heute' : (isTomorrow ? 'Morgen' : t.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }));
   const timeStr = t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   
-  let relStr = 'Jetzt';
+  let relStr = 'Live';
   if (frame) {
     if (frame.isLive || frame.minuteOffset === 0) {
-      relStr = '🔴 Live-Scan';
+      relStr = 'Live';
     } else if (frame.minuteOffset !== undefined) {
       const mo = frame.minuteOffset;
       if (mo < 0) {
-        relStr = `Vor ${Math.abs(mo)} Min. (15m)`;
-      } else if (mo <= 60) {
-        relStr = `+${mo}m Nowcast (5m)`;
+        relStr = `vor ${Math.abs(mo)} Min.`;
+      } else if (mo < 60) {
+        relStr = `+${mo}m`;
       } else if (mo % 60 === 0) {
         relStr = `+${mo / 60}h`;
       } else {
-        relStr = `+${Math.floor(mo / 60)}h ${mo % 60}m (15m)`;
+        relStr = `+${Math.floor(mo / 60)}h ${mo % 60}m`;
       }
     } else if (frame.type === 'past') {
-      relStr = `Vor ${Math.round((Date.now() - t.getTime()) / 60000)} Min.`;
+      const diffM = Math.round((Date.now() - t.getTime()) / 60000);
+      relStr = `vor ${diffM} Min.`;
     } else if (frame.hoursFromNow) {
       relStr = `+${frame.hoursFromNow}h`;
     }
   }
+
+  const fullDateTimeText = relStr ? `${dayStr}, ${timeStr} Uhr (${relStr})` : `${dayStr}, ${timeStr} Uhr`;
 
   const modeChip = document.getElementById('radar-mode-chip');
   const timeDisplay = document.getElementById('radar-time-display');
@@ -1877,25 +1884,21 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
 
       if (modeChip) {
         if (frame.isLive) {
-          modeChip.innerText = '🔴 LIVE-RADAR';
+          modeChip.innerText = '🔴 Live';
           modeChip.style.background = 'rgba(239, 68, 68, 0.25)';
           modeChip.style.borderColor = '#ef4444';
         } else if (frame.minuteOffset !== undefined && frame.minuteOffset < 0) {
-          modeChip.innerText = `⏪ -${Math.abs(frame.minuteOffset)}m Radar-Historie (15m)`;
+          modeChip.innerText = `⏪ -${Math.abs(frame.minuteOffset)}m`;
           modeChip.style.background = 'rgba(56, 189, 248, 0.2)';
           modeChip.style.borderColor = '#38bdf8';
         } else {
-          modeChip.innerText = '⏪ Radar-Historie';
+          modeChip.innerText = '⏪ Historie';
           modeChip.style.background = 'rgba(56, 189, 248, 0.2)';
           modeChip.style.borderColor = '#38bdf8';
         }
       }
       if (timeDisplay) {
-        let pText = 'Trocken';
-        if (locWeather.snow > 0) pText = `❄️ Schneefall (${locWeather.snow.toFixed(1)} cm/h)`;
-        else if (locWeather.precip >= 3.0) pText = `⛈️ Starkregen (${locWeather.precip.toFixed(1)} mm/h)`;
-        else if (locWeather.precip > 0) pText = `🌧️ Regen (${locWeather.precip.toFixed(1)} mm/h)`;
-        timeDisplay.innerText = `${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${pText} • Doppler-Scan`;
+        timeDisplay.innerText = fullDateTimeText;
       }
       WeatherCanvasEngine.render(frame, 'precip');
     } else if (frame) {
@@ -1908,30 +1911,23 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
 
       if (modeChip) {
         if (frame.minuteOffset !== undefined && frame.minuteOffset <= 60 && frame.minuteOffset > 0) {
-          modeChip.innerText = `⚡ +${frame.minuteOffset}m High-Res Nowcast (5m)`;
+          modeChip.innerText = `⚡ Nowcast (+${frame.minuteOffset}m)`;
           modeChip.style.background = 'rgba(245, 158, 11, 0.25)';
           modeChip.style.borderColor = '#f59e0b';
         } else if (frame.minuteOffset !== undefined && frame.minuteOffset <= 180) {
           const hStr = frame.minuteOffset % 60 === 0 ? `+${frame.minuteOffset / 60}h` : `+${Math.floor(frame.minuteOffset / 60)}h ${frame.minuteOffset % 60}m`;
-          modeChip.innerText = `🔮 ${hStr} Detail-Radar (15m)`;
+          modeChip.innerText = `🔮 Detail (${hStr})`;
           modeChip.style.background = 'rgba(168, 85, 247, 0.25)';
           modeChip.style.borderColor = '#c084fc';
         } else {
           const h = frame.hoursFromNow || Math.round((frame.minuteOffset || 0) / 60);
-          modeChip.innerText = `🔮 +${h}h Prognose-Radar`;
+          modeChip.innerText = `🔮 48h Radar (+${h}h)`;
           modeChip.style.background = 'rgba(168, 85, 247, 0.25)';
           modeChip.style.borderColor = '#c084fc';
         }
       }
       if (timeDisplay) {
-        let pText = 'Trocken (0.0 mm/h)';
-        if (locWeather.snow > 0) pText = `❄️ Schneefall (${locWeather.snow.toFixed(1)} cm/h)`;
-        else if (locWeather.precip >= 3.0) pText = `⛈️ Starkregen (${locWeather.precip.toFixed(1)} mm/h)`;
-        else if (locWeather.precip > 0) pText = `🌧️ Regen (${locWeather.precip.toFixed(1)} mm/h)`;
-
-        const baseT = locWeather.temp !== undefined ? locWeather.temp : 6;
-        const freezingLevel = Math.max(600, Math.round(locWeather.elevation + (baseT / 0.0065)));
-        timeDisplay.innerText = `${dayStr}, ${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${pText} • Schneefallgrenze: ~${freezingLevel} m`;
+        timeDisplay.innerText = fullDateTimeText;
       }
     }
 
@@ -1955,13 +1951,12 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     WeatherCanvasEngine.render(frame, 'wind');
 
     if (modeChip) {
-      modeChip.innerText = (frame && frame.isLive) ? '💨 Live-Windfeld' : `💨 ${relStr} Wind`;
+      modeChip.innerText = (frame && frame.isLive) ? '💨 Live-Wind' : '💨 Windfeld';
       modeChip.style.background = 'rgba(56, 189, 248, 0.25)';
       modeChip.style.borderColor = '#38bdf8';
     }
     if (timeDisplay) {
-      const card = getWindCardinalName(locWeather.windDir);
-      timeDisplay.innerText = `${dayStr}, ${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${locWeather.windSpeed} km/h (Böen: ${locWeather.windGusts} km/h) • ${card} (${locWeather.windDir}°)`;
+      timeDisplay.innerText = fullDateTimeText;
     }
 
     state.map.weatherLayerGroup.clearLayers();
@@ -2023,7 +2018,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     WeatherCanvasEngine.render(frame, 'lightning');
 
     if (modeChip) {
-      modeChip.innerText = (frame && frame.isLive) ? '⚡ Live-Blitzortung' : `⚡ ${relStr} Gewitter`;
+      modeChip.innerText = (frame && frame.isLive) ? '⚡ Live-Blitze' : '⚡ Blitze';
       modeChip.style.background = 'rgba(239, 68, 68, 0.25)';
       modeChip.style.borderColor = '#ef4444';
     }
@@ -2038,7 +2033,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
       );
 
       if (timeDisplay) {
-        timeDisplay.innerText = `${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${storm.strikes.length > 0 ? `${storm.strikes.length} Live-Blitze (nächster: ${storm.closestStrikeKm} km)` : 'Keine Blitze im Nahbereich'}`;
+        timeDisplay.innerText = fullDateTimeText;
       }
 
       L.circle([state.currentLocation.lat, state.currentLocation.lon], {
@@ -2095,8 +2090,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
       });
 
       if (timeDisplay) {
-        const isLocalStorm = (locWeather.weatherCode >= 95 && locWeather.weatherCode <= 99) || (locWeather.precip >= 3.0 && locWeather.temp >= 15);
-        timeDisplay.innerText = `${dayStr}, ${timeStr} Uhr (+${frame.hoursFromNow}h) • 📍 ${locWeather.name}: ${isLocalStorm ? '⚡ Lokales Gewitterpotenzial' : 'Keine Gewitterkonvektion'}`;
+        timeDisplay.innerText = fullDateTimeText;
       }
     }
   }
@@ -2147,11 +2141,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     });
 
     if (timeDisplay) {
-      let cDesc = 'Sonnig / Klar';
-      if (locWeather.cloudCover >= 80) cDesc = 'Bedeckt';
-      else if (locWeather.cloudCover >= 50) cDesc = 'Bewölkt';
-      else if (locWeather.cloudCover >= 20) cDesc = 'Heiter';
-      timeDisplay.innerText = `${dayStr}, ${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${cDesc} (${locWeather.cloudCover}% Bewölkung)`;
+      timeDisplay.innerText = fullDateTimeText;
     }
   }
 
@@ -2212,10 +2202,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     });
 
     if (timeDisplay) {
-      const curT = (locWeather.temp !== undefined && locWeather.temp !== null) ? Number(locWeather.temp) : 0;
-      const isFrost = curT <= 0;
-      const tTag = isFrost ? '❄️ Frostgrenze' : '💧 Plusgrade';
-      timeDisplay.innerText = `${dayStr}, ${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${curT.toFixed(1)}°C (${tTag})`;
+      timeDisplay.innerText = fullDateTimeText;
     }
   }
 
@@ -2262,10 +2249,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     });
 
     if (timeDisplay) {
-      let pTag = 'Normaldruck';
-      if (locWeather.pressure >= 1022) pTag = '🔵 Hochdruck H';
-      else if (locWeather.pressure <= 1008) pTag = '🔴 Tiefdruck T';
-      timeDisplay.innerText = `${dayStr}, ${timeStr} Uhr (${relStr}) • 📍 ${locWeather.name}: ${locWeather.pressure} hPa QNH (${pTag})`;
+      timeDisplay.innerText = fullDateTimeText;
     }
   }
 }
@@ -2615,7 +2599,7 @@ export function setupUnifiedRadarControls() {
     });
 
     player.addEventListener('click', (e) => {
-      if (player.classList.contains('is-collapsed') && !e.target.closest('#radar-play-btn')) {
+      if (player.classList.contains('is-collapsed') && !e.target.closest('#radar-player-toggle-btn')) {
         player.classList.remove('is-collapsed');
         toggleBtn.innerText = '▾';
         toggleBtn.title = 'Player minimieren';

@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.11.1-fullscreen-lock';
+const CACHE_NAME = 'best-weather-v2.11.2-clean-radar-dock';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 
