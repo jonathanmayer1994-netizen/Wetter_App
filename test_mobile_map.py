@@ -125,6 +125,21 @@ def run_mobile_tests():
         page.screenshot(path=screenshot_path_2)
         print(f"  📸 Captured screenshot: {screenshot_path_2}")
         
+        print("\n--- TEST: Double-Tap & Double-Click on Map MUST NOT Exit Fullscreen ---")
+        # Test double-click
+        page.dblclick("#interactive-map", position={"x": 180, "y": 300})
+        page.wait_for_timeout(800)
+        is_fs_after_dblclick = page.eval_on_selector("body", "el => el.classList.contains('mobile-map-fullscreen-active')")
+        report("Map remains strictly in fullscreen after double click", is_fs_after_dblclick)
+
+        # Test double touch tap
+        page.touchscreen.tap(180, 300)
+        page.wait_for_timeout(80)
+        page.touchscreen.tap(180, 300)
+        page.wait_for_timeout(800)
+        is_fs_after_double_tap = page.eval_on_selector("body", "el => el.classList.contains('mobile-map-fullscreen-active')")
+        report("Map remains strictly in fullscreen after double tap", is_fs_after_double_tap)
+
         print("\n--- TEST: Closing Fullscreen Map Mode via '✕' Button ---")
         page.click("#map-mobile-close-btn")
         page.wait_for_timeout(600)

@@ -55,37 +55,59 @@ export function initLeafletMap() {
   }).addTo(state.map.instance);
 
   // 5. Klick auf beliebigen Punkt auf der Karte berechnet exakte Geländehöhe & lädt Standort
-  state.map.instance.on('click', async (e) => {
+  // Entprellt (200ms), damit Doppel-Tipp / Doppel-Klick zum Reinzommen nicht als Standortwahl missverstanden wird
+  let mapClickTimer = null;
+  state.map.instance.on('click', (e) => {
+    if (mapClickTimer) {
+      clearTimeout(mapClickTimer);
+      mapClickTimer = null;
+      return;
+    }
     const lat = e.latlng.lat;
     const lon = e.latlng.lng;
 
-    // Sofortige visuelle Rückmeldung: Beacon-Marker direkt auf Klickpunkt setzen
-    if (state.map.marker) {
-      state.map.marker.setLatLng([lat, lon]);
-    }
-    // Zoomlevel niemals automatisch verändern: Zoom erfolgt ausschließlich manuell (Pinch/Mac-Controls/Zoom-Buttons)
-    state.map.instance.panTo([lat, lon], { animate: true });
-    
-    let elev = 500;
-    try {
-      const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
-      const elData = await elRes.json();
-      if (elData.elevation && elData.elevation[0] !== undefined) {
-        elev = Math.round(elData.elevation[0]);
-      }
-    } catch(err) {
-      console.warn('Elevation fetch failed for map click', err);
-    }
+    mapClickTimer = setTimeout(async () => {
+      mapClickTimer = null;
 
-    const isMtn = elev >= 1100;
-    selectExactLocation({
-      name: `${isMtn ? 'Bergpunkt' : 'Kartenpunkt'} (${elev} m)`,
-      lat: lat,
-      lon: lon,
-      elevation: elev,
-      country: '',
-      isMountain: isMtn
-    });
+      // Sofortige visuelle Rückmeldung: Beacon-Marker direkt auf Klickpunkt setzen
+      if (state.map.marker) {
+        state.map.marker.setLatLng([lat, lon]);
+      }
+      // Zoomlevel niemals automatisch verändern: Zoom erfolgt ausschließlich manuell (Pinch/Mac-Controls/Zoom-Buttons)
+      state.map.instance.panTo([lat, lon], { animate: true });
+      
+      let elev = 500;
+      try {
+        const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
+        const elData = await elRes.json();
+        if (elData.elevation && elData.elevation[0] !== undefined) {
+          elev = Math.round(elData.elevation[0]);
+        }
+      } catch(err) {
+        console.warn('Elevation fetch failed for map click', err);
+      }
+
+      const isMtn = elev >= 1100;
+      selectExactLocation({
+        name: `${isMtn ? 'Bergpunkt' : 'Kartenpunkt'} (${elev} m)`,
+        lat: lat,
+        lon: lon,
+        elevation: elev,
+        country: '',
+        isMountain: isMtn
+      });
+    }, 200);
+  });
+
+  // Doppel-Klick / Doppel-Tipp dient ausschließlich dem Kartenzoom und schließt NIEMALS den Vollbildmodus
+  state.map.instance.on('dblclick', (e) => {
+    if (mapClickTimer) {
+      clearTimeout(mapClickTimer);
+      mapClickTimer = null;
+    }
+    if (e.originalEvent) {
+      e.originalEvent.stopPropagation();
+    }
   });
 
   // 6. Event-Listener für Basiskarten-Buttons (OSM)
@@ -257,6 +279,14 @@ export function setupMobileMapFullscreen() {
       closeMobileMapFullscreen();
     }
   });
+
+  // Verhindere jegliches Schließen oder Propagieren bei Doppeltipp/-klick auf der Karte
+  const wrapper = document.getElementById('fullscreen-map-wrapper');
+  if (wrapper) {
+    wrapper.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+    });
+  }
 
   // Mobile Point Weather Card toggle (minimieren / maximieren)
   const pwCard = document.getElementById('map-point-weather-card');

@@ -159,7 +159,17 @@ export function renderOverviewTab() {
   const code = WMO_CODES[cur.weather_code] || WMO_CODES[0];
   const theme = isDay ? code.theme : code.themeNight;
 
-  document.body.className = `weather-${theme}`;
+  const isMapFullscreen = document.body.classList.contains('mobile-map-fullscreen-active');
+  const isModalOpen = document.body.classList.contains('modal-open');
+  const weatherClasses = Array.from(document.body.classList).filter(c => c.startsWith('weather-'));
+  weatherClasses.forEach(c => document.body.classList.remove(c));
+  document.body.classList.add(`weather-${theme}`);
+  if (isMapFullscreen) {
+    document.body.classList.add('mobile-map-fullscreen-active');
+  }
+  if (isModalOpen) {
+    document.body.classList.add('modal-open');
+  }
   if (state.canvasEngine) state.canvasEngine.setMode(theme, isDay);
 
   // Feature 10B: Dynamische Himmelsfarben & Alpenglühen
