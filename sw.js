@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.12.0-auto-cloud-sync';
+const CACHE_NAME = 'best-weather-v2.12.1-app-icon-fix';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 
@@ -42,10 +42,11 @@ const STATIC_ASSETS = [
   './features/bentoSheets.js',
   './features/pullToRefresh.js',
   './manifest.json',
+  './logo.png',
+  './apple-touch-icon.png',
   './favicon.png',
   './icon-192.png',
   './icon-512.png',
-  './apple-touch-icon.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
@@ -120,7 +121,7 @@ self.addEventListener('fetch', (event) => {
           return networkRes;
         })
         .catch(async () => {
-          const cached = await caches.match(req);
+          const cached = await caches.match(req, { ignoreSearch: true });
           if (cached) return cached;
           // Liefert bei fehlender Kachel kein JSON (verhindert Bild-Dekodierungsfehler)
           return new Response(null, { status: 504, statusText: 'Offline Tile Not Cached' });
@@ -141,7 +142,7 @@ self.addEventListener('fetch', (event) => {
           return networkRes;
         })
         .catch(async () => {
-          const cached = await caches.match(req);
+          const cached = await caches.match(req, { ignoreSearch: true });
           if (cached) return cached;
           return new Response(JSON.stringify({ offline: true, error: 'Offline im Alpingebiet (Kein Netzempfang)' }), {
             headers: { 'Content-Type': 'application/json' }
@@ -162,8 +163,13 @@ self.addEventListener('fetch', (event) => {
         return networkRes;
       })
       .catch(async () => {
-        const cachedRes = await caches.match(req);
+        const cachedRes = await caches.match(req, { ignoreSearch: true });
         if (cachedRes) return cachedRes;
+        // Image Fallback: Nie 503 Text zurückliefern, sondern auf gecachtes Icon fallbacken
+        if (req.destination === 'image' || url.pathname.endsWith('.png') || url.pathname.endsWith('.jpg') || url.pathname.endsWith('.ico')) {
+          const imgFallback = await caches.match('./apple-touch-icon.png', { ignoreSearch: true });
+          if (imgFallback) return imgFallback;
+        }
         return new Response('Offline', { status: 503, statusText: 'Offline' });
       })
   );

@@ -193,6 +193,9 @@ body {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
   flex-shrink: 0;
+  object-fit: cover;
+  background: linear-gradient(135deg, #0a84ff, #0056b3);
+  display: block;
 }
 
 .brand-text {
