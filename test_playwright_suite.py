@@ -351,6 +351,26 @@ def run_tests():
         page.wait_for_timeout(300)
         fav_cards = page.query_selector_all(".favorite-card, .preset-fav-chip")
         report("Favorite locations appear in Favorites tab", len(fav_cards) >= 1)
+
+        # Verify clunky manual GSheets card is completely removed from tab view
+        ugly_card = page.query_selector(".gsheets-sync-card")
+        report("Clunky manual Google Sheets card cleanly removed from Favorites tab", ugly_card is None)
+
+        # Verify minimalist Cloud-Sync status bar is present
+        cs_bar = page.is_visible("#cloud-sync-status-bar")
+        report("Minimalist Apple-grade Cloud-Sync status bar visible", cs_bar)
+
+        # Verify Cloud-Sync modal opens via config cog button and closes cleanly
+        page.click("#cloud-sync-config-btn")
+        page.wait_for_timeout(200)
+        report("Cloud-Sync settings modal opens on config button click", page.is_visible("#cloud-sync-modal"))
+        page.click("#cloud-sync-modal-close")
+        page.wait_for_timeout(200)
+        report("Cloud-Sync settings modal closes cleanly", not page.is_visible("#cloud-sync-modal"))
+
+        # Verify Pull-Down-to-Refresh indicator in DOM
+        ptr = page.query_selector("#pull-to-refresh")
+        report("Pull-Down-to-Refresh indicator present in DOM", ptr is not None)
         
         page.close()
 

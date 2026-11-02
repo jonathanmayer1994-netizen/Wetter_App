@@ -22,6 +22,8 @@ import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/netwo
 import { ActualEngine } from './core/actualEngine.js';
 import { renderVerificationDashboard, setupVerificationUI, initVerificationHandlers } from './features/verificationUI.js';
 import { initBentoSheets } from './features/bentoSheets.js';
+import { initPullToRefresh } from './features/pullToRefresh.js';
+import { GoogleSheetsSync } from './core/googleSheetsSync.js';
 import { AlpineStorage } from './storage.js';
 
 // Central Dispatcher Event Bus Subscriptions
@@ -284,6 +286,17 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSourcesQuickNav();
   setupExpertModeToggle();
   initBentoSheets();
+
+  // Pull-Down-to-Refresh: Aktualisiert Wetter & Cloud-Favoriten per Wischgeste
+  initPullToRefresh({
+    onRefreshWeather: loadLocation,
+    onRefreshSync: () => GoogleSheetsSync.pullAll()
+  });
+
+  // VOLLAUTOMATISCHER SYNC: Bei App-Start Favoriten jedes Mal kurz mit Google Sheets abgleichen
+  if (GoogleSheetsSync.isConnected()) {
+    GoogleSheetsSync.pullAll();
+  }
 
   // DEFAULT LOCATION: Beim Öffnen immer aktueller GPS-Standort des Geräts
   const cachedGps = AlpineStorage.safeGetItem('best_weather_last_gps', null);

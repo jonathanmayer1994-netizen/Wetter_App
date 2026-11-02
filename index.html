@@ -36,6 +36,15 @@
   <!-- iOS Safe Area Status Bar Guard to prevent content blur below Dynamic Island / status bar -->
   <div class="ios-status-bar-guard" aria-hidden="true"></div>
 
+  <!-- PULL-DOWN-TO-REFRESH INDICATOR (Native Apple Feel) -->
+  <div id="pull-to-refresh" class="ptr-indicator" aria-hidden="true">
+    <div class="ptr-inner">
+      <span class="ptr-arrow" id="ptr-arrow">↓</span>
+      <span class="ptr-spinner" id="ptr-spinner"></span>
+      <span class="ptr-text" id="ptr-text">Nach unten ziehen zum Aktualisieren</span>
+    </div>
+  </div>
+
   <!-- Main Responsive Layout Wrapper (Dynamic for iPhone, iPad & Desktop) -->
   <div class="app-layout">
     
@@ -1678,35 +1687,43 @@
           <div class="favorites-grid" id="favorites-grid">
             <!-- Dynamisch aus localStorage befüllt -->
           </div>
+
+          <!-- MINIMALISTISCHE CLOUD-SYNC STATUSZEILE (Apple-Grade) -->
+          <div class="cloud-sync-status-bar" id="cloud-sync-status-bar">
+            <div class="cssb-left">
+              <span class="cssb-dot" id="cloud-sync-dot"></span>
+              <span class="cssb-text" id="cloud-sync-status-text">Google Sheets Auto-Sync aktiv</span>
+            </div>
+            <button type="button" class="cssb-config-btn" id="cloud-sync-config-btn" title="Cloud-Sync Einstellungen" aria-label="Cloud-Sync Einstellungen">⚙️</button>
+          </div>
         </section>
 
-        <!-- GOOGLE SHEETS CLOUD-DATENBANK SYNC -->
-        <section class="glass-card gsheets-sync-card" style="margin-top: 14px;">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="card-icon">📊</span>
-              <span>GOOGLE SHEETS CLOUD-DATENBANK</span>
-            </div>
-            <span class="card-tag" id="gsheets-status-badge">Nicht verbunden</span>
-          </div>
-
-          <p class="section-desc">
-            Synchronisiere deine Favoriten, Notizen und Alpin-Touren live mit deiner Google Sheet Tabelle als zentrale Datenbank.
-          </p>
-
-          <div class="gsheets-sync-box">
-            <div class="gsheets-input-row">
-              <input type="url" id="gsheets-url-input" class="stsp-glass-input" placeholder="Google Apps Script Web-App URL (https://script.google.com/macros/s/.../exec)">
-              <div class="gsheets-btn-group">
-                <button type="button" class="action-btn" id="gsheets-save-btn">💾 Speichern</button>
-                <button type="button" class="action-btn action-btn-secondary" id="gsheets-sync-now-btn">🔄 Jetzt syncen</button>
+        <!-- DISKRETES CLOUD-SYNC MODAL (Nur auf Klick geöffnet, kein UI-Müll im Screen) -->
+        <div id="cloud-sync-modal" class="cloud-sync-modal-overlay" style="display: none;">
+          <div class="cloud-sync-modal-card">
+            <div class="cs-modal-header">
+              <div class="cs-modal-title">
+                <span>☁️ Google Sheets Cloud-Sync</span>
+                <span class="card-tag" id="gsheets-status-badge">Verbunden</span>
               </div>
+              <button type="button" class="cs-modal-close" id="cloud-sync-modal-close" aria-label="Schließen">✕</button>
             </div>
-            <div class="gsheets-footer-row">
-              <span class="gsheets-status-hint" id="gsheets-last-sync">Trage deine Web-App URL ein</span>
+            <p class="cs-modal-desc">
+              Favoriten werden vollautomatisch beim Hinzufügen (★), Löschen (✕), App-Start und beim Pull-down-to-refresh mit deinem Google Sheet synchronisiert.
+            </p>
+            <div class="cs-modal-field">
+              <label for="gsheets-url-input" class="cs-modal-label">Google Apps Script Web-App URL oder Google Sheet Link:</label>
+              <input type="url" id="gsheets-url-input" class="stsp-glass-input" placeholder="https://script.google.com/macros/s/.../exec">
+            </div>
+            <div class="cs-modal-actions">
+              <button type="button" class="action-btn" id="gsheets-save-btn">💾 Speichern</button>
+              <button type="button" class="action-btn action-btn-secondary" id="gsheets-sync-now-btn">🔄 Jetzt syncen</button>
+            </div>
+            <div class="cs-modal-footer">
+              <span class="cs-modal-hint" id="gsheets-last-sync">Bereit</span>
             </div>
           </div>
-        </section>
+        </div>
 
       </div>
 

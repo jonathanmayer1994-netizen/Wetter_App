@@ -38,32 +38,47 @@ export function setupFavorites(options = {}) {
     });
   }
 
-  // Google Sheets Cloud Sync Handlers
+  // Google Sheets Cloud Sync Modal & Actions
+  const configBtn = document.getElementById('cloud-sync-config-btn');
+  const modal = document.getElementById('cloud-sync-modal');
+  const modalClose = document.getElementById('cloud-sync-modal-close');
   const gsheetsInput = document.getElementById('gsheets-url-input');
   const gsheetsSaveBtn = document.getElementById('gsheets-save-btn');
   const gsheetsSyncBtn = document.getElementById('gsheets-sync-now-btn');
+
+  if (configBtn && modal) {
+    configBtn.addEventListener('click', () => {
+      GoogleSheetsSync.updateStatusUI();
+      modal.style.display = 'flex';
+      if (gsheetsInput) gsheetsInput.value = GoogleSheetsSync.getUrl();
+    });
+  }
+
+  if (modalClose && modal) {
+    modalClose.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+  }
 
   if (gsheetsSaveBtn && gsheetsInput) {
     gsheetsSaveBtn.addEventListener('click', async () => {
       const url = gsheetsInput.value.trim();
       GoogleSheetsSync.setUrl(url);
-      if (GoogleSheetsSync.isConnected()) {
-        gsheetsSaveBtn.textContent = '⏳ Verbinde...';
-        const res = await GoogleSheetsSync.pullAll();
-        gsheetsSaveBtn.textContent = res.success ? '✅ Gespeichert' : '⚠️ Fehler';
-        setTimeout(() => { gsheetsSaveBtn.textContent = '💾 Speichern'; }, 2000);
-      } else {
-        GoogleSheetsSync.updateStatusUI();
-      }
+      gsheetsSaveBtn.textContent = '⏳ Verbinde...';
+      const res = await GoogleSheetsSync.pullAll();
+      gsheetsSaveBtn.textContent = res.success ? '✅ Gespeichert' : '⚠️ Gespeichert';
+      setTimeout(() => { gsheetsSaveBtn.textContent = '💾 Speichern'; }, 2000);
     });
   }
 
   if (gsheetsSyncBtn) {
     gsheetsSyncBtn.addEventListener('click', async () => {
-      if (!GoogleSheetsSync.isConnected()) {
-        alert('Bitte gib zuerst eine gültige Google Apps Script Web-App URL ein.');
-        return;
-      }
       gsheetsSyncBtn.textContent = '⏳ Synchronisiere...';
       const res = await GoogleSheetsSync.pullAll();
       gsheetsSyncBtn.textContent = res.success ? '✅ Synchronisiert' : '⚠️ Fehler';
@@ -72,8 +87,8 @@ export function setupFavorites(options = {}) {
   }
 
   GoogleSheetsSync.updateStatusUI();
+  // Vollautomatischer Sync im Hintergrund
   if (GoogleSheetsSync.isConnected()) {
-    // Stiller Sync im Hintergrund
     GoogleSheetsSync.pullAll();
   }
 

@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.11.2-clean-radar-dock';
+const CACHE_NAME = 'best-weather-v2.12.0-auto-cloud-sync';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
 const MAX_TILES = 120;
 
@@ -40,6 +40,7 @@ const STATIC_ASSETS = [
   './features/networks.js',
   './features/verificationUI.js',
   './features/bentoSheets.js',
+  './features/pullToRefresh.js',
   './manifest.json',
   './favicon.png',
   './icon-192.png',
