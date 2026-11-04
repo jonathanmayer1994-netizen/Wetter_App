@@ -982,7 +982,55 @@
       <div class="tab-pane" id="tab-sports">
         <div class="view-panel" id="sports-view-panel">
 
-          <!-- 1. GLANCEABLE TOUR HERO & VITAL METRICS STRIP -->
+          <!-- 1. PROMINENTE & SCHLANKE GPX-UPLOAD- & DEMO-BAR -->
+          <section class="glass-card sports-upload-card" id="sports-upload-card">
+            <div class="sports-upload-row">
+              <!-- Eigene GPX hochladen / Drag & Drop -->
+              <div class="sports-drop-zone" id="sports-drop-zone">
+                <div class="sdz-icon-pill">📂</div>
+                <div class="sdz-text-wrap">
+                  <div class="sdz-title-line">
+                    <strong class="sdz-main-title">Eigene GPX-Route analysieren</strong>
+                    <span class="sdz-feature-tag">Hauptfeature</span>
+                  </div>
+                  <span class="sdz-sub-text">Datei hierher ziehen oder antippen (Komoot, Strava, Garmin, Outdooractive)</span>
+                </div>
+                <button type="button" class="sdz-select-btn" id="sports-browse-btn" title="GPX-Datei auswählen">
+                  <span>📂 GPX wählen</span>
+                </button>
+                <input type="file" id="sports-file-input" accept=".gpx" style="display:none;">
+              </div>
+
+              <!-- Exakt 2 Demos: 1 Berg & 1 Radtour -->
+              <div class="sports-demo-block" id="sports-demo-block">
+                <span class="sdb-caption">Oder Demo-Tour testen:</span>
+                <div class="sdb-buttons">
+                  <button type="button" class="sports-route-preset active" data-tour="nebelhorn-oberstdorf" title="Berg-Demo: Nebelhorn 2.224 m">
+                    <span>🏔️ Berg: Nebelhorn (2.224 m)</span>
+                  </button>
+                  <button type="button" class="sports-route-preset" data-tour="allgaeu-radtour" title="Rad-Demo: Allgäu Seen &amp; Iller 42 km">
+                    <span>🚴 Rad: Allgäu-Runde (42 km)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Custom GPX Active File Banner -->
+            <div class="sports-custom-file-banner" id="sports-custom-file-banner" style="display: none;">
+              <div class="scfb-left">
+                <span class="scfb-icon">📄</span>
+                <div class="scfb-info">
+                  <strong class="scfb-filename" id="scfb-filename">Eigene_Tour.gpx</strong>
+                  <span class="scfb-meta" id="scfb-meta">Eigene GPX-Route aktiv • Höhen- &amp; Streckenwetter berechnet</span>
+                </div>
+              </div>
+              <button type="button" class="scfb-reset-btn" id="sports-clear-gpx-btn" title="Zurück zur Demo-Tour">
+                <span>✕ Zurück zu Demos</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- 2. AKTIVE TOUR HERO & VITALE KENNZAHLEN -->
           <section class="glass-card sports-hero-card" id="sports-hero-card">
             <div class="sports-hero-top-row">
               <div class="sports-hero-title-group">
@@ -994,12 +1042,8 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Quick Preset Switcher Pills -->
-              <div class="sports-quick-presets" id="sports-quick-presets">
-                <button type="button" class="sports-route-preset active" data-tour="nebelhorn-oberstdorf" title="Nebelhorn 2.224 m">🏔️ Nebelhorn</button>
-                <button type="button" class="sports-route-preset" data-tour="gruenten-waechter" title="Grünten 1.738 m">⛰️ Grünten</button>
-                <button type="button" class="sports-quick-gpx-btn" id="sports-custom-gpx-trigger" title="Eigene GPX-Datei laden">📂 Eigene GPX</button>
+              <div class="sports-hero-actions">
+                <button type="button" class="sports-quick-gpx-btn" id="sports-custom-gpx-trigger" title="Eigene GPX-Datei laden">📂 GPX wechseln</button>
               </div>
             </div>
 
@@ -1024,7 +1068,7 @@
             </div>
           </section>
 
-          <!-- 2. ONE-TOUCH ALPINE ROUTE- & ELEVATION WEATHER COCKPIT -->
+          <!-- 3. INTEGRIERTES STRECKEN- & HÖHENWETTER COCKPIT -->
           <section class="glass-card sports-cockpit-card" id="sports-cockpit-card">
             <div class="card-header">
               <div class="card-title">
@@ -1033,17 +1077,6 @@
               </div>
               <span class="card-tag" id="cockpit-pos-badge">📍 km 0.0 • -- m</span>
             </div>
-
-            <!-- Interaktives Höhenprofil: Direktes Streichen & Antippen -->
-            <div class="cockpit-chart-container" id="sports-chart-wrapper">
-              <div class="cockpit-chart-hint">👆 Profil berühren</div>
-              <svg id="sports-elevation-svg" class="sports-elevation-svg" viewBox="0 0 900 240" preserveAspectRatio="none">
-                <!-- Dynamisch gerendertes Höhenprofil -->
-              </svg>
-            </div>
-
-            <!-- Unsichtbarer Fallback-Slider für Abwärtskompatibilität -->
-            <input type="range" id="sports-route-slider" min="0" max="100" value="0" step="1" style="display:none;" aria-hidden="true">
 
             <!-- 1-Touch Schnellwahl-Stationen (Start, Scheitelpunkt/Gipfel, Ziel) -->
             <div class="cockpit-quick-stations" id="cockpit-quick-stations">
@@ -1061,7 +1094,25 @@
               </button>
             </div>
 
-            <!-- Smart Weather Capsule für den gewählten Punkt -->
+            <!-- Interaktives Höhenprofil: Direktes Streichen & Antippen -->
+            <div class="cockpit-chart-container" id="sports-chart-wrapper">
+              <div class="cockpit-chart-hint">👆 Profil berühren</div>
+              <svg id="sports-elevation-svg" class="sports-elevation-svg" viewBox="0 0 900 240" preserveAspectRatio="none">
+                <!-- Dynamisch gerendertes Höhenprofil -->
+              </svg>
+            </div>
+
+            <!-- Direkter, sichtbarer Strecken-Slider mit Live-Wegmarke -->
+            <div class="cockpit-slider-container">
+              <div class="csc-slider-meta">
+                <span class="csc-meta-km">0.0 km</span>
+                <span class="csc-meta-live" id="cockpit-slider-hint">Streckenpunkt abfahren</span>
+                <span class="csc-meta-total" id="cockpit-slider-total">-- km</span>
+              </div>
+              <input type="range" id="sports-route-slider" min="0" max="100" value="0" step="0.5" class="sports-route-range-slider" aria-label="Strecke abfahren">
+            </div>
+
+            <!-- Smart Weather Capsule: Direkt an den Scrubber angeschlossen -->
             <div class="cockpit-weather-capsule" id="cockpit-weather-capsule">
               <div class="cwc-header">
                 <div class="cwc-station-info">
@@ -1103,50 +1154,6 @@
               <div class="cwc-alert-bar" id="cwc-alert-bar" style="display: none;">
                 <span class="cwc-alert-icon">⚠️</span>
                 <span class="cwc-alert-text" id="cwc-alert-text">Warnung aktiv</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- 3. LIVE-TOUR & IN-FLIGHT TRACKING COCKPIT BAR -->
-          <section class="glass-card sports-live-tracking-panel" id="sports-live-tracking-panel">
-            <div class="sltp-main">
-              <div class="sltp-status-col">
-                <div class="sltp-beacon-wrap">
-                  <span class="sltp-beacon" id="sltp-beacon-dot"></span>
-                  <strong class="sltp-status-title" id="sltp-status-title">Live-Tour Tracking: Bereit</strong>
-                </div>
-                <span class="sltp-status-desc" id="sltp-status-desc">Aktiviere GPS oder tippe auf das Profil, um Zeiten &amp; Wetter für die Reststrecke live zu aktualisieren.</span>
-              </div>
-              <div class="sltp-actions">
-                <button type="button" class="sltp-btn sltp-btn-start" id="sports-live-track-toggle" title="Live-Standortverfolgung per Smartphone-GPS starten">
-                  <span class="sltp-btn-icon" id="sltp-btn-icon">🟢</span>
-                  <span class="sltp-btn-text" id="sltp-toggle-text">Live-Tour starten</span>
-                </button>
-                <button type="button" class="sltp-btn sltp-btn-step" id="sports-sim-step-btn" title="Simuliert +5 km Fortschritt auf der Route für Testzwecke">
-                  <span>⏩ +5 km Fortschritt</span>
-                </button>
-                <button type="button" class="sltp-btn sltp-btn-reset" id="sports-reset-progress-btn" title="Tour-Fortschritt auf Start (0 km) zurücksetzen" style="display:none;">
-                  <span>🔄 Reset</span>
-                </button>
-              </div>
-            </div>
-            <!-- Live-Tour Fortschritts- & Adaptiv-Status (aktiv wenn unterwegs) -->
-            <div class="sltp-in-flight-summary" id="sltp-in-flight-summary" style="display: none;">
-              <div class="sltp-metric-chip">
-                <span class="smc-label">📍 Absolviert:</span>
-                <strong class="smc-val text-accent" id="sltp-val-done">0.0 km (0%)</strong>
-              </div>
-              <div class="sltp-metric-chip">
-                <span class="smc-label">🏁 Verbleibend:</span>
-                <strong class="smc-val text-cyan" id="sltp-val-remaining">-- km</strong>
-              </div>
-              <div class="sltp-metric-chip">
-                <span class="smc-label">⏱️ Adaptives Tempo:</span>
-                <strong class="smc-val" id="sltp-val-pace">1.0× Plan (Im Zeitplan)</strong>
-              </div>
-              <div class="sltp-metric-chip">
-                <span class="smc-label">⚡ Nächster Wegpunkt:</span>
-                <strong class="smc-val text-yellow" id="sltp-val-next">--</strong>
               </div>
             </div>
           </section>
@@ -1310,18 +1317,9 @@
                 </div>
               </div>
 
-              <!-- GPX Track Dropzone & Upload -->
-              <div class="sports-gpx-section">
-                <div class="sports-drop-zone" id="sports-drop-zone">
-                  <div class="sdz-content">
-                    <span class="sdz-icon">📂</span>
-                    <div class="sdz-text">
-                      <strong>Eigene GPX-Route hier ablegen</strong> oder <button type="button" id="sports-browse-btn" class="sdz-browse-btn">Datei auswählen</button>
-                      <span class="sdz-sub">Unterstützt Komoot, Strava, Garmin, Outdooractive (.gpx)</span>
-                    </div>
-                    <input type="file" id="sports-file-input" accept=".gpx" style="display:none;">
-                  </div>
-                </div>
+              <!-- GPX Hinweis -->
+              <div class="sports-gpx-drawer-hint">
+                <span>💡 Eigene GPX-Routen (.gpx) können direkt oben über das Upload-Feld oder per Drag &amp; Drop geladen werden.</span>
               </div>
 
               <!-- Kompatibilitäts-Container für bestehende Test-Suiten -->

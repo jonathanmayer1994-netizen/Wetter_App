@@ -2548,7 +2548,7 @@ export const MicroEngine = {
   },
 
   /**
-   * 2 Korb-kuratierte Allgäuer GPX Sample-Tracks (Nebelhorn & Grünten)
+   * 2 Korb-kuratierte Allgäuer GPX Sample-Tracks (1 Berg-Tour & 1 Rad-Tour)
    */
   getSampleGPXTrack(tourId) {
     const samples = {
@@ -2565,6 +2565,24 @@ export const MicroEngine = {
           { lat: 47.4330, lon: 10.3290, ele: 1958 },  // Gaisalphorn Grat
           { lat: 47.4380, lon: 10.3160, ele: 1508 },  // Unterer Gaisalpsee
           { lat: 47.4420, lon: 10.3010, ele: 867 }    // Reichenbach Talziel
+        ]
+      },
+      'allgaeu-radtour': {
+        name: 'Allgäuer Seen- & Iller-Radrunde (42 km)',
+        region: 'Immenstadt / Großer Alpsee & Illertal',
+        points: [
+          { lat: 47.5610, lon: 10.2210, ele: 729 },   // Immenstadt Marienplatz
+          { lat: 47.5685, lon: 10.1920, ele: 735 },   // Bühl am Großen Alpsee
+          { lat: 47.5810, lon: 10.1650, ele: 780 },   // Ratholz / Alpsee Bergwelt
+          { lat: 47.6020, lon: 10.1890, ele: 890 },   // Zaumberg / Bergkamm
+          { lat: 47.6250, lon: 10.2310, ele: 930 },   // Diepolz Bergbauern-Plateau
+          { lat: 47.6320, lon: 10.2740, ele: 712 },   // Niedersonthofen See
+          { lat: 47.6510, lon: 10.3150, ele: 685 },   // Martinszell Illerauen
+          { lat: 47.6830, lon: 10.3250, ele: 672 },   // Waltenhofen / Illerspitz
+          { lat: 47.6520, lon: 10.3450, ele: 715 },   // Sulzberg Seehöhe
+          { lat: 47.5980, lon: 10.3120, ele: 725 },   // Rettenberg / Illerbrücke
+          { lat: 47.5420, lon: 10.2600, ele: 732 },   // Blaichach Illerdamm
+          { lat: 47.5605, lon: 10.2220, ele: 729 }    // Immenstadt Ziel
         ]
       },
       'gruenten-waechter': {

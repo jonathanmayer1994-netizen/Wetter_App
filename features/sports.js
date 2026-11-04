@@ -667,7 +667,7 @@ export function setupSportsTab() {
   // Initialisiere Pace-Badges auf den Cards & Pills
   updateSportPaceBadges();
 
-  // Alpine Referenz-Routen (Presets)
+  // Alpine Referenz-Routen (Presets / Demos: 1 Berg, 1 Rad)
   const routePresets = document.querySelectorAll('.sports-route-preset');
   routePresets.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -677,16 +677,21 @@ export function setupSportsTab() {
     });
   });
 
-  // GPX File Upload & Drag'n'Drop
+  // GPX File Upload & Drag'n'Drop (Schlank & Prominent oben platziert)
   const browseBtn = document.getElementById('sports-browse-btn');
   const fileInput = document.getElementById('sports-file-input');
   const dropZone = document.getElementById('sports-drop-zone');
   const customGpxTrigger = document.getElementById('sports-custom-gpx-trigger');
+  const clearGpxBtn = document.getElementById('sports-clear-gpx-btn');
+
+  if (clearGpxBtn) {
+    clearGpxBtn.addEventListener('click', () => {
+      loadSportsPresetTour('nebelhorn-oberstdorf');
+    });
+  }
 
   if (customGpxTrigger && fileInput) {
     customGpxTrigger.addEventListener('click', () => {
-      const drawer = document.getElementById('sports-setup-drawer');
-      if (drawer) drawer.open = true;
       fileInput.click();
     });
   }
@@ -707,6 +712,12 @@ export function setupSportsTab() {
   }
 
   if (dropZone) {
+    dropZone.addEventListener('click', (e) => {
+      // Wenn nicht direkt auf Button geklickt wurde, trotzdem File-Dialog öffnen
+      if (e.target !== browseBtn && !browseBtn.contains(e.target) && fileInput) {
+        fileInput.click();
+      }
+    });
     dropZone.addEventListener('dragover', e => {
       e.preventDefault();
       dropZone.classList.add('dragover');
@@ -729,40 +740,18 @@ export function setupSportsTab() {
     });
   }
 
-  // Live-Tour Tracking Controls
-  const trackToggleBtn = document.getElementById('sports-live-track-toggle');
-  if (trackToggleBtn) {
-    trackToggleBtn.addEventListener('click', toggleLiveTracking);
-  }
-
-  const simStepBtn = document.getElementById('sports-sim-step-btn');
-  if (simStepBtn) {
-    simStepBtn.addEventListener('click', () => {
-      if (!state.sports.timeline) return;
-      const totalKm = state.sports.timeline.totalDistanceKm || 1;
-      const nextKm = Math.min(totalKm, (state.sports.currentProgressKm || 0) + 5.0);
-      updateInFlightProgress(nextKm, true);
-    });
-  }
-
-  const resetBtn = document.getElementById('sports-reset-progress-btn');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      resetInFlightProgress();
-    });
-  }
-
   // Interaktiver Strecken-Slider (Scrubber)
   const routeSlider = document.getElementById('sports-route-slider');
   if (routeSlider) {
     routeSlider.addEventListener('input', () => {
+      state.sports.isDraggingSlider = true;
       const pct = parseFloat(routeSlider.value) || 0;
       const totalDist = state.sports.timeline ? state.sports.timeline.totalDistanceKm : 0;
       const km = (pct / 100) * totalDist;
       updateSportsScrubber(km);
-      if (state.sports.trackingActive) {
-        updateInFlightProgress(km);
-      }
+    });
+    routeSlider.addEventListener('change', () => {
+      state.sports.isDraggingSlider = false;
     });
   }
 
@@ -864,8 +853,16 @@ export async function loadSportsPresetTour(tourId) {
   state.sports.activeTour = tourId;
   state.sports.gpxName = sample.name;
 
-  // Nebelhorn und Grünten sind alpine Bergtouren: automatisch Kategorie 'Berge' aktivieren
-  setAthleteCategory('mountain');
+  // Auto-Switch Athleten-Kategorie: Radtour -> Rad (bike), Bergtour -> Berge (mountain)
+  if (tourId === 'allgaeu-radtour') {
+    setAthleteCategory('bike');
+  } else {
+    setAthleteCategory('mountain');
+  }
+
+  // Eigene GPX Datei-Banner ausblenden
+  const customBanner = document.getElementById('sports-custom-file-banner');
+  if (customBanner) customBanner.style.display = 'none';
 
   // Synchronisiere Buttons in beiden Ansichten (Sports-Tab & GPX-Modal)
   document.querySelectorAll('.sports-route-preset').forEach(btn => {
@@ -880,7 +877,22 @@ export async function loadSportsPresetTour(tourId) {
 
 export async function loadSportsCustomGPX(gpxXml, fileName) {
   state.sports.activeTour = null;
-  state.sports.gpxName = fileName ? fileName.replace(/\.gpx$/i, '') : 'Eigene GPX-Route';
+  const cleanName = fileName ? fileName.replace(/\.gpx$/i, '') : 'Eigene GPX-Route';
+  state.sports.gpxName = cleanName;
+
+  // Alle Demo-Presets deaktivieren
+  document.querySelectorAll('.sports-route-preset').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  // Eigene GPX Banner anzeigen
+  const customBanner = document.getElementById('sports-custom-file-banner');
+  const filenameEl = document.getElementById('scfb-filename');
+  const metaEl = document.getElementById('scfb-meta');
+  if (customBanner) customBanner.style.display = 'flex';
+  if (filenameEl) filenameEl.innerText = fileName || 'Eigene_Tour.gpx';
+  if (metaEl) metaEl.innerText = 'Eigene Route aktiv • Höhen- & Streckenwetter für Wegpunkte berechnet';
+
   await loadAndComputeSportsTour(gpxXml, state.sports.gpxName);
 }
 
@@ -1015,6 +1027,12 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
 
   const heroTitleEl = document.getElementById('sports-active-tour-title');
   const heroSubEl = document.getElementById('sports-active-tour-sub');
+  const heroIconEl = document.getElementById('sports-hero-icon');
+  const sliderTotal = document.getElementById('cockpit-slider-total');
+
+  if (heroIconEl) {
+    heroIconEl.innerText = state.sports.category === 'bike' ? '🚴' : '🏔️';
+  }
   if (heroTitleEl) {
     heroTitleEl.innerText = tourName || state.sports.gpxName || 'Aktive Tour';
   }
@@ -1024,6 +1042,9 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
       ? `Rad • ${(state.sports.bikeSpeedKmH || 26).toFixed(1)} km/h Pace`
       : `Berge • ${(state.sports.mountainSpeedKmH || 4).toFixed(1)} km/h • ${state.sports.mountainAscentHmH || 400} Hm/h`;
     heroSubEl.innerText = `${paceTxt} • Stufenlose SAC-Dynamik & Relativ-Wind`;
+  }
+  if (sliderTotal && parsed.totalDistanceKm) {
+    sliderTotal.innerText = `${parsed.totalDistanceKm.toFixed(1)} km`;
   }
 
   recomputeSportsTimeline();
@@ -1151,275 +1172,19 @@ export function snapCoordinatesToRoute(lat, lon, points) {
 }
 
 /**
- * Startet die automatische Live-Verfolgung per Smartphone-/Browser-GPS
+ * Kompatibilitäts-Stubs: Live-Tour-Tracking wurde vollständig aus der App entfernt
  */
-export function startLiveTracking() {
-  if (!state.sports.timeline) {
-    console.warn('Keine Route geladen für Live-Tracking');
-    return;
-  }
-  state.sports.trackingActive = true;
-  if (!state.sports.actualStartTimeMs) {
-    state.sports.actualStartTimeMs = Date.now();
-  }
-
-  const toggleBtn = document.getElementById('sports-live-track-toggle');
-  const toggleText = document.getElementById('sltp-toggle-text');
-  const beaconDot = document.getElementById('sltp-beacon-dot');
-  const statusTitle = document.getElementById('sltp-status-title');
-  const resetBtn = document.getElementById('sports-reset-progress-btn');
-
-  if (toggleBtn) toggleBtn.classList.add('tracking-active');
-  if (toggleText) toggleText.innerText = '🔴 Live-Tour stoppen';
-  if (beaconDot) beaconDot.classList.add('active');
-  if (statusTitle) statusTitle.innerText = 'Live-Tour aktiv: GPS-Ortung läuft';
-  if (resetBtn) resetBtn.style.display = 'inline-flex';
-
-  if (navigator.geolocation) {
-    state.sports.watchId = navigator.geolocation.watchPosition(
-      pos => {
-        if (!state.sports.trackingActive || !state.sports.timeline) return;
-        const snapped = snapCoordinatesToRoute(
-          pos.coords.latitude,
-          pos.coords.longitude,
-          state.sports.timeline.timedPoints
-        );
-        // Nur vorwärts updaten, um GPS-Jitter zu verhindern
-        if (snapped.km >= (state.sports.currentProgressKm || 0)) {
-          updateInFlightProgress(snapped.km, false);
-        }
-      },
-      err => {
-        console.warn('Geolocation watchPosition Warnung:', err.message);
-        if (statusTitle) statusTitle.innerText = 'Live-Tour aktiv (Simulation & Klick aktiv)';
-      },
-      { enableHighAccuracy: true, maximumAge: 4000, timeout: 12000 }
-    );
-  }
+export function startLiveTracking() {}
+export function stopLiveTracking() {}
+export function toggleLiveTracking() {}
+export function updateInFlightProgress(newKm) {
+  updateSportsScrubber(newKm);
 }
-
-/**
- * Stoppt die Live-Verfolgung
- */
-export function stopLiveTracking() {
-  state.sports.trackingActive = false;
-  if (state.sports.watchId !== null) {
-    navigator.geolocation.clearWatch(state.sports.watchId);
-    state.sports.watchId = null;
-  }
-  const toggleBtn = document.getElementById('sports-live-track-toggle');
-  const toggleText = document.getElementById('sltp-toggle-text');
-  const beaconDot = document.getElementById('sltp-beacon-dot');
-  const statusTitle = document.getElementById('sltp-status-title');
-
-  if (toggleBtn) toggleBtn.classList.remove('tracking-active');
-  if (toggleText) toggleText.innerText = '🟢 Live-Tour starten';
-  if (beaconDot) beaconDot.classList.remove('active');
-  if (statusTitle) {
-    statusTitle.innerText = state.sports.currentProgressKm > 0
-      ? `Live-Tour pausiert (bei km ${state.sports.currentProgressKm.toFixed(1)})`
-      : 'Live-Tour Tracking: Bereit';
-  }
-}
-
-export function toggleLiveTracking() {
-  if (state.sports.trackingActive) {
-    stopLiveTracking();
-  } else {
-    startLiveTracking();
-  }
-}
-
-/**
- * Aktualisiert den In-Flight-Status entlang der Route, berechnet adaptive Pace und
- * re-interpoliert das Wetter für alle zukünftigen Wegpunkte zur NEUEN Ankunftszeit!
- */
-export function updateInFlightProgress(newKm, manualTrigger = false) {
-  if (!state.sports.timeline) return;
-  const timeline = state.sports.timeline;
-  const totalDist = timeline.totalDistanceKm || 1;
-  const clampedKm = Math.max(0, Math.min(totalDist, newKm));
-
-  if (!state.sports.actualStartTimeMs) {
-    state.sports.actualStartTimeMs = Date.now();
-  }
-
-  // Bei manuellen Schritten (z.B. +5 km Button) simulieren wir einen plausiblen Ist-Zeitstempel
-  let nowMs = Date.now();
-  if (manualTrigger) {
-    const plannedHours = (clampedKm / totalDist) * (timeline.totalHours || 2.0);
-    // Realistischer Verzug von +12 Minuten zur Veranschaulichung des adaptiven Tempos
-    nowMs = state.sports.actualStartTimeMs + Math.round((plannedHours * 3600000) + (12 * 60000));
-  }
-
-  const athleteSettings = {
-    category: state.sports.category,
-    bikeSpeedKmH: state.sports.bikeSpeedKmH,
-    mountainSpeedKmH: state.sports.mountainSpeedKmH,
-    mountainAscentHmH: state.sports.mountainAscentHmH
-  };
-
-  const updatedTimeline = MicroEngine.updateInFlightRouteWeather(
-    timeline,
-    clampedKm,
-    nowMs,
-    state.sports.cachedForecast || {},
-    athleteSettings
-  );
-
-  state.sports.timeline = updatedTimeline;
-  state.sports.currentProgressKm = clampedKm;
-  state.sports.currentPointIndex = updatedTimeline.currentPointIndex;
-  state.sports.observedPaceFactor = updatedTimeline.paceFactor;
-  state.sports.timeDeltaMinutes = updatedTimeline.timeDeltaMinutes;
-
-  const resetBtn = document.getElementById('sports-reset-progress-btn');
-  if (resetBtn && clampedKm > 0) resetBtn.style.display = 'inline-flex';
-
-  const routeSlider = document.getElementById('sports-route-slider');
-  if (routeSlider) {
-    routeSlider.value = Math.round((clampedKm / totalDist) * 100);
-  }
-
-  renderInFlightTrackingPanel(updatedTimeline);
-  renderSportsMetrics(updatedTimeline);
-  renderSportsHazards(updatedTimeline.hazards);
-  renderSportsElevationProfile(updatedTimeline);
-  renderSportsWaypointsTable(updatedTimeline);
-  updateSportsScrubber(clampedKm);
-  updateInFlightMap(updatedTimeline, clampedKm);
-}
-
-/**
- * Setzt den Tourfortschritt komplett auf Start (0 km) zurück
- */
 export function resetInFlightProgress() {
-  stopLiveTracking();
-  state.sports.currentProgressKm = 0;
-  state.sports.currentPointIndex = 0;
-  state.sports.observedPaceFactor = 1.0;
-  state.sports.timeDeltaMinutes = 0;
-  state.sports.actualStartTimeMs = null;
-
-  if (state.sports.completedRouteLine && state.sports.map) {
-    state.sports.map.removeLayer(state.sports.completedRouteLine);
-    state.sports.completedRouteLine = null;
-  }
-
-  const resetBtn = document.getElementById('sports-reset-progress-btn');
-  if (resetBtn) resetBtn.style.display = 'none';
-
-  const summaryBar = document.getElementById('sltp-in-flight-summary');
-  if (summaryBar) summaryBar.style.display = 'none';
-
-  const statusTitle = document.getElementById('sltp-status-title');
-  if (statusTitle) statusTitle.innerText = 'Live-Tour Tracking: Bereit';
-  const statusDesc = document.getElementById('sltp-status-desc');
-  if (statusDesc) statusDesc.innerText = 'Aktiviere GPS oder klicke auf die Route, um Zeiten & Wetter für die Reststrecke live zu aktualisieren.';
-
-  const routeSlider = document.getElementById('sports-route-slider');
-  if (routeSlider) routeSlider.value = 0;
-
-  recomputeSportsTimeline();
+  updateSportsScrubber(0);
 }
-
-/**
- * Rendert das In-Flight Tracking Cockpit mit Distanz- & Zeitchips
- */
-export function renderInFlightTrackingPanel(timeline) {
-  const panel = document.getElementById('sports-live-tracking-panel');
-  const summaryBar = document.getElementById('sltp-in-flight-summary');
-  const statusTitle = document.getElementById('sltp-status-title');
-  const statusDesc = document.getElementById('sltp-status-desc');
-
-  if (!panel || !timeline) return;
-
-  if (timeline.inFlight && timeline.currentProgressKm > 0) {
-    if (summaryBar) summaryBar.style.display = 'grid';
-    if (statusTitle) {
-      statusTitle.innerText = state.sports.trackingActive
-        ? '🔴 Live-Tour aktiv (Echtzeit-Standort)'
-        : '⚡ In-Flight Modus aktiv';
-    }
-    if (statusDesc) {
-      const delta = timeline.timeDeltaMinutes || 0;
-      const deltaText = delta > 0
-        ? `${delta} min hinter Zeitplan`
-        : (delta < 0 ? `${Math.abs(delta)} min vor Zeitplan` : 'exakt im Zeitplan');
-      statusDesc.innerText = `Aktuelle Position: km ${timeline.currentProgressKm.toFixed(1)} von ${timeline.totalDistanceKm.toFixed(1)} km (${deltaText}). Verbleibende Wegpunkte & Wetterbedingungen zur neuen Ankunftszeit aktualisiert.`;
-    }
-
-    const dVal = document.getElementById('sltp-val-done');
-    const rVal = document.getElementById('sltp-val-remaining');
-    const pVal = document.getElementById('sltp-val-pace');
-    const nVal = document.getElementById('sltp-val-next');
-
-    const pct = Math.round((timeline.currentProgressKm / timeline.totalDistanceKm) * 100);
-    if (dVal) dVal.innerText = `${timeline.currentProgressKm.toFixed(1)} km (${pct}%)`;
-    if (rVal) rVal.innerText = `${timeline.remainingDistanceKm.toFixed(1)} km (ca. ${timeline.remainingDurationStr})`;
-    if (pVal) {
-      const factor = timeline.paceFactor || 1.0;
-      const dMin = timeline.timeDeltaMinutes || 0;
-      const dSign = dMin > 0 ? `+${dMin}m Verzögerung` : (dMin < 0 ? `${dMin}m schneller` : 'Im Plan');
-      pVal.innerText = `${factor.toFixed(2)}× Tempo (${dSign})`;
-    }
-    if (nVal) {
-      const nextMs = timeline.milestones.find(m => !m.isCompleted);
-      if (nextMs) {
-        nVal.innerText = `${nextMs.label} • ${nextMs.arrivalTimeStr} (${nextMs.weatherIcon} ${nextMs.tempC}°C)`;
-      } else {
-        nVal.innerText = '🏁 Zielankunft erreicht!';
-      }
-    }
-  } else {
-    if (summaryBar) summaryBar.style.display = 'none';
-  }
-}
-
-/**
- * Aktualisiert die Leaflet-Karte bei In-Flight Fortbewegung (absolvierte Teilstrecke grün hervorheben)
- */
-export function updateInFlightMap(timeline, currentKm) {
-  if (!state.sports.map || !timeline || !timeline.timedPoints) return;
-  const pts = timeline.timedPoints;
-  const completedPts = pts.filter(p => p.distFromStartKm <= currentKm + 0.05);
-
-  if (state.sports.completedRouteLine) {
-    state.sports.map.removeLayer(state.sports.completedRouteLine);
-    state.sports.completedRouteLine = null;
-  }
-
-  if (completedPts.length > 1) {
-    const completedLatLngs = completedPts.map(p => [p.lat, p.lon]);
-    state.sports.completedRouteLine = L.polyline(completedLatLngs, {
-      color: '#30d158',
-      weight: 6,
-      opacity: 0.95,
-      lineCap: 'round',
-      lineJoin: 'round'
-    }).addTo(state.sports.map);
-  }
-
-  // Meilenstein-Marker auf der Karte dimmen/hervorheben
-  if (state.sports.milestoneMarkers && state.sports.milestoneMarkers.length > 0) {
-    for (let i = 1; i < timeline.milestones.length - 1; i++) {
-      const m = timeline.milestones[i];
-      const marker = state.sports.milestoneMarkers[i - 1];
-      if (marker) {
-        const el = marker.getElement();
-        if (el) {
-          if (m.isCompleted) {
-            el.style.opacity = '0.45';
-            el.style.filter = 'grayscale(0.6)';
-          } else {
-            el.style.opacity = '1';
-            el.style.filter = 'none';
-          }
-        }
-      }
-    }
-  }
-}
+export function renderInFlightTrackingPanel() {}
+export function updateInFlightMap() {}
 
 export function renderSportsMetrics(timeline) {
   const dDist = document.getElementById('sm-val-dist');
@@ -2067,6 +1832,17 @@ export function updateSportsScrubber(km) {
   const clampedKm = Math.max(0, Math.min(totalDist, km));
   state.sports.scrubberKm = clampedKm;
 
+  // Synchronisiere den sichtbaren Range Slider
+  const routeSlider = document.getElementById('sports-route-slider');
+  if (routeSlider && !state.sports.isDraggingSlider) {
+    routeSlider.value = totalDist > 0 ? (clampedKm / totalDist) * 100 : 0;
+  }
+
+  const sliderTotal = document.getElementById('cockpit-slider-total');
+  if (sliderTotal) {
+    sliderTotal.innerText = `${totalDist.toFixed(1)} km`;
+  }
+
   // Finde nächsten berechneten Punkt
   let closestPt = timeline.timedPoints[0];
   let minDiff = Infinity;
@@ -2095,6 +1871,12 @@ export function updateSportsScrubber(km) {
   const cockpitBadge = document.getElementById('cockpit-pos-badge');
   if (cockpitBadge) {
     cockpitBadge.innerText = `📍 km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m`;
+  }
+
+  const arrStr = closestPt.arrivalDate ? closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+  const sliderHint = document.getElementById('cockpit-slider-hint');
+  if (sliderHint) {
+    sliderHint.innerText = `km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m • ⏱️ ${arrStr} Uhr`;
   }
 
   // Bestimme Streckenpunkt-Typ (Start, Gipfel, Ziel, Abschnitt)

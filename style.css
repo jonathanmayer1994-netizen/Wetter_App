@@ -11136,200 +11136,311 @@ body {
 }
 
 /* =============================================================================
-   IN-FLIGHT LIVE-TOUR TRACKING & DYNAMIC WEATHER RE-INTERPOLATION
+   PROMINENTE & SCHLANKE GPX-UPLOAD- & DEMO-BAR
    ============================================================================= */
-.sports-live-tracking-panel {
-  background: rgba(15, 23, 42, 0.78);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 14px 18px;
-  margin-top: 14px;
-  margin-bottom: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+.sports-upload-card {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 229, 255, 0.06) 100%), rgba(16, 24, 40, 0.85);
+  border: 1.5px solid rgba(0, 229, 255, 0.28);
+  border-radius: 18px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  margin-bottom: 14px;
 }
 
-.sltp-main {
+.sports-upload-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
 }
 
-.sltp-status-col {
+.sports-drop-zone {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 12px;
   flex: 1;
-  min-width: 240px;
-}
-
-.sltp-beacon-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sltp-beacon {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #8e8e93;
-  display: inline-block;
-  box-shadow: 0 0 4px rgba(142, 142, 147, 0.5);
-  transition: all 0.3s ease;
-}
-
-.sltp-beacon.active {
-  background: #30d158;
-  box-shadow: 0 0 10px #30d158, 0 0 20px rgba(48, 209, 88, 0.6);
-  animation: sltpBeaconPulse 1.8s infinite ease-in-out;
-}
-
-@keyframes sltpBeaconPulse {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 0 6px #30d158;
-  }
-
-  50% {
-    transform: scale(1.35);
-    box-shadow: 0 0 14px #30d158, 0 0 24px rgba(48, 209, 88, 0.8);
-  }
-
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 6px #30d158;
-  }
-}
-
-.sltp-status-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: -0.2px;
-}
-
-.sltp-status-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.45;
-  max-width: 620px;
-}
-
-.sltp-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.sltp-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 700;
+  min-width: 280px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(0, 229, 255, 0.35);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  border: 1px solid transparent;
-  outline: none;
 }
 
-.sltp-btn:hover {
+.sports-drop-zone:hover,
+.sports-drop-zone.dragover {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: #00e5ff;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
   transform: translateY(-1px);
 }
 
-.sltp-btn:active {
-  transform: scale(0.97);
-}
-
-.sltp-btn-start {
-  background: rgba(48, 209, 88, 0.16);
-  border-color: rgba(48, 209, 88, 0.45);
-  color: #30d158;
-}
-
-.sltp-btn-start:hover {
-  background: rgba(48, 209, 88, 0.28);
-  border-color: rgba(48, 209, 88, 0.7);
-  box-shadow: 0 4px 14px rgba(48, 209, 88, 0.25);
-}
-
-.sltp-btn-start.tracking-active {
-  background: rgba(255, 69, 58, 0.2);
-  border-color: rgba(255, 69, 58, 0.55);
-  color: #ff453a;
-}
-
-.sltp-btn-start.tracking-active:hover {
-  background: rgba(255, 69, 58, 0.3);
-  border-color: rgba(255, 69, 58, 0.8);
-  box-shadow: 0 4px 14px rgba(255, 69, 58, 0.3);
-}
-
-.sltp-btn-step {
-  background: rgba(0, 229, 255, 0.14);
-  border-color: rgba(0, 229, 255, 0.4);
-  color: #00e5ff;
-}
-
-.sltp-btn-step:hover {
-  background: rgba(0, 229, 255, 0.25);
-  border-color: rgba(0, 229, 255, 0.7);
-  box-shadow: 0 4px 14px rgba(0, 229, 255, 0.25);
-}
-
-.sltp-btn-reset {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #e5e5ea;
-}
-
-.sltp-btn-reset:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-/* In-Flight Live-Kennzahlen Grid */
-.sltp-in-flight-summary {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-  animation: fadeIn 0.3s ease;
-}
-
-.sltp-metric-chip {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+.sdz-icon-pill {
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
-  padding: 8px 12px;
+  background: rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.sdz-text-wrap {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
-.smc-label {
-  font-size: 10px;
+.sdz-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sdz-main-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.sdz-feature-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 229, 255, 0.2);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  color: #00e5ff;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.sdz-sub-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sdz-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0a84ff, #0056b3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(10, 132, 255, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sdz-select-btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+/* Demo-Touren Block (1 Berg, 1 Rad) */
+.sports-demo-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sdb-caption {
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
-.smc-val {
-  font-size: 13px;
+.sdb-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sdb-buttons .sports-route-preset {
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 11.5px;
   font-weight: 700;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e5e5ea;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.sdb-buttons .sports-route-preset:hover {
+  background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
+}
+
+.sdb-buttons .sports-route-preset.active {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: #00e5ff;
+  color: #00e5ff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+}
+
+/* Custom GPX Active File Banner */
+.sports-custom-file-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(48, 209, 88, 0.12);
+  border: 1px solid rgba(48, 209, 88, 0.4);
+}
+
+.scfb-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scfb-icon {
+  font-size: 18px;
+}
+
+.scfb-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.scfb-filename {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #30d158;
+}
+
+.scfb-meta {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
+.scfb-reset-btn {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scfb-reset-btn:hover {
+  background: rgba(255, 69, 58, 0.2);
+  border-color: #ff453a;
+  color: #ff453a;
+}
+
+/* =============================================================================
+   INTEGRIERTER STRECKEN-SLIDER DIREKT UNTER DEM HÖHENPROFIL
+   ============================================================================= */
+.cockpit-slider-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.csc-slider-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
   font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.csc-meta-live {
+  font-weight: 700;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 209, 102, 0.25);
+}
+
+.sports-route-range-slider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #30d158 0%, #00e5ff 50%, #ffd166 100%);
+  outline: none;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+.sports-route-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2.5px solid #00e5ff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.6), 0 2px 8px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.sports-route-range-slider::-webkit-slider-thumb:hover,
+.sports-route-range-slider::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.9), 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+.sports-gpx-drawer-hint {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .sports-upload-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sports-demo-block {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sdb-buttons {
+    width: 100%;
+  }
+  .sdb-buttons .sports-route-preset {
+    flex: 1;
+    text-align: center;
+  }
 }
 
 /* In-Place Waypoints Dynamic Status Classes */

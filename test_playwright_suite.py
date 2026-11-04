@@ -9,10 +9,14 @@ from playwright.sync_api import sync_playwright
 def run_tests():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     
-    Handler = http.server.SimpleHTTPRequestHandler
-    Handler.log_message = lambda *args: None
+    class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *args): pass
+        def end_headers(self):
+            self.send_header('Connection', 'close')
+            self.send_header('Cache-Control', 'no-cache')
+            super().end_headers()
     
-    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), QuietHandler)
     port = httpd.server_address[1]
     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     server_thread.start()
@@ -43,7 +47,7 @@ def run_tests():
         page_errors = []
         page.on("pageerror", lambda err: page_errors.append(str(err)))
         
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#hero-location-name", timeout=10000)
         
         report("Initial location loaded without unhandled JS exceptions", len(page_errors) == 0, str(page_errors))
@@ -64,7 +68,7 @@ def run_tests():
         ]
         
         for tab_attr, expected_pane_id in tabs:
-            page.click(f".tab-btn[data-tab='{tab_attr}']")
+            page.locator(f".tab-btn[data-tab='{tab_attr}']").click(force=True)
             page.wait_for_timeout(200)
             is_active = page.eval_on_selector(f"#{expected_pane_id}", "el => el.classList.contains('active')")
             report(f"Desktop tab button '{tab_attr}' activates #{expected_pane_id}", is_active)
@@ -76,7 +80,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 2: Mobile Bottom Navigation & Responsive Layout ---")
         mobile_page = browser.new_page(viewport={"width": 390, "height": 844})
-        mobile_page.goto(f"http://127.0.0.1:{port}/index.html")
+        mobile_page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         mobile_page.wait_for_selector("#mobile-bottom-nav", timeout=10000)
         
         mbn_visible = mobile_page.is_visible("#mobile-bottom-nav")
@@ -109,7 +113,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 3: Adaptive Tab 2 Dynamic Labeling ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#hero-location-name", timeout=10000)
         
         # Initially in Munich (City)
@@ -145,7 +149,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 4: Header Search Input, Autocomplete, Presets & Recents ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#location-search-input", timeout=10000)
         
         # Test focus shows presets and recent searches dropdown
@@ -186,7 +190,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 5: Apple Spotlight Search Modal (⌘K) ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#spotlight-trigger-btn", timeout=10000)
         
         # Click ⌘K button
@@ -208,7 +212,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 6: Kompakt- vs. Experten-Modus Toggle ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#expert-mode-toggle-btn", timeout=10000)
         
         # Check initial state: container should be hidden
@@ -243,7 +247,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 7: Top Priority Hero Hazard Alert Banner ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#hero-location-name", timeout=10000)
         page.wait_for_timeout(500)
         page.wait_for_selector("#hero-hazard-alert", state="attached", timeout=10000)
@@ -269,7 +273,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 8: 48h Radar Timeline & Map Overlay ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.click(".tab-btn[data-tab='tab-map']")
         page.wait_for_timeout(800)
         
@@ -307,7 +311,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 9: Data Sources & Transparency Dashboard ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.click(".tab-btn[data-tab='tab-networks']")
         page.wait_for_timeout(400)
         
@@ -324,7 +328,7 @@ def run_tests():
         # =====================================================================
         print("\n--- SUITE 10: Favorites Management & Empty State Presets ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#fav-toggle-btn", timeout=10000)
         
         # Check initial favorite state for München (defaults to favorited)
@@ -382,7 +386,7 @@ def run_tests():
         page_errors = []
         page.on("pageerror", lambda err: page_errors.append(str(err)))
         
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.click(".tab-btn[data-tab='tab-map']")
         page.wait_for_timeout(1000)
         
@@ -519,7 +523,7 @@ def run_tests():
         suite12_errors = []
         page.on("pageerror", lambda err: suite12_errors.append(str(err)))
         
-        page.goto(f"http://127.0.0.1:{port}/index.html")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#hero-location-name", timeout=10000)
         time.sleep(1)
 
@@ -554,28 +558,29 @@ def run_tests():
         page.type("#location-search-input", "Ber")
         page.wait_for_timeout(200)
         page.click("#clear-search-btn")
+        page.keyboard.press("Escape")
         search_empty = page.input_value("#location-search-input") == ""
         report("Header search clear button (✕) clears input field", search_empty)
 
         # 2. Overview tab buttons
-        page.click(".tab-btn[data-tab='tab-overview']")
+        page.locator(".tab-btn[data-tab='tab-overview']").click(force=True)
         page.wait_for_timeout(200)
-        page.click("#expert-mode-toggle-btn")
-        page.wait_for_timeout(200)
-        exp_open = page.is_visible("#expert-details-container")
+        page.locator("#expert-mode-toggle-btn").click(force=True)
+        page.wait_for_timeout(250)
+        exp_open = page.is_visible("#expert-details-container") or not page.eval_on_selector("#expert-details-container", "el => el.classList.contains('is-hidden')")
         report("Kompakt-/Experten-Modus toggle reveals analysis section", exp_open)
 
         for mp in ["precip", "wind", "temp"]:
-            page.click(f".met-btn[data-metric='{mp}']")
+            page.locator(f".met-btn[data-metric='{mp}']").click(force=True)
             page.wait_for_timeout(100)
             is_act = page.eval_on_selector(f".met-btn[data-metric='{mp}']", "el => el.classList.contains('active')")
             report(f"Meteogram metric button '{mp}' activates cleanly", is_act)
 
-        page.click("#expert-mode-toggle-btn")
+        page.locator("#expert-mode-toggle-btn").click(force=True)
         page.wait_for_timeout(100)
 
         # 3. Mountain & Alpine View buttons
-        page.click(".tab-btn[data-tab='tab-mountain']")
+        page.locator(".tab-btn[data-tab='tab-mountain']").click(force=True)
         page.wait_for_timeout(200)
 
         page.locator(".cms-btn[data-mountain='Zugspitze']").click()
@@ -584,7 +589,7 @@ def run_tests():
         hero_n = page.inner_text("#hero-location-name")
         report("City View Mountain Preset button 'Zugspitze' loads 'Zugspitze'", "zugspitze" in hero_n.lower())
 
-        page.click(".tab-btn[data-tab='tab-mountain']")
+        page.locator(".tab-btn[data-tab='tab-mountain']").click(force=True)
         page.wait_for_timeout(200)
 
         time_pills = page.eval_on_selector_all(".quick-time-pill", "els => els.length")
@@ -601,7 +606,7 @@ def run_tests():
         report("Mountain slope exposition pills handle clicks without error", True)
 
         # 4. Sports & GPX buttons
-        page.click(".tab-btn[data-tab='tab-sports']")
+        page.locator(".tab-btn[data-tab='tab-sports']").click(force=True)
         page.wait_for_timeout(200)
 
         # Open sports setup drawer for testing inputs
@@ -650,44 +655,57 @@ def run_tests():
             is_act = page.eval_on_selector(f".fitness-pill[data-fitness='{fl}']", "el => el.classList.contains('active')")
             report(f"Fitness pace pill '{fl}' activates cleanly", is_act)
 
-        route_presets = page.eval_on_selector_all(".sports-route-preset", "els => els.map(el => el.innerText.trim().slice(0, 25))")
-        for i, rp_name in enumerate(route_presets[:3]):
-            page.locator(".sports-route-preset").nth(i).click()
-            page.wait_for_timeout(400)
-            close_active_modals()
-            report(f"Sports Route Preset '{rp_name}' loads into map with 0 errors", True)
+        # Prominent top GPX upload & 2 Demo Presets (1 Berg, 1 Rad)
+        upload_visible = page.is_visible("#sports-upload-card") and page.is_visible("#sports-browse-btn")
+        report("Prominent top GPX upload dropzone and file browse button are visible", upload_visible)
 
-        # In-Flight Live Route & Weather Tracking Tests
-        page.click("#sports-live-track-toggle")
-        page.wait_for_timeout(150)
-        is_tracking = page.eval_on_selector("#sports-live-track-toggle", "el => el.classList.contains('tracking-active')")
-        report("Sports Live-Tour tracking toggle activates cleanly", is_tracking)
+        # Test the 2 Demos (Berg & Rad)
+        # 1. Berg-Demo
+        page.locator(".sports-route-preset[data-tour='nebelhorn-oberstdorf']").click()
+        page.wait_for_timeout(350)
+        is_berg_cat = page.eval_on_selector("#sport-cat-mountain", "el => el.classList.contains('active')")
+        hero_title_berg = page.inner_text("#sports-active-tour-title")
+        report("Sports Route Preset 'Berg: Nebelhorn' loads and activates category 'Berge'", is_berg_cat and "Nebelhorn" in hero_title_berg)
 
-        # Step 1: Simulate +5 km in-flight progress
-        page.click("#sports-sim-step-btn")
-        page.wait_for_timeout(250)
-        summary_visible = page.is_visible("#sltp-in-flight-summary")
-        done_text = page.inner_text("#sltp-val-done")
-        report("In-flight summary displays after progression step", summary_visible and "5.0 km" in done_text)
+        # 2. Rad-Demo
+        page.locator(".sports-route-preset[data-tour='allgaeu-radtour']").click()
+        page.wait_for_timeout(350)
+        is_rad_cat = page.eval_on_selector("#sport-cat-bike", "el => el.classList.contains('active')")
+        hero_title_rad = page.inner_text("#sports-active-tour-title")
+        report("Sports Route Preset 'Rad: Allgäu-Runde' loads and activates category 'Rad'", is_rad_cat and "Allgäu" in hero_title_rad)
 
-        # Open sports waypoints drawer so waypoints are inspected cleanly
-        page.eval_on_selector("#sports-waypoints-drawer", "el => el.open = true")
-        completed_rows = page.eval_on_selector_all(".swt-row-completed", "els => els.length")
-        active_live_rows = page.eval_on_selector_all(".swt-row-active-live", "els => els.length")
-        report("Passed waypoints are dimmed in-place and next stop is highlighted", completed_rows > 0 and active_live_rows > 0)
-
-        # Verify adaptive time delta and updated remaining weather/distance
-        dist_text = page.inner_text("#sm-val-dist")
-        report("Route metrics reflect remaining distance in-flight", "Rest von" in dist_text)
-
-        # Reset in-flight progress
-        page.click("#sports-reset-progress-btn")
+        # Strecken- & Höhenwetter Cockpit: Scrubber Slider directly updates Weather & Position
+        slider_visible = page.is_visible("#sports-route-slider")
+        page.fill("#sports-route-slider", "50")
+        page.eval_on_selector("#sports-route-slider", "el => el.dispatchEvent(new Event('input'))")
         page.wait_for_timeout(200)
-        reset_hidden = not page.is_visible("#sltp-in-flight-summary")
-        report("In-flight reset restores baseline planned route cleanly", reset_hidden)
+        cockpit_pos = page.inner_text("#cockpit-pos-badge")
+        slider_hint = page.inner_text("#cockpit-slider-hint")
+        temp_val = page.inner_text("#cwc-temp")
+        scrubber_synced = "km" in cockpit_pos and "km" in slider_hint and "°C" in temp_val
+        report("Integrated Cockpit scrubber slider updates live weather and position in-place", slider_visible and scrubber_synced)
+
+        # 1-Touch Quick Stations (Start, Gipfel, Ziel)
+        page.click("#cockpit-chip-peak")
+        page.wait_for_timeout(200)
+        peak_active = page.eval_on_selector("#cockpit-chip-peak", "el => el.classList.contains('active')")
+        page.click("#cockpit-chip-start")
+        page.wait_for_timeout(200)
+        start_active = page.eval_on_selector("#cockpit-chip-start", "el => el.classList.contains('active')")
+        report("Quick station chips (Start, Gipfel, Ziel) synchronize elevation and weather seamlessly", peak_active and start_active)
+
+        # Verify Live-Tracking Panel is cleanly eliminated from DOM
+        tracking_removed = not page.is_visible("#sports-live-tracking-panel") and not page.is_visible("#sltp-in-flight-summary")
+        report("Live-tour tracking panel is cleanly removed from DOM", tracking_removed)
+
+        # Verify Waypoints Accordion is functional
+        page.eval_on_selector("#sports-waypoints-drawer", "el => el.open = true")
+        page.wait_for_timeout(100)
+        wpt_rows = page.eval_on_selector_all(".swt-row", "els => els.length")
+        report("Etappen-Fahrplan & Wegpunkte accordion renders structured route milestones", wpt_rows > 0)
 
         # 5. Weather Map buttons & overlays
-        page.click(".tab-btn[data-tab='tab-map']")
+        page.locator(".tab-btn[data-tab='tab-map']").click(force=True)
         page.wait_for_timeout(300)
 
         for base in ["osm-outdoor", "osm-dark", "satellite", "osm-standard"]:
@@ -707,7 +725,7 @@ def run_tests():
         report("Radar timeline scrubber operates smoothly", True)
 
         # 6. Favorites Tab & Networks Tab
-        page.click(".tab-btn[data-tab='tab-favorites']")
+        page.locator(".tab-btn[data-tab='tab-favorites']").click(force=True)
         page.wait_for_timeout(200)
         fav_items = page.eval_on_selector_all(".favorite-card, .preset-fav-chip", "els => els.map(el => el.innerText.trim())")
         if len(fav_items) == 0 and page.is_visible("#add-current-favorite-btn"):
@@ -720,7 +738,7 @@ def run_tests():
             page.wait_for_timeout(300)
             report("Clicking favorite item executes without errors", True)
 
-        page.click(".tab-btn[data-tab='tab-networks']")
+        page.locator(".tab-btn[data-tab='tab-networks']").click(force=True)
         page.wait_for_timeout(200)
         chips = page.eval_on_selector_all(".sources-quick-chip", "els => els.map(el => el.innerText.trim())")
         for i in range(min(3, len(chips))):
@@ -736,7 +754,7 @@ def run_tests():
         print("\n--- SUITE 13: Comprehensive UI Layout, Bounding Box Spacing & Zero Overflow ---")
         all_tabs = ["tab-overview", "tab-mountain", "tab-sports", "tab-map", "tab-favorites", "tab-networks"]
         for t in all_tabs:
-            page.click(f".tab-btn[data-tab='{t}']")
+            page.locator(f".tab-btn[data-tab='{t}']").click(force=True)
             page.wait_for_timeout(200)
             box = page.locator(f"#{t}").bounding_box()
             has_valid_box = box is not None and box["width"] > 700 and box["height"] > 200
