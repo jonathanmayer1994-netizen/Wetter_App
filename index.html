@@ -1094,25 +1094,7 @@
               </button>
             </div>
 
-            <!-- Interaktives Höhenprofil: Direktes Streichen & Antippen -->
-            <div class="cockpit-chart-container" id="sports-chart-wrapper">
-              <div class="cockpit-chart-hint">👆 Profil berühren</div>
-              <svg id="sports-elevation-svg" class="sports-elevation-svg" viewBox="0 0 900 240" preserveAspectRatio="none">
-                <!-- Dynamisch gerendertes Höhenprofil -->
-              </svg>
-            </div>
-
-            <!-- Direkter, sichtbarer Strecken-Slider mit Live-Wegmarke -->
-            <div class="cockpit-slider-container">
-              <div class="csc-slider-meta">
-                <span class="csc-meta-km">0.0 km</span>
-                <span class="csc-meta-live" id="cockpit-slider-hint">Streckenpunkt abfahren</span>
-                <span class="csc-meta-total" id="cockpit-slider-total">-- km</span>
-              </div>
-              <input type="range" id="sports-route-slider" min="0" max="100" value="0" step="0.5" class="sports-route-range-slider" aria-label="Strecke abfahren">
-            </div>
-
-            <!-- Smart Weather Capsule: Direkt an den Scrubber angeschlossen -->
+            <!-- Smart Weather Capsule: Direkt im oberen Blickfeld beim Strecken-Scrubben -->
             <div class="cockpit-weather-capsule" id="cockpit-weather-capsule">
               <div class="cwc-header">
                 <div class="cwc-station-info">
@@ -1155,6 +1137,24 @@
                 <span class="cwc-alert-icon">⚠️</span>
                 <span class="cwc-alert-text" id="cwc-alert-text">Warnung aktiv</span>
               </div>
+            </div>
+
+            <!-- Direkter, sichtbarer Strecken-Slider mit Live-Wegmarke -->
+            <div class="cockpit-slider-container">
+              <div class="csc-slider-meta">
+                <span class="csc-meta-km">0.0 km</span>
+                <span class="csc-meta-live" id="cockpit-slider-hint">Streckenpunkt abfahren</span>
+                <span class="csc-meta-total" id="cockpit-slider-total">-- km</span>
+              </div>
+              <input type="range" id="sports-route-slider" min="0" max="100" value="0" step="0.5" class="sports-route-range-slider" aria-label="Strecke abfahren">
+            </div>
+
+            <!-- Interaktives Höhenprofil: Direktes Streichen & Antippen -->
+            <div class="cockpit-chart-container" id="sports-chart-wrapper">
+              <div class="cockpit-chart-hint">👆 Profil berühren</div>
+              <svg id="sports-elevation-svg" class="sports-elevation-svg" viewBox="0 0 900 240" preserveAspectRatio="none">
+                <!-- Dynamisch gerendertes Höhenprofil -->
+              </svg>
             </div>
           </section>
 
@@ -1375,18 +1375,27 @@
             </div>
           </details>
 
-          <!-- 6. INTERAKTIVE STRECKENKARTE -->
-          <section class="glass-card sports-map-card">
+          <!-- 6. INTERAKTIVE STRECKENKARTE MIT VOLLBILDMODUS -->
+          <section class="glass-card sports-map-card" id="sports-map-card">
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">🗺️</span>
                 <span>ROUTENVERLAUF &amp; GEFAHRENZONEN AUF DER KARTE</span>
               </div>
-              <span class="card-tag">OSM Outdoor Relief</span>
+              <div class="sports-map-header-actions">
+                <span class="card-tag">OSM Outdoor</span>
+                <button type="button" class="sports-map-fullscreen-btn" id="sports-map-fullscreen-btn" title="Karte im Vollbildmodus öffnen" aria-label="Karte vergrößern">
+                  <span class="sm-fs-icon">⛶</span>
+                  <span class="sm-fs-text">Vollbild</span>
+                </button>
+              </div>
             </div>
 
-            <div class="sports-map-wrapper">
+            <div class="sports-map-wrapper" id="sports-map-wrapper">
               <div id="sports-map-container" class="sports-map-container"></div>
+              <button type="button" class="sports-map-close-btn" id="sports-map-close-btn" aria-label="Vollbild schließen" title="Vollbild schließen">
+                ✕
+              </button>
             </div>
           </section>
 

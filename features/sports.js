@@ -820,6 +820,42 @@ export function setupSportsTab() {
     });
   }
 
+  // Vollbild-Modus für Sport & GPX Routenkarte
+  const mapFsBtn = document.getElementById('sports-map-fullscreen-btn');
+  const mapCloseBtn = document.getElementById('sports-map-close-btn');
+
+  if (mapFsBtn) {
+    mapFsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSportsMapFullscreen();
+    });
+  }
+  if (mapCloseBtn) {
+    mapCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSportsMapFullscreen();
+    });
+  }
+
+  // Escape-Taste schließt Vollbild
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const wrapper = document.getElementById('sports-map-wrapper');
+      if (wrapper && wrapper.classList.contains('sports-map-fullscreen')) {
+        closeSportsMapFullscreen();
+      }
+    }
+  });
+
+  // Globaler Jump Helper für Map-Popups & Waypoint-Clicks
+  window.jumpToSportsKm = (km) => {
+    updateSportsScrubber(km);
+    const cockpit = document.getElementById('sports-cockpit-card');
+    if (cockpit && !document.getElementById('sports-map-wrapper')?.classList.contains('sports-map-fullscreen')) {
+      cockpit.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+
   // Window Resize: Scrubber & HUD Position neu synchronisieren
   window.addEventListener('resize', () => {
     if (state.sports && state.sports.timeline && state.sports.scrubberKm !== undefined) {
@@ -1366,23 +1402,6 @@ export function renderSportsElevationProfile(timeline) {
     `;
   });
 
-  // Dynamischer Pulsierender Athleten-Marker bei In-Flight Fortschritt
-  let liveAthleteElement = '';
-  if (timeline.inFlight && curKm > 0 && pts.length > 0) {
-    const activePt = pts[timeline.currentPointIndex || 0] || pts[0];
-    const ax = getX(curKm);
-    const ay = getY(activePt.ele);
-    liveAthleteElement = `
-      <g id="svg-live-athlete-dot" transform="translate(${ax.toFixed(1)}, ${ay.toFixed(1)})">
-        <circle r="11" fill="none" stroke="#30d158" stroke-width="2" opacity="0.8">
-          <animate attributeName="r" values="7;16;7" dur="2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.9;0.15;0.9" dur="2s" repeatCount="indefinite" />
-        </circle>
-        <circle r="5.5" fill="#30d158" stroke="#ffffff" stroke-width="2" />
-      </g>
-    `;
-  }
-
   svg.innerHTML = `
     <defs>
       <linearGradient id="sports-profile-grad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -1413,9 +1432,6 @@ export function renderSportsElevationProfile(timeline) {
 
     <!-- Meilensteine & Wetter-Symbole -->
     ${milestoneSVGElements}
-
-    <!-- Live Athleten-Positionsdot -->
-    ${liveAthleteElement}
 
     <!-- Dynamischer Scrubber-Positionsstrich & Cursor-Punkt -->
     <line id="svg-scrubber-line" x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#ffd166" stroke-width="2" stroke-dasharray="3 3" opacity="0.9" />
@@ -1709,6 +1725,40 @@ export function renderSportsWaypointsTable(timeline) {
   container.replaceChildren(fragment);
 }
 
+export function openSportsMapFullscreen() {
+  const wrapper = document.getElementById('sports-map-wrapper');
+  if (!wrapper) return;
+  wrapper.classList.add('sports-map-fullscreen');
+  document.body.classList.add('sports-map-fullscreen-active');
+  document.body.style.overflow = 'hidden';
+
+  setTimeout(() => {
+    if (state.sports.map) {
+      state.sports.map.invalidateSize();
+      if (state.sports.routeLine) {
+        state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [40, 40] });
+      }
+    }
+  }, 120);
+}
+
+export function closeSportsMapFullscreen() {
+  const wrapper = document.getElementById('sports-map-wrapper');
+  if (!wrapper) return;
+  wrapper.classList.remove('sports-map-fullscreen');
+  document.body.classList.remove('sports-map-fullscreen-active');
+  document.body.style.overflow = '';
+
+  setTimeout(() => {
+    if (state.sports.map) {
+      state.sports.map.invalidateSize();
+      if (state.sports.routeLine) {
+        state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [30, 30] });
+      }
+    }
+  }, 120);
+}
+
 export function renderSportsMap(timeline) {
   const container = document.getElementById('sports-map-container');
   if (!container || !timeline || !timeline.timedPoints || timeline.timedPoints.length === 0) return;
@@ -1776,42 +1826,92 @@ export function renderSportsMap(timeline) {
   });
 
   state.sports.startMarker = L.marker([startPt.lat, startPt.lon], { icon: startIcon }).addTo(state.sports.map);
-  state.sports.startMarker.bindPopup(`<b>🚩 Tourstart</b><br>Höhe: ${Math.round(startPt.ele)} m<br>Startzeit: ${timeline.startTimeStr} Uhr`);
+  state.sports.startMarker.bindPopup(`
+    <div class="sports-map-popup-card">
+      <div class="smp-title">🚩 Tourstart</div>
+      <div class="smp-meta">⏱️ Startzeit: <b>${timeline.startTimeStr} Uhr</b> • Höhe: <b>${Math.round(startPt.ele)} m</b></div>
+      <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(0)">
+        📍 Im Streckenwetter anspringen
+      </button>
+    </div>
+  `);
 
   state.sports.endMarker = L.marker([endPt.lat, endPt.lon], { icon: endIcon }).addTo(state.sports.map);
-  state.sports.endMarker.bindPopup(`<b>🏁 Zielankunft</b><br>Strecke: ${timeline.totalDistanceKm.toFixed(1)} km<br>Ankunft: ${timeline.endTimeStr} Uhr`);
+  state.sports.endMarker.bindPopup(`
+    <div class="sports-map-popup-card">
+      <div class="smp-title">🏁 Zielankunft</div>
+      <div class="smp-meta">⏱️ Ankunft: <b>${timeline.endTimeStr} Uhr</b> • Distanz: <b>${timeline.totalDistanceKm.toFixed(1)} km</b></div>
+      <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(${timeline.totalDistanceKm})">
+        📍 Im Streckenwetter anspringen
+      </button>
+    </div>
+  `);
 
-  // Zwischen-Meilensteine mit Wetter-Bubbles
+  // Zwischen-Meilensteine mit Wetter-Bubbles & reichhaltigen Details für Vollbild
   timeline.milestones.forEach((m, idx) => {
     if (idx === 0 || idx === timeline.milestones.length - 1) return;
+    const isPeak = m.ele === timeline.maxElevationM;
+
     const mIcon = L.divIcon({
       className: 'sports-milestone-marker',
-      html: `<div class="ms-marker-bubble"><span class="ms-icon">${m.weatherIcon}</span> <span class="ms-temp">${m.tempC}°</span></div>`,
-      iconSize: [54, 24],
-      iconAnchor: [27, 12]
+      html: `
+        <div class="ms-marker-bubble ${isPeak ? 'bubble-peak' : ''}" data-km="${m.distFromStartKm}">
+          <!-- Kompakte Ansicht für kleine Standardkarte -->
+          <div class="ms-compact-pill">
+            <span class="ms-icon">${m.weatherIcon}</span>
+            <span class="ms-temp">${m.tempC}°</span>
+            <span class="ms-alt">${Math.round(m.ele)}m</span>
+          </div>
+          <!-- Ausführliche Detailansicht für die vergrößerte Karte -->
+          <div class="ms-detailed-card">
+            <div class="msd-header">
+              <span class="msd-name">${isPeak ? '🏔️ ' : ''}${m.label}</span>
+              <span class="msd-alt">${Math.round(m.ele)} m</span>
+            </div>
+            <div class="msd-main">
+              <span class="msd-icon">${m.weatherIcon}</span>
+              <span class="msd-temp">${m.tempC}°C</span>
+              <span class="msd-cond">${m.weatherCondition}</span>
+            </div>
+            <div class="msd-footer">
+              <span class="msd-time">⏱️ ${m.arrivalTimeStr}</span>
+              <span class="msd-wind">💨 ${m.windKmH} km/h</span>
+              ${m.precipMm > 0 ? `<span class="msd-rain">💧 ${m.precipMm.toFixed(1)}mm</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `,
+      iconSize: null,
+      iconAnchor: null
     });
 
     const marker = L.marker([m.lat, m.lon], { icon: mIcon }).addTo(state.sports.map);
     marker.bindPopup(`
-      <div style="font-family: -apple-system, sans-serif; min-width: 170px;">
-        <strong style="color: #00e5ff; font-size: 13px;">${m.label} (${m.distFromStartKm.toFixed(1)} km)</strong><br>
-        <span style="font-size: 11px; color: #8e8e93;">⏱️ Durchgang: ${m.arrivalTimeStr} (${m.arrivalDateStr})</span>
-        <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 6px 0;">
-        <div>${m.weatherIcon} <b>${m.weatherCondition}</b></div>
-        <div>🌡️ Temperatur: <b>${m.tempC}°C</b> (Gefühlt ${m.feltTempC}°C)</div>
-        <div>💨 Wind: <b>${m.windKmH} km/h</b> (Böen ${m.gustsKmH} km/h)</div>
-        <div>💧 Niederschlag: <b>${m.precipMm.toFixed(1)} mm</b> (${m.popPercent}%)</div>
-        ${m.isSnow ? '<div style="color: #64d2ff; font-weight: bold;">❄️ Frost / Schneelage möglich</div>' : ''}
+      <div class="sports-map-popup-card">
+        <div class="smp-title">${isPeak ? '🏔️ ' : '📍 '}${m.label} (${m.distFromStartKm.toFixed(1)} km)</div>
+        <div class="smp-meta">⏱️ Durchgang: <b>${m.arrivalTimeStr}</b> • Höhe: <b>${Math.round(m.ele)} m</b></div>
+        <hr class="smp-divider">
+        <div class="smp-grid">
+          <div>${m.weatherIcon} <b>${m.weatherCondition}</b></div>
+          <div>🌡️ Temperatur: <b>${m.tempC}°C</b> (Gefühlt ${m.feltTempC}°C)</div>
+          <div>💨 Wind: <b>${m.windKmH} km/h</b> (Böen ${m.gustsKmH} km/h)</div>
+          ${m.relWindBadge ? `<div class="smp-wind-badge">${m.relWindBadge}</div>` : ''}
+          <div>💧 Niederschlag: <b>${m.precipMm.toFixed(1)} mm</b> (${m.popPercent}%)</div>
+          ${m.isSnow ? '<div class="smp-snow-badge">❄️ Frost / Schneelage möglich</div>' : ''}
+        </div>
+        <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(${m.distFromStartKm})">
+          📍 Im Streckenwetter anspringen
+        </button>
       </div>
     `);
     state.sports.milestoneMarkers.push(marker);
   });
 
-  // Interaktiver Scrubber-Marker (Athleten-Pin)
+  // Interaktiver Scrubber-Marker (Athleten-Pin ohne Spielereien)
   const athleteIcon = timeline.sportType === 'road_bike' ? '🚴' : (timeline.sportType === 'gravel_mtb' ? '🚵' : (timeline.sportType === 'trailrun' ? '🏃' : '🥾'));
   const scrubberIcon = L.divIcon({
     className: 'sports-scrubber-map-marker',
-    html: `<div class="scrubber-pin-pulse">${athleteIcon}</div>`,
+    html: `<div class="scrubber-pin-static">${athleteIcon}</div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18]
   });

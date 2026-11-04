@@ -685,6 +685,17 @@ def run_tests():
         scrubber_synced = "km" in cockpit_pos and "km" in slider_hint and "°C" in temp_val
         report("Integrated Cockpit scrubber slider updates live weather and position in-place", slider_visible and scrubber_synced)
 
+        # Inverted Cockpit Layout: Dynamic weather data container is placed ABOVE the slider & elevation profile
+        capsule_box = page.eval_on_selector("#cockpit-weather-capsule", "el => el.getBoundingClientRect().top")
+        slider_box = page.eval_on_selector("#sports-route-slider", "el => el.getBoundingClientRect().top")
+        chart_box = page.eval_on_selector("#sports-chart-wrapper", "el => el.getBoundingClientRect().top")
+        order_correct = capsule_box < slider_box and slider_box < chart_box
+        report("Dynamic weather data container sits above route slider and elevation profile for finger-free scrubbing", order_correct)
+
+        # Verify zero SVG animation gimmicks in elevation profile
+        anim_count = page.eval_on_selector("#sports-elevation-svg", "el => el.querySelectorAll('animate').length")
+        report("Elevation profile is static, high-performance and free of animation gimmicks", anim_count == 0)
+
         # 1-Touch Quick Stations (Start, Gipfel, Ziel)
         page.click("#cockpit-chip-peak")
         page.wait_for_timeout(200)
@@ -693,6 +704,24 @@ def run_tests():
         page.wait_for_timeout(200)
         start_active = page.eval_on_selector("#cockpit-chip-start", "el => el.classList.contains('active')")
         report("Quick station chips (Start, Gipfel, Ziel) synchronize elevation and weather seamlessly", peak_active and start_active)
+
+        # Sports Map Fullscreen Mode & Detailed Weather Milestones
+        map_fs_btn_present = page.is_visible("#sports-map-fullscreen-btn")
+        page.click("#sports-map-fullscreen-btn")
+        page.wait_for_timeout(200)
+        is_map_fs = page.eval_on_selector("#sports-map-wrapper", "el => el.classList.contains('sports-map-fullscreen')")
+        close_btn_visible = page.is_visible("#sports-map-close-btn")
+        report("Sports Map enters fullscreen mode and close button (✕) becomes visible", map_fs_btn_present and is_map_fs and close_btn_visible)
+
+        # Verify rich weather milestone markers with detailed badges for fullscreen
+        detailed_badges_count = page.eval_on_selector_all(".ms-detailed-card", "els => els.length")
+        report("Sports Map renders rich multi-line weather milestone points with detailed metrics", detailed_badges_count > 0)
+
+        # Exit fullscreen mode via close button
+        page.click("#sports-map-close-btn")
+        page.wait_for_timeout(200)
+        fs_closed = not page.eval_on_selector("#sports-map-wrapper", "el => el.classList.contains('sports-map-fullscreen')")
+        report("Sports Map closes fullscreen cleanly via the close button", fs_closed)
 
         # Verify Live-Tracking Panel is cleanly eliminated from DOM
         tracking_removed = not page.is_visible("#sports-live-tracking-panel") and not page.is_visible("#sltp-in-flight-summary")
