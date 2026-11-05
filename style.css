@@ -11762,31 +11762,58 @@ body {
   gap: 8px;
 }
 
+#sports-map-card .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+#sports-map-card .card-title {
+  text-transform: none;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: #f1f5f9;
+}
+
 .sports-map-fullscreen-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   background: rgba(0, 229, 255, 0.12);
   border: 1px solid rgba(0, 229, 255, 0.35);
   color: #00e5ff;
-  border-radius: 20px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 700;
+  border-radius: 10px;
+  padding: 0;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-tap-highlight-color: transparent;
+}
+
+.sports-map-fullscreen-btn .sm-fs-icon-svg {
+  display: block;
+  stroke: #00e5ff;
+  transition: transform 0.2s ease;
 }
 
 .sports-map-fullscreen-btn:hover {
   background: rgba(0, 229, 255, 0.24);
   border-color: #00e5ff;
   box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
-  transform: translateY(-1px);
+  transform: scale(1.05);
+}
+
+.sports-map-fullscreen-btn:hover .sm-fs-icon-svg {
+  transform: scale(1.1);
 }
 
 .sports-map-fullscreen-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.94);
 }
 
 /* =============================================================================
@@ -11834,12 +11861,16 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 .sports-map-wrapper {
   position: relative;
   width: 100%;
-  height: 380px;
+  height: 420px;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.25s ease;
   background: #111827;
+}
+
+.sports-map-wrapper .leaflet-control-zoom {
+  display: none !important;
 }
 
 .sports-map-container {
@@ -11849,7 +11880,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 
 @media (max-width: 768px) {
   .sports-map-wrapper:not(.sports-map-fullscreen) {
-    height: 320px;
+    height: 380px;
   }
 }
 

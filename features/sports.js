@@ -1760,7 +1760,7 @@ export function renderSportsMap(timeline) {
 
   if (!state.sports.map) {
     state.sports.map = L.map('sports-map-container', {
-      zoomControl: true,
+      zoomControl: false,
       attributionControl: false,
       maxZoom: 19
     }).setView([timeline.timedPoints[0].lat, timeline.timedPoints[0].lon], 11);
