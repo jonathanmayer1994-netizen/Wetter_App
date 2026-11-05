@@ -1335,31 +1335,21 @@ export function renderSportsHazards(hazards) {
 }
 
 export function renderSportsElevationProfile(timeline) {
-  const svg = document.getElementById('sports-elevation-svg');
-  if (!svg || !timeline) return;
-
-  const W = 900;
-  const H = 240;
-  const padL = 50;
-  const padR = 35;
-  const padT = 35;
-  const padB = 40;
-  const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
-
-  const minZ = Math.max(0, timeline.minElevationM - 80);
-  const maxZ = timeline.maxElevationM + 80;
-  const rangeZ = Math.max(20, maxZ - minZ);
-  const totalDist = Math.max(0.1, timeline.totalDistanceKm);
+  if (!timeline) return;
 
   // Cockpit Station-Labels dynamisch aktualisieren
   const peakLabel = document.getElementById('cockpit-peak-label');
   const finishLabel = document.getElementById('cockpit-finish-label');
-  if (peakLabel) peakLabel.innerText = `Gipfel (${Math.round(timeline.maxElevationM)}m)`;
-  if (finishLabel) finishLabel.innerText = `Ziel (${timeline.totalDistanceKm.toFixed(1)} km)`;
+  if (peakLabel) peakLabel.innerText = `Gipfel ${Math.round(timeline.maxElevationM)}m`;
+  if (finishLabel) finishLabel.innerText = `Ziel ${timeline.totalDistanceKm.toFixed(1)} km`;
 
   const peakMs = timeline.milestones ? timeline.milestones.find(m => m.ele === timeline.maxElevationM) : null;
   timeline.peakKm = peakMs ? peakMs.distFromStartKm : (timeline.totalDistanceKm / 2);
+
+  const svg = document.getElementById('sports-elevation-svg');
+  if (!svg) return;
+
+  const W = 900;
 
   const pts = timeline.timedPoints;
   const count = pts.length;
@@ -1970,13 +1960,13 @@ export function updateSportsScrubber(km) {
   // --- 1. NEUER ALPINE COCKPIT WETTER-MONITOR (Unified & Mobile-Optimized) ---
   const cockpitBadge = document.getElementById('cockpit-pos-badge');
   if (cockpitBadge) {
-    cockpitBadge.innerText = `📍 km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m`;
+    cockpitBadge.innerText = `📍 km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} Hm`;
   }
 
   const arrStr = closestPt.arrivalDate ? closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
   const sliderHint = document.getElementById('cockpit-slider-hint');
   if (sliderHint) {
-    sliderHint.innerText = `km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m • ⏱️ ${arrStr} Uhr`;
+    sliderHint.innerText = `km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} Hm • ⏱️ ${arrStr} Uhr`;
   }
 
   // Bestimme Streckenpunkt-Typ (Start, Gipfel, Ziel, Abschnitt)
@@ -1984,16 +1974,16 @@ export function updateSportsScrubber(km) {
   const isEnd = clampedKm >= totalDist - 0.25;
   const isPeak = Math.abs(closestPt.ele - timeline.maxElevationM) <= 15;
 
-  let stationTitle = `Streckenabschnitt km ${closestPt.distFromStartKm.toFixed(1)}`;
+  let stationTitle = `Streckenpunkt km ${closestPt.distFromStartKm.toFixed(1)}`;
   let stationIcon = closestMs.weatherIcon || '⛅';
   if (isStart) {
-    stationTitle = 'Tourstart / Tal';
+    stationTitle = 'Tourstart';
     stationIcon = '🟢';
   } else if (isPeak) {
-    stationTitle = 'Passhöhe / Gipfel';
+    stationTitle = 'Gipfel / Scheitelpunkt';
     stationIcon = '🏔️';
   } else if (isEnd) {
-    stationTitle = 'Zielankunft / Tour-Ende';
+    stationTitle = 'Zielankunft';
     stationIcon = '🏁';
   }
 
@@ -2014,9 +2004,9 @@ export function updateSportsScrubber(km) {
 
   if (cwcIcon) cwcIcon.innerText = stationIcon;
   if (cwcTitle) cwcTitle.innerText = stationTitle;
-  if (cwcSub) cwcSub.innerText = `km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} m`;
+  if (cwcSub) cwcSub.innerText = `km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele)} Hm`;
   if (cwcTime) {
-    const arrStr = closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const arrStr = closestPt.arrivalDate ? closestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
     cwcTime.innerText = `⏱️ ${arrStr} Uhr`;
   }
   if (cwcTemp) cwcTemp.innerText = `${closestMs.tempC}°C`;
@@ -2026,17 +2016,24 @@ export function updateSportsScrubber(km) {
   }
   if (cwcCond) cwcCond.innerText = `${closestMs.weatherIcon} ${closestMs.weatherCondition || 'Normal'}`;
   if (cwcCondNote) {
-    if (closestMs.weatherCode >= 95) cwcCondNote.innerText = '⚡ Gewitterrisiko';
-    else if (closestMs.isSnow) cwcCondNote.innerText = '❄️ Frost/Schneelage';
+    if (closestMs.weatherCode >= 95) cwcCondNote.innerText = '⚡ Gewitter';
+    else if (closestMs.isSnow) cwcCondNote.innerText = '❄️ Schneelage';
     else if (closestMs.precipMm >= 1) cwcCondNote.innerText = '🌧️ Regenphase';
-    else cwcCondNote.innerText = 'Bedingungen stabil';
+    else cwcCondNote.innerText = 'Stabil';
   }
   if (cwcWind) cwcWind.innerText = `${closestMs.windKmH} km/h`;
   if (cwcGusts) {
-    cwcGusts.innerText = `Böen ${closestMs.gustsKmH} km/h${closestMs.relWindBadge ? ' • ' + closestMs.relWindBadge : ''}`;
+    let relStr = '';
+    if (closestMs.relWindBadge) {
+      if (closestMs.relWindBadge.includes('Gegenwind')) relStr = ' • 🌬️ Gegenwind';
+      else if (closestMs.relWindBadge.includes('Rückenwind')) relStr = ' • 💨 Rückenwind';
+      else if (closestMs.relWindBadge.includes('Seitenwind')) relStr = ' • ⚠️ Seitenwind';
+      else relStr = ` • ${closestMs.relWindBadge}`;
+    }
+    cwcGusts.innerText = `Böen ${closestMs.gustsKmH} km/h${relStr}`;
   }
   if (cwcPrecip) cwcPrecip.innerText = closestMs.precipMm > 0 ? `${closestMs.precipMm.toFixed(1)} mm` : '0 mm';
-  if (cwcPop) cwcPop.innerText = `${closestMs.popPercent}% Regenrisiko`;
+  if (cwcPop) cwcPop.innerText = `${closestMs.popPercent}% Risiko`;
 
   // Warnungs-Banner bei alpinen Gefahren am Wegpunkt
   if (cwcAlert && cwcAlertText) {

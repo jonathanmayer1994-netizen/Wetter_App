@@ -669,7 +669,7 @@ def run_tests():
 
         # 2. Rad-Demo
         page.locator(".sports-route-preset[data-tour='allgaeu-radtour']").click()
-        page.wait_for_timeout(350)
+        page.wait_for_function("() => document.getElementById('sports-active-tour-title').innerText.includes('Allgäu')", timeout=5000)
         is_rad_cat = page.eval_on_selector("#sport-cat-bike", "el => el.classList.contains('active')")
         hero_title_rad = page.inner_text("#sports-active-tour-title")
         report("Sports Route Preset 'Rad: Allgäu-Runde' loads and activates category 'Rad'", is_rad_cat and "Allgäu" in hero_title_rad)
@@ -685,16 +685,15 @@ def run_tests():
         scrubber_synced = "km" in cockpit_pos and "km" in slider_hint and "°C" in temp_val
         report("Integrated Cockpit scrubber slider updates live weather and position in-place", slider_visible and scrubber_synced)
 
-        # Inverted Cockpit Layout: Dynamic weather data container is placed ABOVE the slider & elevation profile
+        # Streamlined Cockpit Layout: Dynamic weather data container sits ABOVE the route slider
         capsule_box = page.eval_on_selector("#cockpit-weather-capsule", "el => el.getBoundingClientRect().top")
         slider_box = page.eval_on_selector("#sports-route-slider", "el => el.getBoundingClientRect().top")
-        chart_box = page.eval_on_selector("#sports-chart-wrapper", "el => el.getBoundingClientRect().top")
-        order_correct = capsule_box < slider_box and slider_box < chart_box
-        report("Dynamic weather data container sits above route slider and elevation profile for finger-free scrubbing", order_correct)
+        order_correct = capsule_box < slider_box
+        report("Dynamic weather data container sits above route slider for finger-free scrubbing", order_correct)
 
-        # Verify zero SVG animation gimmicks in elevation profile
-        anim_count = page.eval_on_selector("#sports-elevation-svg", "el => el.querySelectorAll('animate').length")
-        report("Elevation profile is static, high-performance and free of animation gimmicks", anim_count == 0)
+        # Bottom chart representation cleanly removed as requested ("die darstellung unten komplett entfernen!")
+        chart_removed = page.query_selector("#sports-chart-wrapper") is None
+        report("Redundant bottom profile chart is cleanly removed from DOM", chart_removed)
 
         # 1-Touch Quick Stations (Start, Gipfel, Ziel)
         page.click("#cockpit-chip-peak")

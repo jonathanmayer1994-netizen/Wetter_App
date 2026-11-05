@@ -1074,24 +1074,24 @@
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">🏔️</span>
-                <span>STRECKEN- &amp; HÖHENWETTER</span>
+                <span>Strecken- &amp; Höhenwetter</span>
               </div>
-              <span class="card-tag" id="cockpit-pos-badge">📍 km 0.0 • -- m</span>
+              <span class="card-tag" id="cockpit-pos-badge">📍 km 0.0 • -- Hm</span>
             </div>
 
             <!-- 1-Touch Schnellwahl-Stationen (Start, Scheitelpunkt/Gipfel, Ziel) -->
             <div class="cockpit-quick-stations" id="cockpit-quick-stations">
               <button type="button" class="cockpit-station-chip active" id="cockpit-chip-start" data-station="start">
                 <span class="csc-icon">🟢</span>
-                <span class="csc-label">Start (0 km)</span>
+                <span class="csc-label">Start 0 km</span>
               </button>
               <button type="button" class="cockpit-station-chip" id="cockpit-chip-peak" data-station="peak">
                 <span class="csc-icon">🏔️</span>
-                <span class="csc-label" id="cockpit-peak-label">Gipfel (-- m)</span>
+                <span class="csc-label" id="cockpit-peak-label">Gipfel --m</span>
               </button>
               <button type="button" class="cockpit-station-chip" id="cockpit-chip-finish" data-station="finish">
                 <span class="csc-icon">🏁</span>
-                <span class="csc-label" id="cockpit-finish-label">Ziel (-- km)</span>
+                <span class="csc-label" id="cockpit-finish-label">Ziel -- km</span>
               </button>
             </div>
 
@@ -1102,7 +1102,7 @@
                   <span class="cwc-icon" id="cwc-icon">⛅</span>
                   <div class="cwc-title-col">
                     <strong class="cwc-title" id="cwc-title">Startpunkt</strong>
-                    <span class="cwc-sub" id="cwc-sub">km 0.0 • -- m</span>
+                    <span class="cwc-sub" id="cwc-sub">km 0.0 • -- Hm</span>
                   </div>
                 </div>
                 <div class="cwc-time-badge" id="cwc-time">⏱️ --:-- Uhr</div>
@@ -1118,7 +1118,7 @@
                 <div class="cwc-tile">
                   <span class="cwc-tile-label">⛅ Wetterlage</span>
                   <div class="cwc-tile-val" id="cwc-cond">--</div>
-                  <span class="cwc-tile-sub" id="cwc-cond-note">Bedingungen stabil</span>
+                  <span class="cwc-tile-sub" id="cwc-cond-note">Stabil</span>
                 </div>
 
                 <div class="cwc-tile">
@@ -1148,14 +1148,6 @@
                 <span class="csc-meta-total" id="cockpit-slider-total">-- km</span>
               </div>
               <input type="range" id="sports-route-slider" min="0" max="100" value="0" step="0.5" class="sports-route-range-slider" aria-label="Strecke abfahren">
-            </div>
-
-            <!-- Interaktives Höhenprofil: Direktes Streichen & Antippen -->
-            <div class="cockpit-chart-container" id="sports-chart-wrapper">
-              <div class="cockpit-chart-hint">👆 Profil berühren</div>
-              <svg id="sports-elevation-svg" class="sports-elevation-svg" viewBox="0 0 900 240" preserveAspectRatio="none">
-                <!-- Dynamisch gerendertes Höhenprofil -->
-              </svg>
             </div>
           </section>
 
