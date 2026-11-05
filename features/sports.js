@@ -1355,7 +1355,7 @@ export function renderSportsElevationProfile(timeline) {
   // Cockpit Station-Labels dynamisch aktualisieren
   const peakLabel = document.getElementById('cockpit-peak-label');
   const finishLabel = document.getElementById('cockpit-finish-label');
-  if (peakLabel) peakLabel.innerText = `Gipfel (${Math.round(timeline.maxElevationM)} m)`;
+  if (peakLabel) peakLabel.innerText = `Gipfel (${Math.round(timeline.maxElevationM)}m)`;
   if (finishLabel) finishLabel.innerText = `Ziel (${timeline.totalDistanceKm.toFixed(1)} km)`;
 
   const peakMs = timeline.milestones ? timeline.milestones.find(m => m.ele === timeline.maxElevationM) : null;

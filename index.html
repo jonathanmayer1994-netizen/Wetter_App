@@ -986,14 +986,13 @@
           <section class="glass-card sports-upload-card" id="sports-upload-card">
             <div class="sports-upload-row">
               <!-- Eigene GPX hochladen / Drag & Drop -->
-              <div class="sports-drop-zone" id="sports-drop-zone">
-                <div class="sdz-icon-pill">📂</div>
-                <div class="sdz-text-wrap">
-                  <div class="sdz-title-line">
-                    <strong class="sdz-main-title">Eigene GPX-Route analysieren</strong>
-                    <span class="sdz-feature-tag">Hauptfeature</span>
+              <div class="sports-drop-zone" id="sports-drop-zone" title="Eigene GPX-Route hochladen oder hierher ziehen">
+                <div class="sdz-left">
+                  <span class="sdz-icon-pill">📂</span>
+                  <div class="sdz-text-wrap">
+                    <strong class="sdz-main-title">Eigene GPX-Route laden</strong>
+                    <span class="sdz-sub-text">Komoot, Strava, Garmin &amp; mehr</span>
                   </div>
-                  <span class="sdz-sub-text">Datei hierher ziehen oder antippen (Komoot, Strava, Garmin, Outdooractive)</span>
                 </div>
                 <button type="button" class="sdz-select-btn" id="sports-browse-btn" title="GPX-Datei auswählen">
                   <span>📂 GPX wählen</span>
@@ -1006,10 +1005,12 @@
                 <span class="sdb-caption">Oder Demo-Tour testen:</span>
                 <div class="sdb-buttons">
                   <button type="button" class="sports-route-preset active" data-tour="nebelhorn-oberstdorf" title="Berg-Demo: Nebelhorn 2.224 m">
-                    <span>🏔️ Berg: Nebelhorn (2.224 m)</span>
+                    <span class="srp-icon">🏔️</span>
+                    <span class="srp-title">Berg: Nebelhorn</span>
                   </button>
-                  <button type="button" class="sports-route-preset" data-tour="allgaeu-radtour" title="Rad-Demo: Allgäu Seen &amp; Iller 42 km">
-                    <span>🚴 Rad: Allgäu-Runde (42 km)</span>
+                  <button type="button" class="sports-route-preset" data-tour="allgaeu-radtour" title="Rad-Demo: Allgäu-Runde 42 km">
+                    <span class="srp-icon">🚴</span>
+                    <span class="srp-title">Rad: Allgäu-Runde</span>
                   </button>
                 </div>
               </div>
@@ -1025,7 +1026,7 @@
                 </div>
               </div>
               <button type="button" class="scfb-reset-btn" id="sports-clear-gpx-btn" title="Zurück zur Demo-Tour">
-                <span>✕ Zurück zu Demos</span>
+                <span>✕ Demos</span>
               </button>
             </div>
           </section>
@@ -1036,29 +1037,29 @@
               <div class="sports-hero-title-group">
                 <div class="sports-hero-badge-wrap">
                   <span class="sports-hero-icon" id="sports-hero-icon">🏔️</span>
-                  <div>
+                  <div class="sports-hero-text">
                     <h2 class="sports-hero-title" id="sports-active-tour-title">Nebelhorn Rundtour (2.224 m)</h2>
                     <p class="sports-hero-sub" id="sports-active-tour-sub">Allgäuer Alpen • Stufenlose SAC-Dynamik &amp; Relativ-Wind</p>
                   </div>
                 </div>
               </div>
               <div class="sports-hero-actions">
-                <button type="button" class="sports-quick-gpx-btn" id="sports-custom-gpx-trigger" title="Eigene GPX-Datei laden">📂 GPX wechseln</button>
+                <button type="button" class="sports-quick-gpx-btn" id="sports-custom-gpx-trigger" title="Eigene GPX-Datei laden">📂 GPX</button>
               </div>
             </div>
 
             <!-- Route Vital Metrics Summary (4 Cards) -->
             <div class="sports-metrics-grid" id="sports-metrics-grid">
               <div class="sm-card">
-                <span class="sm-label">Streckenlänge</span>
+                <span class="sm-label">Strecke</span>
                 <span class="sm-val text-accent" id="sm-val-dist">-- km</span>
               </div>
               <div class="sm-card">
-                <span class="sm-label">Höhenmeter Aufstieg</span>
+                <span class="sm-label">Aufstieg / Abstieg</span>
                 <span class="sm-val text-cyan" id="sm-val-ascent">+-- m</span>
               </div>
               <div class="sm-card">
-                <span class="sm-label">Kalkulierte Dauer</span>
+                <span class="sm-label">Kalk. Dauer</span>
                 <span class="sm-val" id="sm-val-dur">-- h -- min</span>
               </div>
               <div class="sm-card">
