@@ -300,11 +300,14 @@ export function renderMountainWebcams() {
   const cacheBuster = Math.floor(Date.now() / 600000); // 10-Minuten-Bucket für frischeste Livecam-Bilder
   grid.innerHTML = cams.map(cam => {
     const liveThumb = `${cam.thumbUrl}${cam.thumbUrl.includes('?') ? '&' : '?'}t=${cacheBuster}`;
+    const backupAttr = cam.backupThumbUrl ? `data-backup="${cam.backupThumbUrl}"` : '';
     return `
     <div class="webcam-card" data-id="${cam.id}" data-cam='${JSON.stringify(cam).replace(/'/g, "&#39;")}'>
       <div class="webcam-thumb-wrap">
-        <span class="webcam-live-badge">${cam.status}</span>
-        <img src="${liveThumb}" alt="${cam.title}" class="webcam-thumb" loading="lazy" onerror="this.onerror=null;this.src='${cam.thumbUrl}';">
+        <span class="webcam-live-badge">${cam.status || '🟢 Live'}</span>
+        <span class="webcam-provider-badge">🏔️ ${cam.providerName || 'bergfex'}</span>
+        <img src="${liveThumb}" alt="${cam.title}" class="webcam-thumb" loading="lazy" ${backupAttr}
+             onerror="if (this.dataset.backup && this.dataset.triedBackup !== '1') { this.dataset.triedBackup = '1'; this.src = this.dataset.backup; } else { this.onerror = null; this.src = '${cam.thumbUrl}'; }">
       </div>
       <div class="webcam-card-info">
         <span class="webcam-title">${cam.title}</span>
@@ -342,9 +345,28 @@ export function openWebcamModal(cam) {
     const liveSrc = cam.highResUrl || cam.thumbUrl;
     img.src = `${liveSrc}${liveSrc.includes('?') ? '&' : '?'}t=${Date.now()}`;
     img.alt = cam.title;
+    img.onerror = () => {
+      if (cam.backupThumbUrl && img.src !== cam.backupThumbUrl) {
+        img.src = cam.backupThumbUrl;
+      }
+    };
   }
-  if (meta) meta.innerText = `Blickrichtung: ${cam.viewDir} • Kamerastation auf ${cam.elevation} • ${cam.status}`;
-  if (link) link.href = cam.streamUrl;
+  if (meta) {
+    meta.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+        <span><strong>Höhe:</strong> ${cam.elevation} • <strong>Blickrichtung:</strong> ${cam.viewDir}</span>
+        <span style="font-size:11px; font-weight:700; color:#38bdf8; background:rgba(56,189,248,0.14); padding:2px 8px; border-radius:12px; border:1px solid rgba(56,189,248,0.25);">
+          🏔️ ${cam.providerName || 'bergfex Live'}
+        </span>
+      </div>
+    `;
+  }
+  if (link) {
+    link.href = cam.streamUrl;
+    link.innerText = cam.provider === 'bergfex' 
+      ? '🔗 Auf bergfex.de in voller Auflösung ansehen' 
+      : '🔗 Zur offiziellen Livecam-Seite';
+  }
 
   modal.style.display = 'flex';
 }

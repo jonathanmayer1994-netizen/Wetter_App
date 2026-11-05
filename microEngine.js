@@ -3441,254 +3441,535 @@ export const MicroEngine = {
   },
 
   /**
-   * STUFE 10: Alpine Live-Webcams (Matterhorn, Zugspitze, Mont Blanc, Dolomiten etc.)
+   * STUFE 10: Alpine Live-Webcams (Primär Bergfex-Anbindung mit Live-Stream & HD-Bildern)
+   * Nutzt Bergfex Webcams wo immer möglich inklusive intelligenter Umkreis- & Koordinaten-Zuordnung.
    */
   getMountainWebcams(mountainName, lat, lon) {
     const registry = {
-      'matterhorn': [
-        {
-          id: 'cam-mh-live',
-          title: 'Matterhorn (4.478 m) • Live-Blick Zermatt',
-          elevation: '4.478 m',
-          viewDir: 'Südwest (SW)',
-          thumbUrl: 'https://www.zermatt.net/graphics/lc/matterhorn.jpg',
-          streamUrl: 'https://www.zermatt.ch/webcam',
-          status: '🟢 Live'
-        },
-        {
-          id: 'cam-mh-dorf',
-          title: 'Zermatt Dorf & Bahnhof (1.620 m)',
-          elevation: '1.620 m',
-          viewDir: 'Bahnhofstrasse',
-          thumbUrl: 'https://www.zermatt.net/graphics/lc25/bahnhof.jpg',
-          streamUrl: 'https://www.zermatt.ch/webcam',
-          status: '🟢 Live'
-        },
-        {
-          id: 'cam-mh-alpin',
-          title: 'Walliser Hochalpen & Gletschermeer',
-          elevation: '3.195 m',
-          viewDir: 'Gletscherblick',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/becherhaus/current/720.jpg',
-          streamUrl: 'https://www.zermatt.ch/webcam',
-          status: '🟢 Live HD'
-        }
-      ],
-      'zugspitze': [
-        {
-          id: 'cam-zs-gipfel',
-          title: 'Zugspitzgipfel (2.962 m) • Panoramablick',
-          elevation: '2.962 m',
-          viewDir: '360° Rundumblick',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/720.jpg',
-          highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/1200.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-zs-platt',
-          title: 'Zugspitzplatt & Gletscher (2.600 m)',
-          elevation: '2.600 m',
-          viewDir: 'Südost (SO)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-sued/current/720.jpg',
-          highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-sued/current/1200.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-sued/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-zs-eibsee',
-          title: 'Zugspitz-Nordwand & Eibseeblick (2.962 m)',
-          elevation: '2.962 m',
-          viewDir: 'Nord (N) auf Eibsee',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-nord/current/720.jpg',
-          highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-nord/current/1200.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-nord/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-zs-ost',
-          title: 'Jubiläumsgrat & Höllental (2.962 m)',
-          elevation: '2.962 m',
-          viewDir: 'Ost (O)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-ost/current/720.jpg',
-          highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-ost/current/1200.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-ost/',
-          status: '🟢 Live HD'
-        }
-      ],
-      'watzmann': [
-        {
-          id: 'cam-wm-ostwand',
-          title: 'Watzmann Ostwand & Hocheck (Blick Graflhöhe 950 m)',
-          elevation: '950 m',
-          viewDir: 'Südwest (SW) auf Watzmann',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/windbeutelbaron/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/windbeutelbaron/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-wm-jenner',
-          title: 'Jenner Bergstation (1.800 m) • Berchtesgadener Alpen',
-          elevation: '1.800 m',
-          viewDir: 'Nordost (NO)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/jenner-ost/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/jenner-ost/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-wm-jenner-sued',
-          title: 'Jenner Süd (1.800 m) • Hagengebirge & Steinernes Meer',
-          elevation: '1.800 m',
-          viewDir: 'Süd (S)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/jenner-sued/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/jenner-sued/',
-          status: '🟢 Live HD'
-        }
-      ],
-      'nebelhorn': [
-        {
-          id: 'cam-nh-gipfel',
-          title: 'Nebelhornbahn Gipfel (2.224 m) • Allgäuer Hochalpen',
-          elevation: '2.224 m',
-          viewDir: 'Südost (SO)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-nh-zugspitze',
-          title: 'Zugspitzgipfel (2.962 m) • Wetterstein-Referenz',
-          elevation: '2.962 m',
-          viewDir: '360° Panorama',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/',
-          status: '🟢 Live HD'
-        }
-      ],
-      'gruenten': [
-        {
-          id: 'cam-gr-gipfel',
-          title: 'Grünten Jägerdenkmal (1.738 m) • Allgäuer Wächter',
-          elevation: '1.738 m',
-          viewDir: 'Süd-Südwest (SSW)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/gruenten/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/gruenten/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-gr-nebelhorn',
-          title: 'Nebelhorn Gipfel (2.224 m) • Allgäuer Hochalpen',
-          elevation: '2.224 m',
-          viewDir: 'Südost (SO)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/',
-          status: '🟢 Live HD'
-        }
-      ],
-      'grossglockner': [
-        {
-          id: 'cam-gg-freiwand',
-          title: 'Großglockner (3.798 m) & Pasterzengletscher',
-          elevation: '2.369 m',
-          viewDir: 'Nordwest (NW) auf Glockner',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/freiwandeck/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/freiwandeck/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-gg-sued',
-          title: 'Großglockner Südwand (Glocknerwinkel 1.984 m)',
-          elevation: '1.984 m',
-          viewDir: 'Nord (N)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/glocknerwinkel/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/glocknerwinkel/',
-          status: '🟢 Live HD'
-        }
-      ],
-      'wendelstein': [
-        {
-          id: 'cam-ws-ost',
-          title: 'Wendelstein Ostgipfel (1.838 m) • Voralpenland',
-          elevation: '1.838 m',
-          viewDir: 'Ost (O)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-ost/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-ost/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-ws-west',
-          title: 'Wendelstein Westblick (1.838 m) • Mangfallgebirge',
-          elevation: '1.838 m',
-          viewDir: 'West (W)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-west/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-west/',
-          status: '🟢 Live HD'
-        }
-      ],
-      'kronplatz': [
-        {
-          id: 'cam-kp-gipfel',
-          title: 'Kronplatz Gipfel (2.275 m) • 360° Dolomiten-Rundblick',
-          elevation: '2.275 m',
-          viewDir: 'Rundumblick',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/kronplatz/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/kronplatz/',
-          status: '🟢 Live HD'
-        },
-        {
-          id: 'cam-rit-rosengarten',
-          title: 'Ritten (2.260 m) • Blick auf Rosengarten & Schlern',
-          elevation: '2.260 m',
-          viewDir: 'Südost (SO)',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/ritten/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/ritten/',
-          status: '🟢 Live HD'
-        }
-      ],
-      'innsbruck': [
-        {
-          id: 'cam-ibk-nordkette',
-          title: 'Innsbruck Nordkette & Hafelekar (1.905 m)',
-          elevation: '1.905 m',
-          viewDir: 'Süd (S) auf Stadt & Stubaier Alpen',
-          thumbUrl: 'https://www.foto-webcam.eu/webcam/innsbruck/current/720.jpg',
-          streamUrl: 'https://www.foto-webcam.eu/webcam/innsbruck/',
-          status: '🟢 Live HD'
-        }
-      ]
+      'nebelhorn': {
+        name: 'Nebelhorn & Allgäuer Alpen',
+        lat: 47.41,
+        lon: 10.31,
+        cams: [
+          {
+            id: 'bf-14104',
+            title: 'Nebelhorn Gipfelstation (2.224 m) • Allgäu',
+            elevation: '2.224 m',
+            viewDir: 'Südost (SO) • 400-Gipfel-Alpenrundblick',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14104',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14104',
+            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14104/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/current/720.jpg',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-14105',
+            title: 'Fellhorn Gipfelstation (1.967 m) • Oberstdorf',
+            elevation: '1.967 m',
+            viewDir: 'Südwest (SW) • Blumenberg & Kleinwalsertal',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14105',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14105',
+            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14105/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/fellhorn/current/720.jpg',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-14106',
+            title: 'Kanzelwand Bergstation (1.957 m) • Allgäu/Riezlern',
+            elevation: '1.957 m',
+            viewDir: 'Nordost (NO) • Riezlern & Allgäuer Hauptkamm',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14106',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14106',
+            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14106/',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-14107',
+            title: 'Walmendingerhorn (1.996 m) • Berg der Sinne',
+            elevation: '1.996 m',
+            viewDir: 'West (W) • Großer Widderstein & Ifenmassiv',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14107',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14107',
+            streamUrl: 'https://www.bergfex.at/sommer/kleinwalsertal/webcams/c14107/',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-14108',
+            title: 'Söllereck Bergstation (1.400 m) • Oberstdorf',
+            elevation: '1.400 m',
+            viewDir: 'Ost (O) • Stillachtal & Höfatsblick',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14108',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14108',
+            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14108/',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'zugspitze': {
+        name: 'Zugspitze & Wettersteingebirge',
+        lat: 47.42,
+        lon: 10.98,
+        cams: [
+          {
+            id: 'bf-1583',
+            title: 'Zugspitzgipfel (2.962 m) • Panoramablick',
+            elevation: '2.962 m',
+            viewDir: '360° Rundumblick • Höchster Punkt Deutschlands',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1583',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1583',
+            streamUrl: 'https://www.bergfex.de/sommer/garmisch-partenkirchen/webcams/c1583/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-1586',
+            title: 'Zugspitzplatt & Gletscher (2.600 m)',
+            elevation: '2.600 m',
+            viewDir: 'Südost (SO) • Sonnalpin & Schneeferner',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1586',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1586',
+            streamUrl: 'https://www.bergfex.de/sommer/garmisch-partenkirchen/webcams/c1586/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-sued/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-1587',
+            title: 'Alpspitze & Osterfelderkopf (2.050 m)',
+            elevation: '2.050 m',
+            viewDir: 'AlpspiX • Höllental & Alpspitz-Nordwand',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1587',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1587',
+            streamUrl: 'https://www.bergfex.de/sommer/garmisch-partenkirchen/webcams/c1587/',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-1589',
+            title: 'Eibseeblick & Zugspitzmassiv (973 m)',
+            elevation: '973 m',
+            viewDir: 'Nord (N) auf den kristallklaren Eibsee',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1589',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1589',
+            streamUrl: 'https://www.bergfex.de/sommer/garmisch-partenkirchen/webcams/c1589/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze-nord/current/720.jpg',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'watzmann': {
+        name: 'Watzmann & Berchtesgadener Land',
+        lat: 47.55,
+        lon: 12.92,
+        cams: [
+          {
+            id: 'bf-10218',
+            title: 'Watzmannhaus & Hocheck (1.930 m)',
+            elevation: '1.930 m',
+            viewDir: 'Südwest (SW) auf Watzmann Ostwand & Grat',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=10218',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=10218',
+            streamUrl: 'https://www.bergfex.de/sommer/berchtesgaden/webcams/c10218/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/windbeutelbaron/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-10219',
+            title: 'Jenner Bergstation (1.800 m) • Königssee',
+            elevation: '1.800 m',
+            viewDir: 'Blick auf Königssee & Berchtesgadener Alpen',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=10219',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=10219',
+            streamUrl: 'https://www.bergfex.de/sommer/berchtesgaden/webcams/c10219/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/jenner-ost/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-10220',
+            title: 'Roßfeld Panoramastraße (1.540 m)',
+            elevation: '1.540 m',
+            viewDir: 'Hoher Göll & Salzburger Becken',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=10220',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=10220',
+            streamUrl: 'https://www.bergfex.de/sommer/berchtesgaden/webcams/c10220/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/jenner-sued/current/720.jpg',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'gruenten': {
+        name: 'Grünten & Allgäuer Voralpen',
+        lat: 47.55,
+        lon: 10.32,
+        cams: [
+          {
+            id: 'bf-14110',
+            title: 'Grünten Übelhorn (1.738 m) • Wächter des Allgäus',
+            elevation: '1.738 m',
+            viewDir: 'Südwest (SW) • 360° Allgäu- & Alpenblick',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14110',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14110',
+            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14110/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/gruenten/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-14112',
+            title: 'Mittagberg Immenstadt (1.451 m)',
+            elevation: '1.451 m',
+            viewDir: 'Nagelfluhkette & Großer Alpsee',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14112',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14112',
+            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14112/',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-14111',
+            title: 'Ofterschwang & Gunzesried (1.300 m)',
+            elevation: '1.300 m',
+            viewDir: 'Illertal & Allgäuer Hörnergruppe',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14111',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14111',
+            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14111/',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'grossglockner': {
+        name: 'Großglockner & Hohe Tauern',
+        lat: 47.07,
+        lon: 12.69,
+        cams: [
+          {
+            id: 'bf-800',
+            title: 'Kaiser-Franz-Josefs-Höhe (2.369 m)',
+            elevation: '2.369 m',
+            viewDir: 'Großglockner Gipfel (3.798 m) & Pasterze',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=800',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=800',
+            streamUrl: 'https://www.bergfex.at/sommer/grossglockner/webcams/c800/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/freiwandeck/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-801',
+            title: 'Pasterzengletscher (2.135 m) • Großglockner',
+            elevation: '2.135 m',
+            viewDir: 'Gletscherboden & Johannisberg',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=801',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=801',
+            streamUrl: 'https://www.bergfex.at/sommer/grossglockner/webcams/c801/',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-950',
+            title: 'Glocknerwinkel & Kals (1.984 m)',
+            elevation: '1.984 m',
+            viewDir: 'Glockner Südwand & Ködnitztal',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=950',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=950',
+            streamUrl: 'https://www.bergfex.at/sommer/grossglockner/webcams/c950/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/glocknerwinkel/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-802',
+            title: 'Heiligenblut am Großglockner (1.301 m)',
+            elevation: '1.301 m',
+            viewDir: 'Wallfahrtskirche & Nationalpark Hohe Tauern',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=802',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=802',
+            streamUrl: 'https://www.bergfex.at/sommer/grossglockner/webcams/c802/',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'wendelstein': {
+        name: 'Wendelstein & Mangfallgebirge',
+        lat: 47.70,
+        lon: 12.01,
+        cams: [
+          {
+            id: 'bf-1585',
+            title: 'Wendelstein Gipfel (1.838 m) • Inntalblick',
+            elevation: '1.838 m',
+            viewDir: 'Ost (O) • Chiemgauer Alpen & Kaisergebirge',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1585',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1585',
+            streamUrl: 'https://www.bergfex.de/sommer/wendelstein/webcams/c1585/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-ost/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-1588',
+            title: 'Wendelstein Westblick (1.838 m)',
+            elevation: '1.838 m',
+            viewDir: 'West (W) • Mangfallgebirge & Schliersee',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1588',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1588',
+            streamUrl: 'https://www.bergfex.de/sommer/wendelstein/webcams/c1588/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/wendelstein-west/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'innsbruck': {
+        name: 'Innsbruck & Stubaier Alpen',
+        lat: 47.26,
+        lon: 11.39,
+        cams: [
+          {
+            id: 'bf-1412',
+            title: 'Innsbruck Patscherkofel (1.965 m)',
+            elevation: '1.965 m',
+            viewDir: 'Blick über Innsbruck, Inntal & Nordkette',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1412',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1412',
+            streamUrl: 'https://www.bergfex.at/sommer/innsbruck/webcams/c1412/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/innsbruck/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-1415',
+            title: 'Stubaier Gletscher / Schaufeljoch (3.170 m)',
+            elevation: '3.170 m',
+            viewDir: 'Top of Tyrol • Stubaier Hochalpen',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1415',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1415',
+            streamUrl: 'https://www.bergfex.at/sommer/stubaier-gletscher/webcams/c1415/',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'kronplatz': {
+        name: 'Kronplatz & Dolomiten',
+        lat: 46.74,
+        lon: 11.95,
+        cams: [
+          {
+            id: 'bf-3101',
+            title: 'Kronplatz Gipfel & Concordia (2.275 m)',
+            elevation: '2.275 m',
+            viewDir: '360° Rundumblick • Dolomiten Welterbe',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=3101',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=3101',
+            streamUrl: 'https://www.bergfex.it/sommer/kronplatz/webcams/c3101/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/kronplatz/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-3105',
+            title: 'Ritten Rosengarten & Schlern (2.260 m)',
+            elevation: '2.260 m',
+            viewDir: 'Südost (SO) • UNESCO Welterbe Dolomiten',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=3105',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=3105',
+            streamUrl: 'https://www.bergfex.it/sommer/kronplatz/webcams/c3105/',
+            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/ritten/current/720.jpg',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'schladming': {
+        name: 'Dachstein & Schladming',
+        lat: 47.45,
+        lon: 13.62,
+        cams: [
+          {
+            id: 'bf-1601',
+            title: 'Dachstein Gletscher Skywalk (2.700 m)',
+            elevation: '2.700 m',
+            viewDir: 'Dachstein Skywalk • Hängebrücke',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1601',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1601',
+            streamUrl: 'https://www.bergfex.at/sommer/dachstein-gletscher/webcams/c1601/',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-1602',
+            title: 'Planai Schladming (1.900 m)',
+            elevation: '1.900 m',
+            viewDir: 'Blick auf Ennstal & Dachstein-Südwand',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1602',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1602',
+            streamUrl: 'https://www.bergfex.at/sommer/schladming-planai/webcams/c1602/',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'ischgl': {
+        name: 'Ischgl & Silvretta',
+        lat: 46.97,
+        lon: 10.28,
+        cams: [
+          {
+            id: 'bf-1151',
+            title: 'Ischgl Idalp (2.320 m) • Silvretta Arena',
+            elevation: '2.320 m',
+            viewDir: 'Silvretta Arena • Grenze AT / CH',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=1151',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=1151',
+            streamUrl: 'https://www.bergfex.at/sommer/ischgl/webcams/c1151/',
+            status: '🟢 Live HD • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      },
+      'matterhorn': {
+        name: 'Matterhorn & Zermatt',
+        lat: 45.97,
+        lon: 7.74,
+        cams: [
+          {
+            id: 'bf-2962',
+            title: 'Matterhorn Glacier Paradise (3.883 m)',
+            elevation: '3.883 m',
+            viewDir: 'Klein Matterhorn & Theodulgletscher',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=2962',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=2962',
+            streamUrl: 'https://www.bergfex.ch/sommer/zermatt/webcams/c2962/',
+            backupThumbUrl: 'https://www.zermatt.net/graphics/lc/matterhorn.jpg',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          },
+          {
+            id: 'bf-2963',
+            title: 'Zermatt Gornergrat (3.089 m)',
+            elevation: '3.089 m',
+            viewDir: 'Monte Rosa & Gornergletscher',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=2963',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=2963',
+            streamUrl: 'https://www.bergfex.ch/sommer/zermatt/webcams/c2963/',
+            backupThumbUrl: 'https://www.zermatt.net/graphics/lc25/bahnhof.jpg',
+            status: '🟢 Live • bergfex',
+            provider: 'bergfex',
+            providerName: 'bergfex Livecam'
+          }
+        ]
+      }
     };
 
     const key = (mountainName || '').toLowerCase();
-    if (key.includes('matterhorn') || key.includes('zermatt')) return registry['matterhorn'];
-    if (key.includes('zugspitze') || key.includes('garmisch')) return registry['zugspitze'];
-    if (key.includes('watzmann') || key.includes('berchtesgaden')) return registry['watzmann'];
-    if (key.includes('nebelhorn') || key.includes('oberstdorf')) return registry['nebelhorn'];
-    if (key.includes('gruenten') || key.includes('grünten') || key.includes('rettenberg') || key.includes('burgberg')) return registry['gruenten'];
-    if (key.includes('glockner')) return registry['grossglockner'];
-    if (key.includes('wendelstein')) return registry['wendelstein'];
-    if (key.includes('bozen') || key.includes('meran') || key.includes('dolomit') || key.includes('kronplatz')) return registry['kronplatz'];
-    if (key.includes('innsbruck')) return registry['innsbruck'];
 
-    // Fallback: Echte alpine Referenz-Webcams (Zugspitze & Nebelhorn)
+    // 1. Direkte Keyword-Treffer nach Bergnamen / Region
+    if (key.includes('matterhorn') || key.includes('zermatt')) return registry['matterhorn'].cams;
+    if (key.includes('zugspitze') || key.includes('garmisch') || key.includes('wetterstein') || key.includes('grainau')) return registry['zugspitze'].cams;
+    if (key.includes('watzmann') || key.includes('berchtesgaden') || key.includes('königssee') || key.includes('koenigssee')) return registry['watzmann'].cams;
+    if (key.includes('nebelhorn') || key.includes('oberstdorf') || key.includes('fellhorn') || key.includes('kanzelwand') || key.includes('kleinwalsertal')) return registry['nebelhorn'].cams;
+    if (key.includes('gruenten') || key.includes('grünten') || key.includes('rettenberg') || key.includes('burgberg') || key.includes('immenstadt') || key.includes('sonthofen')) return registry['gruenten'].cams;
+    if (key.includes('glockner') || key.includes('heiligenblut') || key.includes('kals')) return registry['grossglockner'].cams;
+    if (key.includes('wendelstein') || key.includes('bayrischzell') || key.includes('brannenburg') || key.includes('sudelfeld')) return registry['wendelstein'].cams;
+    if (key.includes('bozen') || key.includes('meran') || key.includes('dolomit') || key.includes('kronplatz') || key.includes('bruneck')) return registry['kronplatz'].cams;
+    if (key.includes('innsbruck') || key.includes('nordkette') || key.includes('stubai')) return registry['innsbruck'].cams;
+    if (key.includes('dachstein') || key.includes('schladming') || key.includes('planai')) return registry['schladming'].cams;
+    if (key.includes('ischgl') || key.includes('silvretta') || key.includes('galtür')) return registry['ischgl'].cams;
+
+    // 2. Intelligente Geodistanz-Zuordnung (Haversine-Formel)
+    if (typeof lat === 'number' && typeof lon === 'number' && !isNaN(lat) && !isNaN(lon)) {
+      let nearestKey = null;
+      let minDistance = Infinity;
+
+      for (const [rKey, entry] of Object.entries(registry)) {
+        const dLat = (entry.lat - lat) * Math.PI / 180;
+        const dLon = (entry.lon - lon) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat * Math.PI / 180) * Math.cos(entry.lat * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const distKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        if (distKm < minDistance) {
+          minDistance = distKm;
+          nearestKey = rKey;
+        }
+      }
+
+      // Wenn Standort innerhalb von 80 km zu einer alpinen Bergfex-Region liegt
+      if (nearestKey && minDistance <= 80) {
+        return registry[nearestKey].cams;
+      }
+    }
+
+    // 3. Fallback: Echte alpine Referenz-Webcams (Zugspitze & Nebelhorn via Bergfex)
     return [
       {
-        id: 'cam-ref-zs',
+        id: 'bf-ref-zs',
         title: `Alpine Referenz-Livecam (Zugspitze 2.962 m)`,
         elevation: '2.962 m',
-        viewDir: '360° Panorama',
-        thumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/720.jpg',
-        highResUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/1200.jpg',
-        streamUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/',
-        status: '🟢 Live HD'
+        viewDir: '360° Panorama • Wettersteingebirge',
+        thumbUrl: 'https://images.bergfex.at/webcams/?id=1583',
+        highResUrl: 'https://images.bergfex.at/webcams/?id=1583',
+        streamUrl: 'https://www.bergfex.de/sommer/garmisch-partenkirchen/webcams/c1583/',
+        backupThumbUrl: 'https://www.foto-webcam.eu/webcam/zugspitze/current/720.jpg',
+        status: '🟢 Live HD • bergfex',
+        provider: 'bergfex',
+        providerName: 'bergfex Livecam'
       },
       {
-        id: 'cam-ref-nh',
+        id: 'bf-ref-nh',
         title: `Alpine Referenz-Livecam (Nebelhorn 2.224 m)`,
         elevation: '2.224 m',
-        viewDir: 'Südost (SO)',
-        thumbUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/current/720.jpg',
-        streamUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/',
-        status: '🟢 Live HD'
+        viewDir: 'Südost (SO) • Allgäuer Hochalpen',
+        thumbUrl: 'https://images.bergfex.at/webcams/?id=14104',
+        highResUrl: 'https://images.bergfex.at/webcams/?id=14104',
+        streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14104/',
+        backupThumbUrl: 'https://www.foto-webcam.eu/webcam/nebelhorn/current/720.jpg',
+        status: '🟢 Live HD • bergfex',
+        provider: 'bergfex',
+        providerName: 'bergfex Livecam'
       }
     ];
   },
