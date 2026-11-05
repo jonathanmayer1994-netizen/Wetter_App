@@ -87,16 +87,19 @@ def run_mobile_tests():
         topbar_box = page.locator("#map-floating-topbar").bounding_box()
         report("Floating topbar does not overlap close button", topbar_box is not None and close_box is not None and topbar_box["x"] + topbar_box["width"] <= close_box["x"] + 2)
         
-        # Check Zoom Dock (placed above radar player without collision!)
-        zoom_box = page.locator("#map-floating-zoom-dock").bounding_box()
-        report("Floating zoom dock is visible and positioned on right edge", zoom_box is not None and zoom_box["x"] > 300)
+        # Check Layer Pill (Sleek Apple Weather / Windy style pill)
+        layer_pill_visible = page.is_visible("#map-layer-pill")
+        report("Map layer trigger pill is visible", layer_pill_visible)
+
+        # Check Zoom Dock cleanly removed as requested by user
+        report("Floating zoom dock is cleanly removed from mobile map", not page.is_visible("#map-floating-zoom-dock"))
         
         # Check Radar Timeline Player
         radar_box = page.locator("#radar-floating-controls").bounding_box()
         report("Radar player is docked at the bottom of the screen", radar_box is not None and abs(radar_box["y"] + radar_box["height"] - viewport_h) <= 15)
         
-        # Verify Zoom Dock and Radar Player do NOT collide vertically
-        report("Zoom dock is cleanly positioned above radar player", zoom_box is not None and radar_box is not None and zoom_box["y"] + zoom_box["height"] <= radar_box["y"] + 20)
+        # Verify Topbar and Radar Player do NOT collide vertically
+        report("Topbar is cleanly positioned above radar player", topbar_box is not None and radar_box is not None and topbar_box["y"] + topbar_box["height"] < radar_box["y"])
 
         # Screenshot 1: Precip / Radar Fullscreen Mobile View
         screenshot_path_1 = "mobile_map_fullscreen_radar.png"
@@ -104,8 +107,18 @@ def run_mobile_tests():
         print(f"  📸 Captured screenshot: {screenshot_path_1}")
         
         print("\n--- TEST: Wind Overlay & Mobile Wind Compass Ergonomics ---")
+        # Open drawer via pill
+        page.click("#map-layer-pill")
+        page.wait_for_timeout(300)
+        report("Map layer drawer opens on pill click", page.is_visible("#map-layer-drawer"))
+        
+        # Select wind overlay inside drawer
         page.click(".map-overlay-btn[data-overlay='wind']")
-        page.wait_for_timeout(600)
+        page.wait_for_timeout(300)
+
+        # Close drawer to inspect map with compass
+        page.click("#map-layer-close-btn")
+        page.wait_for_timeout(300)
         
         compass_visible = page.is_visible("#map-wind-compass-widget")
         report("Wind Compass widget is visible on Wind overlay", compass_visible)
@@ -126,9 +139,13 @@ def run_mobile_tests():
         print(f"  📸 Captured screenshot: {screenshot_path_2}")
 
         print("\n--- TEST: Zero-Collision Floating Cards & Streamlined Timeline Scrubber ---")
-        # Switch back to precip overlay
+        # Switch back to precip overlay via drawer
+        page.click("#map-layer-pill")
+        page.wait_for_timeout(250)
         page.click(".map-overlay-btn[data-overlay='precip']")
-        page.wait_for_timeout(400)
+        page.wait_for_timeout(200)
+        page.click("#map-layer-close-btn")
+        page.wait_for_timeout(250)
 
         # Trigger point weather card by tapping map center
         page.mouse.click(190, 360)

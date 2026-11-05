@@ -4991,85 +4991,350 @@ body {
 }
 
 /* =============================================================================
- * FLOATING TOP DOCK (WETTER-EBENEN & KARTENSTILE — APPLE WEATHER / WINDY STYLE)
+ * FLOATING TOP DOCK: APPLE WEATHER / WINDY STYLE LAYER PILL & DRAWER
  * ============================================================================= */
 .map-floating-topbar {
   position: absolute;
   top: 14px;
   left: 14px;
-  right: 14px;
   z-index: 500;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+}
+
+.map-layer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background: rgba(15, 23, 42, 0.90);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 9999px;
   padding: 7px 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  overflow-x: auto;
-  scrollbar-width: none;
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.40);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.map-floating-topbar::-webkit-scrollbar {
-  display: none;
+.map-layer-pill:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
 }
 
-.mft-group {
+.map-layer-pill.active,
+.map-layer-pill[aria-expanded="true"] {
+  border-color: #38bdf8;
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35), 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.mlp-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.mlp-text {
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.mlp-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.16);
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.mlp-chevron {
+  font-size: 10px;
+  color: #94a3b8;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-block;
+}
+
+.map-layer-pill.active .mlp-chevron,
+.map-layer-pill[aria-expanded="true"] .mlp-chevron {
+  transform: rotate(180deg);
+}
+
+/* Layer Backdrop */
+.map-layer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100005;
+  transition: opacity 0.25s ease;
+}
+
+/* Layer & Kartenstil Drawer */
+.map-layer-drawer {
+  position: absolute;
+  top: 58px;
+  left: 14px;
+  width: 380px;
+  max-width: calc(100vw - 28px);
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  border-radius: 20px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  z-index: 100010;
+  overflow: hidden;
+  animation: mldPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mldPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mld-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.mft-divider {
-  width: 1px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.15);
-  margin: 0 4px;
-  flex-shrink: 0;
+.mld-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.mft-label {
-  font-size: 10px;
-  font-weight: 800;
+.mld-icon {
+  font-size: 20px;
+}
+
+.mld-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.mld-subtitle {
+  font-size: 11px;
+  color: #94a3b8;
+  display: block;
+  margin-top: 2px;
+}
+
+.mld-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.mld-close-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.mld-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: calc(82vh - 120px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.mld-section-header {
+  margin-bottom: 8px;
+}
+
+.mld-section-label {
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  color: var(--text-tertiary);
-  letter-spacing: 0.5px;
-  margin-right: 2px;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+}
+
+.mld-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
 }
 
 .map-overlay-btn,
 .map-base-btn {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   color: #cbd5e1;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  white-space: nowrap;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .map-overlay-btn:hover,
 .map-base-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.10);
   border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  transform: translateY(-1px);
 }
 
 .map-overlay-btn.active,
 .map-base-btn.active {
-  background: var(--ios-blue);
-  border-color: var(--ios-blue);
+  background: rgba(14, 165, 233, 0.16);
+  border-color: #38bdf8;
   color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4) inset;
+}
+
+.mob-icon,
+.mbb-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.mob-text,
+.mbb-text {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.mob-name,
+.mbb-name {
+  font-size: 12px;
   font-weight: 700;
-  box-shadow: 0 2px 10px rgba(10, 132, 255, 0.45);
+  color: #f1f5f9;
+  line-height: 1.2;
+}
+
+.map-overlay-btn.active .mob-name,
+.map-base-btn.active .mbb-name {
+  color: #38bdf8;
+}
+
+.mob-desc,
+.mbb-desc {
+  font-size: 10px;
+  color: #64748b;
+  line-height: 1.2;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mob-check,
+.mbb-check {
+  font-size: 12px;
+  font-weight: 800;
+  color: transparent;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: color 0.15s ease;
+}
+
+.map-overlay-btn.active .mob-check,
+.map-base-btn.active .mbb-check {
+  color: #38bdf8;
+}
+
+.mld-actions-flex {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mld-action-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mld-action-chip:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mld-footer {
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.mld-done-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.mld-done-btn:hover {
+  background: #0369a1;
+}
+
+/* Redundant Right Dock Cleanly Removed */
+.map-floating-zoom-dock {
+  display: none !important;
 }
 
 .map-legend-card {
@@ -5145,23 +5410,10 @@ body {
 }
 
 /* =============================================================================
- * FLOATING MAP ZOOM & ACTION CONTROLS DOCK (APPLE LIQUID GLASS)
+ * FLOATING MAP ZOOM & ACTION CONTROLS DOCK (REMOVED — PINCH-TO-ZOOM / CLEAN)
  * ============================================================================= */
 .map-floating-zoom-dock {
-  position: absolute;
-  top: 170px;
-  right: 14px;
-  z-index: 450;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
-  padding: 5px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  display: none !important;
 }
 
 .map-zoom-action-btn {
@@ -7944,76 +8196,58 @@ body {
     line-height: 1;
   }
 
-  /* 1. Mobile Floating Topbar (Wetter-Overlays & Basiskarten) */
+  /* 1. Mobile Floating Topbar: Single Layer Trigger Pill (Zero Overflow, Zero Clutter) */
   .map-floating-topbar {
     position: fixed;
     top: calc(env(safe-area-inset-top, 20px) + 12px);
     left: 12px;
-    right: 68px; /* Lässt Freiraum für den 44px Schließen-Button */
+    right: auto;
     z-index: 100002;
-    padding: 5px 8px;
-    gap: 6px;
+    padding: 0;
+    gap: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .map-layer-pill {
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 9999px;
     background: rgba(15, 23, 42, 0.92);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 24px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    isolation: isolate;
-    transform: translateZ(0);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
   }
 
-  .map-floating-topbar::-webkit-scrollbar {
-    display: none;
+  /* Mobile Bottom Sheet for Ebenen & Kartenstil */
+  .map-layer-drawer {
+    position: fixed !important;
+    top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 16px) + 10px) !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 80vh !important;
+    border-radius: 24px !important;
+    z-index: 100010 !important;
+    animation: slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
   }
 
-  .mft-group {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
+  @keyframes slideUpSheet {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
-  .mft-divider {
-    width: 1px;
-    height: 16px;
-    background: rgba(255, 255, 255, 0.15);
-    margin: 0 2px;
-    flex-shrink: 0;
-  }
-
-  .mft-label {
-    font-size: 9.5px;
-    font-weight: 800;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
-    letter-spacing: 0.4px;
-    margin-right: 2px;
-  }
-
-  .map-overlay-btn,
-  .map-base-btn {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 5px 10px;
-    min-height: 32px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.06);
-    color: #e2e8f0;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .map-overlay-btn.active,
-  .map-base-btn.active {
-    background: rgba(56, 189, 248, 0.28);
-    border-color: rgba(56, 189, 248, 0.7);
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+  .map-layer-backdrop {
+    position: fixed !important;
+    z-index: 100008 !important;
   }
 
   /* 2. Floating HUD: Windkompass (Oben links) & Point Weather Card (Unten links über Player) */
@@ -8234,21 +8468,9 @@ body {
     padding-bottom: 0;
   }
 
-  /* 3. Floating Zoom Dock (Rechte Seite unter dem Schließen-Button verankert — Ergonomisch & Zero-Kollision) */
+  /* 3. Floating Zoom Dock cleanly removed */
   .map-floating-zoom-dock {
-    position: fixed !important;
-    top: calc(env(safe-area-inset-top, 20px) + 68px) !important;
-    bottom: auto !important;
-    right: 12px !important;
-    z-index: 100001 !important;
-    padding: 3px !important;
-    gap: 4px !important;
-    border-radius: 16px !important;
-    background: rgba(15, 23, 42, 0.88) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+    display: none !important;
   }
 
   /* Dynamische Positionierung der Point-Weather-Card bei eingeklapptem Player */

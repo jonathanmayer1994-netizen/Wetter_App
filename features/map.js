@@ -113,55 +113,93 @@ export function initLeafletMap() {
   // 6. Event-Listener für Basiskarten-Buttons (OSM)
   document.querySelectorAll('.map-base-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.map-base-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      setMapBaseLayer(btn.dataset.base);
+      const base = btn.dataset.base;
+      document.querySelectorAll('.map-base-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.base === base);
+      });
+      setMapBaseLayer(base);
     });
   });
 
   // 7. Event-Listener für Wetter-Overlay-Buttons
   document.querySelectorAll('.map-overlay-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.map-overlay-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      setMapOverlay(btn.dataset.overlay);
+      const overlay = btn.dataset.overlay;
+      document.querySelectorAll('.map-overlay-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.overlay === overlay);
+      });
+      setMapOverlay(overlay);
     });
   });
 
-  // 8. Eigene Liquid Glass Zoom- & Navigationssteuerung (+ / − / 🎯 / 🏔️)
-  const zoomInBtn = document.getElementById('map-zoom-in-btn');
-  if (zoomInBtn) {
-    zoomInBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (state.map.instance) state.map.instance.zoomIn();
-    });
+  // 8. Layer & Kartenstil Drawer Controller (Apple Weather / Windy Style)
+  const layerPill = document.getElementById('map-layer-pill');
+  const layerDrawer = document.getElementById('map-layer-drawer');
+  const layerBackdrop = document.getElementById('map-layer-backdrop');
+  const layerCloseBtn = document.getElementById('map-layer-close-btn');
+  const layerDoneBtn = document.getElementById('map-layer-done-btn');
+
+  function openMapLayerDrawer() {
+    if (layerDrawer) {
+      layerDrawer.classList.add('is-open');
+      layerDrawer.style.display = 'block';
+    }
+    if (layerBackdrop) {
+      layerBackdrop.classList.add('is-open');
+      layerBackdrop.style.display = 'block';
+    }
+    if (layerPill) {
+      layerPill.classList.add('active');
+      layerPill.setAttribute('aria-expanded', 'true');
+    }
   }
 
-  const zoomOutBtn = document.getElementById('map-zoom-out-btn');
-  if (zoomOutBtn) {
-    zoomOutBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (state.map.instance) state.map.instance.zoomOut();
-    });
+  function closeMapLayerDrawer() {
+    if (layerDrawer) {
+      layerDrawer.classList.remove('is-open');
+      layerDrawer.style.display = 'none';
+    }
+    if (layerBackdrop) {
+      layerBackdrop.classList.remove('is-open');
+      layerBackdrop.style.display = 'none';
+    }
+    if (layerPill) {
+      layerPill.classList.remove('active');
+      layerPill.setAttribute('aria-expanded', 'false');
+    }
   }
 
-  const recenterBtn = document.getElementById('map-zoom-location-btn');
-  if (recenterBtn) {
-    recenterBtn.addEventListener('click', (e) => {
+  if (layerPill) {
+    layerPill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = layerDrawer && layerDrawer.classList.contains('is-open');
+      if (isOpen) closeMapLayerDrawer();
+      else openMapLayerDrawer();
+    });
+  }
+  if (layerCloseBtn) layerCloseBtn.addEventListener('click', (e) => { e.stopPropagation(); closeMapLayerDrawer(); });
+  if (layerDoneBtn) layerDoneBtn.addEventListener('click', (e) => { e.stopPropagation(); closeMapLayerDrawer(); });
+  if (layerBackdrop) layerBackdrop.addEventListener('click', () => closeMapLayerDrawer());
+
+  // Schnell-Aktionen im Drawer
+  const mldRecenterBtn = document.getElementById('mld-recenter-btn');
+  if (mldRecenterBtn) {
+    mldRecenterBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (state.map.instance && state.currentLocation) {
         state.map.instance.panTo([state.currentLocation.lat, state.currentLocation.lon], { animate: true });
       }
+      closeMapLayerDrawer();
     });
   }
-
-  const alpsBtn = document.getElementById('map-zoom-alps-btn');
-  if (alpsBtn) {
-    alpsBtn.addEventListener('click', (e) => {
+  const mldAlpsBtn = document.getElementById('mld-alps-btn');
+  if (mldAlpsBtn) {
+    mldAlpsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (state.map.instance) {
         state.map.instance.setView([47.2, 11.5], 7, { animate: true });
       }
+      closeMapLayerDrawer();
     });
   }
 
@@ -173,6 +211,7 @@ export function initLeafletMap() {
   loadUnifiedRadarEngine();
   updateWeatherOverlay();
   updatePointWeatherCard();
+  updateMapLayerPill();
 
   // 11. Karteninteraktion (Pan & Zoom) synchronisiert das unendlich scharfe Wetterfeld
   state.map.instance.on('moveend zoomend', () => {
@@ -407,6 +446,8 @@ export function setMapBaseLayer(baseKey) {
       showUnifiedRadarFrame(state.map.radarIndex);
     }
   }
+
+  updateMapLayerPill();
 }
 
 export function getWindCardinalName(deg) {
@@ -743,6 +784,38 @@ export function setMapOverlay(overlayKey) {
   state.map.activeOverlay = overlayKey;
   updateWindCompassWidget();
   updateWeatherOverlay();
+  updateMapLayerPill();
+}
+
+/**
+ * Aktualisiert die Layer-Trigger-Pille mit aktuellem Icon und Namen
+ */
+export function updateMapLayerPill() {
+  const pillIcon = document.getElementById('mlp-icon');
+  const pillText = document.getElementById('mlp-text');
+  const pillTag = document.getElementById('mlp-tag');
+
+  const overlayMap = {
+    'precip': { icon: '🌧️', name: '48h Radar' },
+    'wind': { icon: '💨', name: 'Wind' },
+    'lightning': { icon: '⚡', name: 'Blitze' },
+    'clouds': { icon: '☁️', name: 'Wolken' },
+    'temp': { icon: '🌡️', name: 'Temperatur' },
+    'pressure': { icon: '⏲️', name: 'Luftdruck' }
+  };
+  const baseMap = {
+    'osm-outdoor': 'Topo',
+    'osm-standard': 'Standard',
+    'satellite': 'Satellit',
+    'osm-dark': 'Dunkel'
+  };
+
+  const curOverlay = overlayMap[state.map.activeOverlay] || overlayMap['precip'];
+  const curBase = baseMap[state.map.activeBase] || 'Topo';
+
+  if (pillIcon) pillIcon.innerText = curOverlay.icon;
+  if (pillText) pillText.innerText = curOverlay.name;
+  if (pillTag) pillTag.innerText = curBase;
 }
 
 /**

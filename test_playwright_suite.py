@@ -290,6 +290,11 @@ def run_tests():
         collapse_btn = page.query_selector("#radar-player-toggle-btn")
         report("Radar collapse toggle button present", collapse_btn is not None)
 
+        # Open layer drawer
+        if not page.is_visible("#map-layer-drawer"):
+            page.click("#map-layer-pill")
+            page.wait_for_timeout(200)
+
         # Test that radar controls stay visible on Wind, Wolken, Temp overlays
         page.click(".map-overlay-btn[data-overlay='wind']")
         page.wait_for_timeout(200)
@@ -398,22 +403,28 @@ def run_tests():
         report("Zero annoying white boxes or auto-open popups over user location", not page.is_visible(".leaflet-popup"))
         report("User location beacon pin is rendered on map", page.is_visible(".user-location-beacon"))
 
-        # Verify Modern Floating Zoom & Navigation Dock Controls (+ / − / 🎯 / 🏔️)
-        report("Floating Zoom Dock is visible on map", page.is_visible("#map-floating-zoom-dock"))
-        page.click("#map-zoom-in-btn")
-        page.wait_for_timeout(100)
-        report("Map zoom in (+) button operates smoothly", True)
-        page.click("#map-zoom-out-btn")
-        page.wait_for_timeout(100)
-        report("Map zoom out (−) button operates smoothly", True)
-        page.click("#map-zoom-location-btn")
+        # Verify Clunky Zoom Dock Removed as Requested & Layer Pill Present
+        report("Floating Zoom Dock cleanly removed as requested", not page.is_visible("#map-floating-zoom-dock"))
+        report("Map Layer Pill is visible on map", page.is_visible("#map-layer-pill"))
+        page.click("#map-layer-pill")
+        page.wait_for_timeout(200)
+        report("Map Layer Drawer opens on pill tap", page.is_visible("#map-layer-drawer"))
+        
+        # Test Quick Actions in Drawer
+        page.click("#mld-recenter-btn")
         page.wait_for_timeout(150)
         report("Map recenter to location (🎯) operates smoothly", True)
-        page.click("#map-zoom-alps-btn")
+        page.click("#map-layer-pill")
+        page.wait_for_timeout(150)
+        page.click("#mld-alps-btn")
         page.wait_for_timeout(150)
         report("Map Alps overview (🏔️) button operates smoothly", True)
         
-        # Verify Base Map Layers
+        # Verify Base Map Layers (re-open drawer)
+        if not page.is_visible("#map-layer-drawer"):
+            page.click("#map-layer-pill")
+            page.wait_for_timeout(150)
+
         for base in ["osm-outdoor", "osm-dark", "satellite", "osm-standard"]:
             btn = page.query_selector(f".map-base-btn[data-base='{base}']")
             report(f"Map base button '{base}' present", btn is not None)
@@ -736,6 +747,11 @@ def run_tests():
         # 5. Weather Map buttons & overlays
         page.locator(".tab-btn[data-tab='tab-map']").click(force=True)
         page.wait_for_timeout(300)
+
+        # Open layer drawer
+        if not page.is_visible("#map-layer-drawer"):
+            page.click("#map-layer-pill")
+            page.wait_for_timeout(150)
 
         for base in ["osm-outdoor", "osm-dark", "satellite", "osm-standard"]:
             page.click(f".map-base-btn[data-base='{base}']")

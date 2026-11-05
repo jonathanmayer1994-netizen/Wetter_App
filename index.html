@@ -1447,38 +1447,160 @@
               <span class="mmcb-icon">✕</span>
             </button>
 
-            <!-- 1. SLEEK FLOATING TOP DOCK (WETTER-EBENEN, KARTENSTIL & ACTIONS) -->
+            <!-- 1. SLEEK FLOATING TOP BAR: Apple Weather / Windy Style Layer Pill -->
             <div class="map-floating-topbar" id="map-floating-topbar">
-              <!-- Overlay Switcher Pills -->
-              <div class="mft-group mft-overlays">
-                <span class="mft-label">Wetter:</span>
-                <button class="map-overlay-btn active" data-overlay="precip" title="48-Stunden hochauflösender Niederschlags- & Schneefilm">🌧️❄️ 48h Radar</button>
-                <button class="map-overlay-btn" data-overlay="wind" title="Animierte Windströmung & Böen">💨 Wind</button>
-                <button class="map-overlay-btn" data-overlay="lightning" title="Live-Blitzentladungen & Gewitter-Tracker">⚡ Blitze</button>
-                <button class="map-overlay-btn" data-overlay="clouds" title="Bewölkungsgrad & Wolkenfelder">☁️ Wolken</button>
-                <button class="map-overlay-btn" data-overlay="temp" title="Temperatur-Feld & Frostgrenzen">🌡️ Temp</button>
-                <button class="map-overlay-btn" data-overlay="pressure" title="Luftdruck QNH & Isobaren">⏲️ Druck</button>
-              </div>
+              <button class="map-layer-pill" id="map-layer-pill" type="button" aria-expanded="false" aria-controls="map-layer-drawer" title="Wetterebenen und Kartenstil anpassen">
+                <span class="mlp-icon" id="mlp-icon">🌧️</span>
+                <span class="mlp-text" id="mlp-text">48h Radar</span>
+                <span class="mlp-tag" id="mlp-tag">Topo</span>
+                <span class="mlp-chevron">▾</span>
+              </button>
+            </div>
 
-              <div class="mft-divider"></div>
+            <!-- Layer Backdrop Overlay (Soft blur when layer sheet is open) -->
+            <div class="map-layer-backdrop" id="map-layer-backdrop" style="display:none;"></div>
 
-              <!-- Basiskarten Switcher Pills -->
-              <div class="mft-group mft-bases">
-                <span class="mft-label">Karte:</span>
-                <button class="map-base-btn active" data-base="osm-standard" title="OpenStreetMap Standard — Kristallklare Detailtiefe">🗺️ Standard</button>
-                <button class="map-base-btn" data-base="osm-outdoor" title="OSM Topo — Höhenlinien, Schummerung & Alpinrelief">🏔️ Topo</button>
-                <button class="map-base-btn" data-base="osm-dark" title="OSM Dunkel — Nativer High-Contrast Nachtmodus">🌙 Dunkel</button>
-                <button class="map-base-btn" data-base="satellite" title="Satelliten-Luftbild mit OSM-Beschriftung">🛰️ Satellit</button>
-              </div>
-
-              <div class="mft-divider"></div>
-
-              <!-- Action Toggles -->
-              <div class="mft-group mft-actions">
-                <button class="gpx-launch-btn" id="gpx-open-btn" title="GPX-Tour laden & Höhenprofil">🥾 GPX Tour</button>
-                <div class="map-location-chip" id="map-location-chip">
-                  <span>📍 München</span>
+            <!-- 2. LAYER & KARTENSTIL DRAWER / SHEET (Apple iOS & Windy Grade) -->
+            <div class="map-layer-drawer" id="map-layer-drawer" role="dialog" aria-modal="true" aria-labelledby="mld-title" style="display:none;">
+              <div class="mld-header">
+                <div class="mld-title-group">
+                  <span class="mld-icon">🗺️</span>
+                  <div>
+                    <h3 class="mld-title" id="mld-title">Ebenen & Kartenstil</h3>
+                    <span class="mld-subtitle">Wetterdaten und Kartendarstellung wählen</span>
+                  </div>
                 </div>
+                <button class="mld-close-btn" id="map-layer-close-btn" type="button" aria-label="Schließen">✕</button>
+              </div>
+
+              <div class="mld-body">
+                <!-- SECTION 1: WETTER-EBENEN -->
+                <div class="mld-section">
+                  <div class="mld-section-header">
+                    <span class="mld-section-label">Wetter-Ebene</span>
+                  </div>
+                  <div class="mld-grid mld-grid-overlays">
+                    <button class="map-overlay-btn active" data-overlay="precip" type="button">
+                      <span class="mob-icon">🌧️❄️</span>
+                      <div class="mob-text">
+                        <span class="mob-name">48h Radar</span>
+                        <span class="mob-desc">Regen & Schnee</span>
+                      </div>
+                      <span class="mob-check">✓</span>
+                    </button>
+
+                    <button class="map-overlay-btn" data-overlay="wind" type="button">
+                      <span class="mob-icon">💨</span>
+                      <div class="mob-text">
+                        <span class="mob-name">Wind & Böen</span>
+                        <span class="mob-desc">Strömungsfeld</span>
+                      </div>
+                      <span class="mob-check">✓</span>
+                    </button>
+
+                    <button class="map-overlay-btn" data-overlay="lightning" type="button">
+                      <span class="mob-icon">⚡</span>
+                      <div class="mob-text">
+                        <span class="mob-name">Blitze</span>
+                        <span class="mob-desc">Live-Gewitter</span>
+                      </div>
+                      <span class="mob-check">✓</span>
+                    </button>
+
+                    <button class="map-overlay-btn" data-overlay="clouds" type="button">
+                      <span class="mob-icon">☁️</span>
+                      <div class="mob-text">
+                        <span class="mob-name">Bewölkung</span>
+                        <span class="mob-desc">Wolkenfelder</span>
+                      </div>
+                      <span class="mob-check">✓</span>
+                    </button>
+
+                    <button class="map-overlay-btn" data-overlay="temp" type="button">
+                      <span class="mob-icon">🌡️</span>
+                      <div class="mob-text">
+                        <span class="mob-name">Temperatur</span>
+                        <span class="mob-desc">Höhen- & Frostgrenzen</span>
+                      </div>
+                      <span class="mob-check">✓</span>
+                    </button>
+
+                    <button class="map-overlay-btn" data-overlay="pressure" type="button">
+                      <span class="mob-icon">⏲️</span>
+                      <div class="mob-text">
+                        <span class="mob-name">Luftdruck</span>
+                        <span class="mob-desc">Isobaren & Fronten</span>
+                      </div>
+                      <span class="mob-check">✓</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- SECTION 2: KARTEN-STIL -->
+                <div class="mld-section">
+                  <div class="mld-section-header">
+                    <span class="mld-section-label">Karten-Stil</span>
+                  </div>
+                  <div class="mld-grid mld-grid-bases">
+                    <button class="map-base-btn active" data-base="osm-outdoor" type="button">
+                      <span class="mbb-icon">🏔️</span>
+                      <div class="mbb-text">
+                        <span class="mbb-name">Topo / Alpin</span>
+                        <span class="mbb-desc">Höhenlinien & Relief</span>
+                      </div>
+                      <span class="mbb-check">✓</span>
+                    </button>
+
+                    <button class="map-base-btn" data-base="osm-standard" type="button">
+                      <span class="mbb-icon">🗺️</span>
+                      <div class="mbb-text">
+                        <span class="mbb-name">Standard</span>
+                        <span class="mbb-desc">Straßen & Orte</span>
+                      </div>
+                      <span class="mbb-check">✓</span>
+                    </button>
+
+                    <button class="map-base-btn" data-base="satellite" type="button">
+                      <span class="mbb-icon">🛰️</span>
+                      <div class="mbb-text">
+                        <span class="mbb-name">Satellit</span>
+                        <span class="mbb-desc">Luftbild mit Beschriftung</span>
+                      </div>
+                      <span class="mbb-check">✓</span>
+                    </button>
+
+                    <button class="map-base-btn" data-base="osm-dark" type="button">
+                      <span class="mbb-icon">🌙</span>
+                      <div class="mbb-text">
+                        <span class="mbb-name">Dunkel</span>
+                        <span class="mbb-desc">Nachtkontrast</span>
+                      </div>
+                      <span class="mbb-check">✓</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- SECTION 3: SCHNELL-NAVIGATION & AKTIONEN -->
+                <div class="mld-section">
+                  <div class="mld-section-header">
+                    <span class="mld-section-label">Navigation & Aktionen</span>
+                  </div>
+                  <div class="mld-actions-flex">
+                    <button class="mld-action-chip" id="mld-recenter-btn" type="button">
+                      <span>🎯 Mein Standort</span>
+                    </button>
+                    <button class="mld-action-chip" id="mld-alps-btn" type="button">
+                      <span>🏔️ Alpenraum</span>
+                    </button>
+                    <button class="mld-action-chip" id="gpx-open-btn" type="button">
+                      <span>🥾 GPX Tour laden</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mld-footer">
+                <button class="mld-done-btn" id="map-layer-done-btn" type="button">✓ Fertig</button>
               </div>
             </div>
 
@@ -1563,22 +1685,7 @@
               </div>
             </div>
 
-            <!-- Floating Modern Zoom & View Controls Dock (Rechte Kartenseite) -->
-            <div class="map-floating-zoom-dock" id="map-floating-zoom-dock" role="toolbar" aria-label="Zoom- und Kartennavigation">
-              <button class="map-zoom-action-btn" id="map-zoom-in-btn" title="Karte vergrößern (+)" aria-label="Vergrößern">
-                <span class="mzb-symbol">+</span>
-              </button>
-              <button class="map-zoom-action-btn" id="map-zoom-out-btn" title="Karte verkleinern (−)" aria-label="Verkleinern">
-                <span class="mzb-symbol">−</span>
-              </button>
-              <div class="map-zoom-divider"></div>
-              <button class="map-zoom-action-btn" id="map-zoom-location-btn" title="Auf ausgewählten Standort zentrieren" aria-label="Standort zentrieren">
-                <span class="mzb-icon">🎯</span>
-              </button>
-              <button class="map-zoom-action-btn" id="map-zoom-alps-btn" title="Alpenraum-Gesamtübersicht" aria-label="Alpen-Übersicht">
-                <span class="mzb-icon">🏔️</span>
-              </button>
-            </div>
+
 
             <!-- Floating GPX Tour Active Banner -->
             <div class="gpx-active-tour-banner" id="gpx-active-tour-banner" style="display:none;">
