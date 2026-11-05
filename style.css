@@ -8895,18 +8895,26 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+  gap: 10px;
+  flex-wrap: nowrap;
+  margin-bottom: 8px;
 }
 
 .atp-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #ffffff;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.atp-title strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .atp-icon {
@@ -9662,6 +9670,34 @@ body {
   }
 
   /* Compact iPhone Studio & Metrics Tuning */
+  .alpine-drawer-summary {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+    padding: 8px 10px !important;
+  }
+
+  .alpine-drawer-summary .card-title {
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    text-transform: none !important;
+    letter-spacing: 0.2px !important;
+  }
+
+  .alpine-drawer-summary .card-tag {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    font-size: 10.5px !important;
+    padding: 3px 8px !important;
+  }
+
   .athlete-category-selector {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -9671,8 +9707,9 @@ body {
 
   .athlete-cat-card {
     padding: 6px 8px !important;
-    min-height: 48px !important;
-    border-radius: 14px !important;
+    min-height: 44px !important;
+    border-radius: 12px !important;
+    gap: 8px !important;
   }
 
   .athlete-cat-card .acc-desc {
@@ -9681,38 +9718,66 @@ body {
 
   .athlete-cat-card .acc-icon-wrap {
     font-size: 18px !important;
-    width: 30px !important;
-    height: 30px !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
   }
 
   .athlete-cat-card .acc-title {
-    font-size: 12px !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
   }
 
   .athlete-cat-card .acc-badge {
-    font-size: 9.5px !important;
-    padding: 1px 4px !important;
+    font-size: 10px !important;
+    padding: 2px 5px !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
 
   .atp-header {
-    margin-bottom: 2px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    margin-bottom: 4px !important;
+  }
+
+  .atp-title {
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
   }
 
   .atp-title strong {
     font-size: 11.5px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   .atp-stepper-wrap {
     gap: 4px !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
   }
 
   .atp-step-btn {
     padding: 2px 7px !important;
     font-size: 10.5px !important;
+    min-height: 26px !important;
+    white-space: nowrap !important;
   }
 
   .atp-live-val {
     font-size: 12px !important;
+    font-weight: 800 !important;
+    min-width: 58px !important;
+    white-space: nowrap !important;
+    text-align: center !important;
   }
 
   .atp-slider-row {

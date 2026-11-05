@@ -479,7 +479,7 @@ export function setupSportsTab() {
     if (mtnSpeedSlider) mtnSpeedSlider.value = val;
     if (mtnSpeedVal) mtnSpeedVal.innerText = `${val.toFixed(1)} km/h`;
     const badge = document.getElementById('acc-mountain-badge');
-    if (badge) badge.innerText = `${val.toFixed(1)} km/h • ${state.sports.mountainAscentHmH} Hm/h`;
+    if (badge) badge.innerText = `${val.toFixed(1)} km/h`;
 
     mtnSpeedPresets.forEach(btn => {
       btn.classList.toggle('active', Math.abs(parseFloat(btn.dataset.mtnspeed) - val) < 0.1);
@@ -521,7 +521,7 @@ export function setupSportsTab() {
     if (mtnAscentSlider) mtnAscentSlider.value = val;
     if (mtnAscentVal) mtnAscentVal.innerText = `${val} Hm/h`;
     const badge = document.getElementById('acc-mountain-badge');
-    if (badge) badge.innerText = `${state.sports.mountainSpeedKmH.toFixed(1)} km/h • ${val} Hm/h`;
+    if (badge) badge.innerText = `${state.sports.mountainSpeedKmH.toFixed(1)} km/h`;
 
     mtnAscentPresets.forEach(btn => {
       btn.classList.toggle('active', parseInt(btn.dataset.ascent, 10) === val);
@@ -1098,7 +1098,7 @@ export function updateSportPaceBadges() {
   const mAsc = state.sports.mountainAscentHmH || 400;
 
   if (bikeBadge) bikeBadge.innerText = `${bSpeed.toFixed(1)} km/h`;
-  if (mtnBadge) mtnBadge.innerText = `${mSpeed.toFixed(1)} km/h • ${mAsc} Hm/h`;
+  if (mtnBadge) mtnBadge.innerText = `${mSpeed.toFixed(1)} km/h`;
   if (bikeVal) bikeVal.innerText = `${bSpeed.toFixed(1)} km/h`;
   if (mtnSpeedVal) mtnSpeedVal.innerText = `${mSpeed.toFixed(1)} km/h`;
   if (mtnAscentVal) mtnAscentVal.innerText = `${mAsc} Hm/h`;
