@@ -383,6 +383,7 @@ export const MicroEngine = {
       "freezing_level_height",
       "shortwave_radiation",
       "global_tilted_irradiance",
+      "sunshine_duration",
       ...pressureVars,
     ].join(",");
 

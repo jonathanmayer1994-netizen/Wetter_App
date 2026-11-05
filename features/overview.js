@@ -798,17 +798,69 @@ export function render10DayForecast(daily, hourly) {
     const minVal = daily.temperature_2m_min[i];
     const maxVal = daily.temperature_2m_max[i];
 
-    // Bar positioning relative to 10-day global spectrum
-    const leftPct = Math.max(0, Math.min(85, ((minVal - gMin) / totalRange) * 100));
-    const widthPct = Math.max(14, Math.min(100 - leftPct, (((maxVal - minVal) / totalRange) * 100)));
-
-    // Dot on the bar for current temperature (today only)
-    let dotHtml = '';
-    if (isToday && curTemp !== null) {
-      const curRatio = Math.max(0, Math.min(1, (curTemp - minVal) / Math.max(0.5, maxVal - minVal)));
-      const dotLeftPct = (curRatio * 100).toFixed(1);
-      dotHtml = `<span class="daily-bar-cur-dot" style="left:${dotLeftPct}%;" title="Aktuell: ${Math.round(curTemp)}°"></span>`;
+    // Sunshine hours & daylight duration calculations
+    let sunDurSec = daily.sunshine_duration ? (daily.sunshine_duration[i] || 0) : 0;
+    const daylightSec = daily.daylight_duration ? (daily.daylight_duration[i] || 0) : 0;
+    if (sunDurSec === 0 && hourly && hourly.sunshine_duration) {
+      let sumSec = 0;
+      for (let h = 0; h < 24; h++) {
+        const idx = (i * 24) + h;
+        if (hourly.sunshine_duration[idx] > 0) sumSec += hourly.sunshine_duration[idx];
+      }
+      if (sumSec > 0) sunDurSec = sumSec;
     }
+    const sunHours = sunDurSec / 3600;
+    const sunHoursFormatted = sunHours >= 10 ? Math.round(sunHours) + ' h' : sunHours.toFixed(1).replace('.', ',') + ' h';
+    const daylightHours = daylightSec > 0 ? (daylightSec / 3600) : 0;
+    const sunQuotaPct = daylightSec > 0 ? Math.min(100, Math.round((sunDurSec / daylightSec) * 100)) : 0;
+
+    // Mini sparkline & expanded hourly bars for daylight hours (06:00 to 18:00 = 13 hours)
+    const sparkHours = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+    const miniBars = [];
+    const expandedBars = [];
+    for (const h of sparkHours) {
+      const hIdx = (i * 24) + h;
+      let hSunSec = 0;
+      if (hourly && hourly.sunshine_duration && hourly.sunshine_duration[hIdx] != null) {
+        hSunSec = hourly.sunshine_duration[hIdx];
+      } else if (hourly && hourly.cloud_cover && hourly.cloud_cover[hIdx] != null) {
+        const isDay = hourly.is_day ? hourly.is_day[hIdx] === 1 : (h >= 7 && h <= 17);
+        hSunSec = isDay ? Math.max(0, (100 - (hourly.cloud_cover[hIdx] || 0)) / 100 * 3600) : 0;
+      }
+      const sunMin = Math.round(Math.min(60, Math.max(0, hSunSec / 60)));
+
+      let miniClass = 'msb-overcast';
+      let miniHeightPct = 18;
+      if (sunMin >= 45) {
+        miniClass = 'msb-full';
+        miniHeightPct = 100;
+      } else if (sunMin >= 20) {
+        miniClass = 'msb-mid';
+        miniHeightPct = 60;
+      } else if (sunMin >= 5) {
+        miniClass = 'msb-low';
+        miniHeightPct = 35;
+      } else {
+        const isDayHour = hourly && hourly.is_day ? hourly.is_day[hIdx] === 1 : (h >= 7 && h <= 17);
+        if (!isDayHour) {
+          miniClass = 'msb-night';
+          miniHeightPct = 10;
+        }
+      }
+      miniBars.push(`<span class="msb-bar ${miniClass}" style="height:${miniHeightPct}%;" title="${h}:00 Uhr: ${sunMin} Min. Sonne"></span>`);
+
+      const expHeightPct = Math.max(12, Math.round((sunMin / 60) * 100));
+      expandedBars.push(`
+        <div class="esb-col" title="${h}:00 Uhr: ${sunMin} Min. Sonnenschein">
+          <div class="esb-bar-track">
+            <div class="esb-bar-fill ${miniClass}" style="height:${expHeightPct}%;"></div>
+          </div>
+          <span class="esb-time-label">${h % 3 === 0 ? h + 'h' : ''}</span>
+        </div>
+      `);
+    }
+    const miniBarsHtml = miniBars.join('');
+    const expandedBarsHtml = expandedBars.join('');
 
     // 4 day parts from hourly
     const dayStartHourIdx = i * 24;
@@ -841,7 +893,8 @@ export function render10DayForecast(daily, hourly) {
     wrapper.id = `daily-item-${i}`;
 
     wrapper.innerHTML = `
-      <div class="daily-interactive-row" data-index="${i}">
+      <div class="daily-interactive-row" data-index="${i}" role="button" tabindex="0" aria-expanded="false" aria-controls="inline-accordion-${i}">
+        <!-- TOP DECK (Deck 1 on Mobile, flows in desktop grid) -->
         <div class="daily-row-mobile-top">
           <!-- 1. Day & Date -->
           <div class="daily-date-cell">
@@ -852,62 +905,74 @@ export function render10DayForecast(daily, hourly) {
             <div class="daily-date-badge">${dateShort}</div>
           </div>
 
-          <!-- 6. Temperature Bar (in mobile top, on desktop flows in grid) -->
-          <div class="daily-temp-bar-cell">
-            <span class="daily-min-label">${Math.round(convertTemp(minVal))}°</span>
-            <div class="daily-bar-container">
-              <div class="daily-bar-fill" style="left:${leftPct}%; width:${widthPct}%;">
-                ${dotHtml}
-              </div>
-            </div>
-            <span class="daily-max-label">${Math.round(convertTemp(maxVal))}°</span>
-          </div>
-
-          <!-- 7. Expand Chevron (on mobile in top row beside temp bar; on desktop in col 7) -->
-          <div class="daily-action-cell">
-            <span class="daily-expand-chevron">›</span>
-          </div>
-        </div>
-
-        <div class="daily-row-mobile-bottom">
           <!-- 2. Condition & Icon -->
           <div class="daily-condition-cell">
             <span class="daily-icon-box" title="${condLabel}">${condIcon}</span>
             <span class="daily-cond-text" title="${condLabel}">${condLabel}</span>
           </div>
 
-          <!-- 3. Precipitation: Regen + Schnee getrennt -->
+          <!-- 3. Minimalist Crisp Temperature Min / Max -->
+          <div class="daily-temp-cell">
+            <span class="daily-temp-badge">
+              <span class="dt-min" title="Tiefsttemperatur">${Math.round(convertTemp(minVal))}°</span>
+              <span class="dt-sep">/</span>
+              <span class="dt-max" title="Höchsttemperatur">${Math.round(convertTemp(maxVal))}°</span>
+            </span>
+          </div>
+
+          <!-- 4. Expand Chevron Indicator -->
+          <div class="daily-action-cell">
+            <span class="daily-expand-chevron" aria-hidden="true">›</span>
+          </div>
+        </div>
+
+        <!-- BOTTOM DECK (Deck 2 on Mobile, flows in desktop grid) -->
+        <div class="daily-row-mobile-bottom">
+          <!-- 5. Sunshine Hours, Mini-Sparkline & Sunrise/Sunset -->
+          <div class="daily-sun-cell">
+            <div class="daily-sun-mini-group" title="${sunHoursFormatted} Sonnenschein">
+              <span class="dsm-hours">☀️ ${sunHoursFormatted}</span>
+              <div class="dsm-chart" title="Verteilung von 06:00 bis 18:00 Uhr">
+                ${miniBarsHtml}
+              </div>
+            </div>
+            <div class="daily-astro-pill" title="Sonnenaufgang: ${sunriseStr} Uhr · Sonnenuntergang: ${sunsetStr} Uhr">
+              <span class="dap-item">🌅 ${sunriseStr}</span>
+              <span class="dap-dot">•</span>
+              <span class="dap-item">🌇 ${sunsetStr}</span>
+            </div>
+          </div>
+
+          <!-- 6. Precipitation -->
           <div class="daily-precip-cell">
             ${(() => {
               const snowSum = daily.snowfall_sum ? (daily.snowfall_sum[i] || 0) : 0;
               const parts = [];
               if (pop > 10 || rainSum > 0.05) parts.push(`💧 ${pop}% ${rainSum.toFixed(1)} mm`);
               if (snowSum > 0.05) parts.push(`❄️ ${snowSum.toFixed(1)} cm`);
-              if (parts.length === 0) return '<span class="daily-precip-dry">💧 0% • Trocken</span>';
+              if (parts.length === 0) return '<span class="daily-precip-dry">💧 0%</span>';
               return `<span class="daily-precip-chip ${rainSum >= 5 || snowSum >= 5 ? 'heavy-rain' : ''}">${parts.join(' · ')}</span>`;
             })()}
           </div>
 
-          <!-- 4. Wind & Gusts -->
+          <!-- 7. Wind & Gusts -->
           <div class="daily-wind-cell">
             <span class="daily-wind-chip ${windGusts >= 45 ? 'wind-alert' : ''}">
               <span class="wind-main">💨 ${windSpd} km/h</span>
-              <span class="wind-gusts">Böen ${windGusts}</span>
-            </span>
-          </div>
-
-          <!-- 5. UV-Index -->
-          <div class="daily-uv-cell desktop-only">
-            <span class="daily-uv-chip">
-              ☀️ UV ${uvMax}
+              ${windGusts > windSpd + 10 ? `<span class="wind-gusts">Böen ${windGusts}</span>` : ''}
             </span>
           </div>
         </div>
       </div>
 
-      <!-- INLINE EXPANDABLE 4-DAY-PARTS ACCORDION -->
+      <!-- INLINE EXPANDABLE METEOROLOGICAL ACCORDION -->
       <div class="daily-inline-accordion" id="inline-accordion-${i}" style="display:none;">
         <div class="inline-accordion-inner">
+          
+          <!-- 4 Day Parts Breakdown -->
+          <div class="inline-section-header">
+            <span class="ish-title">⏱️ Tagesabschnitte im Überblick</span>
+          </div>
           <div class="inline-parts-row">
             ${partsData.map(p => `
               <div class="inline-part-card">
@@ -919,36 +984,103 @@ export function render10DayForecast(daily, hourly) {
             `).join('')}
           </div>
 
-          <div class="inline-meta-bar">
-            <div class="imb-stats">
-              <span>🌅 Aufgang: <strong>${sunriseStr}</strong></span>
-              <span>🌇 Untergang: <strong>${sunsetStr}</strong></span>
-              <span>💨 Max. Böen: <strong>${windGusts} km/h</strong></span>
-              <span>💧 24h Regen: <strong>${(rainSum || 0).toFixed(1)} mm</strong></span>
+          <!-- Detailed Sun & Daylight Timeline Section -->
+          <div class="inline-sun-section">
+            <div class="inline-section-header">
+              <span class="ish-title">☀️ Sonnenverlauf & Tageslicht</span>
+              <span class="ish-badge">${sunHoursFormatted} Sonne (${sunQuotaPct > 0 ? `${sunQuotaPct}% Quote` : 'bedeckt'})</span>
             </div>
-            <button class="inline-modal-launch-btn" data-day-index="${i}">
-              Vollständige Analyse ↗
+            <div class="inline-sun-timeline-box">
+              <div class="istb-astro-bar">
+                <div class="istb-astro-point">
+                  <span class="iap-icon">🌅</span>
+                  <div class="iap-text">
+                    <span class="iap-lbl">Aufgang</span>
+                    <span class="iap-val">${sunriseStr}</span>
+                  </div>
+                </div>
+                
+                <div class="istb-bars-container">
+                  <div class="istb-bars-track">
+                    ${expandedBarsHtml}
+                  </div>
+                </div>
+
+                <div class="istb-astro-point">
+                  <span class="iap-icon">🌇</span>
+                  <div class="iap-text">
+                    <span class="iap-lbl">Untergang</span>
+                    <span class="iap-val">${sunsetStr}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="istb-daylight-info">
+                <span>Tageslichtdauer: <strong>${daylightHours.toFixed(1).replace('.', ',')} Stunden</strong> (${sunriseStr} bis ${sunsetStr} Uhr)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Key Meteorological Metrics -->
+          <div class="inline-stats-grid">
+            <div class="isg-card">
+              <span class="isg-icon">💨</span>
+              <div class="isg-content">
+                <span class="isg-lbl">Wind & Spitzenböen</span>
+                <span class="isg-val">${windSpd} km/h <span class="isg-sub">(Böen ${windGusts} km/h)</span></span>
+              </div>
+            </div>
+            <div class="isg-card">
+              <span class="isg-icon">💧</span>
+              <div class="isg-content">
+                <span class="isg-lbl">Niederschlag 24h</span>
+                <span class="isg-val">${rainSum > 0 ? `${rainSum.toFixed(1)} mm` : '0,0 mm'} <span class="isg-sub">(${pop}% Risiko)</span></span>
+              </div>
+            </div>
+            <div class="isg-card">
+              <span class="isg-icon">☀️</span>
+              <div class="isg-content">
+                <span class="isg-lbl">Maximaler UV-Index</span>
+                <span class="isg-val">UV ${uvMax} <span class="isg-sub">(${uvMax <= 2 ? 'Niedrig' : uvMax <= 5 ? 'Mäßig' : 'Hoch'})</span></span>
+              </div>
+            </div>
+            <div class="isg-card">
+              <span class="isg-icon">🌡️</span>
+              <div class="isg-content">
+                <span class="isg-lbl">Gefühlte Temperatur</span>
+                <span class="isg-val">${Math.round(convertTemp(daily.apparent_temperature_min ? daily.apparent_temperature_min[i] : minVal))}° bis ${Math.round(convertTemp(daily.apparent_temperature_max ? daily.apparent_temperature_max[i] : maxVal))}°</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deep Modal Link Button -->
+          <div class="inline-footer-actions">
+            <button type="button" class="inline-modal-launch-btn" data-day-index="${i}">
+              Vollständige 24h-Detailanalyse öffnen ↗
             </button>
           </div>
+
         </div>
       </div>
     `;
 
-    // Toggle inline accordion on clicking the row
+    // Toggle inline accordion on clicking ANYWHERE on the day row
     const rowElem = wrapper.querySelector('.daily-interactive-row');
     const accordion = wrapper.querySelector('.daily-inline-accordion');
-    const chevron = wrapper.querySelector('.daily-expand-chevron');
 
     rowElem.addEventListener('click', (e) => {
-      // Wenn der Chevron angeklickt wird, nur Accordion umschalten
-      if (e.target.closest('.daily-expand-chevron')) {
-        const isExpanded = accordion.style.display === 'block';
-        accordion.style.display = isExpanded ? 'none' : 'block';
-        wrapper.classList.toggle('expanded', !isExpanded);
-        chevron.innerText = isExpanded ? '›' : '▾';
-      } else {
-        // Klick auf die Zeile öffnet direkt das vollständige Tages-Detail-Modal!
-        openDayDetailModal(i, daily, hourly);
+      // If user clicked the launch modal button, do not toggle accordion
+      if (e.target.closest('.inline-modal-launch-btn')) return;
+
+      const isExpanded = accordion.style.display === 'block';
+      accordion.style.display = isExpanded ? 'none' : 'block';
+      wrapper.classList.toggle('expanded', !isExpanded);
+      rowElem.setAttribute('aria-expanded', !isExpanded ? 'true' : 'false');
+    });
+
+    rowElem.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        rowElem.click();
       }
     });
 
