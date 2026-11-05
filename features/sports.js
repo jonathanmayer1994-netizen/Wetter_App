@@ -1726,10 +1726,13 @@ export function openSportsMapFullscreen() {
     if (state.sports.map) {
       state.sports.map.invalidateSize();
       if (state.sports.routeLine) {
-        state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [40, 40] });
+        state.sports.map.fitBounds(state.sports.routeLine.getBounds(), {
+          padding: [60, 60],
+          maxZoom: 15
+        });
       }
     }
-  }, 120);
+  }, 80);
 }
 
 export function closeSportsMapFullscreen() {
@@ -1743,10 +1746,12 @@ export function closeSportsMapFullscreen() {
     if (state.sports.map) {
       state.sports.map.invalidateSize();
       if (state.sports.routeLine) {
-        state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [30, 30] });
+        state.sports.map.fitBounds(state.sports.routeLine.getBounds(), {
+          padding: [25, 25]
+        });
       }
     }
-  }, 120);
+  }, 80);
 }
 
 export function renderSportsMap(timeline) {
@@ -1760,10 +1765,21 @@ export function renderSportsMap(timeline) {
       maxZoom: 19
     }).setView([timeline.timedPoints[0].lat, timeline.timedPoints[0].lon], 11);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+    // Hochauflösende Alpin-Topokarte mit Geländerelief & Höhenlinien (OpenTopoMap)
+    const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxNativeZoom: 17,
       maxZoom: 19,
-      attribution: '© OpenStreetMap contributors, HOT'
-    }).addTo(state.sports.map);
+      subdomains: ['a', 'b', 'c'],
+      attribution: '© OpenStreetMap, SRTM | OpenTopoMap'
+    });
+    topoLayer.on('tileerror', function(err) {
+      if (err.tile && !err.tile._fallbackTried) {
+        err.tile._fallbackTried = true;
+        const coords = err.coords;
+        err.tile.src = `https://tile.openstreetmap.fr/hot/${coords.z}/${coords.x}/${coords.y}.png`;
+      }
+    });
+    topoLayer.addTo(state.sports.map);
   }
 
   // Bestehende Schichten entfernen
@@ -1779,103 +1795,144 @@ export function renderSportsMap(timeline) {
 
   const latLngs = timeline.timedPoints.map(p => [p.lat, p.lon]);
 
-  // Route Hintergrund-Casing (Glow-Effekt)
+  // Route Hintergrund-Casing: strahlend weiße Umrandung wie auf Outdoor-Karten
   state.sports.routeBgLine = L.polyline(latLngs, {
-    color: '#005577',
-    weight: 8,
-    opacity: 0.7,
-    lineCap: 'round',
-    lineJoin: 'round'
-  }).addTo(state.sports.map);
-
-  // Vordergrund-Route (Leuchtendes Cyan)
-  state.sports.routeLine = L.polyline(latLngs, {
-    color: '#00e5ff',
-    weight: 4.5,
+    color: '#ffffff',
+    weight: 7.5,
     opacity: 0.95,
     lineCap: 'round',
     lineJoin: 'round'
   }).addTo(state.sports.map);
 
-  // Start & Ziel Marker
+  // Vordergrund-Route: kräftiges Alpin-Blau
+  state.sports.routeLine = L.polyline(latLngs, {
+    color: '#0066ff',
+    weight: 4.5,
+    opacity: 1.0,
+    lineCap: 'round',
+    lineJoin: 'round'
+  }).addTo(state.sports.map);
+
+  // Start & Ziel Daten ermitteln
   const startPt = timeline.timedPoints[0];
   const endPt = timeline.timedPoints[timeline.timedPoints.length - 1];
+  const startMs = timeline.milestones[0] || { weatherIcon: '☀️', tempC: 10, windKmH: 5, precipMm: 0, weatherCondition: 'Trocken' };
+  const endMs = timeline.milestones[timeline.milestones.length - 1] || { weatherIcon: '☀️', tempC: 10, windKmH: 5, precipMm: 0, weatherCondition: 'Trocken' };
 
+  // 1. START Marker (Roter Pin mit weißem Kreis 'START' + Callout-Badge wie im Referenzdesign)
   const startIcon = L.divIcon({
     className: 'sports-custom-pin start-pin',
-    html: '<div class="pin-inner pin-start">🚩 <span>START</span></div>',
-    iconSize: [72, 28],
-    iconAnchor: [36, 14]
+    html: `
+      <div class="sm-pin-teardrop sm-pin-start">
+        <div class="ms-compact-pill sm-ref-badge sm-badge-start">
+          <span class="ms-icon">${startMs.weatherIcon}</span>
+          <span class="ms-temp">${startMs.tempC}°</span>
+          <span class="ms-time">${timeline.startTimeStr}</span>
+        </div>
+        <div class="sm-pin-icon-wrap">
+          <div class="sm-pin-circle">
+            <span class="sm-pin-label">START</span>
+          </div>
+          <div class="sm-pin-stem"></div>
+        </div>
+      </div>
+    `,
+    iconSize: null,
+    iconAnchor: null
   });
 
-  const endIcon = L.divIcon({
-    className: 'sports-custom-pin end-pin',
-    html: '<div class="pin-inner pin-end">🏁 <span>ZIEL</span></div>',
-    iconSize: [68, 28],
-    iconAnchor: [34, 14]
-  });
-
-  state.sports.startMarker = L.marker([startPt.lat, startPt.lon], { icon: startIcon }).addTo(state.sports.map);
+  state.sports.startMarker = L.marker([startPt.lat, startPt.lon], { icon: startIcon, zIndexOffset: 2500 }).addTo(state.sports.map);
   state.sports.startMarker.bindPopup(`
     <div class="sports-map-popup-card">
       <div class="smp-title">🚩 Tourstart</div>
       <div class="smp-meta">⏱️ Startzeit: <b>${timeline.startTimeStr} Uhr</b> • Höhe: <b>${Math.round(startPt.ele)} m</b></div>
+      <div class="smp-grid">
+        <div>${startMs.weatherIcon} <b>${startMs.weatherCondition}</b></div>
+        <div>🌡️ Temperatur: <b>${startMs.tempC}°C</b></div>
+        <div>💨 Wind: <b>${startMs.windKmH} km/h</b></div>
+      </div>
       <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(0)">
         📍 Im Streckenwetter anspringen
       </button>
     </div>
   `);
 
-  state.sports.endMarker = L.marker([endPt.lat, endPt.lon], { icon: endIcon }).addTo(state.sports.map);
+  // 2. ZIEL Marker (Roter Pin mit weißem Kreis und Zielflagge 🏁 + Callout-Badge)
+  const endIcon = L.divIcon({
+    className: 'sports-custom-pin end-pin',
+    html: `
+      <div class="sm-pin-teardrop sm-pin-end">
+        <div class="ms-compact-pill sm-ref-badge sm-badge-end">
+          <span class="ms-icon">${endMs.weatherIcon}</span>
+          <span class="ms-temp">${endMs.tempC}°</span>
+          <span class="ms-time">${timeline.endTimeStr}</span>
+        </div>
+        <div class="sm-pin-icon-wrap">
+          <div class="sm-pin-circle">
+            <span class="sm-pin-flag">🏁</span>
+          </div>
+          <div class="sm-pin-stem"></div>
+        </div>
+      </div>
+    `,
+    iconSize: null,
+    iconAnchor: null
+  });
+
+  state.sports.endMarker = L.marker([endPt.lat, endPt.lon], { icon: endIcon, zIndexOffset: 2500 }).addTo(state.sports.map);
   state.sports.endMarker.bindPopup(`
     <div class="sports-map-popup-card">
       <div class="smp-title">🏁 Zielankunft</div>
       <div class="smp-meta">⏱️ Ankunft: <b>${timeline.endTimeStr} Uhr</b> • Distanz: <b>${timeline.totalDistanceKm.toFixed(1)} km</b></div>
+      <div class="smp-grid">
+        <div>${endMs.weatherIcon} <b>${endMs.weatherCondition}</b></div>
+        <div>🌡️ Temperatur: <b>${endMs.tempC}°C</b></div>
+        <div>💨 Wind: <b>${endMs.windKmH} km/h</b></div>
+      </div>
       <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(${timeline.totalDistanceKm})">
         📍 Im Streckenwetter anspringen
       </button>
     </div>
   `);
 
-  // Zwischen-Meilensteine mit Wetter-Bubbles & reichhaltigen Details für Vollbild
+  // 3. Zwischen-Meilensteine alle ~200 Hm mit eleganten Wetter-Callouts (Referenzdesign)
   timeline.milestones.forEach((m, idx) => {
     if (idx === 0 || idx === timeline.milestones.length - 1) return;
-    const isPeak = m.ele === timeline.maxElevationM;
+    const isPeak = (m.ele === timeline.maxElevationM || m.label?.includes('Gipfel') || m.label?.includes('Pass'));
 
     const mIcon = L.divIcon({
       className: 'sports-milestone-marker',
       html: `
         <div class="ms-marker-bubble ${isPeak ? 'bubble-peak' : ''}" data-km="${m.distFromStartKm}">
           <!-- Kompakte Ansicht für kleine Standardkarte -->
-          <div class="ms-compact-pill">
+          <div class="ms-compact-pill sm-ref-pill">
             <span class="ms-icon">${m.weatherIcon}</span>
             <span class="ms-temp">${m.tempC}°</span>
-            <span class="ms-alt">${Math.round(m.ele)}m</span>
+            <span class="ms-time">${m.arrivalTimeStr ? m.arrivalTimeStr.replace(' Uhr', '') : ''}</span>
           </div>
           <!-- Ausführliche Detailansicht für die vergrößerte Karte -->
-          <div class="ms-detailed-card">
-            <div class="msd-header">
-              <span class="msd-name">${isPeak ? '🏔️ ' : ''}${m.label}</span>
-              <span class="msd-alt">${Math.round(m.ele)} m</span>
+          <div class="ms-detailed-card sm-ref-card ${isPeak ? 'bubble-peak' : ''}">
+            <div class="sm-ref-main">
+              <span class="ms-icon">${m.weatherIcon}</span>
+              <span class="ms-temp">${m.tempC}°</span>
+              <span class="ms-time">${m.arrivalTimeStr ? m.arrivalTimeStr.replace(' Uhr', '') : ''}</span>
             </div>
-            <div class="msd-main">
-              <span class="msd-icon">${m.weatherIcon}</span>
-              <span class="msd-temp">${m.tempC}°C</span>
-              <span class="msd-cond">${m.weatherCondition}</span>
+            <div class="sm-ref-sub">
+              <span class="sm-cond">${isPeak ? '🏔️ ' : ''}${m.weatherCondition}</span>
+              <span class="sm-dot">•</span>
+              <span class="sm-wind">💨 ${m.windKmH} km/h</span>
+              ${m.precipMm > 0 ? `<span class="sm-dot">•</span><span class="sm-rain">💧 ${m.precipMm.toFixed(1)}mm</span>` : ''}
             </div>
-            <div class="msd-footer">
-              <span class="msd-time">⏱️ ${m.arrivalTimeStr}</span>
-              <span class="msd-wind">💨 ${m.windKmH} km/h</span>
-              ${m.precipMm > 0 ? `<span class="msd-rain">💧 ${m.precipMm.toFixed(1)}mm</span>` : ''}
-            </div>
+            <div class="sm-ref-arrow"></div>
           </div>
+          <div class="sm-trail-dot ${isPeak ? 'dot-peak' : ''}"></div>
         </div>
       `,
       iconSize: null,
       iconAnchor: null
     });
 
-    const marker = L.marker([m.lat, m.lon], { icon: mIcon }).addTo(state.sports.map);
+    const marker = L.marker([m.lat, m.lon], { icon: mIcon, zIndexOffset: isPeak ? 2000 : 1000 }).addTo(state.sports.map);
     marker.bindPopup(`
       <div class="sports-map-popup-card">
         <div class="smp-title">${isPeak ? '🏔️ ' : '📍 '}${m.label} (${m.distFromStartKm.toFixed(1)} km)</div>
@@ -1897,7 +1954,17 @@ export function renderSportsMap(timeline) {
     state.sports.milestoneMarkers.push(marker);
   });
 
-  // Interaktiver Scrubber-Marker (Athleten-Pin ohne Spielereien)
+  // 4. Zentraler Tour-HUD-Badge auf der Karte (wie im Referenz-Screenshot: Dauer & Distanz)
+  const hud = document.getElementById('sports-map-center-hud');
+  if (hud) {
+    hud.style.display = 'flex';
+    const hudTime = document.getElementById('sm-hud-time');
+    const hudDist = document.getElementById('sm-hud-dist');
+    if (hudTime) hudTime.innerText = `${timeline.totalDurationStr || '--'}`;
+    if (hudDist) hudDist.innerText = `${timeline.totalDistanceKm.toFixed(1)} km • +${Math.round(timeline.totalAscentM)} Hm`;
+  }
+
+  // 5. Interaktiver Scrubber-Marker (Athleten-Pin ohne störende Animationen)
   const athleteIcon = timeline.sportType === 'road_bike' ? '🚴' : (timeline.sportType === 'gravel_mtb' ? '🚵' : (timeline.sportType === 'trailrun' ? '🏃' : '🥾'));
   const scrubberIcon = L.divIcon({
     className: 'sports-scrubber-map-marker',
@@ -1910,7 +1977,7 @@ export function renderSportsMap(timeline) {
 
   setTimeout(() => {
     state.sports.map.invalidateSize();
-    state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [30, 30] });
+    state.sports.map.fitBounds(state.sports.routeLine.getBounds(), { padding: [35, 35] });
   }, 100);
 }
 

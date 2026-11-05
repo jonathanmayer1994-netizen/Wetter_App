@@ -2781,36 +2781,99 @@ export const MicroEngine = {
       });
     }
 
-    // Wähle 6 bis 12 markante Meilensteine / Wegpunkte entlang der Route
+    // Intelligente Wegpunkt- & Meilenstein-Generierung im ~200 Hm Abstand (plus Start, Peak & Ziel)
     const totalKm = parsedGPX.totalDistanceKm || (timedPoints[timedPoints.length - 1].distFromStartKm) || 1;
-    const targetSteps = Math.max(6, Math.min(12, Math.round(totalKm / 2.5)));
-    const stepKm = totalKm / (targetSteps - 1);
+    const startPoint = timedPoints[0];
+    const endPoint = timedPoints[timedPoints.length - 1];
 
-    const milestones = [];
-    let currentTargetKm = 0;
+    let peakPoint = timedPoints[0];
+    for (const p of timedPoints) {
+      if (p.ele > peakPoint.ele) {
+        peakPoint = p;
+      }
+    }
 
-    for (let s = 0; s < targetSteps; s++) {
-      currentTargetKm = s * stepKm;
-      let closestPt = timedPoints[0];
-      let minDiff = Infinity;
-      for (const p of timedPoints) {
-        const diff = Math.abs(p.distFromStartKm - currentTargetKm);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestPt = p;
+    const minEle = Math.min(...timedPoints.map(p => p.ele));
+    const maxEle = peakPoint.ele;
+    const elevationSpan = maxEle - minEle;
+
+    const rawMilestones = [startPoint];
+    let lastRecordedEle = startPoint.ele;
+    let lastRecordedKm = startPoint.distFromStartKm || 0;
+
+    // Bei bergigem Gelände (> 250 Hm Spannweite): Intelligente Abtastung alle ~200 Höhenmeter
+    if (elevationSpan >= 250) {
+      const ELEVATION_STEP = 200; // Intelligenter 200 Hm Abstand
+      const MIN_DIST_KM = 0.75;   // Ausgewogener Mindestabstand (verhindert Überlappungen auf steilen Abschnitten)
+      const MAX_DIST_KM = 3.5;    // Maximalabstand 3.5 km
+
+      for (let i = 1; i < timedPoints.length - 1; i++) {
+        const pt = timedPoints[i];
+        const distSinceLast = (pt.distFromStartKm || 0) - lastRecordedKm;
+        const eleDiffSinceLast = Math.abs(pt.ele - lastRecordedEle);
+        const isPeak = (pt === peakPoint || Math.abs(pt.ele - maxEle) < 1.0);
+
+        if (isPeak && !rawMilestones.includes(peakPoint)) {
+          rawMilestones.push(pt);
+          lastRecordedEle = pt.ele;
+          lastRecordedKm = pt.distFromStartKm || 0;
+          continue;
+        }
+
+        const crossed200Hm = eleDiffSinceLast >= ELEVATION_STEP && distSinceLast >= MIN_DIST_KM;
+        const maxDistExceeded = distSinceLast >= MAX_DIST_KM;
+
+        if (crossed200Hm || maxDistExceeded) {
+          rawMilestones.push(pt);
+          lastRecordedEle = pt.ele;
+          lastRecordedKm = pt.distFromStartKm || 0;
         }
       }
-      if (!milestones.some(m => m.index === closestPt.index)) {
-        milestones.push(closestPt);
+    } else {
+      // Flache Strecke: Gleichmäßige Aufteilung alle 2.5 bis 3.5 km
+      const targetSteps = Math.max(5, Math.min(10, Math.round(totalKm / 3.0)));
+      const stepKm = totalKm / Math.max(1, targetSteps - 1);
+      for (let s = 1; s < targetSteps - 1; s++) {
+        const targetKm = s * stepKm;
+        let closestPt = timedPoints[0];
+        let minDiff = Infinity;
+        for (const p of timedPoints) {
+          const diff = Math.abs(p.distFromStartKm - targetKm);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestPt = p;
+          }
+        }
+        if (!rawMilestones.includes(closestPt)) {
+          rawMilestones.push(closestPt);
+        }
       }
     }
 
-    // Stelle sicher, dass Start und Ziel immer exakt enthalten sind
-    if (milestones[0].index !== timedPoints[0].index) {
-      milestones.unshift(timedPoints[0]);
+    if (!rawMilestones.includes(peakPoint) && peakPoint !== startPoint && peakPoint !== endPoint) {
+      rawMilestones.push(peakPoint);
     }
-    if (milestones[milestones.length - 1].index !== timedPoints[timedPoints.length - 1].index) {
-      milestones.push(timedPoints[timedPoints.length - 1]);
+    if (!rawMilestones.includes(endPoint)) {
+      rawMilestones.push(endPoint);
+    }
+
+    rawMilestones.sort((a, b) => (a.distFromStartKm || 0) - (b.distFromStartKm || 0));
+
+    // Deduplizierung: mind. 250m Abstand außer für Peak und Ziel
+    const milestones = [];
+    for (let i = 0; i < rawMilestones.length; i++) {
+      const cur = rawMilestones[i];
+      if (milestones.length === 0) {
+        milestones.push(cur);
+      } else {
+        const last = milestones[milestones.length - 1];
+        const distDiff = (cur.distFromStartKm || 0) - (last.distFromStartKm || 0);
+        const isEnd = (i === rawMilestones.length - 1);
+        const isPeak = (cur === peakPoint);
+        if (distDiff >= 0.25 || isEnd || isPeak) {
+          milestones.push(cur);
+        }
+      }
     }
 
     // Wetterdaten für jeden Meilenstein zur genauen Ankunftszeit interpolieren

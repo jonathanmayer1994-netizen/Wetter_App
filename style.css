@@ -11157,7 +11157,48 @@ body {
   transform: scale(0.96);
 }
 
-/* Sports Map Wrapper */
+/* =============================================================================
+ * SPORTS MAP: OUTDOOR ALPIN-LOOK & VOLLBILDMODUS (MATCHING KOMOOT / OUTDOORACTIVE)
+ * ============================================================================= */
+
+/* 1. Fullscreen Body & Ancestor Blockers - Removes containing block traps */
+body.sports-map-fullscreen-active {
+  overflow: hidden !important;
+  touch-action: pan-x pan-y !important;
+}
+
+body.sports-map-fullscreen-active .mobile-bottom-nav,
+body.sports-map-fullscreen-active .app-header,
+body.sports-map-fullscreen-active .main-tab-bar,
+body.sports-map-fullscreen-active .ios-status-bar-guard,
+body.sports-map-fullscreen-active #hero-hazard-alert,
+body.sports-map-fullscreen-active .spotlight-banner {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+body.sports-map-fullscreen-active #sports-map-card {
+  position: static !important;
+  contain: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transform: none !important;
+  filter: none !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.sports-map-fullscreen-active #sports-map-card > .card-header {
+  display: none !important;
+}
+
+/* 2. Map Wrapper & Responsive Heights */
 .sports-map-wrapper {
   position: relative;
   width: 100%;
@@ -11166,6 +11207,7 @@ body {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.25s ease;
+  background: #111827;
 }
 
 .sports-map-container {
@@ -11173,7 +11215,13 @@ body {
   height: 100%;
 }
 
-/* Sports Map Fullscreen Mode */
+@media (max-width: 768px) {
+  .sports-map-wrapper:not(.sports-map-fullscreen) {
+    height: 320px;
+  }
+}
+
+/* 3. Sports Map Fullscreen Container */
 .sports-map-wrapper.sports-map-fullscreen {
   position: fixed !important;
   top: 0 !important;
@@ -11183,7 +11231,7 @@ body {
   width: 100vw !important;
   height: 100vh !important;
   height: 100dvh !important;
-  z-index: 10000 !important;
+  z-index: 100000 !important;
   border-radius: 0 !important;
   border: none !important;
   margin: 0 !important;
@@ -11193,29 +11241,30 @@ body {
 }
 
 .sports-map-wrapper.sports-map-fullscreen .sports-map-container {
-  width: 100% !important;
-  height: 100% !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
 }
 
-/* Close Button on Fullscreen Map */
+/* 4. Close Button on Fullscreen Map */
 .sports-map-close-btn {
   display: none;
   position: absolute;
   top: max(16px, env(safe-area-inset-top));
   right: max(16px, env(safe-area-inset-right));
-  z-index: 10010;
+  z-index: 100010;
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(15, 23, 42, 0.92);
+  background: rgba(15, 23, 42, 0.88);
   border: 1.5px solid rgba(255, 255, 255, 0.25);
   color: #ffffff;
   font-size: 20px;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   align-items: center;
   justify-content: center;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -11227,7 +11276,7 @@ body {
 }
 
 .sports-map-close-btn:hover {
-  background: rgba(255, 69, 58, 0.88);
+  background: rgba(255, 69, 58, 0.92);
   border-color: #ff453a;
   transform: scale(1.08);
 }
@@ -11236,205 +11285,282 @@ body {
   transform: scale(0.94);
 }
 
-@media (max-width: 1024px) {
-  .sports-metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* 5. Center Tour HUD Badge (Floating on Map) */
+.sports-map-center-hud {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 100005;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 6px 14px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-@media (max-width: 768px) {
-  .sports-metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-
-  .sports-start-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .sports-map-wrapper:not(.sports-map-fullscreen) {
-    height: 300px;
-  }
+.sm-hud-time {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
 }
 
-/* Sports Leaflet Pins & Bubbles */
+.sm-hud-dist {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0284c7;
+}
+
+/* 6. Custom Teardrop Pin Markers (START & ZIEL) */
 .sports-custom-pin {
   background: none;
   border: none;
+  overflow: visible !important;
 }
 
-.pin-inner {
+.sm-pin-teardrop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.sm-pin-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sm-pin-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #dc2626;
+  border: 2.5px solid #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 800;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.pin-start {
-  background: linear-gradient(135deg, rgba(48, 209, 88, 0.95), rgba(30, 160, 60, 0.95));
-  border: 1.5px solid #30d158;
+.sm-pin-label {
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
 }
 
-.pin-end {
-  background: linear-gradient(135deg, rgba(255, 69, 58, 0.95), rgba(200, 30, 30, 0.95));
-  border: 1.5px solid #ff453a;
+.sm-pin-flag {
+  font-size: 18px;
+  line-height: 1;
 }
 
-/* Milestone Weather Markers on Map */
+.sm-pin-stem {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid #dc2626;
+  margin-top: -1px;
+}
+
+/* Weather Badges attached to Start / End */
+.sm-pin-teardrop .sm-ref-badge {
+  margin-bottom: 4px;
+}
+
+/* 7. Reference-Style White Weather Callout Badges */
 .sports-milestone-marker {
   background: none;
   border: none;
-  width: auto !important;
-  height: auto !important;
-  margin: 0 !important;
-  transform: translate(-50%, -50%);
+  overflow: visible !important;
   pointer-events: auto;
 }
 
 .ms-marker-bubble {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   cursor: pointer;
+  transform: translate(-50%, -100%);
   transition: transform 0.15s ease;
 }
 
 .ms-marker-bubble:hover {
-  transform: scale(1.06);
-  z-index: 500;
+  transform: translate(-50%, -105%) scale(1.05);
+  z-index: 5000 !important;
 }
 
-/* Standard (Kompakt) Ansicht für kleine Karte */
+/* Trail Dot placed exactly on GPS track */
+.sm-trail-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #0066ff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  margin-top: 2px;
+}
+
+.sm-trail-dot.dot-peak {
+  width: 11px;
+  height: 11px;
+  background: #f59e0b;
+}
+
+/* Kompakte Pill für Inline / kleine Karte */
 .sports-map-wrapper:not(.sports-map-fullscreen) .ms-compact-pill {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(0, 229, 255, 0.45);
-  border-radius: 12px;
-  padding: 2px 7px;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  padding: 3px 8px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
   white-space: nowrap;
 }
 
 .sports-map-wrapper:not(.sports-map-fullscreen) .ms-compact-pill .ms-temp {
-  color: #00e5ff;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0f172a;
 }
 
-.sports-map-wrapper:not(.sports-map-fullscreen) .ms-compact-pill .ms-alt {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 9.5px;
+.sports-map-wrapper:not(.sports-map-fullscreen) .ms-compact-pill .ms-time {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
   font-family: var(--font-mono);
 }
 
 .sports-map-wrapper:not(.sports-map-fullscreen) .ms-detailed-card {
-  display: none;
+  display: none !important;
 }
 
-/* Vollbild-Ansicht: Automatisch ausführliche Detailkacheln an den Wegpunkten */
+/* Vollbild-Ansicht: Edle weiße Referenz-Callouts mit vollen Wetterdaten */
 .sports-map-wrapper.sports-map-fullscreen .ms-compact-pill {
-  display: none;
+  display: none !important;
 }
 
 .sports-map-wrapper.sports-map-fullscreen .ms-detailed-card {
-  display: flex;
+  position: relative;
+  display: flex !important;
   flex-direction: column;
-  gap: 3px;
-  background: rgba(10, 16, 28, 0.94);
-  border: 1.5px solid rgba(0, 229, 255, 0.55);
-  border-radius: 10px;
-  padding: 5px 9px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7), 0 0 10px rgba(0, 229, 255, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  min-width: 145px;
-  max-width: 185px;
-  color: #ffffff;
+  gap: 2px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 5px 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  min-width: 120px;
+  max-width: 180px;
 }
 
 .bubble-peak .ms-detailed-card {
-  border-color: #ffd166 !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7), 0 0 12px rgba(255, 209, 102, 0.3) !important;
+  border: 1.5px solid #f59e0b !important;
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.35) !important;
 }
 
-.msd-header {
+.sm-ref-main {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 3px;
 }
 
-.msd-name {
-  font-size: 11px;
-  font-weight: 700;
-  color: #00e5ff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bubble-peak .msd-name {
-  color: #ffd166;
-}
-
-.msd-alt {
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  font-family: var(--font-mono);
-}
-
-.msd-main {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 800;
-  color: #ffffff;
-}
-
-.msd-icon {
-  font-size: 14px;
+.sm-ref-main .ms-icon {
+  font-size: 15px;
   line-height: 1;
 }
 
-.msd-temp {
-  color: #00e5ff;
+.sm-ref-main .ms-temp {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
 }
 
-.msd-cond {
-  font-size: 10.5px;
+.sm-ref-main .ms-time {
+  font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: #64748b;
+  font-family: var(--font-mono);
+  margin-left: auto;
+}
+
+.sm-ref-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.sm-cond {
+  color: #1e293b;
+}
+
+.sm-dot {
+  color: #cbd5e1;
+}
+
+.sm-wind {
+  color: #0369a1;
+}
+
+.sm-rain {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+/* Callout Stem / Arrow */
+.sm-ref-arrow {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #ffffff;
+}
+
+/* 8. Start & Ziel Badge Styling */
+.sm-ref-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 2px 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
   white-space: nowrap;
 }
 
-.msd-footer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
+.sm-ref-badge .ms-temp {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0f172a;
 }
 
-.msd-rain {
-  color: #64d2ff;
-  font-weight: 700;
+.sm-ref-badge .ms-time {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  font-family: var(--font-mono);
 }
 
 /* Statischer Athleten-Marker auf der Karte (ohne störende Animationen) */
