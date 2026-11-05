@@ -7,6 +7,7 @@
 import { state } from '../core/state.js';
 import { WMO_CODES } from '../core/constants.js';
 import { MicroEngine } from '../microEngine.js';
+import { ActualEngine } from '../core/actualEngine.js';
 import { escapeHtml } from '../httpClient.js';
 import { updateNavigationWarningBadges } from './search.js';
 
@@ -329,6 +330,29 @@ export function renderMountainWebcams() {
         console.error(e);
       }
     });
+
+    // 📸 Clientseitige Live-Computer-Vision: Prüfe Webcam-Bild auf Nebel vs. Sonne
+    try {
+      const cam = JSON.parse(card.dataset.cam);
+      if (cam.thumbUrl && ActualEngine && typeof ActualEngine.analyzeWebcamForFog === 'function') {
+        ActualEngine.analyzeWebcamForFog(cam.thumbUrl).then(analysis => {
+          if (!analysis) return;
+          const infoEl = card.querySelector('.webcam-card-info');
+          if (infoEl && !card.querySelector('.webcam-ai-tag')) {
+            const tag = document.createElement('span');
+            tag.className = `webcam-ai-tag ${analysis.isFoggy ? 'ai-tag-fog' : (analysis.isSunny ? 'ai-tag-sun' : '')}`;
+            if (analysis.isFoggy) {
+              tag.innerText = `🌫️ Dichter Hochnebel (Kontrast σ ${analysis.stdDev})`;
+            } else if (analysis.isSunny) {
+              tag.innerText = `☀️ Klar & Sonnig (Himmel ${analysis.blueSkyRatio}%)`;
+            } else {
+              tag.innerText = `⛅ Wolkig / Diffus (σ ${analysis.stdDev})`;
+            }
+            infoEl.appendChild(tag);
+          }
+        }).catch(() => {});
+      }
+    } catch (_) {}
   });
 }
 

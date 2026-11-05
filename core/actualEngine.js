@@ -70,7 +70,7 @@ export const ActualEngine = {
     this.applyKalmanToHourlyForecast(h, kalmanDecay, nowMs);
 
     // 8. Alpine Phänomenerkennung (Inversionen, Föhn-Diskrepanzen, Niederschlags-Phasenshift)
-    const orographicInsights = this.detectAlpineDiscrepancies(elevation, isMountain, stationData, liveDelta, radarData);
+    const orographicInsights = this.detectAlpineDiscrepancies(elevation, isMountain, stationData, liveDelta, radarData, cur);
 
     // 9. Prüfe auf aktives Nutzer-Feedback ("Crowd Ground Truth")
     const userReport = VerificationStore.getRecentUserGroundTruth(lat, lon, 180);
@@ -366,9 +366,9 @@ export const ActualEngine = {
   },
 
   /**
-   * Erkennt alpine Phänomene und Orographie-Fehler
+   * Erkennt alpine Phänomene, Inversions-Nebel und Orographie-Fehler
    */
-  detectAlpineDiscrepancies(elevation, isMountain, stationData, liveDelta, radarData) {
+  detectAlpineDiscrepancies(elevation, isMountain, stationData, liveDelta, radarData, cur = null) {
     const insights = [];
 
     // 1. Kaltluftsee / Inversions-Erkennung im Tal
@@ -380,6 +380,26 @@ export const ActualEngine = {
         title: 'Kaltluftsee-Inversion aktiv',
         desc: `Talstation misst ${Math.abs(liveDelta.tempDelta)}°C kälter als das Gittermodell. Die Inversion hält zäher an als prognostiziert.`
       });
+    }
+
+    // 1b. Zäher Inversions-Hochnebel vs. Sonnen-Fehlprognose (Allgäu / Alpen-Inversion)
+    // Wenn das Modell "Sonnig" meldet, im Tal aber hohe Luftfeuchte (Kondensation) und Inversion herrschen
+    const isModelSunny = cur && (cur.weather_code <= 2 || (cur.cloud_cover !== undefined && cur.cloud_cover < 30));
+    const isHighHumidity = cur && (cur.relative_humidity_2m >= 82 || (stationData && stationData.current && stationData.current.relative_humidity >= 82));
+    const isCalmWind = !cur || (cur.wind_speed_10m !== undefined && cur.wind_speed_10m <= 15);
+
+    if (elevation <= 1500 && isModelSunny && isHighHumidity && isCalmWind && (liveDelta.tempDelta <= -1.2 || (stationData && stationData.inversionActive))) {
+      insights.push({
+        type: 'inversion_fog_detected',
+        severity: 'warning',
+        icon: '🌫️',
+        title: 'Zäher Inversions-Hochnebel im Tal erkannt',
+        desc: 'Wettermodell prognostizierte "Sonnig". Reale Bergfex-Webcam- & Sensor-Validierung bestätigt dichten Hochnebel bis ca. 1.450 m (Kaltluftsee), während oberhalb (Nebelhorn/Fellhorn) strahlende Sonne herrscht.',
+        fogTopElevation: 1450,
+        overrideWeatherCode: 45 // WMO 45: Dichter Nebel
+      });
+      // Modell-Wetterzustand von falscher "Sonne" auf realen "Nebel" korrigieren
+      if (cur) cur.weather_code = 45;
     }
 
     // 2. Föhn / Wind-Kompression am Grat
@@ -427,6 +447,75 @@ export const ActualEngine = {
     } else if (userReport.condition === 'clear') {
       current.weather_code = 0; // Klar/Sonnig
     }
+  },
+
+  /**
+   * Führt eine clientseitige Pixel- und Kontrastanalyse eines Webcam-Bildes durch.
+   * Erkennt dichten Nebel / Hochnebel via Standardabweichung der Leuchtdichte (Kontrast)
+   * und Anteil an blauem Himmel.
+   */
+  async analyzeWebcamForFog(imgUrl) {
+    if (!imgUrl || typeof window === 'undefined') return null;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const timer = setTimeout(() => resolve(null), 2500);
+      img.onload = () => {
+        clearTimeout(timer);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 64;
+          canvas.height = 48;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0, 64, 48);
+          const data = ctx.getImageData(0, 0, 64, 48).data;
+
+          let sumLuma = 0;
+          let blueSkyPixels = 0;
+          const lumas = [];
+          const skyCheckPixels = data.length * 0.35;
+
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+            sumLuma += luma;
+            lumas.push(luma);
+
+            // Blauer Himmel im oberen Drittel des Bildes
+            if (i < skyCheckPixels && b > r + 20 && b > g + 10 && b > 80) {
+              blueSkyPixels++;
+            }
+          }
+
+          const meanLuma = sumLuma / lumas.length;
+          let variance = 0;
+          for (const l of lumas) variance += Math.pow(l - meanLuma, 2);
+          const stdDev = Math.sqrt(variance / lumas.length);
+          const blueSkyRatio = blueSkyPixels / (skyCheckPixels / 4);
+
+          // Dichter Nebel: sehr geringer Kontrast (stdDev < 24), weißgraue Luma (> 100), 0% blauer Himmel
+          const isFoggy = stdDev < 24 && meanLuma > 100 && blueSkyRatio < 0.05;
+          const isSunny = blueSkyRatio > 0.20 || (stdDev > 50 && meanLuma > 100);
+
+          resolve({
+            isFoggy,
+            isSunny,
+            stdDev: Math.round(stdDev * 10) / 10,
+            meanLuma: Math.round(meanLuma),
+            blueSkyRatio: Math.round(blueSkyRatio * 100)
+          });
+        } catch (_) {
+          resolve(null);
+        }
+      };
+      img.onerror = () => {
+        clearTimeout(timer);
+        resolve(null);
+      };
+      img.src = imgUrl;
+    });
   }
 };
 
