@@ -27,7 +27,8 @@ export const ActualEngine = {
     stationData,
     multiModel,
     modelHistory,
-    radarData
+    radarData,
+    webcams = null
   }) {
     if (!weatherRaw || !weatherRaw.current || !weatherRaw.hourly) {
       return null;
@@ -57,8 +58,8 @@ export const ActualEngine = {
     // 3. Hole die Aligned-History der letzten 24 Stunden (Soll vs. Ist)
     const history24h = VerificationStore.getAlignedVerificationHistory(lat, lon, 24);
 
-    // 4. Berechne Modellfehler, Treffsicherheit (Scorecard) und Bayesianische Gewichte
-    const modelEvaluation = this.evaluateModelsPerformance(history24h, multiModel);
+    // 4. Berechne Modellfehler, Treffsicherheit (Scorecard) und Bayesianische Gewichte unter Berücksichtigung der Wetterlage
+    const modelEvaluation = this.evaluateModelsPerformance(history24h, multiModel, weatherRaw);
 
     // 5. Ermittle die aktuellen Live-Abweichungen (Ist vs. Modell)
     const liveDelta = this.computeLiveDelta(cur, groundTruth);
@@ -71,6 +72,41 @@ export const ActualEngine = {
 
     // 8. Alpine Phänomenerkennung (Inversionen, Föhn-Diskrepanzen, Niederschlags-Phasenshift)
     const orographicInsights = this.detectAlpineDiscrepancies(elevation, isMountain, stationData, liveDelta, radarData, cur);
+
+    // 8b. Live-Webcam Assimilationsnetzwerk (Hintergrund-Computer-Vision)
+    if (Array.isArray(webcams) && webcams.length > 0) {
+      try {
+        this.assimilateWebcamNetwork(webcams, elevation).then(res => {
+          if (res) {
+            if (res.confirmedInversion) {
+              orographicInsights.push({
+                type: 'webcam_inversion_groundtruth',
+                severity: 'warning',
+                icon: '📷',
+                title: 'Live-Webcam Assimilations-Netzwerk bestätigt Inversion',
+                desc: `${res.tag} • '${res.lowerCam}' (${res.lowerCamElev}m) meldet dichten Nebel, '${res.upperCam}' (${res.upperCamElev}m) meldet wolkenlosen Himmel.`,
+                fogTopElevation: res.fogTopElevation,
+                overrideWeatherCode: res.overrideWeatherCode
+              });
+              if (cur && res.overrideWeatherCode !== null && res.overrideWeatherCode !== undefined) {
+                cur.weather_code = res.overrideWeatherCode;
+              }
+            } else if (res.confirmedFog) {
+              orographicInsights.push({
+                type: 'webcam_fog_confirmed',
+                severity: 'warning',
+                icon: '🌫️',
+                title: 'Webcam-Bodenwahrheit: Nebel bestätigt',
+                desc: res.tag,
+                fogTopElevation: res.fogTopElevation,
+                overrideWeatherCode: 45
+              });
+              if (cur && elevation <= res.fogTopElevation) cur.weather_code = 45;
+            }
+          }
+        }).catch(() => {});
+      } catch (_) {}
+    }
 
     // 9. Prüfe auf aktives Nutzer-Feedback ("Crowd Ground Truth")
     const userReport = VerificationStore.getRecentUserGroundTruth(lat, lon, 180);
@@ -218,9 +254,73 @@ export const ActualEngine = {
   },
 
   /**
+   * Klassifiziert die atmosphärische Wetterlage (Konvektion, Großfront, Hochdruck/Inversion)
+   * zur adaptiven Modellgewichtung (Convective vs. Synoptic Blending)
+   */
+  detectSynopticRegime(weatherRaw, multiModel) {
+    if (!weatherRaw || !weatherRaw.hourly) {
+      return {
+        id: 'standard',
+        name: 'Standard-Wetterlage',
+        badge: '⚖️ BMA-Balanciert',
+        icon: '📊',
+        multipliers: { icon_d2: 1.0, arome: 1.0, icon_eu: 1.0, ecmwf: 1.0, gfs: 1.0 }
+      };
+    }
+    const h = weatherRaw.hourly;
+    const cur = weatherRaw.current || {};
+
+    const maxCape = Array.isArray(h.cape) ? Math.max(...h.cape.slice(0, 24).filter(v => typeof v === 'number')) : 0;
+    const hasConvectiveCode = (cur.weather_code >= 80 && cur.weather_code <= 82) || 
+                              (cur.weather_code >= 95 && cur.weather_code <= 99) ||
+                              (Array.isArray(h.weather_code) && h.weather_code.slice(0, 12).some(c => (c >= 80 && c <= 82) || (c >= 95 && c <= 99)));
+    if (maxCape >= 350 || hasConvectiveCode) {
+      return {
+        id: 'convective',
+        name: 'Gewitter- & Konvektionslage (hohes CAPE)',
+        badge: '⚡ ICON-D2 & AROME priorisiert (2.2km / 1.3km)',
+        icon: '⚡',
+        multipliers: { icon_d2: 1.45, arome: 1.45, icon_eu: 1.15, ecmwf: 0.75, gfs: 0.55 }
+      };
+    }
+
+    const isFrontalRain = (cur.weather_code >= 61 && cur.weather_code <= 75) ||
+                          (Array.isArray(h.precipitation) && h.precipitation.slice(0, 12).filter(p => p > 0.5).length >= 5);
+    if (isFrontalRain && maxCape < 150) {
+      return {
+        id: 'synoptic_frontal',
+        name: 'Großräumige Fronten- & Niederschlagsdynamik',
+        badge: '🌐 ECMWF IFS priorisiert (Global 9km)',
+        icon: '🌧️',
+        multipliers: { ecmwf: 1.40, icon_eu: 1.20, icon_d2: 0.95, arome: 0.95, gfs: 0.80 }
+      };
+    }
+
+    const isHighPressure = (cur.surface_pressure && cur.surface_pressure >= 1018) || (cur.pressure_msl && cur.pressure_msl >= 1020);
+    const isCalm = cur.wind_speed_10m !== undefined && cur.wind_speed_10m <= 15;
+    if (isHighPressure && isCalm) {
+      return {
+        id: 'inversion_high',
+        name: 'Stabile Hochdrucklage / Grenzschicht-Inversion',
+        badge: '🏔️ Lokale Kaltluft- & Hangmodelle priorisiert',
+        icon: '🌫️',
+        multipliers: { icon_d2: 1.35, arome: 1.25, icon_eu: 1.15, ecmwf: 1.05, gfs: 0.70 }
+      };
+    }
+
+    return {
+      id: 'standard',
+      name: 'Ausgeglichene synoptische Lage',
+      badge: '⚖️ BMA-Balanciert',
+      icon: '📊',
+      multipliers: { icon_d2: 1.10, arome: 1.05, icon_eu: 1.10, ecmwf: 1.05, gfs: 0.90 }
+    };
+  },
+
+  /**
    * Berechnet Fehlermetriken (MAE, RMSE, Treffsicherheit) und dynamische Bayesian-Gewichte
    */
-  evaluateModelsPerformance(history24h, multiModel = null) {
+  evaluateModelsPerformance(history24h, multiModel = null, weatherRaw = null) {
     const models = {
       icon_d2: { name: 'ICON-D2 (2.2 km)', errors: [], maeTemp: 0.6, score: 92, weight: 0.55, badge: 'High-Res DACH' },
       ecmwf: { name: 'ECMWF IFS (0.25°)', errors: [], maeTemp: 0.9, score: 86, weight: 0.30, badge: 'Global #1' },
@@ -231,6 +331,9 @@ export const ActualEngine = {
     if (multiModel && multiModel.activeRegionalModel) {
       models.icon_d2.name = multiModel.activeRegionalModel;
     }
+
+    // Wetterlagen-Regime diagnostizieren
+    const synopticRegime = this.detectSynopticRegime(weatherRaw, multiModel);
 
     let validDataPoints = 0;
 
@@ -280,8 +383,13 @@ export const ActualEngine = {
       // Trefferscore berechnen: 100% minus Strafabzug pro 1.0°C MAE
       m.score = Math.max(40, Math.min(99, Math.round(100 - m.maeTemp * 15)));
 
+      // Wetterlagen-Multiplikator einbeziehen
+      const regimeFactor = (synopticRegime && synopticRegime.multipliers && synopticRegime.multipliers[key])
+        ? synopticRegime.multipliers[key]
+        : 1.0;
+
       // Bayesianisches inverses Fehlergewicht: w = 1 / (MAE^2 + epsilon)
-      const invErr = 1 / (Math.pow(Math.max(0.2, m.maeTemp), 1.8) + 0.1);
+      const invErr = (1 / (Math.pow(Math.max(0.2, m.maeTemp), 1.8) + 0.1)) * regimeFactor;
       m._invErr = invErr;
       invErrorSum += invErr;
     });
@@ -305,6 +413,7 @@ export const ActualEngine = {
       evaluatedHours: validDataPoints,
       winnerKey: topModelKey,
       winnerName: models[topModelKey].name,
+      synopticRegime,
       models
     };
   },
@@ -516,6 +625,72 @@ export const ActualEngine = {
       };
       img.src = imgUrl;
     });
+  },
+
+  /**
+   * Automatisiertes Webcam-Assimilations-Netzwerk:
+   * Analysiert parallele Stations- und Berg-Webcams in verschiedenen Höhen,
+   * ermittelt empirische Inversionsgrenzen und korrigiert Modell-Fehlprognosen.
+   */
+  async assimilateWebcamNetwork(webcams, currentLocationElevation) {
+    if (!Array.isArray(webcams) || webcams.length === 0 || typeof window === 'undefined') {
+      return null;
+    }
+
+    const validCams = webcams.filter(c => c.thumbUrl && c.elevation);
+    if (validCams.length < 1) return null;
+
+    const analyses = await Promise.allSettled(
+      validCams.slice(0, 3).map(async (cam) => {
+        const analysis = await this.analyzeWebcamForFog(cam.thumbUrl);
+        const elevMeters = parseInt(String(cam.elevation).replace(/[^0-9]/g, ''), 10) || 1000;
+        return { cam, elevMeters, analysis };
+      })
+    );
+
+    const successful = analyses
+      .filter(r => r.status === 'fulfilled' && r.value.analysis)
+      .map(r => r.value)
+      .sort((a, b) => a.elevMeters - b.elevMeters);
+
+    if (successful.length === 0) return null;
+
+    const fogCam = successful.find(s => s.analysis.isFoggy);
+    const sunCam = successful.slice().reverse().find(s => s.analysis.isSunny);
+
+    if (fogCam && sunCam && sunCam.elevMeters > fogCam.elevMeters) {
+      const empiricalFogTop = Math.round((fogCam.elevMeters + sunCam.elevMeters) / 2);
+      const isTargetAboveFog = currentLocationElevation > empiricalFogTop;
+
+      return {
+        confirmedInversion: true,
+        fogTopElevation: empiricalFogTop,
+        lowerCam: fogCam.cam.title,
+        lowerCamElev: fogCam.elevMeters,
+        upperCam: sunCam.cam.title,
+        upperCamElev: sunCam.elevMeters,
+        isTargetAboveFog,
+        overrideWeatherCode: isTargetAboveFog ? 0 : 45,
+        tag: `📷 Live-Webcam Assimilation: Nebelmeer bis ~${empiricalFogTop} m`
+      };
+    } else if (fogCam && !sunCam) {
+      return {
+        confirmedFog: true,
+        fogTopElevation: Math.max(1400, fogCam.elevMeters + 150),
+        lowerCam: fogCam.cam.title,
+        overrideWeatherCode: (currentLocationElevation <= fogCam.elevMeters + 150) ? 45 : null,
+        tag: `📷 Live-Webcam: Dichter Nebel bei '${fogCam.cam.title}' bestätigt`
+      };
+    } else if (sunCam && !fogCam) {
+      return {
+        confirmedSun: true,
+        upperCam: sunCam.cam.title,
+        overrideWeatherCode: 0,
+        tag: `📷 Live-Webcam: Strahlende Sonne bei '${sunCam.cam.title}' bestätigt`
+      };
+    }
+
+    return null;
   }
 };
 

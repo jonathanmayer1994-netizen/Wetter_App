@@ -176,7 +176,8 @@ export async function loadLocation(loc) {
         stationData: microResult.stationData,
         multiModel: state.multiModel,
         modelHistory: microResult.modelHistory,
-        radarData: microResult.radarData
+        radarData: microResult.radarData,
+        webcams: MicroEngine.getMountainWebcams(validLoc.name, validLoc.lat, validLoc.lon)
       });
       state.actualVerification = verificationResult;
 

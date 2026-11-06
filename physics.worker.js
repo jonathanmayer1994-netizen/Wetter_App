@@ -137,13 +137,23 @@ function calculatePressureLapseRate(h, hourIdx = 0, targetElevation = null) {
     return { lapseRatePer100m: -0.65, isInversion: false, isFallback: true };
   }
 
+  const t1000 = (h.temperature_1000hPa && typeof h.temperature_1000hPa[hourIdx] === 'number') ? h.temperature_1000hPa[hourIdx] : null;
+  const t925 = (h.temperature_925hPa && typeof h.temperature_925hPa[hourIdx] === 'number') ? h.temperature_925hPa[hourIdx] : null;
   const t850 = (h.temperature_850hPa && typeof h.temperature_850hPa[hourIdx] === 'number') ? h.temperature_850hPa[hourIdx] : null;
   const t700 = (h.temperature_700hPa && typeof h.temperature_700hPa[hourIdx] === 'number') ? h.temperature_700hPa[hourIdx] : null;
   const t500 = (h.temperature_500hPa && typeof h.temperature_500hPa[hourIdx] === 'number') ? h.temperature_500hPa[hourIdx] : null;
+  const t2m = (h.temperature_2m && typeof h.temperature_2m[hourIdx] === 'number') ? h.temperature_2m[hourIdx] : null;
 
+  const z1000 = (h.geopotential_height_1000hPa && typeof h.geopotential_height_1000hPa[hourIdx] === 'number') ? h.geopotential_height_1000hPa[hourIdx] : 180;
+  const z925 = (h.geopotential_height_925hPa && typeof h.geopotential_height_925hPa[hourIdx] === 'number') ? h.geopotential_height_925hPa[hourIdx] : 830;
   const z850 = (h.geopotential_height_850hPa && typeof h.geopotential_height_850hPa[hourIdx] === 'number') ? h.geopotential_height_850hPa[hourIdx] : 1457;
   const z700 = (h.geopotential_height_700hPa && typeof h.geopotential_height_700hPa[hourIdx] === 'number') ? h.geopotential_height_700hPa[hourIdx] : 3012;
   const z500 = (h.geopotential_height_500hPa && typeof h.geopotential_height_500hPa[hourIdx] === 'number') ? h.geopotential_height_500hPa[hourIdx] : 5574;
+
+  const hasInversion = (t850 !== null && t925 !== null && t850 >= t925 - 0.2) ||
+    (t850 !== null && t2m !== null && t850 > t2m + 1.0) ||
+    (t925 !== null && t2m !== null && t925 > t2m + 1.0) ||
+    (t850 !== null && t1000 !== null && t850 > t1000);
 
   let lapseRate = null;
 
@@ -151,9 +161,12 @@ function calculatePressureLapseRate(h, hourIdx = 0, targetElevation = null) {
     if (targetElevation >= z700 && t700 !== null && t500 !== null) {
       const dz = Math.max(100, z500 - z700);
       lapseRate = ((t500 - t700) / dz) * 100;
-    } else if (targetElevation < z700 && t850 !== null && t700 !== null) {
+    } else if (targetElevation >= z850 && targetElevation < z700 && t850 !== null && t700 !== null) {
       const dz = Math.max(100, z700 - z850);
       lapseRate = ((t700 - t850) / dz) * 100;
+    } else if (targetElevation < z850 && t925 !== null && t850 !== null) {
+      const dz = Math.max(100, z850 - z925);
+      lapseRate = ((t850 - t925) / dz) * 100;
     }
   }
 
@@ -173,14 +186,14 @@ function calculatePressureLapseRate(h, hourIdx = 0, targetElevation = null) {
   if (lapseRate === null || isNaN(lapseRate)) {
     return {
       lapseRatePer100m: -0.65,
-      isInversion: false,
+      isInversion: hasInversion,
       isFallback: true
     };
   }
 
   return {
     lapseRatePer100m: Math.round(lapseRate * 100) / 100,
-    isInversion: lapseRate > 0,
+    isInversion: hasInversion || (lapseRate > 0),
     isFallback: false
   };
 }

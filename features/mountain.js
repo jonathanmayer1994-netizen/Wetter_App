@@ -101,7 +101,8 @@ export function renderMountainPanel() {
   const invElem = document.getElementById('m-inversion-status');
   if (invElem) {
     if (m.atmosphere.inversionActive) {
-      invElem.innerText = '⚠️ Inversion aktiv (Oben wärmer)';
+      const invTop = m.atmosphere.inversionTopMeters ? ` (Nebelmeer bis ~${m.atmosphere.inversionTopMeters.toLocaleString('de-DE')} m)` : '';
+      invElem.innerText = `⚠️ Inversion aktiv${invTop} • Oben wärmer`;
       invElem.style.color = '#ffd166';
     } else {
       invElem.innerText = '🟢 Normaler Berg-Gradient';
@@ -133,7 +134,13 @@ export function renderMountainPanel() {
     summitCondEl.innerText = w.snowCondition || 'Normal';
   }
   if (summitBadgeEl) {
-    if (m.atmosphere.inversionActive) {
+    if (m.microWeather && m.microWeather.foehnDiagnostic && m.microWeather.foehnDiagnostic.alertLevel >= 1) {
+      summitBadgeEl.innerText = m.microWeather.foehnDiagnostic.alertLevel === 2 ? '🔴 Föhnsturm' : '🟡 Föhn';
+      summitBadgeEl.style.color = m.microWeather.foehnDiagnostic.badgeColor;
+    } else if (m.microWeather && m.microWeather.snow && m.microWeather.snow.isSnow && m.microWeather.snow.freshSnowCm24h > 0) {
+      summitBadgeEl.innerText = `❄️ +${m.microWeather.snow.freshSnowCm24h} cm`;
+      summitBadgeEl.style.color = '#64d2ff';
+    } else if (m.atmosphere.inversionActive) {
       summitBadgeEl.innerText = '⚠️ Inversion';
       summitBadgeEl.style.color = '#ffd166';
     } else if (snowLevel && snowLevel < loc.elevation) {

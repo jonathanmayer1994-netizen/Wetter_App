@@ -95,6 +95,12 @@ export function renderVerificationDashboard() {
     })).sort((a, b) => b.score - a.score);
 
     scorecardHtml = `
+      ${modelEvaluation.synopticRegime ? `
+        <div class="vfy-regime-banner" style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;">
+          <span>${modelEvaluation.synopticRegime.icon} <strong>Wetterlage:</strong> ${escapeHtml(modelEvaluation.synopticRegime.name)}</span>
+          <span style="color:#64d2ff;font-weight:600;">${escapeHtml(modelEvaluation.synopticRegime.badge)}</span>
+        </div>
+      ` : ''}
       <div class="vfy-scorecard-grid">
         ${sortedModels.map(m => `
           <div class="vfy-model-card ${m.isWinner ? 'is-winner' : ''}">

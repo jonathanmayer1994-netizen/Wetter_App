@@ -254,18 +254,20 @@ export function renderOverviewTab() {
   } else {
     // Prüfe auf Inversions-Hochnebel (Allgäu / Voralpen Kaltluftsee)
     const isInversionActive = (m && m.atmosphere && m.atmosphere.inversionActive);
+    const invTopMeters = (m && m.atmosphere && m.atmosphere.inversionTopMeters) ? m.atmosphere.inversionTopMeters : 1450;
+    const invTopStr = invTopMeters.toLocaleString('de-DE');
     const hasInversionFog = (state.actualData && state.actualData.orographicInsights && state.actualData.orographicInsights.some(i => i.type === 'inversion_fog_detected')) ||
       (isInversionActive && (cur.relative_humidity_2m >= 80 || cur.weather_code <= 2));
 
-    const isMountainSummitAboveFog = state.currentLocation.isMountain && state.currentLocation.elevation >= 1400;
+    const isMountainSummitAboveFog = state.currentLocation.isMountain && state.currentLocation.elevation >= (invTopMeters - 50);
 
     if (hasInversionFog || (isInversionActive && isMountainSummitAboveFog)) {
-      if (!isMountainSummitAboveFog && state.currentLocation.elevation <= 1450) {
-        conditionLabel = 'Dichter Hochnebel (Inversion bis ~1.450 m)';
+      if (!isMountainSummitAboveFog && state.currentLocation.elevation <= invTopMeters) {
+        conditionLabel = `Dichter Hochnebel (Inversion bis ~${invTopStr} m)`;
         const iconEl = document.getElementById('hero-weather-icon');
         if (iconEl) iconEl.innerText = '🌫️';
       } else {
-        conditionLabel = 'Sonnig über dem Nebelmeer (Inversion)';
+        conditionLabel = `Sonnig über dem Nebelmeer (Inversion bis ~${invTopStr} m)`;
         const iconEl = document.getElementById('hero-weather-icon');
         if (iconEl) iconEl.innerText = '☀️🏔️';
       }
@@ -284,10 +286,12 @@ export function renderOverviewTab() {
     }
   }
 
-  // Föhn- & Talwind-Status im Hero anzeigen
+  // Föhn- & Talwind-Status im Hero anzeigen (inkl. synoptischer Föhn-Ampel)
   if (state.currentLocation.isMountain && m && m.microWeather) {
     if (m.microWeather.foehn && m.microWeather.foehn.active) {
       conditionLabel += ` · 💨 ${m.microWeather.foehn.label || m.microWeather.foehn.type}`;
+    } else if (m.microWeather.foehnDiagnostic && m.microWeather.foehnDiagnostic.alertLevel >= 1) {
+      conditionLabel += ` · 💨 ${m.microWeather.foehnDiagnostic.title}`;
     } else if (m.microWeather.valleyWind && m.microWeather.valleyWind.active) {
       const vIcon = m.microWeather.valleyWind.type === 'Anabatic' ? '☀️' : '🌙';
       conditionLabel += ` · ${vIcon} ${m.microWeather.valleyWind.label}`;
@@ -298,6 +302,8 @@ export function renderOverviewTab() {
       let pillText = `🏔️ ${state.currentLocation.elevation.toLocaleString('de-DE')} m`;
       if (m.microWeather.foehn && m.microWeather.foehn.active) {
         pillText += ` · 💨 ${m.microWeather.foehn.type}`;
+      } else if (m.microWeather.foehnDiagnostic && m.microWeather.foehnDiagnostic.alertLevel >= 1) {
+        pillText += ` · 💨 ${m.microWeather.foehnDiagnostic.alertLevel === 2 ? 'Föhnsturm' : 'Föhnbereitschaft'}`;
       } else if (m.microWeather.valleyWind && m.microWeather.valleyWind.active) {
         const vIcon = m.microWeather.valleyWind.type === 'Anabatic' ? '☀️' : '🌙';
         pillText += ` · ${vIcon} ${m.microWeather.valleyWind.type}`;
@@ -308,14 +314,16 @@ export function renderOverviewTab() {
 
   document.getElementById('hero-condition-text').innerText = conditionLabel;
 
-  // Schneefallgrenze & Nullgradgrenze darstellen:
-  // - Vollständig ausgeschrieben ("Schneefallgrenze: ~1.422 m")
-  // - Bei Stadtwetter dezent & weniger prominent
-  // - Bei Bergwetter deutlicher (alpine Pill), aber nicht riesig
+  // Schneefallgrenze, Nullgradgrenze & Neuschnee darstellen
   const snowlineEl = document.getElementById('hero-snowline-row');
   if (snowlineEl) {
     const isMountain = !!state.currentLocation.isMountain;
-    if (isPrecip && snowLevel && (isMountain || snowLevel < 3500)) {
+    const snowPhysics = m && m.microWeather && m.microWeather.snow;
+    if (snowPhysics && snowPhysics.isSnow && snowPhysics.freshSnowCm24h > 0) {
+      snowlineEl.style.display = 'flex';
+      const snowText = `❄️ +${snowPhysics.freshSnowCm24h} cm Neuschnee (24h) • ${snowPhysics.qualityLabel.split('•')[0].trim()}`;
+      snowlineEl.innerHTML = `<span class="hero-snowline-mountain">${snowText}</span>`;
+    } else if (isPrecip && snowLevel && (isMountain || snowLevel < 3500)) {
       const sfgVal = Math.round(snowLevel).toLocaleString('de-DE');
       snowlineEl.style.display = 'flex';
       if (isMountain) {
@@ -326,7 +334,11 @@ export function renderOverviewTab() {
     } else if (!isPrecip && isMountain && freezingLevel) {
       const flVal = Math.round(freezingLevel).toLocaleString('de-DE');
       snowlineEl.style.display = 'flex';
-      snowlineEl.innerHTML = `<span class="hero-snowline-mountain freezing">🧊 Nullgradgrenze: ~${flVal} m</span>`;
+      if (m && m.atmosphere && m.atmosphere.inversionActive && m.atmosphere.inversionTopMeters) {
+        snowlineEl.innerHTML = `<span class="hero-snowline-mountain freezing">🌫️ Inversion bis ~${m.atmosphere.inversionTopMeters.toLocaleString('de-DE')} m • 🧊 0°C: ~${flVal} m</span>`;
+      } else {
+        snowlineEl.innerHTML = `<span class="hero-snowline-mountain freezing">🧊 Nullgradgrenze: ~${flVal} m</span>`;
+      }
     } else {
       snowlineEl.style.display = 'none';
       snowlineEl.innerHTML = '';

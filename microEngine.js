@@ -71,12 +71,13 @@ export const MicroEngine = {
       terrain.elevation = officialElevation;
     }
 
-    // 2. Open-Meteo Daten, Stationsdaten (Bright Sky/DWD), Modell-Historie & Radar parallel abrufen
-    const [weatherRaw, stationData, modelHistory, radarData] = await Promise.all([
+    // 2. Open-Meteo Daten, Stationsdaten (Bright Sky/DWD), Modell-Historie, Radar & Alpen-Druckgradient parallel abrufen
+    const [weatherRaw, stationData, modelHistory, radarData, alpineFoehn] = await Promise.all([
       this.fetchOpenMeteoMultiLayer(lat, lon, terrain),
       this.fetchStationData(lat, lon, terrain, isMountain, country),
       this.fetchModelHistory(lat, lon, terrain.elevation),
-      this.fetchRadarNowcastData(lat, lon)
+      this.fetchRadarNowcastData(lat, lon),
+      this.fetchAlpinePressureGradient(lat, lon)
     ]);
 
     // 2b. Dynamische Bias-Korrektur anwenden, BEVOR microWeather.temperature10m berechnet wird
@@ -85,7 +86,7 @@ export const MicroEngine = {
     );
 
     // 3. Physikalische Mikro-Effekte berechnen (auf Basis der bias-korrigierten Daten)
-    const physics = this.computeMicroPhysics(terrain, weatherRaw, isMountain, stationData);
+    const physics = this.computeMicroPhysics(terrain, weatherRaw, isMountain, stationData, alpineFoehn);
 
     // 4. Höhenprofil (Tal vs. Berg) via physics.worker.js (Task 3a) mit synchronem Fallback
     let altitudeProfile = null;
@@ -105,6 +106,7 @@ export const MicroEngine = {
       ...physics,
       biasCorrection,
       altitudeProfile,
+      foehnDiagnostic: alpineFoehn,
       weatherRaw,
       stationData,
       modelHistory,
@@ -379,6 +381,7 @@ export const MicroEngine = {
       "wind_gusts_10m",
       "uv_index",
       "cloud_cover",
+      "cape",
       "snowfall",
       "freezing_level_height",
       "shortwave_radiation",
@@ -1246,9 +1249,244 @@ export const MicroEngine = {
   },
 
   /**
+   * Berechnet das dynamische vertikale Inversionsprofil und die exakte Obergrenze des Nebelmeers
+   * anhand von Feuchtesprung (Subsidenzdeckel) und Temperaturumkehr über geopotentiellen Höhen.
+   */
+  calculateInversionProfile(h, hourIdx = 0) {
+    if (!h) {
+      return { inversionActive: false, inversionTopMeters: null, inversionBaseMeters: null, inversionStrengthC: 0 };
+    }
+
+    const levels = [1000, 925, 850, 700, 600, 500];
+    const points = [];
+
+    const t2m = (h.temperature_2m && typeof h.temperature_2m[hourIdx] === 'number') ? h.temperature_2m[hourIdx] : null;
+    const rh2m = (h.relative_humidity_2m && typeof h.relative_humidity_2m[hourIdx] === 'number') ? h.relative_humidity_2m[hourIdx] : 75;
+
+    for (const lvl of levels) {
+      const z = h[`geopotential_height_${lvl}hPa`]?.[hourIdx];
+      const t = h[`temperature_${lvl}hPa`]?.[hourIdx];
+      const rh = h[`relative_humidity_${lvl}hPa`]?.[hourIdx];
+      if (typeof z === 'number' && typeof t === 'number') {
+        points.push({ hpa: lvl, z, t, rh: (typeof rh === 'number' ? rh : rh2m) });
+      }
+    }
+
+    points.sort((a, b) => a.z - b.z);
+    if (points.length < 2) {
+      return { inversionActive: false, inversionTopMeters: null, inversionBaseMeters: null, inversionStrengthC: 0 };
+    }
+
+    let inversionActive = false;
+    let inversionTopMeters = null;
+    let inversionBaseMeters = null;
+    let maxWarmth = -Infinity;
+    let maxStrength = 0;
+
+    let warmPeakIdx = -1;
+    for (let i = 0; i < points.length; i++) {
+      if (points[i].z <= 2600 && points[i].t > maxWarmth) {
+        maxWarmth = points[i].t;
+        warmPeakIdx = i;
+      }
+    }
+
+    if (warmPeakIdx > 0 && maxWarmth >= points[0].t + 0.3) {
+      inversionActive = true;
+      inversionBaseMeters = Math.round(points[0].z);
+      maxStrength = Math.round((maxWarmth - points[0].t) * 10) / 10;
+
+      const peakPoint = points[warmPeakIdx];
+      const nextPoint = points[warmPeakIdx + 1];
+
+      if (nextPoint) {
+        if (peakPoint.rh > 65 && nextPoint.rh < 55) {
+          const dRh = peakPoint.rh - nextPoint.rh;
+          const frac = dRh > 0.01 ? (peakPoint.rh - 60) / dRh : 0.5;
+          inversionTopMeters = Math.round(peakPoint.z + Math.max(0, Math.min(1, frac)) * (nextPoint.z - peakPoint.z));
+        } else {
+          inversionTopMeters = Math.round(peakPoint.z + Math.min(300, (nextPoint.z - peakPoint.z) * 0.35));
+        }
+      } else {
+        inversionTopMeters = Math.round(peakPoint.z + 150);
+      }
+    } else if (points.length >= 2) {
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        if (p1.z <= 2200 && p1.rh >= 75 && p2.rh <= 50 && (p2.t >= p1.t - 1.5)) {
+          inversionActive = true;
+          inversionBaseMeters = Math.round(p1.z);
+          const dRh = p1.rh - p2.rh;
+          const frac = (p1.rh - 60) / dRh;
+          inversionTopMeters = Math.round(p1.z + Math.max(0, Math.min(1, frac)) * (p2.z - p1.z));
+          maxStrength = Math.round((p2.t - p1.t + 1.0) * 10) / 10;
+          break;
+        }
+      }
+    }
+
+    if (inversionTopMeters) {
+      inversionTopMeters = Math.max(650, Math.min(2350, inversionTopMeters));
+    }
+
+    return {
+      inversionActive,
+      inversionTopMeters,
+      inversionBaseMeters,
+      inversionStrengthC: maxStrength
+    };
+  },
+
+  /**
+   * Synoptischer transalpiner Druckgradient (Süd- vs. Nordalpen) zur Föhndiagnose
+   * Δp = p_msl(Süd: Bozen/Lugano) - p_msl(Nord: Innsbruck/Kempten)
+   */
+  async fetchAlpinePressureGradient(lat = 47.5, lon = 10.3) {
+    const now = Date.now();
+    if (this._foehnCache && (now - this._foehnCache.timestamp < 15 * 60 * 1000)) {
+      return this._foehnCache.data;
+    }
+
+    try {
+      const url = 'https://api.open-meteo.com/v1/forecast?latitude=46.50,47.26&longitude=11.35,11.40&current=pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m';
+      const res = await resilientFetch(url, { cancelCategory: 'foehn-gradient', ttlMs: 15 * 60 * 1000 });
+      if (Array.isArray(res) && res.length === 2) {
+        const pSouth = res[0].current?.pressure_msl || 1015;
+        const pNorth = res[1].current?.pressure_msl || 1015;
+        const deltaP = Math.round((pSouth - pNorth) * 10) / 10;
+
+        let alertLevel = 0;
+        let status = 'none';
+        let title = 'Ausgeglichener Alpen-Druckgradient';
+        let description = 'Keine signifikante Alpenüberströmung aktiv.';
+        let badgeColor = '#30d158';
+
+        if (deltaP >= 8.0) {
+          alertLevel = 2;
+          status = 'foehn_storm';
+          title = `🔴 Föhnsturm aktiv (Δp +${deltaP} hPa)`;
+          description = 'Extremer Süd-Nord-Druckgradient (Bozen-Innsbruck). Orkanartige Böen an Alpenpässen und Föhndurchbruch bis ins Vorland.';
+          badgeColor = '#ff453a';
+        } else if (deltaP >= 4.0) {
+          alertLevel = 1;
+          status = 'foehn_alert';
+          title = `🟡 Föhnbereitschaft (Δp +${deltaP} hPa)`;
+          description = 'Mäßiger bis starker Südföhn in den Alpentälern. Trockene Warmluft und lebhafte Böen.';
+          badgeColor = '#ffd166';
+        } else if (deltaP <= -4.0) {
+          alertLevel = 1;
+          status = 'nordfoehn';
+          title = `🔵 Nordföhn / Gegenstrom (Δp ${deltaP} hPa)`;
+          description = 'Höherer Druck nördlich der Alpen. Staulage an den Nordalpen, Nordföhndurchbruch im Tessin/Südtirol.';
+          badgeColor = '#64d2ff';
+        }
+
+        const data = {
+          deltaP_hPa: deltaP,
+          pSouth_hPa: Math.round(pSouth * 10) / 10,
+          pNorth_hPa: Math.round(pNorth * 10) / 10,
+          alertLevel,
+          status,
+          title,
+          description,
+          badgeColor
+        };
+        this._foehnCache = { timestamp: now, data };
+        return data;
+      }
+    } catch (_) {}
+
+    return {
+      deltaP_hPa: 0.0,
+      alertLevel: 0,
+      status: 'none',
+      title: 'Ausgeglichener Druckgradient',
+      description: 'Keine signifikante Alpenüberströmung.',
+      badgeColor: '#30d158'
+    };
+  },
+
+  /**
+   * Mikrophysikalisches Schneemodell: Berechnet Snow-to-Liquid-Ratio (SLR),
+   * Neuschneemächtigkeit in Zentimetern und Schneequalität nach Kristallisationstemperatur.
+   */
+  computeMicroSnowPhysics(h, idx, microTemp, localWetBulb, terrain, microWindGusts, localPrecip) {
+    const isFreezing = localWetBulb <= 0.8 || microTemp <= 0.5;
+    if (!isFreezing || localPrecip <= 0) {
+      return {
+        isSnow: false,
+        freshSnowCm1h: 0,
+        freshSnowCm24h: 0,
+        snowDensityKgM3: null,
+        slr: null,
+        qualityLabel: 'Schneefrei',
+        driftingRisk: false
+      };
+    }
+
+    let slr = 10;
+    let density = 100;
+    let quality = 'Normaler Alpinschnee';
+
+    if (microTemp > 0.5 && localWetBulb <= 0.8) {
+      slr = 6.0;
+      density = 165;
+      quality = '🌧️❄️ Schwerer Nassschnee / Pappschnee (Dichte ~165 kg/m³)';
+    } else if (microTemp >= -2.0 && microTemp <= 0.5) {
+      slr = 8.5;
+      density = 120;
+      quality = '❄️ Dichter Neuschnee (Dichte ~120 kg/m³)';
+    } else if (microTemp >= -6.0 && microTemp < -2.0) {
+      slr = 12.5;
+      density = 80;
+      quality = '❄️ Guter Pulverschnee (Dichte ~80 kg/m³)';
+    } else if (microTemp >= -11.0 && microTemp < -6.0) {
+      slr = 16.0;
+      density = 62;
+      quality = '❄️✨ Feiner, lockerer Kaltpulverschnee (Dichte ~62 kg/m³)';
+    } else {
+      slr = 22.0;
+      density = 45;
+      quality = '✨ Federleichter Champagne Powder (Dichte ~45 kg/m³)';
+    }
+
+    const freshSnowCm1h = Math.round((localPrecip * slr / 10) * 10) / 10;
+
+    let freshSnowCm24h = freshSnowCm1h;
+    if (h && h.precipitation && h.time) {
+      let sum24 = 0;
+      for (let s = idx; s < Math.min(idx + 24, h.precipitation.length); s++) {
+        const pStep = h.precipitation[s] || 0;
+        if (pStep > 0) {
+          const tStep = (h.temperature_2m && h.temperature_2m[s] !== undefined) ? h.temperature_2m[s] : microTemp;
+          const slrStep = tStep < -7 ? 18 : (tStep < -3 ? 14 : (tStep <= 0.5 ? 9 : 0));
+          sum24 += (pStep * slrStep / 10);
+        }
+      }
+      freshSnowCm24h = Math.round(sum24 * 10) / 10;
+    }
+
+    const driftingRisk = (microWindGusts >= 35 && freshSnowCm1h >= 0.2);
+    if (driftingRisk) {
+      quality += ' • 💨 Akute Triebschneebildung (Kamm- & Lee-Gefahr)';
+    }
+
+    return {
+      isSnow: true,
+      freshSnowCm1h,
+      freshSnowCm24h,
+      snowDensityKgM3: density,
+      slr,
+      qualityLabel: quality,
+      driftingRisk
+    };
+  },
+
+  /**
    * STUFE 3: Berechnet Mikrowetter-Physik
    */
-  computeMicroPhysics(terrain, weatherData, isMountain, stationData = null) {
+  computeMicroPhysics(terrain, weatherData, isMountain, stationData = null, alpineFoehn = null) {
     const h = weatherData.hourly;
     const cur = weatherData.current;
 
@@ -1266,8 +1504,10 @@ export const MicroEngine = {
       }
     }
 
-    // 1. Tatsächliche Lapse-Rate aus Druckflächen (850 / 700 / 500 hPa) berechnen
+    // 1. Tatsächliche Lapse-Rate & Inversionsprofil aus Druckflächen (850 / 700 / 500 hPa) berechnen
     const { lapseRatePer100m, isInversion } = this.calculatePressureLapseRate(h, idx, terrain.elevation);
+    const invProfile = this.calculateInversionProfile(h, idx);
+    const activeInversion = isInversion || invProfile.inversionActive;
 
     if (!isMountain) {
       // Stadt-Modus: Keine Felswand, normales 2m Wetter mit orographischem Inversionsabgleich
@@ -1276,7 +1516,7 @@ export const MicroEngine = {
       const windDampener = 1 / (1 + cityWind / 12);
 
       // Bei Inversion (Lapse-Rate > 0) und Kessel/Mulde (TPI < 0): Cold Pool im Tal
-      if (isInversion && terrain.tpi < 0) {
+      if (activeInversion && terrain.tpi < 0) {
         const poolDepth = 1.2 + (lapseRatePer100m * 1.5) + (Math.abs(terrain.tpi) / 20);
         cityTemp -= Math.min(4.0, poolDepth) * windDampener;
         cityTemp = Math.round(cityTemp * 10) / 10;
@@ -1286,6 +1526,7 @@ export const MicroEngine = {
       const curRh = (cur && typeof cur.relative_humidity_2m === 'number') ? cur.relative_humidity_2m : (h.relative_humidity_2m ? h.relative_humidity_2m[idx] : 70);
       const localWetBulb = this.computeWetBulbTemp(cityTemp, curRh);
       const cityPrecip = (cur && typeof cur.precipitation === 'number') ? cur.precipitation : (h && h.precipitation ? (h.precipitation[idx] || 0) : 0);
+      const citySnowPhysics = this.computeMicroSnowPhysics(h, idx, cityTemp, localWetBulb, terrain, 15, cityPrecip);
 
       let precipType = 'Trocken';
       let precipIcon = '☀️';
@@ -1307,7 +1548,10 @@ export const MicroEngine = {
         terrain10m: terrain,
         atmosphere: {
           lapseRatePer100m: lapseRatePer100m,
-          inversionActive: isInversion,
+          inversionActive: activeInversion,
+          inversionTopMeters: invProfile.inversionTopMeters,
+          inversionBaseMeters: invProfile.inversionBaseMeters,
+          inversionStrengthC: invProfile.inversionStrengthC,
           freezingLevelMeters: Math.round(freezingLevelMeters),
           snowLevelMeters: Math.round(snowLevelMeters),
           wetBulbTemp: localWetBulb,
@@ -1329,7 +1573,9 @@ export const MicroEngine = {
           windSpeedKmH: cur ? Math.round(cur.wind_speed_10m) : 10,
           windGustsKmH: cur ? Math.round(cur.wind_gusts_10m) : 15,
           windDirectionDeg: cur ? cur.wind_direction_10m : 180,
-          snowCondition: 'Schneefrei / Stadtgebiet',
+          snowCondition: citySnowPhysics.isSnow ? citySnowPhysics.qualityLabel : 'Schneefrei / Stadtgebiet',
+          snow: citySnowPhysics,
+          foehnDiagnostic: alpineFoehn || { deltaP_hPa: 0, alertLevel: 0, status: 'none', title: 'Normaler Gradient', badgeColor: '#30d158' },
           slopeWindExposure: 'Boden- / Straßenniveau (Ebene)',
           regionalModelName: (weatherData && weatherData._regionalModel && weatherData._regionalModel.displayName)
             ? weatherData._regionalModel.displayName
@@ -1661,8 +1907,9 @@ export const MicroEngine = {
       }
     }
 
-    let snowCondition = 'Schneefrei / Fels';
-    if (terrain.elevation >= snowLevelMeters || localWetBulb <= 0.5) {
+    const snowPhysics = this.computeMicroSnowPhysics(h, idx, microTemp, localWetBulb, terrain, microWindGusts, localPrecip);
+    let snowCondition = snowPhysics.isSnow ? snowPhysics.qualityLabel : 'Schneefrei / Fels';
+    if (!snowPhysics.isSnow && (terrain.elevation >= snowLevelMeters || localWetBulb <= 0.5)) {
       if (terrain.compassAzimuth >= 315 || terrain.compassAzimuth <= 45) {
         snowCondition = '❄️ Kalter Pulverschnee / Firneis';
       } else if (terrain.compassAzimuth >= 135 && terrain.compassAzimuth <= 225) {
@@ -1672,12 +1919,31 @@ export const MicroEngine = {
       }
     }
 
+    // Wenn Föhn-Ampel aktiv ist (alertLevel >= 1) und Föhn lokal noch nicht getriggert wurde:
+    if (alpineFoehn && alpineFoehn.alertLevel >= 1 && !foehn.active) {
+      const isSouthSector = (freeAirWindDir >= 130 && freeAirWindDir <= 230);
+      const isNorthSector = (freeAirWindDir >= 320 || freeAirWindDir <= 40);
+      if ((alpineFoehn.status === 'nordfoehn' && isNorthSector) || (alpineFoehn.status !== 'nordfoehn' && isSouthSector)) {
+        foehn = {
+          active: true,
+          type: alpineFoehn.status === 'nordfoehn' ? 'Nordföhn' : 'Südföhn',
+          tempDelta: alpineFoehn.alertLevel === 2 ? 3.5 : 2.0,
+          humidityDelta: -20,
+          windBoost: alpineFoehn.alertLevel === 2 ? 25 : 15,
+          label: `${alpineFoehn.status === 'nordfoehn' ? 'Nordföhn' : 'Südföhn'} (Δp ${alpineFoehn.deltaP_hPa > 0 ? '+' : ''}${alpineFoehn.deltaP_hPa} hPa)`
+        };
+      }
+    }
+
     return {
       timestamp: h.time[idx],
       terrain10m: terrain,
       atmosphere: {
         lapseRatePer100m: Math.round(lapseRatePer100m * 100) / 100,
-        inversionActive: isInversion,
+        inversionActive: activeInversion,
+        inversionTopMeters: invProfile.inversionTopMeters,
+        inversionBaseMeters: invProfile.inversionBaseMeters,
+        inversionStrengthC: invProfile.inversionStrengthC,
         freezingLevelMeters: Math.round(freezingLevelMeters),
         snowLevelMeters: Math.round(snowLevelMeters),
         wetBulbTemp: localWetBulb,
@@ -1688,8 +1954,10 @@ export const MicroEngine = {
         wetBulbTemp: localWetBulb,
         relativeHumidity: Math.round(curRh),
         foehn: foehn,
+        foehnDiagnostic: alpineFoehn || { deltaP_hPa: 0, alertLevel: 0, status: 'none', title: 'Normaler Gradient', badgeColor: '#30d158' },
         valleyWind: valleyWind,
         precipitationMm: localPrecip,
+        snow: snowPhysics,
         orographicMultiplier: Math.round(orographicMultiplier * 100) / 100,
         precipType: precipType,
         precipIcon: precipIcon,
