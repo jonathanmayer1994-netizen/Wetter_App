@@ -1488,11 +1488,12 @@ body {
 }
 
 .ish-title {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-tertiary);
+  white-space: nowrap;
 }
 
 .ish-badge {
@@ -1503,6 +1504,28 @@ body {
   border: 1px solid rgba(255, 209, 102, 0.25);
   padding: 2px 8px;
   border-radius: 10px;
+}
+
+/* 24h Inline Day Overview Chart Card (Apple Weather & Windy High-Precision Vector Design) */
+.inline-day-chart-card {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 10px 10px 10px;
+  margin-bottom: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  position: relative;
+}
+
+.inline-day-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  user-select: none;
 }
 
 .inline-parts-row {
@@ -8264,7 +8287,7 @@ body {
     width: fit-content !important;
     min-width: unset !important;
     max-width: 240px !important;
-    padding: 6px 10px !important;
+    padding: 5px 10px !important;
     gap: 10px !important;
     background: rgba(15, 23, 42, 0.94) !important;
     backdrop-filter: blur(24px) !important;

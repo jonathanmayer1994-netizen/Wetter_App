@@ -423,26 +423,36 @@ export const MicroEngine = {
     });
 
     const modelPriority = this.getRegionalModelPriority(lat, lon, terrain.elevation);
-    if (modelPriority.primaryModel && modelPriority.primaryModel !== 'best_match') {
-      params.set('models', modelPriority.primaryModel);
-    }
+    // Open-Meteo's Standard (best_match) blendet regionale Modelle (ICON-D2, ICON-EU, AROME)
+    // nahtlos mit ECMWF IFS für volle 10 Tage (240h) ein.
+    // Ein starres "models=icon_eu" bricht nach 120h (Tag 5) ab und liefert danach Null-Werte!
+    // Daher lassen wir den 10-Tage-Forecast nahtlos auf Best-Match laufen.
 
     let raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
       cancelCategory: 'micro-weather-forecast',
       ttlMs: 3 * 60 * 1000
     });
 
-    // Robuster Fallback auf Standard Best-Match, falls ein regionales Modell an den Grenzen fehlschlägt
-    if (!raw && params.has('models')) {
-      params.delete('models');
-      raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
-        cancelCategory: 'micro-weather-forecast-fallback',
-        ttlMs: 3 * 60 * 1000
-      });
-    }
-
     if (raw) {
       raw._regionalModel = modelPriority;
+      // Sanity-Check: Fehlende Tageswerte (z. B. Min/Max) aus stündlichen Daten rekonstruieren
+      if (raw.daily && raw.hourly && raw.hourly.temperature_2m && Array.isArray(raw.daily.time)) {
+        for (let i = 0; i < raw.daily.time.length; i++) {
+          const sH = i * 24;
+          const eH = Math.min((i + 1) * 24, raw.hourly.temperature_2m.length);
+          if (eH > sH) {
+            const dayTemps = raw.hourly.temperature_2m.slice(sH, eH).filter(v => typeof v === 'number' && !isNaN(v));
+            if (dayTemps.length > 0) {
+              if (raw.daily.temperature_2m_min[i] == null || isNaN(raw.daily.temperature_2m_min[i])) {
+                raw.daily.temperature_2m_min[i] = Math.min(...dayTemps);
+              }
+              if (raw.daily.temperature_2m_max[i] == null || isNaN(raw.daily.temperature_2m_max[i])) {
+                raw.daily.temperature_2m_max[i] = Math.max(...dayTemps);
+              }
+            }
+          }
+        }
+      }
       if (raw.current) raw.current = validateCurrentWeather(raw.current);
       if (raw.hourly) raw.hourly = validateHourlyWeather(raw.hourly);
     }

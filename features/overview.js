@@ -798,6 +798,200 @@ export function renderHourlySlider(hourly) {
   }
 }
 
+/**
+ * ULTRA-PRÄZISER APPLE-WEATHER-GRADE 24H TAGESÜBERBLICK (SVG)
+ * Kombiniert Temperaturverlauf als geschmeidige Spline, Sonnenstunden als solare Lichtbalken,
+ * exakte Sonnenauf- & -untergangs-Meilensteine sowie bedingte Niederschlagsbalken (NUR wenn Niederschlag fällt).
+ */
+export function renderDayOverviewSVG({
+  dayIndex,
+  hourlyTemps,
+  hourlySunSecList,
+  hourlyPrecip,
+  hourlyPop,
+  sunriseStr,
+  sunsetStr,
+  sunriseDec,
+  sunsetDec,
+  tMin,
+  tMax
+}) {
+  const validTemps = (Array.isArray(hourlyTemps) && hourlyTemps.length === 24) ? hourlyTemps : new Array(24).fill(10);
+  const minT = (typeof tMin === 'number' && !isNaN(tMin)) ? tMin : Math.min(...validTemps);
+  const maxT = (typeof tMax === 'number' && !isNaN(tMax)) ? tMax : Math.max(...validTemps);
+  const tempRange = Math.max(2, maxT - minT);
+
+  const hasPrecip = Array.isArray(hourlyPrecip) && hourlyPrecip.some(p => p > 0.05);
+  const W = 540;
+  const H = hasPrecip ? 195 : 138;
+  const padLeft = 26;
+  const padRight = 26;
+  const chartW = W - padLeft - padRight; // 488
+
+  const getX = (hour) => padLeft + (Math.max(0, Math.min(24, hour)) / 24) * chartW;
+
+  // Y-Bereich für Temperaturkurve
+  const chartTop = 44;
+  const chartBottom = 104;
+  const chartHeight = chartBottom - chartTop; // 60px
+  const getY = (t) => chartBottom - ((t - minT) / tempRange) * chartHeight;
+
+  // Sonnenauf- & Untergangs-Positionen
+  const xSunrise = Math.max(padLeft, Math.min(W - padRight, getX(sunriseDec)));
+  const xSunset = Math.max(padLeft, Math.min(W - padRight, getX(sunsetDec)));
+
+  // SVG IDs für Gradienten & Filter
+  const gradId = `dayTempGrad_${dayIndex}`;
+  const fillId = `dayTempFill_${dayIndex}`;
+  const sunGradId = `daySunGrad_${dayIndex}`;
+
+  // 1. Sonnenstunden-Balken (Tageslicht & Intensität)
+  let sunBarsHtml = '';
+  if (Array.isArray(hourlySunSecList)) {
+    for (let h = 0; h < 24; h++) {
+      const sSec = hourlySunSecList[h] || 0;
+      const sunMin = Math.round(sSec / 60);
+      if (sunMin >= 5) {
+        const bx = getX(h) + 1;
+        const bw = Math.max(2, (chartW / 24) - 2);
+        const barH = Math.max(6, Math.round((sunMin / 60) * 34));
+        const by = chartBottom - barH;
+        const opacity = Math.min(0.65, (sunMin / 60) * 0.45 + 0.15);
+        sunBarsHtml += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="url(#${sunGradId})" fill-opacity="${opacity.toFixed(2)}" />`;
+      }
+    }
+  }
+
+  // 2. Temperaturkurve als glatter kubischer Bezier-Pfad
+  const pts = [];
+  for (let h = 0; h < 24; h++) {
+    pts.push({ x: getX(h + 0.5), y: getY(validTemps[h]), t: validTemps[h], h });
+  }
+
+  let pathD = `M ${getX(0).toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let idx = 0; idx < pts.length - 1; idx++) {
+    const p0 = pts[Math.max(0, idx - 1)];
+    const p1 = pts[idx];
+    const p2 = pts[idx + 1];
+    const p3 = pts[Math.min(pts.length - 1, idx + 2)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    pathD += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  pathD += ` L ${getX(24).toFixed(1)} ${pts[pts.length - 1].y.toFixed(1)}`;
+
+  const fillD = `${pathD} L ${getX(24).toFixed(1)} ${chartBottom.toFixed(1)} L ${getX(0).toFixed(1)} ${chartBottom.toFixed(1)} Z`;
+
+  // Min / Max Marker
+  let minPt = pts[0], maxPt = pts[0];
+  for (const pt of pts) {
+    if (pt.t < minPt.t) minPt = pt;
+    if (pt.t > maxPt.t) maxPt = pt;
+  }
+
+  // 3. Niederschlagsteil (Bedingt: NUR wenn es am Tag Niederschlag gibt)
+  let precipSectionHtml = '';
+  if (hasPrecip) {
+    const maxPrecipVal = Math.max(2, ...hourlyPrecip);
+    let pBars = '';
+    for (let h = 0; h < 24; h++) {
+      const pAmt = hourlyPrecip[h] || 0;
+      const popVal = (hourlyPop && hourlyPop[h]) || 0;
+      if (pAmt > 0.05 || popVal >= 20) {
+        const bx = getX(h) + 1;
+        const bw = Math.max(2, (chartW / 24) - 2);
+        const bH = Math.max(5, Math.round((pAmt / maxPrecipVal) * 28));
+        const by = 164 - bH;
+        pBars += `
+          <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bH.toFixed(1)}" rx="2.5" fill="#38bdf8" fill-opacity="0.82" />
+          ${pAmt >= 0.1 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${(by - 3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="700" fill="#38bdf8">${pAmt.toFixed(1)}</text>` : ''}
+          ${popVal >= 15 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="174" text-anchor="middle" font-size="7.5" font-weight="600" fill="#94a3b8">${popVal}%</text>` : ''}
+        `;
+      }
+    }
+
+    precipSectionHtml = `
+      <!-- Niederschlags-Trennlinie & Sektion -->
+      <line x1="${padLeft}" y1="122" x2="${W - padRight}" y2="122" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1" />
+      <text x="${padLeft}" y="133" font-size="8.5" font-weight="700" fill="#38bdf8" letter-spacing="0.4">💧 NIEDERSCHLAG (mm / %)</text>
+      ${pBars}
+    `;
+  }
+
+  const timeAxisY = hasPrecip ? 189 : 127;
+
+  return `
+    <svg class="inline-day-svg" viewBox="0 0 ${W} ${H}" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <defs>
+        <linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#38bdf8" />
+          <stop offset="35%" stop-color="#fbbf24" />
+          <stop offset="70%" stop-color="#f97316" />
+          <stop offset="100%" stop-color="#38bdf8" />
+        </linearGradient>
+        <linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.22" />
+          <stop offset="65%" stop-color="#38bdf8" stop-opacity="0.04" />
+          <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
+        </linearGradient>
+        <linearGradient id="${sunGradId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fde047" />
+          <stop offset="100%" stop-color="#f59e0b" />
+        </linearGradient>
+        <filter id="glow_${dayIndex}" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#f59e0b" flood-opacity="0.28" />
+        </filter>
+      </defs>
+
+      <!-- Tageslicht-Glow Hintergrundzone zwischen Sonnenaufgang und Untergang -->
+      ${xSunset > xSunrise ? `
+        <rect x="${xSunrise.toFixed(1)}" y="${chartTop}" width="${(xSunset - xSunrise).toFixed(1)}" height="${chartHeight}" rx="4" fill="rgba(245, 158, 11, 0.07)" />
+      ` : ''}
+
+      <!-- Horizontale Hilfslinien -->
+      <line x1="${padLeft}" y1="${chartBottom}" x2="${W - padRight}" y2="${chartBottom}" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1" />
+      <line x1="${padLeft}" y1="${chartTop}" x2="${W - padRight}" y2="${chartTop}" stroke="rgba(255, 255, 255, 0.05)" stroke-dasharray="2,4" stroke-width="1" />
+
+      <!-- Sonnenstunden Balken (Golden Solar Glow) -->
+      ${sunBarsHtml}
+
+      <!-- Temperaturverlauf Flächenfüllung & Spline -->
+      <path d="${fillD}" fill="url(#${fillId})" />
+      <path d="${pathD}" fill="none" stroke="url(#${gradId})" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow_${dayIndex})" />
+
+      <!-- Min & Max Marker -->
+      <circle cx="${maxPt.x.toFixed(1)}" cy="${maxPt.y.toFixed(1)}" r="3.8" fill="#fbbf24" stroke="#ffffff" stroke-width="1.8" />
+      <text x="${maxPt.x.toFixed(1)}" y="${(Math.max(30, maxPt.y - 8)).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="800" fill="#fde047">H ${Math.round(maxPt.t)}°</text>
+
+      <circle cx="${minPt.x.toFixed(1)}" cy="${minPt.y.toFixed(1)}" r="3.8" fill="#38bdf8" stroke="#ffffff" stroke-width="1.8" />
+      <text x="${minPt.x.toFixed(1)}" y="${(Math.min(118, minPt.y + 13)).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="800" fill="#7dd3fc">T ${Math.round(minPt.t)}°</text>
+
+      <!-- Sonnenauf- & Sonnenuntergang Vertikale Linien & Meilensteine -->
+      <line x1="${xSunrise.toFixed(1)}" y1="18" x2="${xSunrise.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 191, 36, 0.7)" stroke-width="1.2" stroke-dasharray="3,3" />
+      <text x="${xSunrise.toFixed(1)}" y="14" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fbbf24">🌅 ${sunriseStr}</text>
+
+      <line x1="${xSunset.toFixed(1)}" y1="18" x2="${xSunset.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 146, 60, 0.7)" stroke-width="1.2" stroke-dasharray="3,3" />
+      <text x="${xSunset.toFixed(1)}" y="14" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fb923c">🌇 ${sunsetStr}</text>
+
+      <!-- Niederschlag (nur wenn Niederschlag vorhanden) -->
+      ${precipSectionHtml}
+
+      <!-- Zeitachse (0h, 6h, 12h, 18h, 24h) -->
+      <g class="chart-time-axis" font-size="8" font-weight="600" fill="#64748b">
+        <text x="${getX(0).toFixed(1)}" y="${timeAxisY}" text-anchor="start">00:00</text>
+        <text x="${getX(6).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">06:00</text>
+        <text x="${getX(12).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">12:00</text>
+        <text x="${getX(18).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">18:00</text>
+        <text x="${getX(24).toFixed(1)}" y="${timeAxisY}" text-anchor="end">24:00</text>
+      </g>
+    </svg>
+  `;
+}
+
 export function render10DayForecast(daily, hourly) {
   const container = document.getElementById('daily-forecast-list');
   if (!container || !daily || !daily.time || daily.time.length === 0) return;
@@ -833,35 +1027,63 @@ export function render10DayForecast(daily, hourly) {
     const minVal = daily.temperature_2m_min[i];
     const maxVal = daily.temperature_2m_max[i];
 
-    // Sunshine hours & daylight duration calculations
-    let sunDurSec = daily.sunshine_duration ? (daily.sunshine_duration[i] || 0) : 0;
-    const daylightSec = daily.daylight_duration ? (daily.daylight_duration[i] || 0) : 0;
-    if (sunDurSec === 0 && hourly && hourly.sunshine_duration) {
-      let sumSec = 0;
-      for (let h = 0; h < 24; h++) {
-        const idx = (i * 24) + h;
-        if (hourly.sunshine_duration[idx] > 0) sumSec += hourly.sunshine_duration[idx];
+    // 24h-Stundenarrays für diesen spezifischen Tag extrahieren
+    const dayStartHourIdx = i * 24;
+    const hourlyTemps = [];
+    const hourlySunSecList = [];
+    const hourlyPrecip = [];
+    const hourlyPop = [];
+
+    let totalDaySunSec = 0;
+    for (let h = 0; h < 24; h++) {
+      const hIdx = dayStartHourIdx + h;
+      
+      // Temperatur
+      let t = 10;
+      if (hourly && hourly.temperature_2m && hourly.temperature_2m[hIdx] != null && !isNaN(hourly.temperature_2m[hIdx])) {
+        t = hourly.temperature_2m[hIdx];
       }
-      if (sumSec > 0) sunDurSec = sumSec;
+      hourlyTemps.push(convertTemp(t));
+
+      // Sonnenschein
+      let sSec = 0;
+      if (hourly && hourly.sunshine_duration && hourly.sunshine_duration[hIdx] != null && !isNaN(hourly.sunshine_duration[hIdx])) {
+        sSec = hourly.sunshine_duration[hIdx];
+      } else if (hourly && hourly.cloud_cover && hourly.cloud_cover[hIdx] != null) {
+        const isDay = (hourly.is_day ? hourly.is_day[hIdx] === 1 : (h >= 7 && h <= 17));
+        sSec = isDay ? Math.max(0, (100 - (hourly.cloud_cover[hIdx] || 0)) / 100 * 3600) : 0;
+      }
+      hourlySunSecList.push(sSec);
+      totalDaySunSec += sSec;
+
+      // Niederschlag
+      let p = 0;
+      if (hourly && hourly.precipitation && hourly.precipitation[hIdx] != null && !isNaN(hourly.precipitation[hIdx])) {
+        p = hourly.precipitation[hIdx];
+      }
+      hourlyPrecip.push(p);
+
+      // Niederschlagswahrscheinlichkeit
+      let popVal = 0;
+      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[hIdx] != null) {
+        popVal = hourly.precipitation_probability[hIdx];
+      }
+      hourlyPop.push(popVal);
     }
+
+    // Sunshine hours & daylight duration calculations — 100% mathematische Konsistenz
+    const daylightSec = daily.daylight_duration ? (daily.daylight_duration[i] || 0) : 0;
+    const sunDurSec = Math.max(totalDaySunSec, daily.sunshine_duration ? (daily.sunshine_duration[i] || 0) : 0);
     const sunHours = sunDurSec / 3600;
     const sunHoursFormatted = sunHours >= 10 ? Math.round(sunHours) + ' h' : sunHours.toFixed(1).replace('.', ',') + ' h';
     const daylightHours = daylightSec > 0 ? (daylightSec / 3600) : 0;
     const sunQuotaPct = daylightSec > 0 ? Math.min(100, Math.round((sunDurSec / daylightSec) * 100)) : 0;
 
-    // Mini sparkline & expanded hourly bars for daylight hours (06:00 to 18:00 = 13 hours)
+    // Mini sparkline for daylight hours (06:00 to 18:00 = 13 hours) — greift exakt auf dieselben hourlySunSecList zu
     const sparkHours = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
     const miniBars = [];
-    const expandedBars = [];
     for (const h of sparkHours) {
-      const hIdx = (i * 24) + h;
-      let hSunSec = 0;
-      if (hourly && hourly.sunshine_duration && hourly.sunshine_duration[hIdx] != null) {
-        hSunSec = hourly.sunshine_duration[hIdx];
-      } else if (hourly && hourly.cloud_cover && hourly.cloud_cover[hIdx] != null) {
-        const isDay = hourly.is_day ? hourly.is_day[hIdx] === 1 : (h >= 7 && h <= 17);
-        hSunSec = isDay ? Math.max(0, (100 - (hourly.cloud_cover[hIdx] || 0)) / 100 * 3600) : 0;
-      }
+      const hSunSec = hourlySunSecList[h] || 0;
       const sunMin = Math.round(Math.min(60, Math.max(0, hSunSec / 60)));
 
       let miniClass = 'msb-overcast';
@@ -876,6 +1098,7 @@ export function render10DayForecast(daily, hourly) {
         miniClass = 'msb-low';
         miniHeightPct = 35;
       } else {
+        const hIdx = dayStartHourIdx + h;
         const isDayHour = hourly && hourly.is_day ? hourly.is_day[hIdx] === 1 : (h >= 7 && h <= 17);
         if (!isDayHour) {
           miniClass = 'msb-night';
@@ -883,44 +1106,30 @@ export function render10DayForecast(daily, hourly) {
         }
       }
       miniBars.push(`<span class="msb-bar ${miniClass}" style="height:${miniHeightPct}%;" title="${h}:00 Uhr: ${sunMin} Min. Sonne"></span>`);
-
-      const expHeightPct = Math.max(12, Math.round((sunMin / 60) * 100));
-      expandedBars.push(`
-        <div class="esb-col" title="${h}:00 Uhr: ${sunMin} Min. Sonnenschein">
-          <div class="esb-bar-track">
-            <div class="esb-bar-fill ${miniClass}" style="height:${expHeightPct}%;"></div>
-          </div>
-          <span class="esb-time-label">${h % 3 === 0 ? h + 'h' : ''}</span>
-        </div>
-      `);
     }
     const miniBarsHtml = miniBars.join('');
-    const expandedBarsHtml = expandedBars.join('');
 
-    // 4 day parts from hourly
-    const dayStartHourIdx = i * 24;
-    const partsData = [
-      { name: 'Morgens', offset: 8, icon: '🌅' },
-      { name: 'Mittags', offset: 13, icon: '☀️' },
-      { name: 'Abends', offset: 19, icon: '🌇' },
-      { name: 'Nachts', offset: 23, icon: '🌙' }
-    ].map(p => {
-      const idx = dayStartHourIdx + p.offset;
-      let t = '--';
-      let partPop = 0;
-      let partIcon = p.icon;
-      if (hourly && hourly.temperature_2m && hourly.temperature_2m[idx] !== undefined) {
-        t = `${Math.round(convertTemp(hourly.temperature_2m[idx]))}°`;
-        partPop = hourly.precipitation_probability ? hourly.precipitation_probability[idx] : 0;
-        const partCode = hourly.weather_code ? hourly.weather_code[idx] : 0;
-        const pInfo = WMO_CODES[partCode] || WMO_CODES[0];
-        partIcon = (p.offset >= 6 && p.offset <= 20) ? pInfo.icon : pInfo.iconNight;
-      }
-      return { ...p, t, partPop, partIcon };
+    const sunriseDate = daily.sunrise && daily.sunrise[i] ? new Date(daily.sunrise[i]) : null;
+    const sunsetDate = daily.sunset && daily.sunset[i] ? new Date(daily.sunset[i]) : null;
+    const sunriseStr = sunriseDate && !isNaN(sunriseDate.getTime()) ? sunriseDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    const sunsetStr = sunsetDate && !isNaN(sunsetDate.getTime()) ? sunsetDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    const sunriseDec = sunriseDate && !isNaN(sunriseDate.getTime()) ? (sunriseDate.getHours() + sunriseDate.getMinutes() / 60) : 7.25;
+    const sunsetDec = sunsetDate && !isNaN(sunsetDate.getTime()) ? (sunsetDate.getHours() + sunsetDate.getMinutes() / 60) : 16.75;
+
+    // SVG Chart für den 24h-Tagesüberblick
+    const dayChartSvg = renderDayOverviewSVG({
+      dayIndex: i,
+      hourlyTemps,
+      hourlySunSecList,
+      hourlyPrecip,
+      hourlyPop,
+      sunriseStr,
+      sunsetStr,
+      sunriseDec,
+      sunsetDec,
+      tMin: convertTemp(minVal),
+      tMax: convertTemp(maxVal)
     });
-
-    const sunriseStr = daily.sunrise && daily.sunrise[i] ? new Date(daily.sunrise[i]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-    const sunsetStr = daily.sunset && daily.sunset[i] ? new Date(daily.sunset[i]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
 
     const isExtended = i >= 3;
     const wrapper = document.createElement('div');
@@ -1004,55 +1213,13 @@ export function render10DayForecast(daily, hourly) {
       <div class="daily-inline-accordion" id="inline-accordion-${i}" style="display:none;">
         <div class="inline-accordion-inner">
           
-          <!-- 4 Day Parts Breakdown -->
+          <!-- 24h-Tagesverlauf (Apple-Weather-Grade SVG: Temperaturverlauf, Sonnenstunden, Meilensteine & bedingter Niederschlag) -->
           <div class="inline-section-header">
-            <span class="ish-title">⏱️ Tagesabschnitte im Überblick</span>
+            <span class="ish-title">⏱️ 24h-Tagesverlauf</span>
+            <span class="ish-badge">☀️ ${sunHoursFormatted}${sunQuotaPct > 0 ? ` (${sunQuotaPct}% Sonne)` : ''}</span>
           </div>
-          <div class="inline-parts-row">
-            ${partsData.map(p => `
-              <div class="inline-part-card">
-                <span class="ipc-name">${p.name}</span>
-                <span class="ipc-icon">${p.partIcon}</span>
-                <span class="ipc-temp">${p.t}</span>
-                <span class="ipc-rain">${p.partPop > 10 ? `💧 ${p.partPop}%` : 'Trocken'}</span>
-              </div>
-            `).join('')}
-          </div>
-
-          <!-- Detailed Sun & Daylight Timeline Section -->
-          <div class="inline-sun-section">
-            <div class="inline-section-header">
-              <span class="ish-title">☀️ Sonnenverlauf & Tageslicht</span>
-              <span class="ish-badge">${sunHoursFormatted} Sonne (${sunQuotaPct > 0 ? `${sunQuotaPct}% Quote` : 'bedeckt'})</span>
-            </div>
-            <div class="inline-sun-timeline-box">
-              <div class="istb-astro-bar">
-                <div class="istb-astro-point">
-                  <span class="iap-icon">🌅</span>
-                  <div class="iap-text">
-                    <span class="iap-lbl">Aufgang</span>
-                    <span class="iap-val">${sunriseStr}</span>
-                  </div>
-                </div>
-                
-                <div class="istb-bars-container">
-                  <div class="istb-bars-track">
-                    ${expandedBarsHtml}
-                  </div>
-                </div>
-
-                <div class="istb-astro-point">
-                  <span class="iap-icon">🌇</span>
-                  <div class="iap-text">
-                    <span class="iap-lbl">Untergang</span>
-                    <span class="iap-val">${sunsetStr}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="istb-daylight-info">
-                <span>Tageslichtdauer: <strong>${daylightHours.toFixed(1).replace('.', ',')} Stunden</strong> (${sunriseStr} bis ${sunsetStr} Uhr)</span>
-              </div>
-            </div>
+          <div class="inline-day-chart-card">
+            ${dayChartSvg}
           </div>
 
           <!-- Key Meteorological Metrics -->

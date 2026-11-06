@@ -108,7 +108,21 @@ export function validateHourlyWeather(hourly) {
   const length = hourly.time.length;
   const sanitizeArray = (arr, defaultValue = 0) => {
     if (!Array.isArray(arr)) return new Array(length).fill(defaultValue);
-    return arr.map(v => (typeof v === 'number' && !isNaN(v) ? v : defaultValue));
+    let lastValid = null;
+    for (let i = 0; i < arr.length; i++) {
+      if (typeof arr[i] === 'number' && !isNaN(arr[i])) {
+        lastValid = arr[i];
+        break;
+      }
+    }
+    if (lastValid === null) lastValid = defaultValue;
+    return arr.map(v => {
+      if (typeof v === 'number' && !isNaN(v)) {
+        lastValid = v;
+        return v;
+      }
+      return lastValid;
+    });
   };
 
   const result = {
