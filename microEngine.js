@@ -794,13 +794,21 @@ export const MicroEngine = {
       // Höhendifferenz zwischen Zielstandort und Messstation
       const deltaZ = terrain.elevation - stationHeight;
       // Tatsächliche atmosphärische Lapse-Rate aus Druckflächen nutzen (Fallback 0.65 °C/100m)
-      const { lapseRatePer100m: curLapseRate } = this.calculatePressureLapseRate(h, curIdx, terrain.elevation);
+      const { lapseRatePer100m: curLapseRate, isInversion } = this.calculatePressureLapseRate(h, curIdx, terrain.elevation);
       const lapseDeltaT = (deltaZ / 100) * curLapseRate;
 
       // Räumliche & orographische Konfidenzgewichtung: Station > ICON-EU/AROME > ECMWF/GFS
       const wDist = Math.exp(-stationDistKm / 35); // Relevanzradius ~35 km
       const wHeight = Math.exp(-Math.abs(deltaZ) / 500); // Vertikaler Relevanzradius ~500 m
-      const stationWeight = Math.min(0.95, Math.max(0, wDist * wHeight));
+      let stationWeight = Math.min(0.95, Math.max(0, wDist * wHeight));
+
+      // Meteorologische Entkopplung bei Inversion / Kaltluftsee:
+      // Liegt die Bodenstation im Tal (z. B. Oberstdorf 805 m) und der Zielort auf einem Berggipfel (z. B. Grünten 1.738 m),
+      // trennt die Inversionsgrenzschicht die beiden Luftmassen. 
+      // Eine lineare Extrapolation aus dem kalten Tal auf den milden Gipfel ist physikalisch unzulässig!
+      if (isInversion && Math.abs(deltaZ) > 350) {
+        stationWeight = 0; // Entkoppelt: Freie Atmosphäre aus Druckflächen ist für den Gipfel maßgeblich!
+      }
 
       if (stationWeight >= 0.08 && stationDistKm <= 95) {
         let weightedBiasSum = 0;
@@ -1172,13 +1180,24 @@ export const MicroEngine = {
       return { lapseRatePer100m: -0.65, isInversion: false, isFallback: true };
     }
 
+    const t1000 = (h.temperature_1000hPa && typeof h.temperature_1000hPa[hourIdx] === 'number') ? h.temperature_1000hPa[hourIdx] : null;
+    const t925 = (h.temperature_925hPa && typeof h.temperature_925hPa[hourIdx] === 'number') ? h.temperature_925hPa[hourIdx] : null;
     const t850 = (h.temperature_850hPa && typeof h.temperature_850hPa[hourIdx] === 'number') ? h.temperature_850hPa[hourIdx] : null;
     const t700 = (h.temperature_700hPa && typeof h.temperature_700hPa[hourIdx] === 'number') ? h.temperature_700hPa[hourIdx] : null;
     const t500 = (h.temperature_500hPa && typeof h.temperature_500hPa[hourIdx] === 'number') ? h.temperature_500hPa[hourIdx] : null;
+    const t2m = (h.temperature_2m && typeof h.temperature_2m[hourIdx] === 'number') ? h.temperature_2m[hourIdx] : null;
 
+    const z1000 = (h.geopotential_height_1000hPa && typeof h.geopotential_height_1000hPa[hourIdx] === 'number') ? h.geopotential_height_1000hPa[hourIdx] : 180;
+    const z925 = (h.geopotential_height_925hPa && typeof h.geopotential_height_925hPa[hourIdx] === 'number') ? h.geopotential_height_925hPa[hourIdx] : 830;
     const z850 = (h.geopotential_height_850hPa && typeof h.geopotential_height_850hPa[hourIdx] === 'number') ? h.geopotential_height_850hPa[hourIdx] : 1457;
     const z700 = (h.geopotential_height_700hPa && typeof h.geopotential_height_700hPa[hourIdx] === 'number') ? h.geopotential_height_700hPa[hourIdx] : 3012;
     const z500 = (h.geopotential_height_500hPa && typeof h.geopotential_height_500hPa[hourIdx] === 'number') ? h.geopotential_height_500hPa[hourIdx] : 5574;
+
+    // Erkennung einer bodennahen Inversion (Kaltluftsee im Tal vs. wärmere Luftschicht darüber)
+    const hasInversion = (t850 !== null && t925 !== null && t850 >= t925 - 0.2) ||
+      (t850 !== null && t2m !== null && t850 > t2m + 1.0) ||
+      (t925 !== null && t2m !== null && t925 > t2m + 1.0) ||
+      (t850 !== null && t1000 !== null && t850 > t1000);
 
     let lapseRate = null;
 
@@ -1187,9 +1206,12 @@ export const MicroEngine = {
       if (targetElevation >= z700 && t700 !== null && t500 !== null) {
         const dz = Math.max(100, z500 - z700);
         lapseRate = ((t500 - t700) / dz) * 100;
-      } else if (targetElevation < z700 && t850 !== null && t700 !== null) {
+      } else if (targetElevation >= z850 && targetElevation < z700 && t850 !== null && t700 !== null) {
         const dz = Math.max(100, z700 - z850);
         lapseRate = ((t700 - t850) / dz) * 100;
+      } else if (targetElevation < z850 && t925 !== null && t850 !== null) {
+        const dz = Math.max(100, z850 - z925);
+        lapseRate = ((t850 - t925) / dz) * 100;
       }
     }
 
@@ -1211,14 +1233,14 @@ export const MicroEngine = {
     if (lapseRate === null || isNaN(lapseRate)) {
       return {
         lapseRatePer100m: -0.65,
-        isInversion: false,
+        isInversion: hasInversion,
         isFallback: true
       };
     }
 
     return {
       lapseRatePer100m: Math.round(lapseRate * 100) / 100,
-      isInversion: lapseRate > 0,
+      isInversion: hasInversion || (lapseRate > 0),
       isFallback: false
     };
   },
@@ -1478,7 +1500,12 @@ export const MicroEngine = {
       }
     }
 
-    const baseTemp = (h.temperature_2m ? h.temperature_2m[idx] : 10) * 0.5 + freeAirTemp * 0.5;
+    // Für Berggipfel und alpine Hochlagen bestimmt die freie Atmosphäre (Druckflächen)
+    // vorrangig die Temperatur, da bodennahe 2m-Modellgitter im Gebirge das Gelände stark glätten.
+    const mountainBlend = (isMountain && terrain.elevation >= 800)
+      ? Math.min(0.85, Math.max(0.40, (terrain.elevation - 600) / 1200))
+      : 0.30;
+    const baseTemp = (h.temperature_2m ? h.temperature_2m[idx] : freeAirTemp) * (1 - mountainBlend) + freeAirTemp * mountainBlend;
     let microTemp = baseTemp + radiationTempOffset + topoInversionOffset;
 
     // -------------------------------------------------------------------------
@@ -1582,6 +1609,16 @@ export const MicroEngine = {
 
     // Wet-Bulb Schneefallgrenze & 0°C Trocken-Isotherme
     const { snowLevelMeters, freezingLevelMeters } = this.calculateWetBulbSnowLevel(h, idx, terrain.elevation);
+
+    // Physikalische Konsistenzprüfung mit der Nullgradgrenze (Freezing Level):
+    // Liegt die 0°C-Grenze weit oberhalb des Gipfels (z. B. Nullgradgrenze ~3.050 m vs. Grünten 1.738 m),
+    // befindet sich der Berg tief in der milden Höhenluftmasse und KANN NICHT im Frostbereich liegen!
+    if (freezingLevelMeters && freezingLevelMeters > terrain.elevation + 200) {
+      const minPhysicalTemp = Math.max(0.5, (freezingLevelMeters - terrain.elevation) / 450);
+      if (microTemp < minPhysicalTemp) {
+        microTemp = minPhysicalTemp;
+      }
+    }
     const localWetBulb = this.computeWetBulbTemp(microTemp, curRh);
 
     // Orographische Niederschlags-Verstärkung an Luv-Hängen (Wind + Hangneigung + Azimut)
@@ -3625,41 +3662,41 @@ export const MicroEngine = {
         lon: 10.32,
         cams: [
           {
-            id: 'bf-14110',
-            title: 'Grünten Übelhorn (1.738 m) • Wächter des Allgäus',
+            id: 'feratel-3049',
+            title: 'Grünten Gipfel Oberallgäu (1.738 m) • BR-Rundfunkstation',
             elevation: '1.738 m',
-            viewDir: 'Südwest (SW) • 360° Allgäu- & Alpenblick',
-            thumbUrl: 'https://images.bergfex.at/webcams/?id=14110',
-            highResUrl: 'https://images.bergfex.at/webcams/?id=14110',
-            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14110/',
-            backupThumbUrl: 'https://www.foto-webcam.eu/webcam/gruenten/current/720.jpg',
-            status: '🟢 Live HD • bergfex',
-            provider: 'bergfex',
-            providerName: 'bergfex Livecam'
+            viewDir: 'Südwest (SW) • 360° Allgäu- & Alpenrundblick',
+            thumbUrl: 'https://wtvpict.feratel.com/picture/35/3049.jpeg',
+            highResUrl: 'https://wtvpict.feratel.com/picture/35/3049.jpeg',
+            streamUrl: 'https://webtv.feratel.com/webtv/?cam=3049&design=v4',
+            backupThumbUrl: 'https://wtvpict.feratel.com/picture/35/3049.jpg',
+            status: '🟢 Live 4K • Alpsee-Grünten / feratel',
+            provider: 'feratel',
+            providerName: 'Alpsee-Grünten'
           },
           {
-            id: 'bf-14112',
-            title: 'Mittagberg Immenstadt (1.451 m)',
+            id: 'mittag-cam',
+            title: 'Mittagberg Immenstadt (1.451 m) • Nagelfluhkette',
             elevation: '1.451 m',
             viewDir: 'Nagelfluhkette & Großer Alpsee',
-            thumbUrl: 'https://images.bergfex.at/webcams/?id=14112',
-            highResUrl: 'https://images.bergfex.at/webcams/?id=14112',
-            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14112/',
-            status: '🟢 Live • bergfex',
+            thumbUrl: 'https://wtvpict.feratel.com/picture/35/3049.jpeg',
+            highResUrl: 'https://wtvpict.feratel.com/picture/35/3049.jpeg',
+            streamUrl: 'https://www.bergfex.de/sommer/alpsee-gruenten/webcams/',
+            status: '🟢 Live • Alpsee-Grünten',
             provider: 'bergfex',
-            providerName: 'bergfex Livecam'
+            providerName: 'bergfex Live'
           },
           {
-            id: 'bf-14111',
-            title: 'Ofterschwang & Gunzesried (1.300 m)',
+            id: 'alpsee-gruenten-cams',
+            title: 'Alpsee-Grünten & Hörnergruppe (1.300 m)',
             elevation: '1.300 m',
-            viewDir: 'Illertal & Allgäuer Hörnergruppe',
-            thumbUrl: 'https://images.bergfex.at/webcams/?id=14111',
-            highResUrl: 'https://images.bergfex.at/webcams/?id=14111',
-            streamUrl: 'https://www.bergfex.de/sommer/oberstdorf/webcams/c14111/',
+            viewDir: 'Illertal & Allgäuer Voralpen',
+            thumbUrl: 'https://images.bergfex.at/webcams/?id=14104',
+            highResUrl: 'https://images.bergfex.at/webcams/?id=14104',
+            streamUrl: 'https://www.bergfex.de/sommer/alpsee-gruenten/webcams/',
             status: '🟢 Live • bergfex',
             provider: 'bergfex',
-            providerName: 'bergfex Livecam'
+            providerName: 'bergfex Live'
           }
         ]
       },

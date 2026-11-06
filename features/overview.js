@@ -253,11 +253,14 @@ export function renderOverviewTab() {
     }
   } else {
     // Prüfe auf Inversions-Hochnebel (Allgäu / Voralpen Kaltluftsee)
+    const isInversionActive = (m && m.atmosphere && m.atmosphere.inversionActive);
     const hasInversionFog = (state.actualData && state.actualData.orographicInsights && state.actualData.orographicInsights.some(i => i.type === 'inversion_fog_detected')) ||
-      (m && m.atmosphere && m.atmosphere.inversionActive && cur.relative_humidity_2m >= 82 && cur.weather_code <= 2);
+      (isInversionActive && (cur.relative_humidity_2m >= 80 || cur.weather_code <= 2));
 
-    if (hasInversionFog) {
-      if (state.currentLocation.elevation <= 1500) {
+    const isMountainSummitAboveFog = state.currentLocation.isMountain && state.currentLocation.elevation >= 1400;
+
+    if (hasInversionFog || (isInversionActive && isMountainSummitAboveFog)) {
+      if (!isMountainSummitAboveFog && state.currentLocation.elevation <= 1450) {
         conditionLabel = 'Dichter Hochnebel (Inversion bis ~1.450 m)';
         const iconEl = document.getElementById('hero-weather-icon');
         if (iconEl) iconEl.innerText = '🌫️';
@@ -269,7 +272,11 @@ export function renderOverviewTab() {
     } else {
       // Trocken: Cloud-Cover in die Bedingung einbeziehen (Hero und Karte konsistent)
       const cloud = cur.cloud_cover !== undefined ? cur.cloud_cover : (w.hourly && w.hourly.cloud_cover ? w.hourly.cloud_cover[0] : 0);
-      if (cloud >= 75) conditionLabel = 'Bedeckt';
+      if (isMountainSummitAboveFog && m && m.atmosphere && m.atmosphere.freezingLevelMeters > state.currentLocation.elevation + 400 && cloud < 45) {
+        conditionLabel = 'Klar / Wolkenlos';
+        const iconEl = document.getElementById('hero-weather-icon');
+        if (iconEl) iconEl.innerText = '☀️';
+      } else if (cloud >= 75) conditionLabel = 'Bedeckt';
       else if (cloud >= 50) conditionLabel = 'Wolkig';
       else if (cloud >= 25) conditionLabel = 'Teilweise bewölkt';
       else if (cloud < 15 && (cur.weather_code === 0 || cur.weather_code === 1)) conditionLabel = 'Klar / Wolkenlos';

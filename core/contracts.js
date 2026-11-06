@@ -111,7 +111,7 @@ export function validateHourlyWeather(hourly) {
     return arr.map(v => (typeof v === 'number' && !isNaN(v) ? v : defaultValue));
   };
 
-  return {
+  const result = {
     time: hourly.time,
     temperature_2m: sanitizeArray(hourly.temperature_2m, 10.0),
     apparent_temperature: sanitizeArray(hourly.apparent_temperature, 10.0),
@@ -130,6 +130,15 @@ export function validateHourlyWeather(hourly) {
     freezing_level_height: sanitizeArray(hourly.freezing_level_height, 2200),
     global_tilted_irradiance: sanitizeArray(hourly.global_tilted_irradiance, 0)
   };
+
+  // Erhalte alle 3D-Druckflächen (*hPa) und Strahlungsgrößen für physikalische Alpin-Modellierung
+  for (const [key, value] of Object.entries(hourly)) {
+    if (!(key in result) && Array.isArray(value)) {
+      result[key] = value;
+    }
+  }
+
+  return result;
 }
 
 /**
