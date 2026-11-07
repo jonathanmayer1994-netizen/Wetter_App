@@ -1,0 +1,504 @@
+/* ==========================================================================
+   TAB 2: BERG & HÖHE (Höhenprofil & Wand-Ausrichtung)
+   ========================================================================== */
+.mountain-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.m-stat {
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 82px;
+}
+
+.m-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+}
+
+.m-val {
+  font-size: 16px;
+  font-weight: 800;
+  margin-top: 4px;
+  line-height: 1.25;
+  color: #ffffff;
+}
+
+.m-val.text-accent {
+  color: #ffd166;
+}
+
+.m-val.text-cyan {
+  color: var(--ios-cyan);
+}
+
+/* KONSOLIDIERTE ALPINE GIPFEL-KACHELN & ACCORDION */
+.mountain-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.mh-tile {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mh-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+}
+
+.mh-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-top: 2px;
+  letter-spacing: -0.3px;
+}
+
+.mh-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Ausklappbare Drawer für Hintergrunddetails */
+.alpine-drawer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+  margin-top: 12px;
+}
+
+.alpine-drawer-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 6px 4px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.alpine-drawer-summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.alpine-drawer-summary::-webkit-details-marker {
+  display: none;
+}
+
+.alpine-drawer[open] .drawer-arrow {
+  transform: rotate(180deg);
+}
+
+.drawer-arrow {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.alpine-drawer-body {
+  padding-top: 10px;
+}
+
+.alpine-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.ad-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ad-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ad-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+@media (max-width: 650px) {
+  .mountain-hero-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .mh-tile {
+    padding: 10px 12px;
+  }
+  .mh-val {
+    font-size: 16px;
+  }
+  .alpine-details-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* ==========================================================================
+   STADTKLIMA & URBANES MIKROKLIMA COCKPIT (TAB 2)
+   ========================================================================== */
+.city-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.ch-tile {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.ch-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(100, 210, 255, 0.35);
+}
+
+.ch-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+}
+
+.ch-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-top: 2px;
+  letter-spacing: -0.3px;
+}
+
+.ch-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.city-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 8px;
+}
+
+.city-badge.badge-good {
+  color: #30d158;
+  background: rgba(48, 209, 88, 0.15);
+  border: 1px solid rgba(48, 209, 88, 0.35);
+}
+
+.city-badge.badge-warm {
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.15);
+  border: 1px solid rgba(255, 209, 102, 0.35);
+}
+
+.city-badge.badge-hot {
+  color: #ff9f0a;
+  background: rgba(255, 159, 10, 0.15);
+  border: 1px solid rgba(255, 159, 10, 0.35);
+}
+
+.city-badge.badge-extreme {
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.15);
+  border: 1px solid rgba(255, 69, 58, 0.35);
+}
+
+.city-badge.badge-cool {
+  color: #64d2ff;
+  background: rgba(100, 210, 255, 0.15);
+  border: 1px solid rgba(100, 210, 255, 0.35);
+}
+
+/* Detail Drawer Grid for City */
+.city-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.cd-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cd-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cd-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.cd-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* 24h City Timeline */
+.city-timeline-scroll {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 6px 2px 10px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.city-timeline-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 68px;
+  padding: 8px 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.city-timeline-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+}
+
+.cti-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cti-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cti-temp {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.cti-uhi {
+  font-size: 9px;
+  font-weight: 700;
+  color: #ff9f0a;
+}
+
+.cti-status {
+  font-size: 9px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* Biometeorologie & Sport Card */
+.city-biomet-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.cbb-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cbb-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cbb-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.cbb-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.cbb-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cbb-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+/* Subtle Mountain Switch Card at Bottom of City View */
+.city-mountain-switch-card-subtle {
+  padding: 14px 18px !important;
+  background: rgba(16, 24, 38, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.cmsc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.cmsc-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cmsc-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.cmsc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cmsc-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.cmsc-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.cmsc-quick-peaks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cmsc-peak-pill {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(100, 210, 255, 0.3);
+  background: rgba(100, 210, 255, 0.12);
+  color: #a0e1ff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cmsc-peak-pill:hover {
+  background: rgba(100, 210, 255, 0.25);
+  border-color: var(--ios-cyan);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.cmsc-peak-pill.cms-btn-toggle {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #ffd166;
+}
+
+.cmsc-peak-pill.cms-btn-toggle:hover {
+  background: rgba(245, 158, 11, 0.28);
+  border-color: #f59e0b;
+}
+
+@media (max-width: 650px) {
+  .city-hero-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .ch-tile {
+    padding: 10px 12px;
+  }
+  .ch-val {
+    font-size: 16px;
+  }
+  .city-details-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .cmsc-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+

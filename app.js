@@ -140,8 +140,11 @@ export function setupTabs() {
 }
 
 // =============================================================================
-// CENTRAL LOCATION LOADER & WEATHER REFRESH
+// CENTRAL LOCATION LOADER & WEATHER REFRESH (STATE-02: AbortController-Kaskade)
 // =============================================================================
+let activeLocationAbortController = null;
+let activeLocationSequence = 0;
+
 export async function loadLocation(loc) {
   const validLoc = validateLocation(loc);
   state.currentLocation = validLoc;
@@ -150,15 +153,25 @@ export async function loadLocation(loc) {
   renderAdaptiveTab2();
   updateMapLocation();
 
+  // Bricht laufende Vorhersage-Anfragen des vorherigen Standorts zuverlässig ab
+  if (activeLocationAbortController) {
+    try { activeLocationAbortController.abort(); } catch (_) {}
+  }
+  activeLocationAbortController = new AbortController();
+  const currentSeq = ++activeLocationSequence;
+
   try {
     const customTilt = state.activeAspect.isAuto ? null : state.activeAspect.tilt;
     const customAzimuth = state.activeAspect.isAuto ? null : state.activeAspect.azimuth;
 
     const [microResult, multiModel, airQuality] = await Promise.all([
-      MicroEngine.getMicroScaleWeather(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain, customTilt, customAzimuth, validLoc.country),
-      MicroEngine.fetchMultiModelComparison(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain),
-      MicroEngine.fetchAirQualityAndUV(validLoc.lat, validLoc.lon, validLoc.elevation)
+      MicroEngine.getMicroScaleWeather(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain, customTilt, customAzimuth, validLoc.country, { signal: activeLocationAbortController.signal }),
+      MicroEngine.fetchMultiModelComparison(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain, { signal: activeLocationAbortController.signal }),
+      MicroEngine.fetchAirQualityAndUV(validLoc.lat, validLoc.lon, validLoc.elevation, { signal: activeLocationAbortController.signal })
     ]);
+
+    // Ignoriere veraltete Antwort falls Nutzer zwischenzeitlich einen anderen Ort gewählt hat
+    if (currentSeq !== activeLocationSequence) return;
 
     state.microData = microResult;
     state.weatherData = microResult.weatherRaw;

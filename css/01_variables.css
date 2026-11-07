@@ -1,0 +1,92 @@
+/* ==========================================================================
+   BEST WEATHER — DYNAMIC RESPONSIVE DESIGN SYSTEM (DESKTOP, IPAD & IPHONE)
+   Apple iOS 18 Glassmorphism & High-Precision Alpine Meteorology
+   ========================================================================== */
+
+:root {
+  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+  --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Atmospheric Sky Gradients */
+  --bg-gradient-top: #153243;
+  --bg-gradient-mid: #284b63;
+  --bg-gradient-bottom: #0f1c2e;
+  --accent-glow: rgba(100, 210, 255, 0.22);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.85);
+  --text-tertiary: rgba(255, 255, 255, 0.70);
+
+  /* Apple Frosted Glass Tokens */
+  --glass-bg: rgba(255, 255, 255, 0.10);
+  --glass-bg-hover: rgba(255, 255, 255, 0.16);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --glass-border-subtle: rgba(255, 255, 255, 0.10);
+  --glass-inner-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
+  --glass-card-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.4), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
+  --glass-blur: blur(28px);
+
+  /* iOS Accents */
+  --ios-blue: #0a84ff;
+  --ios-cyan: #64d2ff;
+  --ios-yellow: #ffd60a;
+  --ios-orange: #ff9f0a;
+  --ios-red: #ff453a;
+  --ios-green: #30d158;
+  --ios-purple: #bf5af2;
+
+  --radius-card: 24px;
+  --radius-sub: 16px;
+  --radius-pill: 9999px;
+  --transition-smooth: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Atmospheric Weather Class Themes */
+body.weather-clear-day {
+  --bg-gradient-top: #1a4d80;
+  --bg-gradient-mid: #2b7bbd;
+  --bg-gradient-bottom: #14365d;
+  --accent-glow: rgba(255, 214, 10, 0.22);
+}
+
+body.weather-clear-night {
+  --bg-gradient-top: #060b19;
+  --bg-gradient-mid: #0b1736;
+  --bg-gradient-bottom: #111f42;
+  --accent-glow: rgba(100, 210, 255, 0.15);
+}
+
+body.weather-cloudy {
+  --bg-gradient-top: #2c3e50;
+  --bg-gradient-mid: #415a77;
+  --bg-gradient-bottom: #1b263b;
+  --accent-glow: rgba(186, 218, 245, 0.15);
+}
+
+body.weather-rain {
+  --bg-gradient-top: #141f2d;
+  --bg-gradient-mid: #1d334a;
+  --bg-gradient-bottom: #101b26;
+  --accent-glow: rgba(100, 210, 255, 0.22);
+}
+
+body.weather-snow {
+  --bg-gradient-top: #2b3a4a;
+  --bg-gradient-mid: #4a637d;
+  --bg-gradient-bottom: #526b83;
+  --accent-glow: rgba(255, 255, 255, 0.28);
+}
+
+body.weather-thunder {
+  --bg-gradient-top: #120c22;
+  --bg-gradient-mid: #1f143a;
+  --bg-gradient-bottom: #140d26;
+  --accent-glow: rgba(191, 90, 242, 0.35);
+}
+
+body.weather-fog {
+  --bg-gradient-top: #36393e;
+  --bg-gradient-mid: #4e535a;
+  --bg-gradient-bottom: #2b2e33;
+  --accent-glow: rgba(200, 210, 220, 0.15);
+}
+

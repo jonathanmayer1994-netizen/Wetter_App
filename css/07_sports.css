@@ -1,0 +1,5888 @@
+/* ==========================================================================
+   MOBILE & IPHONE TWEAKS (Under 768px: Mobile iOS layout)
+   ========================================================================== */
+@media (max-width: 768px) {
+  .app-layout {
+    padding-top: max(24px, calc(env(safe-area-inset-top, 0px) + 20px)) !important;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom, 12px)) !important;
+    padding-left: max(14px, env(safe-area-inset-left, 14px)) !important;
+    padding-right: max(14px, env(safe-area-inset-right, 14px)) !important;
+    gap: 14px;
+  }
+
+  .tab-pane.active,
+  #mountain-view-panel,
+  #city-view-panel,
+  .view-panel {
+    gap: 14px;
+  }
+
+  .bento-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .bento-compact-card {
+    padding: 10px 12px !important;
+    min-height: 94px !important;
+  }
+
+  .bento-compact-card .card-title {
+    font-size: 11px !important;
+    gap: 4px !important;
+  }
+
+  .bento-compact-card .bento-open-pill {
+    font-size: 10px !important;
+    padding: 1px 6px !important;
+  }
+
+  .bento-compact-card .bento-main-val {
+    font-size: 20px !important;
+  }
+
+  .bento-compact-card .bento-sub-title {
+    font-size: 11px !important;
+    margin-top: 1px !important;
+  }
+
+  .bento-compact-card .bento-hint {
+    font-size: 10px !important;
+    margin-top: 2px !important;
+    line-height: 1.25 !important;
+  }
+
+  .bento-compact-card .compact-compass-wrapper,
+  .bento-compact-card .compact-sun-arc {
+    display: none !important;
+  }
+
+  .global-navbar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand actions"
+      "search search";
+    gap: 10px 8px;
+    align-items: center;
+  }
+
+  .nav-brand {
+    grid-area: brand;
+  }
+
+  .search-container {
+    display: contents;
+  }
+
+  .header-action-group {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .search-input-wrapper {
+    grid-area: search;
+    width: 100%;
+    min-width: 100%;
+    position: relative;
+  }
+
+  .search-input-box {
+    height: 44px;
+    padding: 0 14px;
+    box-sizing: border-box;
+  }
+
+  .search-input-box input {
+    font-size: 16px !important;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .header-gps-pill .hgp-text {
+    display: none;
+  }
+
+  .header-gps-pill {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    isolation: isolate;
+    transform: translateZ(0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .nav-icon-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
+    isolation: isolate;
+    transform: translateZ(0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .search-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    width: 100%;
+    border-radius: 16px;
+    max-height: 52vh;
+    z-index: 2500;
+  }
+
+  /* Horizontale Sticky-Pills für iOS ohne Überdeckung des Contents */
+  .main-tab-bar {
+    position: sticky;
+    top: 8px;
+    z-index: 500;
+    width: 100%;
+    margin: 2px 0 6px 0;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding: 5px 8px;
+    border-radius: var(--radius-pill);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .main-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    font-size: 13px;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .hero-card {
+    padding: 14px 16px !important;
+    gap: 8px !important;
+  }
+
+  .hero-main-temp {
+    font-size: 50px !important;
+  }
+
+  .hero-city-name {
+    font-size: 22px !important;
+  }
+
+  .desktop-tablet-only,
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mountain-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .m-stat {
+    padding: 10px 12px;
+    min-height: 74px;
+  }
+
+  .m-val {
+    font-size: 14px;
+  }
+
+  .smart-time-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .time-badge {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  .aspect-result-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .model-comparison-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .air-quality-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .aspect-result-box {
+    padding: 10px 12px;
+    min-height: 74px;
+  }
+
+  .ar-val {
+    font-size: 14px;
+  }
+
+  .daily-interactive-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 11px 13px;
+  }
+
+  .daily-row-mobile-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .daily-row-mobile-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    padding-top: 7px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .daily-date-cell {
+    grid-column: auto;
+    grid-row: auto;
+    flex-shrink: 0;
+    min-width: 58px;
+  }
+
+  .daily-day-label .day-full {
+    display: none;
+  }
+
+  .daily-day-label .day-short {
+    display: inline;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .daily-date-badge {
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  .daily-condition-cell {
+    grid-column: auto;
+    grid-row: auto;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .daily-icon-box {
+    font-size: 19px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+
+  .daily-cond-text {
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.2px;
+  }
+
+  .daily-temp-cell {
+    grid-column: auto;
+    grid-row: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .daily-temp-badge {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    font-family: var(--font-mono);
+  }
+
+  .dt-min {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #94a3b8;
+  }
+
+  .dt-sep {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.25);
+  }
+
+  .dt-max {
+    font-size: 15px;
+    font-weight: 800;
+    color: #ffffff;
+  }
+
+  .daily-action-cell {
+    grid-column: auto;
+    grid-row: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 16px;
+  }
+
+  .daily-expand-chevron {
+    font-size: 18px;
+    color: var(--text-tertiary);
+  }
+
+  .daily-sun-cell {
+    grid-column: auto;
+    grid-row: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .daily-sun-mini-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .dsm-hours {
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .dsm-chart {
+    height: 13px;
+    padding: 1px 2px;
+    gap: 1.5px;
+  }
+
+  .msb-bar {
+    width: 2.5px;
+  }
+
+  .daily-astro-pill {
+    padding: 2px 6px;
+    font-size: 10px;
+    gap: 3px;
+  }
+
+  .daily-precip-cell {
+    grid-column: auto;
+    grid-row: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-left: auto;
+  }
+
+  .daily-precip-chip {
+    padding: 2.5px 6px;
+    font-size: 10px;
+    gap: 3px;
+    white-space: nowrap;
+  }
+
+  .daily-precip-dry {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .daily-wind-cell {
+    grid-column: auto;
+    grid-row: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .daily-wind-chip {
+    font-size: 10.5px;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+  }
+
+  .daily-wind-chip .wind-main {
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+
+  .daily-wind-chip .wind-gusts {
+    font-size: 9.5px;
+    opacity: 0.8;
+  }
+
+  /* Accordion Mobile Refinements */
+  .daily-inline-accordion {
+    padding: 12px 10px;
+  }
+
+  .inline-parts-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .inline-part-card {
+    padding: 7px 6px;
+  }
+
+  .inline-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+    margin-bottom: 7px;
+  }
+
+  .isg-card {
+    padding: 4px 6px;
+    gap: 5px;
+  }
+
+  .isg-icon {
+    font-size: 13px;
+  }
+
+  .isg-lbl {
+    font-size: 8px;
+  }
+
+  .isg-val {
+    font-size: 10.5px;
+  }
+
+  .isg-sub {
+    font-size: 9px;
+  }
+
+  .istb-astro-point {
+    gap: 4px;
+  }
+
+  .iap-icon {
+    font-size: 15px;
+  }
+
+  .iap-val {
+    font-size: 11.5px;
+  }
+
+  .istb-bars-container {
+    padding: 0 4px;
+  }
+
+  .esb-bar-track {
+    max-width: 9px;
+    height: 22px;
+  }
+
+  .inline-modal-launch-btn {
+    width: 100%;
+    text-align: center;
+    padding: 8px 14px;
+  }
+
+  .modal-card {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .modal-bento-overview {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .day-parts-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .modal-deep-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .modal-astro-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  /* =============================================================================
+   * MOBILE FULLSCREEN MAP MODE & 100% ERGONOMIC CONTROLS
+   * ============================================================================= */
+
+  /* Wenn die Vollbild-Karte mobil aktiv ist: Menüleiste & Header vollständig ausblenden */
+  body.mobile-map-fullscreen-active {
+    overflow: hidden !important;
+    touch-action: pan-x pan-y !important;
+  }
+
+  body.mobile-map-fullscreen-active .mobile-bottom-nav,
+  body.mobile-map-fullscreen-active .app-header,
+  body.mobile-map-fullscreen-active .main-tab-bar,
+  body.mobile-map-fullscreen-active #hero-hazard-alert,
+  body.mobile-map-fullscreen-active .spotlight-banner {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+
+  body.mobile-map-fullscreen-active .main-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  body.mobile-map-fullscreen-active #tab-map {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+    z-index: 99990 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    background: #0f172a !important;
+  }
+
+  body.mobile-map-fullscreen-active .map-view-card {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+  }
+
+  body.mobile-map-fullscreen-active .map-view-card > .card-header {
+    display: none !important;
+  }
+
+  body.mobile-map-fullscreen-active .fullscreen-map-wrapper {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    z-index: 99995 !important;
+  }
+
+  body.mobile-map-fullscreen-active #interactive-map {
+    width: 100vw !important;
+    height: 100dvh !important;
+    height: 100vh !important;
+  }
+
+  /* Dedicated Mobile Close "X" Button */
+  .map-mobile-close-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 20px) + 12px);
+    right: 12px;
+    z-index: 100005;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 12px rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    isolation: isolate;
+    transform: translateZ(0);
+  }
+
+  .map-mobile-close-btn:active {
+    transform: scale(0.90);
+    background: rgba(239, 68, 68, 0.45);
+    border-color: rgba(239, 68, 68, 0.8);
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+  }
+
+  .map-mobile-close-btn .mmcb-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  /* 1. Mobile Floating Topbar: Single Layer Trigger Pill (Zero Overflow, Zero Clutter) */
+  .map-floating-topbar {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 20px) + 12px);
+    left: 12px;
+    right: auto;
+    z-index: 100002;
+    padding: 0;
+    gap: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .map-layer-pill {
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.92);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Mobile Bottom Sheet for Ebenen & Kartenstil */
+  .map-layer-drawer {
+    position: fixed !important;
+    top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 16px) + 10px) !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 80vh !important;
+    border-radius: 24px !important;
+    z-index: 100010 !important;
+    animation: slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  @keyframes slideUpSheet {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .map-layer-backdrop {
+    position: fixed !important;
+    z-index: 100008 !important;
+  }
+
+  /* 2. Floating HUD: Windkompass (Oben links) & Point Weather Card (Unten links über Player) */
+  .map-left-hud-stack {
+    display: contents !important;
+  }
+
+  /* Windkompass — 100% Perfekt auf Mobile abgestimmt (Weder zu groß noch zu klein!) */
+  .map-wind-compass-widget {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 20px) + 68px) !important;
+    left: 12px !important;
+    z-index: 100001 !important;
+    width: fit-content !important;
+    min-width: unset !important;
+    max-width: 240px !important;
+    padding: 5px 10px !important;
+    gap: 10px !important;
+    background: rgba(15, 23, 42, 0.94) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    isolation: isolate !important;
+    transform: translateZ(0) !important;
+  }
+
+  .mwc-compass-dial {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+  }
+
+  .mwc-outer-ring {
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  }
+
+  .mwc-cardinal {
+    font-size: 7.5px;
+    font-weight: 800;
+  }
+
+  .mwc-needle-arrow {
+    font-size: 13px;
+    color: #38bdf8;
+    filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.8));
+  }
+
+  .mwc-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .mwc-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mwc-badge {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+  }
+
+  .mwc-dir-chip {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .mwc-speed-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .mwc-speed-val {
+    font-size: 19px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .mwc-speed-unit {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .mwc-gust-box {
+    margin-left: 6px;
+    font-size: 9.5px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .mwc-desc {
+    font-size: 9.5px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+
+  /* Tipp auf Windkompass wechselt in kompakten Modus */
+  .map-wind-compass-widget.compact .mwc-desc,
+  .map-wind-compass-widget.compact .mwc-header {
+    display: none;
+  }
+  .map-wind-compass-widget.compact {
+    padding: 5px 10px;
+    gap: 8px;
+  }
+
+  /* Point Weather Card on Mobile — Sitzt ergonomisch unten links über dem Player (100% kollisionsfrei) */
+  .map-point-weather-card {
+    position: fixed !important;
+    top: auto !important;
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 96px) !important;
+    left: 10px !important;
+    z-index: 100001 !important;
+    width: fit-content !important;
+    min-width: unset !important;
+    max-width: calc(100vw - 20px) !important;
+    background: rgba(15, 23, 42, 0.90) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 16px !important;
+    padding: 6px 10px !important;
+    gap: 5px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  .mpw-header {
+    padding-bottom: 4px;
+  }
+
+  .mpw-name {
+    font-size: 12px;
+    font-weight: 700;
+    max-width: 120px;
+  }
+
+  .mpw-badge {
+    font-size: 8.5px;
+    padding: 1px 5px;
+  }
+
+  .mpw-elevation-chip {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+
+  .mpw-time-badge {
+    font-size: 8.5px;
+    padding: 1px 5px;
+  }
+
+  .mpw-mobile-toggle-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 2px;
+  }
+
+  .mpw-temp-val {
+    font-size: 17px;
+  }
+
+  .mpw-condition-icon {
+    font-size: 20px;
+  }
+
+  .mpw-condition-label {
+    font-size: 9.5px;
+    max-width: 80px;
+  }
+
+  .mpw-metric-pill {
+    font-size: 9.5px;
+    padding: 2px 4px;
+  }
+
+  .mpw-front-motion {
+    padding: 3px 6px;
+    font-size: 9.5px;
+  }
+
+  /* Auf Mobile standardmäßig als ultra-kompakte Kapsel; per Klick aufklappbar */
+  .map-point-weather-card.collapsed .mpw-body,
+  .map-point-weather-card.collapsed .mpw-front-motion {
+    display: none !important;
+  }
+  .map-point-weather-card.collapsed {
+    padding: 5px 10px;
+  }
+  .map-point-weather-card.collapsed .mpw-header {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  /* 3. Floating Zoom Dock cleanly removed */
+  .map-floating-zoom-dock {
+    display: none !important;
+  }
+
+  /* Dynamische Positionierung der Point-Weather-Card bei eingeklapptem Player */
+  #fullscreen-map-wrapper:has(#radar-floating-controls.is-collapsed) .map-point-weather-card,
+  body.mobile-map-fullscreen-active:has(#radar-floating-controls.is-collapsed) .map-point-weather-card {
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 52px) !important;
+  }
+
+  /* Eingeklappter Radar-Player auf Mobile: Schlanke zentrierte Pill */
+  .modern-radar-player.is-collapsed {
+    padding: 6px 14px;
+    border-radius: 999px;
+    max-width: 320px;
+    margin: 0 auto;
+    bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  }
+
+  .map-zoom-action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+  }
+
+  .map-zoom-action-btn:active {
+    transform: scale(0.92);
+    background: rgba(56, 189, 248, 0.3);
+  }
+
+  /* 4. Niederschlags- & Farb-Legende (Auf Mobile ausgeblendet, um den Screen nicht zu überfrachten) */
+  .map-legend-card {
+    display: none !important;
+  }
+
+  .legend-title {
+    font-size: 8.5px;
+    font-weight: 700;
+  }
+
+  .legend-gradient-bar {
+    width: 95px;
+    height: 5px;
+    margin: 3px 0;
+  }
+
+  .legend-scale-labels {
+    font-size: 7.5px;
+    width: 95px;
+  }
+
+  /* 5. Streamlined Radar Timeline Scrubber (Unten verankert — Schlank & Zero-Kollision) */
+  .modern-radar-player {
+    position: fixed;
+    bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    left: 10px;
+    right: 10px;
+    z-index: 100002;
+    padding: 7px 12px 9px 12px;
+    gap: 5px;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 18px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+
+  .radar-mode-chip {
+    font-size: 10px;
+    padding: 2.5px 8px;
+    font-weight: 800;
+  }
+
+  .radar-time-banner {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .radar-slider-container {
+    padding: 1px 2px;
+    gap: 2px;
+  }
+
+  .radar-timeline-markers {
+    font-size: 9px;
+    padding: 0 3px;
+    margin-top: 1px;
+  }
+}
+
+/* =============================================================================
+ * FEATURE 1: LAWINENLAGEBERICHT & SCHNEEDECKEN-STABILITÄT (EAWS)
+ * ============================================================================= */
+.avalanche-card {
+  margin-top: 16px;
+}
+
+.eaws-level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-size: 13px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.eaws-num {
+  font-size: 16px;
+  font-family: var(--font-mono);
+}
+
+.avalanche-content-grid {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 20px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.avalanche-rose-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rose-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.avalanche-rose-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.avalanche-rose-svg {
+  width: 160px;
+  height: 160px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
+}
+
+.rose-ring-outer {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1;
+  stroke-dasharray: 2, 2;
+}
+
+.rose-ring-inner {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 1;
+}
+
+.rose-center {
+  fill: #1e293b;
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 1;
+}
+
+.rose-center-txt {
+  fill: #94a3b8;
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.rose-lbl {
+  fill: #cbd5e1;
+  font-size: 11px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.rose-sec {
+  transition: fill 0.25s ease, opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.rose-sec.danger-high {
+  fill: #ed1c24;
+  opacity: 0.88;
+}
+
+.rose-sec.danger-med {
+  fill: #f7931e;
+  opacity: 0.85;
+}
+
+.rose-sec.danger-low {
+  fill: #50b848;
+  opacity: 0.65;
+}
+
+.rose-sec:hover {
+  opacity: 1;
+  filter: brightness(1.2);
+}
+
+.rose-crit-elev {
+  font-size: 11px;
+  text-align: center;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.rose-crit-elev strong {
+  color: #ff9f0a;
+}
+
+.avalanche-details-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.av-problems-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.av-problem-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.av-p-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.av-p-content strong {
+  font-size: 13px;
+  color: #fff;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.av-p-content p {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.av-metrics-row {
+  display: flex;
+  gap: 12px;
+}
+
+.av-metric-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.amp-label {
+  color: var(--text-secondary);
+}
+
+.amp-val {
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.av-safety-box {
+  background: rgba(237, 28, 36, 0.12);
+  border: 1px solid rgba(237, 28, 36, 0.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.asb-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ff6b6b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.asb-text {
+  font-size: 12px;
+  color: #f1f5f9;
+  line-height: 1.45;
+}
+
+/* =============================================================================
+ * FEATURE 2: ECHTZEIT-BLITZORTUNG & GEWITTER-ALARM
+ * ============================================================================= */
+.thunderstorm-alert-box {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 999;
+  max-width: 360px;
+  background: rgba(18, 24, 38, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 69, 58, 0.45);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+  animation: slideInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.tab-icon {
+  font-size: 18px;
+  color: #ff453a;
+  margin-right: 6px;
+}
+
+.tab-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ff6b6b;
+  flex: 1;
+}
+
+.tab-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+
+.tab-close-btn:hover {
+  color: #fff;
+}
+
+.tab-body-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.tab-stat strong {
+  color: #fff;
+}
+
+.tab-advice {
+  font-size: 11px;
+  color: #ffd166;
+  font-weight: 600;
+  line-height: 1.4;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 6px;
+}
+
+@keyframes lightning-pulse {
+  0% {
+    transform: scale(0.85);
+    box-shadow: 0 0 0 0 rgba(255, 69, 58, 0.85);
+  }
+
+  70% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 14px rgba(255, 69, 58, 0);
+  }
+
+  100% {
+    transform: scale(0.85);
+    box-shadow: 0 0 0 0 rgba(255, 69, 58, 0);
+  }
+}
+
+.lightning-marker {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  animation: lightning-pulse 1.8s infinite;
+  cursor: pointer;
+  border: 1.5px solid #ffffff;
+  color: #ffffff;
+}
+
+/* =============================================================================
+ * FEATURE 3: INTERAKTIVES ENSEMBLE-METEOGRAMM (10 TAGE SPAGHETTI-PLOTS)
+ * ============================================================================= */
+.meteogram-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.meteogram-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mt-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+  letter-spacing: 0.5px;
+}
+
+.meteogram-metric-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.met-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.met-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.met-btn.active {
+  background: var(--ios-cyan);
+  color: #000000;
+  border-color: var(--ios-cyan);
+  font-weight: 700;
+}
+
+.meteogram-chart-wrapper {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  background: rgba(8, 12, 20, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ensemble-meteogram-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.meteogram-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.meteogram-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.m-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.m-leg-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.m-leg-dot.ecmwf {
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.8);
+}
+
+.m-leg-dot.gfs {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.8);
+}
+
+.m-leg-dot.icon {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+}
+
+.m-leg-corridor {
+  width: 16px;
+  height: 8px;
+  background: rgba(99, 102, 241, 0.35);
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* =============================================================================
+ * FEATURE 6: GPX-ROUTEN-INSPEKTOR & HÖHENPROFIL-MIKROWETTER
+ * ============================================================================= */
+.gpx-launch-btn {
+  background: linear-gradient(135deg, rgba(48, 209, 88, 0.2), rgba(0, 199, 190, 0.25));
+  border: 1px solid rgba(48, 209, 88, 0.4);
+  color: #ffffff;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gpx-launch-btn:hover {
+  background: linear-gradient(135deg, rgba(48, 209, 88, 0.35), rgba(0, 199, 190, 0.45));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(48, 209, 88, 0.3);
+}
+
+.gpx-modal-card {
+  max-width: 820px;
+  width: 94%;
+}
+
+.gpx-presets-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.gpx-p-label {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.gpx-preset-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gpx-preset-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--ios-cyan);
+  color: #ffffff;
+}
+
+.gpx-drop-zone {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.gpx-drop-zone.dragover {
+  border-color: var(--ios-cyan);
+  background: rgba(100, 210, 255, 0.1);
+}
+
+.gpx-drop-icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.gpx-drop-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.gpx-browse-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.gpx-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.gpx-stat-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gsc-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.gsc-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.gpx-chart-wrapper {
+  margin: 14px 0;
+  background: rgba(8, 12, 20, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.gpx-chart-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+  margin-bottom: 8px;
+}
+
+.gpx-elevation-svg {
+  width: 100%;
+  height: 180px;
+  display: block;
+}
+
+.gpx-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* =============================================================================
+ * FEATURE 7: ALPINE LIVE-WEBCAMS
+ * ============================================================================= */
+.webcams-card {
+  margin-top: 16px;
+}
+
+.webcams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.webcam-card {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(16, 24, 38, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.webcam-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+
+.webcam-thumb-wrap {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+}
+
+.webcam-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.webcam-card:hover .webcam-thumb {
+  transform: scale(1.05);
+}
+
+.webcam-live-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(48, 209, 88, 0.4);
+  color: #30d158;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  z-index: 2;
+}
+
+.webcam-provider-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #38bdf8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.webcam-card-info {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.webcam-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.webcam-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.webcam-ai-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  margin-top: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.2s ease;
+}
+
+.webcam-ai-tag.ai-tag-fog {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.webcam-ai-tag.ai-tag-sun {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.webcam-modal-card {
+  max-width: 720px;
+  width: 92%;
+}
+
+.webcam-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.webcam-modal-img {
+  width: 100%;
+  max-height: 440px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.webcam-modal-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.webcam-modal-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.action-btn-secondary {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+
+.action-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.modal-footer-actions,
+.gpx-actions-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 768px) {
+  .avalanche-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gpx-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .thunderstorm-alert-box {
+    left: 10px;
+    right: 10px;
+    max-width: none;
+  }
+}
+
+/* ==========================================================================
+   TAB: SPORT & ROUTENWETTER-STUDIO (RAD & BERGE) — APPLE LIQUID GLASS DESIGN
+   ========================================================================== */
+
+/* 1. Haupt-Kategorie Wähler (2 Karten: Rad & Berge) */
+.athlete-category-selector {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  .athlete-category-selector {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.athlete-cat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+.athlete-cat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+}
+
+.athlete-cat-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.athlete-cat-card.active {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.22), rgba(0, 229, 255, 0.12));
+  border-color: rgba(0, 229, 255, 0.7);
+  box-shadow: 0 6px 24px rgba(0, 229, 255, 0.28), inset 0 0 16px rgba(0, 229, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.acc-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+  transition: transform 0.24s ease;
+}
+
+.athlete-cat-card.active .acc-icon-wrap {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.3), rgba(10, 132, 255, 0.4));
+  border-color: rgba(0, 229, 255, 0.6);
+  transform: scale(1.05);
+}
+
+.acc-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.acc-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.acc-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.acc-badge {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--ios-cyan);
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.athlete-cat-card.active .acc-badge {
+  background: rgba(0, 229, 255, 0.25);
+  border-color: rgba(0, 229, 255, 0.7);
+  color: #e0f7ff;
+}
+
+.acc-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* 2. Stufenlose Geschwindigkeits- & Höhenmeter-Steuerung (Slider & Stepper) */
+.athlete-tuning-panel {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.atp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: nowrap;
+  margin-bottom: 8px;
+}
+
+.atp-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.atp-title strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atp-icon {
+  font-size: 18px;
+}
+
+.atp-stepper-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.atp-step-btn {
+  padding: 6px 12px;
+  min-height: 32px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  touch-action: manipulation;
+}
+
+.atp-step-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: scale(1.04);
+}
+
+.atp-step-btn:active {
+  transform: scale(0.96);
+}
+
+.atp-live-val {
+  font-size: 16px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  min-width: 80px;
+  text-align: center;
+}
+
+.atp-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 14px 0;
+}
+
+.slider-boundary {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.athlete-range-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(0, 229, 255, 0.4), rgba(10, 132, 255, 0.6));
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.athlete-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #00e5ff;
+  box-shadow: 0 2px 10px rgba(0, 229, 255, 0.5), 0 0 2px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.athlete-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px rgba(0, 229, 255, 0.7);
+}
+
+.athlete-range-slider::-webkit-slider-thumb:active {
+  transform: scale(1.22);
+}
+
+.atp-presets-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.atp-preset-hint {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.atp-preset-btn {
+  padding: 5px 11px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.atp-preset-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.atp-preset-btn.active {
+  background: rgba(0, 229, 255, 0.22);
+  border-color: #00e5ff;
+  color: #00e5ff;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(0, 229, 255, 0.3);
+}
+
+.atp-physics-note {
+  margin: 10px 0 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  opacity: 0.9;
+}
+
+/* 3. TOURENSTART: SEPARATE DATUM- & UHRZEIT-SELEKTION (APPLE LIQUID GLASS) */
+.sports-tour-start-panel {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  margin: 12px 0 16px 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .sports-tour-start-panel {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    margin: 8px 0 12px 0 !important;
+    border-radius: 16px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .stsp-divider {
+    display: none !important;
+  }
+
+  #sports-date-presets,
+  #sports-time-presets {
+    display: none !important;
+  }
+
+  .stsp-header {
+    gap: 4px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .stsp-label {
+    font-size: 11px !important;
+    letter-spacing: 0.2px !important;
+  }
+
+  .stsp-glass-input {
+    height: 40px !important;
+    padding: 6px 8px !important;
+    font-size: 14px !important;
+    text-align: center !important;
+    border-radius: 12px !important;
+  }
+}
+
+.stsp-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.stsp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stsp-icon {
+  font-size: 16px;
+}
+
+.stsp-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.stsp-input-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.stsp-glass-input {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  color: #ffffff;
+  padding: 10px 14px;
+  font-family: var(--font-main);
+  font-size: 16px !important;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  min-height: 46px;
+  height: 46px;
+  display: block;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  transition: all 0.2s ease;
+  color-scheme: dark;
+}
+
+.stsp-glass-input::-webkit-date-and-time-value {
+  text-align: center;
+  margin: 0;
+  padding: 0;
+  line-height: 24px;
+}
+
+.stsp-glass-input:focus {
+  border-color: #00e5ff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.25);
+}
+
+.stsp-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .stsp-presets {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 2px 1px 4px 1px;
+  }
+
+  .stsp-presets::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.stsp-preset-btn {
+  padding: 5px 9px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  touch-action: manipulation;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.stsp-preset-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.stsp-preset-btn.active {
+  background: rgba(255, 209, 102, 0.22);
+  border-color: #ffd166;
+  color: #ffd166;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(255, 209, 102, 0.3);
+}
+
+.stsp-divider {
+  width: 1px;
+  height: 80%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 768px) {
+  .stsp-divider {
+    width: 100%;
+    height: 1px;
+    margin: 4px 0;
+  }
+}
+
+/* Wegpunkt-Wettertabelle: Relativer Wind & Abfahrts-Badges */
+.swt-wind-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.swt-rel-wind-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 3px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swt-rel-wind-badge.headwind {
+  background: rgba(255, 69, 58, 0.18);
+  border: 1px solid rgba(255, 69, 58, 0.45);
+  color: #ff6961;
+}
+
+.swt-rel-wind-badge.tailwind {
+  background: rgba(48, 209, 88, 0.18);
+  border: 1px solid rgba(48, 209, 88, 0.45);
+  color: #30d158;
+}
+
+.swt-rel-wind-badge.crosswind {
+  background: rgba(255, 214, 10, 0.18);
+  border: 1px solid rgba(255, 214, 10, 0.45);
+  color: #ffd60a;
+}
+
+.swt-descent-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 3px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(100, 210, 255, 0.16);
+  border: 1px solid rgba(100, 210, 255, 0.45);
+  color: #64d2ff;
+  white-space: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sportart-Auswahl (Apple-Style Glass Pills - Legacy & Helper) */
+.sports-type-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 10px 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sports-type-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.sport-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  min-height: 54px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  touch-action: manipulation;
+  flex-shrink: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.sport-pill .sp-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.sport-pill .sp-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+}
+
+.sport-pill .sp-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.sport-pill .sp-pace-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ios-cyan);
+  line-height: 1.2;
+}
+
+.sport-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.sport-pill.active {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.88), rgba(0, 110, 230, 0.96));
+  color: #ffffff;
+  border-color: rgba(100, 210, 255, 0.8);
+  box-shadow: 0 4px 18px rgba(0, 122, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.sport-pill.active .sp-label {
+  color: #ffffff;
+}
+
+.sport-pill.active .sp-pace-badge {
+  color: #e0f7ff;
+}
+
+/* 4-stufiger Fitness-Level-Wähler */
+.sports-fitness-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  margin: 4px 0 10px 0;
+}
+
+.sf-caption {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sports-fitness-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fitness-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  touch-action: manipulation;
+}
+
+.fitness-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.fitness-pill.active {
+  background: rgba(48, 209, 88, 0.22);
+  border-color: var(--ios-green);
+  color: #30d158;
+  box-shadow: 0 2px 10px rgba(48, 209, 88, 0.25);
+}
+
+.fitness-pill .fp-multiplier {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  opacity: 0.85;
+}
+
+/* Wegpunkt Filter Chips */
+.swt-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.swt-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.swt-filter-pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.swt-filter-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.swt-filter-pill.active {
+  background: var(--ios-cyan);
+  border-color: var(--ios-cyan);
+  color: #000;
+  box-shadow: 0 2px 8px rgba(0, 229, 255, 0.35);
+}
+
+.sports-start-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  margin: 10px 0;
+}
+
+.sports-time-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sports-input-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.sports-datetime-input {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: #ffffff;
+  padding: 8px 12px;
+  font-family: var(--font-main);
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+  min-height: 40px;
+  transition: border-color 0.2s;
+}
+
+.sports-datetime-input:focus {
+  border-color: var(--ios-cyan);
+  box-shadow: 0 0 0 3px rgba(100, 210, 255, 0.25);
+}
+
+.sports-presets-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sport-time-btn {
+  padding: 6px 12px;
+  min-height: 36px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.sport-time-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.sport-time-btn.active {
+  background: rgba(255, 209, 102, 0.2);
+  border-color: #ffd166;
+  color: #ffd166;
+  font-weight: 700;
+}
+
+.sports-gpx-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.sports-presets-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: none;
+}
+
+.sports-presets-row::-webkit-scrollbar {
+  display: none;
+}
+
+.sp-preset-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.sports-route-preset {
+  padding: 6px 12px;
+  min-height: 36px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.sports-route-preset:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.sports-route-preset.active {
+  background: rgba(100, 210, 255, 0.18);
+  border-color: var(--ios-cyan);
+  color: var(--ios-cyan);
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .sports-presets-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    padding: 2px 0 6px 0 !important;
+  }
+
+  .sp-preset-label {
+    grid-column: 1 / -1;
+    margin-bottom: 2px;
+  }
+
+  .sports-route-preset {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 8px 6px;
+    font-size: 12px;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  /* Compact iPhone Studio & Metrics Tuning */
+  .alpine-drawer-summary {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+    padding: 8px 10px !important;
+  }
+
+  .alpine-drawer-summary .card-title {
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    text-transform: none !important;
+    letter-spacing: 0.2px !important;
+  }
+
+  .alpine-drawer-summary .card-tag {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    font-size: 10.5px !important;
+    padding: 3px 8px !important;
+  }
+
+  .athlete-category-selector {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin: 6px 0 !important;
+  }
+
+  .athlete-cat-card {
+    padding: 6px 8px !important;
+    min-height: 44px !important;
+    border-radius: 12px !important;
+    gap: 8px !important;
+  }
+
+  .athlete-cat-card .acc-desc {
+    display: none !important;
+  }
+
+  .athlete-cat-card .acc-icon-wrap {
+    font-size: 18px !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .athlete-cat-card .acc-title {
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  .athlete-cat-card .acc-badge {
+    font-size: 10px !important;
+    padding: 2px 5px !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  .atp-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    margin-bottom: 4px !important;
+  }
+
+  .atp-title {
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+  }
+
+  .atp-title strong {
+    font-size: 11.5px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .atp-stepper-wrap {
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .atp-step-btn {
+    padding: 2px 7px !important;
+    font-size: 10.5px !important;
+    min-height: 26px !important;
+    white-space: nowrap !important;
+  }
+
+  .atp-live-val {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    min-width: 58px !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+  }
+
+  .atp-slider-row {
+    margin: 4px 0 !important;
+  }
+
+  .athlete-range-slider {
+    height: 5px !important;
+  }
+
+  .athlete-range-slider::-webkit-slider-thumb {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .sports-metrics-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 6px !important;
+    padding: 8px 4px !important;
+    margin: 6px 0 !important;
+  }
+
+  .sm-card {
+    padding: 6px 2px !important;
+    text-align: center !important;
+    border-radius: 10px !important;
+  }
+
+  .sm-label {
+    font-size: 9px !important;
+    letter-spacing: -0.2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .sm-val {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+  }
+
+  .atp-presets-row,
+  .atp-physics-note {
+    display: none !important;
+  }
+}
+
+.sports-drop-zone {
+  border: 1.5px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sports-drop-zone:hover,
+.sports-drop-zone.dragover {
+  border-color: var(--ios-cyan);
+  background: rgba(100, 210, 255, 0.06);
+}
+
+.sdz-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.sdz-icon {
+  font-size: 26px;
+}
+
+.sdz-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.sdz-browse-btn {
+  background: none;
+  border: none;
+  color: var(--ios-cyan);
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0;
+}
+
+.sdz-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.sports-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 0;
+  width: 100%;
+}
+
+.sm-card {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 44px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.sm-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sm-val {
+  font-size: 14px;
+  font-weight: 800;
+  margin-top: 2px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hazard Banner & Alerts */
+.hazard-summary-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(48, 209, 88, 0.12);
+  border: 1px solid rgba(48, 209, 88, 0.3);
+  margin-bottom: 12px;
+}
+
+.hazard-summary-banner.severity-yellow {
+  background: rgba(255, 209, 102, 0.12);
+  border-color: rgba(255, 209, 102, 0.35);
+}
+
+.hazard-summary-banner.severity-red {
+  background: rgba(255, 69, 58, 0.14);
+  border-color: rgba(255, 69, 58, 0.45);
+}
+
+.hsb-icon {
+  font-size: 28px;
+}
+
+.hsb-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hsb-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.hsb-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.hazard-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hazard-alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hazard-alert-item.severity-red {
+  border-color: rgba(255, 69, 58, 0.4);
+  background: rgba(255, 69, 58, 0.08);
+}
+
+.hazard-alert-item.severity-yellow {
+  border-color: rgba(255, 209, 102, 0.35);
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.hai-icon {
+  font-size: 20px;
+}
+
+.hai-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hai-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.hai-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+/* Timeline & Scrubber */
+.sports-scrubber-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ss-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ss-badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(100, 210, 255, 0.16);
+  border: 1px solid rgba(100, 210, 255, 0.35);
+  color: var(--ios-cyan);
+}
+
+.sports-route-slider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  cursor: pointer;
+}
+
+.sports-route-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #007aff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.sports-route-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+/* ==========================================================================
+   KOMPAKTER ROUTEN- & HÖHENWETTER MONITOR (ONE-TOUCH ALPINE COCKPIT)
+   ========================================================================== */
+.sports-cockpit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sports-cockpit-card .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+  margin-bottom: 4px;
+}
+
+.sports-cockpit-card .card-title {
+  min-width: 0;
+  flex-shrink: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: none;
+}
+
+#cockpit-pos-badge {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  padding: 3px 8px;
+  border-radius: 8px;
+  letter-spacing: 0.2px;
+}
+
+.cockpit-quick-stations {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.cockpit-station-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cockpit-station-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.cockpit-station-chip:active {
+  transform: scale(0.97);
+}
+
+.cockpit-station-chip.active {
+  background: rgba(10, 132, 255, 0.25);
+  border-color: #0a84ff;
+  color: #64d2ff;
+  box-shadow: 0 0 12px rgba(10, 132, 255, 0.35);
+}
+
+.csc-icon {
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.csc-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Smart Weather Capsule (Slim, Crystal Clear & Finger-Free) */
+.cockpit-weather-capsule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(0, 229, 255, 0.04) 100%), rgba(14, 20, 32, 0.9);
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.cwc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  padding-bottom: 6px;
+}
+
+.cwc-station-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.cwc-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cwc-title-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cwc-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cwc-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: #00e5ff;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cwc-time-badge {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.14);
+  border: 1px solid rgba(255, 209, 102, 0.35);
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* 4-Kachel Grid */
+.cwc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.cwc-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px 9px;
+  min-width: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cwc-tile:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(0, 229, 255, 0.3);
+}
+
+.cwc-tile-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.cwc-tile-val {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cwc-tile-sub {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.1px;
+}
+
+/* Alert-Bar */
+.cwc-alert-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 69, 58, 0.16);
+  border: 1px solid rgba(255, 69, 58, 0.4);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #ff453a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sports-chart-wrapper {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(10, 16, 28, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sports-elevation-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sports-hud-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: auto;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(100, 210, 255, 0.35);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  z-index: 10;
+  max-width: 320px;
+  width: max-content;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sports-hud-badge.hud-dock-left {
+  border-right: 2.5px solid var(--ios-cyan, #00e5ff);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.6), 4px 0 14px rgba(0, 229, 255, 0.2);
+}
+
+.sports-hud-badge.hud-dock-right {
+  border-left: 2.5px solid var(--ios-cyan, #00e5ff);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.6), -4px 0 14px rgba(0, 229, 255, 0.2);
+}
+
+@media (max-width: 600px) {
+  .sports-hud-badge {
+    font-size: 11px;
+    padding: 6px 10px;
+    gap: 2px;
+    max-width: 230px;
+    border-radius: 10px;
+  }
+
+  .sports-hud-badge .shb-top {
+    font-size: 11.5px;
+    gap: 4px;
+  }
+
+  .sports-hud-badge .shb-sub {
+    font-size: 10px;
+  }
+}
+
+.shb-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.shb-metrics {
+  color: var(--ios-cyan);
+  font-weight: 600;
+}
+
+.shb-sub {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+/* Waypoints Table */
+.sports-waypoints-table-wrap {
+  overflow-x: auto;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.swt-mobile-summary {
+  display: none;
+}
+
+.swt-accordion-pane {
+  display: none;
+}
+
+.swt-desktop-cells {
+  display: contents;
+}
+
+.swt-header,
+.swt-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.25fr) 100px 125px 125px 115px minmax(225px, 1.4fr) 110px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  min-width: 1040px;
+}
+
+.swt-header {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.swt-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+
+.swt-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.swt-row.active {
+  background: rgba(100, 210, 255, 0.12);
+  border-left: 3px solid var(--ios-cyan);
+}
+
+.swt-col-pos {
+  font-weight: 700;
+  color: #fff;
+}
+
+.swt-col-dist-ele {
+  font-family: var(--font-mono);
+  color: var(--ios-cyan);
+  font-weight: 600;
+}
+
+.swt-col-time {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.swt-col-cond {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.swt-col-temp {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.swt-col-wind {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.swt-col-precip {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.swt-row.active-waypoint {
+  background: rgba(0, 229, 255, 0.16) !important;
+  border-left: 3px solid var(--ios-cyan) !important;
+}
+
+/* Individual Cell Formats */
+.swt-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.swt-cell.swt-milestone {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.swt-type-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+}
+
+.swt-type-tag.tag-wpt {
+  color: var(--text-secondary);
+}
+
+.swt-type-tag.tag-start {
+  color: var(--ios-cyan);
+}
+
+.swt-type-tag.tag-finish {
+  color: #ff9f0a;
+}
+
+.swt-type-tag.tag-peak {
+  color: #bf5af2;
+}
+
+.swt-m-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swt-m-coords {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  letter-spacing: 0.2px;
+}
+
+.swt-cell.swt-dist-ele {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swt-dist {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.swt-ele {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.swt-cell.swt-time {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swt-time-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.swt-arr-time {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.swt-arr-date {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.swt-cell.swt-weather {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swt-w-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.swt-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.swt-cond {
+  font-size: 13px;
+  color: #ffffff;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swt-cell.swt-temp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swt-temp-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.swt-temp-felt {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.swt-cell.swt-wind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.swt-wind-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.swt-gusts {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.swt-cell.swt-precip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.swt-precip-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.swt-precip-mm {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.swt-snow-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(100, 210, 255, 0.18);
+  border: 1px solid rgba(100, 210, 255, 0.4);
+  color: #64d2ff;
+  width: fit-content;
+}
+
+.swt-empty-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  background: rgba(48, 209, 88, 0.08);
+  border: 1px solid rgba(48, 209, 88, 0.25);
+  border-radius: 12px;
+  color: #fff;
+  margin: 14px;
+}
+
+.swt-empty-notice span {
+  font-size: 26px;
+}
+
+.swt-empty-notice strong {
+  display: block;
+  color: #30d158;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.swt-empty-notice p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ==========================================================================
+   IPHONE & MOBILE HORIZONTAL STAGE CAROUSEL (Anti-Vertical-Scroll Pattern)
+   ========================================================================== */
+.swt-mobile-stepper {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sports-waypoints-card {
+    padding: 12px 10px !important;
+  }
+
+  .swt-card-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .swt-filter-group {
+    width: 100% !important;
+    display: flex !important;
+    gap: 6px !important;
+  }
+
+  .swt-filter-pill {
+    flex: 1 !important;
+    text-align: center !important;
+    padding: 6px 4px !important;
+    font-size: 11px !important;
+    justify-content: center !important;
+  }
+
+  .swt-mobile-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    margin: 4px 0 8px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .sms-nav-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .sms-nav-btn:active {
+    transform: scale(0.92);
+    background: rgba(0, 229, 255, 0.25);
+  }
+
+  .sms-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .sms-step-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: #00e5ff;
+    letter-spacing: 0.2px;
+  }
+
+  .sms-swipe-hint {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .sports-waypoints-table-wrap {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin-top: 4px;
+  }
+
+  .swt-header {
+    display: none !important;
+  }
+
+  .swt-desktop-cells {
+    display: none !important;
+  }
+
+  .swt-mobile-stepper {
+    display: none !important;
+  }
+
+  /* FAHRPLAN-PERLENKETTE (Vertikale Stationen-Liste) */
+  .swt-body {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    scroll-snap-type: none !important;
+    gap: 8px !important;
+    padding: 2px 0 10px 0 !important;
+    width: 100% !important;
+  }
+
+  .swt-row {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 16px !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(15, 23, 42, 0.7) 100%), rgba(12, 19, 36, 0.75) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
+    overflow: hidden !important;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease !important;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .swt-row:active {
+    transform: scale(0.99);
+  }
+
+  .swt-row.is-expanded {
+    border-color: rgba(0, 229, 255, 0.5) !important;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(15, 23, 42, 0.85) 100%) !important;
+    box-shadow: 0 6px 22px rgba(0, 229, 255, 0.2) !important;
+  }
+
+  .swt-row.swt-row-active-live {
+    border-left: 3px solid #00e5ff !important;
+  }
+
+  /* 1. COMPACT SUMMARY BAR (Fahrplan-Zeile) */
+  .swt-mobile-summary {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    gap: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .sms-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .sms-node-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .sms-node-badge.node-start {
+    background: rgba(48, 209, 88, 0.2);
+    border-color: #30d158;
+    color: #30d158;
+  }
+
+  .sms-node-badge.node-peak {
+    background: rgba(255, 209, 102, 0.25);
+    border-color: #ffd166;
+    color: #ffd166;
+    box-shadow: 0 0 10px rgba(255, 209, 102, 0.35);
+  }
+
+  .sms-node-badge.node-end {
+    background: rgba(100, 210, 255, 0.2);
+    border-color: #64d2ff;
+    color: #64d2ff;
+  }
+
+  .sms-node-badge.node-completed {
+    background: rgba(48, 209, 88, 0.25);
+    border-color: #30d158;
+    color: #30d158;
+    font-weight: 800;
+  }
+
+  .sms-node-badge.node-next {
+    background: rgba(0, 229, 255, 0.25);
+    border-color: #00e5ff;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+  }
+
+  .sms-text-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    gap: 2px;
+  }
+
+  .sms-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .sms-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 170px;
+  }
+
+  .sms-peak-badge {
+    font-size: 9.5px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: rgba(255, 209, 102, 0.2);
+    color: #ffd166;
+    border: 1px solid rgba(255, 209, 102, 0.4);
+    font-weight: 700;
+  }
+
+  .sms-warn-badge {
+    font-size: 9.5px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: rgba(255, 69, 58, 0.2);
+    color: #ff453a;
+    border: 1px solid rgba(255, 69, 58, 0.4);
+    font-weight: 700;
+  }
+
+  .sms-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  .sms-sep {
+    opacity: 0.35;
+  }
+
+  .sms-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .sms-weather-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .sms-icon {
+    font-size: 15px;
+  }
+
+  .sms-temp {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .sms-chevron {
+    font-size: 14px;
+    color: var(--text-tertiary);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s;
+    user-select: none;
+  }
+
+  .swt-row.is-expanded .sms-chevron {
+    transform: rotate(180deg);
+    color: var(--ios-cyan);
+  }
+
+  /* 2. ACCORDION DETAILS PANE */
+  .swt-accordion-pane {
+    display: block !important;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    border-top: 1px solid transparent;
+  }
+
+  .swt-row.is-expanded .swt-accordion-pane {
+    max-height: 420px;
+    opacity: 1;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .sap-inner {
+    padding: 10px 12px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .sap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .sap-chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .sap-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .sap-val {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.25;
+  }
+
+  .sap-sub {
+    font-size: 10.5px;
+    color: var(--text-secondary);
+    line-height: 1.2;
+  }
+
+  .sap-footer {
+    display: flex;
+    align-items: center;
+    justify-content: stretch;
+    margin-top: 2px;
+  }
+
+  .sap-focus-btn {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(0, 229, 255, 0.12);
+    border: 1px solid rgba(0, 229, 255, 0.35);
+    color: var(--ios-cyan);
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: all 0.15s ease;
+  }
+
+  .sap-focus-btn:active {
+    background: rgba(0, 229, 255, 0.28);
+    transform: scale(0.98);
+  }
+}
+
+/* Sports Map Header Actions & Fullscreen Toggle */
+.sports-map-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#sports-map-card .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+#sports-map-card .card-title {
+  text-transform: none;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: #f1f5f9;
+}
+
+.sports-map-fullscreen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: #00e5ff;
+  border-radius: 10px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sports-map-fullscreen-btn .sm-fs-icon-svg {
+  display: block;
+  stroke: #00e5ff;
+  transition: transform 0.2s ease;
+}
+
+.sports-map-fullscreen-btn:hover {
+  background: rgba(0, 229, 255, 0.24);
+  border-color: #00e5ff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+  transform: scale(1.05);
+}
+
+.sports-map-fullscreen-btn:hover .sm-fs-icon-svg {
+  transform: scale(1.1);
+}
+
+.sports-map-fullscreen-btn:active {
+  transform: scale(0.94);
+}
+
+/* =============================================================================
+ * SPORTS MAP: OUTDOOR ALPIN-LOOK & VOLLBILDMODUS (MATCHING KOMOOT / OUTDOORACTIVE)
+ * ============================================================================= */
+
+/* 1. Fullscreen Body & Ancestor Blockers - Removes containing block traps */
+body.sports-map-fullscreen-active {
+  overflow: hidden !important;
+  touch-action: pan-x pan-y !important;
+}
+
+body.sports-map-fullscreen-active .mobile-bottom-nav,
+body.sports-map-fullscreen-active .app-header,
+body.sports-map-fullscreen-active .main-tab-bar,
+body.sports-map-fullscreen-active .ios-status-bar-guard,
+body.sports-map-fullscreen-active #hero-hazard-alert,
+body.sports-map-fullscreen-active .spotlight-banner {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+body.sports-map-fullscreen-active #sports-map-card {
+  position: static !important;
+  contain: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transform: none !important;
+  filter: none !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.sports-map-fullscreen-active #sports-map-card > .card-header {
+  display: none !important;
+}
+
+/* 2. Map Wrapper & Responsive Heights */
+.sports-map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.25s ease;
+  background: #111827;
+}
+
+.sports-map-wrapper .leaflet-control-zoom {
+  display: none !important;
+}
+
+.sports-map-container {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  .sports-map-wrapper:not(.sports-map-fullscreen) {
+    height: 380px;
+  }
+}
+
+/* 3. Sports Map Fullscreen Container */
+.sports-map-wrapper.sports-map-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 100000 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #090e17 !important;
+  box-shadow: none !important;
+}
+
+.sports-map-wrapper.sports-map-fullscreen .sports-map-container {
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+}
+
+/* 4. Close Button on Fullscreen Map */
+.sports-map-close-btn {
+  display: none;
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 100010;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sports-map-wrapper.sports-map-fullscreen .sports-map-close-btn {
+  display: flex !important;
+}
+
+.sports-map-close-btn:hover {
+  background: rgba(255, 69, 58, 0.92);
+  border-color: #ff453a;
+  transform: scale(1.08);
+}
+
+.sports-map-close-btn:active {
+  transform: scale(0.94);
+}
+
+/* 5. Center Tour HUD Badge (Floating on Map) */
+.sports-map-center-hud {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 100005;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 6px 14px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sm-hud-time {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.sm-hud-dist {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0284c7;
+}
+
+/* 6. Custom Teardrop Pin Markers (START & ZIEL) */
+.sports-custom-pin {
+  background: none;
+  border: none;
+  overflow: visible !important;
+}
+
+.sm-pin-teardrop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.sm-pin-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sm-pin-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #dc2626;
+  border: 2.5px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.sm-pin-label {
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.sm-pin-flag {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sm-pin-stem {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid #dc2626;
+  margin-top: -1px;
+}
+
+/* Weather Badges attached to Start / End */
+.sm-pin-teardrop .sm-ref-badge {
+  margin-bottom: 4px;
+}
+
+/* 7. Reference-Style White Weather Callout Badges */
+.sports-milestone-marker {
+  background: none;
+  border: none;
+  overflow: visible !important;
+  pointer-events: auto;
+}
+
+.ms-marker-bubble {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transform: translate(-50%, -100%);
+  transition: transform 0.15s ease;
+}
+
+.ms-marker-bubble:hover {
+  transform: translate(-50%, -105%) scale(1.05);
+  z-index: 5000 !important;
+}
+
+/* Trail Dot placed exactly on GPS track */
+.sm-trail-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #0066ff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  margin-top: 2px;
+}
+
+.sm-trail-dot.dot-peak {
+  width: 11px;
+  height: 11px;
+  background: #f59e0b;
+}
+
+/* Kompakte Pill für Inline / kleine Karte */
+.sports-map-wrapper:not(.sports-map-fullscreen) .ms-compact-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  padding: 3px 8px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
+  white-space: nowrap;
+}
+
+.sports-map-wrapper:not(.sports-map-fullscreen) .ms-compact-pill .ms-temp {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.sports-map-wrapper:not(.sports-map-fullscreen) .ms-compact-pill .ms-time {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  font-family: var(--font-mono);
+}
+
+.sports-map-wrapper:not(.sports-map-fullscreen) .ms-detailed-card {
+  display: none !important;
+}
+
+/* Vollbild-Ansicht: Edle weiße Referenz-Callouts mit vollen Wetterdaten */
+.sports-map-wrapper.sports-map-fullscreen .ms-compact-pill {
+  display: none !important;
+}
+
+.sports-map-wrapper.sports-map-fullscreen .ms-detailed-card {
+  position: relative;
+  display: flex !important;
+  flex-direction: column;
+  gap: 2px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 5px 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  min-width: 120px;
+  max-width: 180px;
+}
+
+.bubble-peak .ms-detailed-card {
+  border: 1.5px solid #f59e0b !important;
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.35) !important;
+}
+
+.sm-ref-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sm-ref-main .ms-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.sm-ref-main .ms-temp {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.sm-ref-main .ms-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  font-family: var(--font-mono);
+  margin-left: auto;
+}
+
+.sm-ref-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sm-cond {
+  color: #1e293b;
+}
+
+.sm-dot {
+  color: #cbd5e1;
+}
+
+.sm-wind {
+  color: #0369a1;
+}
+
+.sm-rain {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+/* Callout Stem / Arrow */
+.sm-ref-arrow {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #ffffff;
+}
+
+/* 8. Start & Ziel Badge Styling */
+.sm-ref-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 2px 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
+
+.sm-ref-badge .ms-temp {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.sm-ref-badge .ms-time {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  font-family: var(--font-mono);
+}
+
+/* Statischer Athleten-Marker auf der Karte (ohne störende Animationen) */
+.sports-scrubber-map-marker {
+  background: none;
+  border: none;
+}
+
+.scrubber-pin-static {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffd166 20%, #ff9f0a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.5), 0 4px 16px rgba(0, 0, 0, 0.6);
+  border: 1.5px solid #ffffff;
+}
+
+/* Leaflet Sports Map Popup Styling */
+.sports-map-popup-card {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-width: 190px;
+  color: #ffffff;
+  padding: 2px;
+}
+
+.smp-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #00e5ff;
+  margin-bottom: 2px;
+}
+
+.smp-meta {
+  font-size: 11px;
+  color: #a0aec0;
+  margin-bottom: 4px;
+}
+
+.smp-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  margin: 6px 0;
+}
+
+.smp-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.5px;
+}
+
+.smp-wind-badge {
+  font-size: 11px;
+  color: #ffd166;
+  font-weight: 600;
+}
+
+.smp-snow-badge {
+  color: #64d2ff;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.smp-jump-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 229, 255, 0.18);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  color: #00e5ff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.smp-jump-btn:hover {
+  background: rgba(0, 229, 255, 0.32);
+  border-color: #00e5ff;
+}
+
+.smp-jump-btn:active {
+  transform: scale(0.97);
+}
+
+/* =============================================================================
+   PROMINENTE & SCHLANKE GPX-UPLOAD- & DEMO-BAR
+   ============================================================================= */
+.sports-upload-card {
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(0, 229, 255, 0.05) 100%), rgba(16, 24, 40, 0.85);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  margin-bottom: 8px;
+}
+
+.sports-upload-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.sports-drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(0, 229, 255, 0.35);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sports-drop-zone:hover,
+.sports-drop-zone.dragover {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: #00e5ff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+}
+
+.sdz-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sdz-icon-pill {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.sdz-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sdz-main-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sdz-sub-text {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sdz-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0a84ff, #0056b3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3);
+  transition: all 0.15s ease;
+}
+
+.sdz-select-btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+/* Demo-Touren Block (1 Berg, 1 Rad) */
+.sports-demo-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.sdb-caption {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+}
+
+.sdb-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sdb-buttons .sports-route-preset {
+  min-width: 0;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e5e5ea;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sdb-buttons .sports-route-preset:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.sdb-buttons .sports-route-preset.active {
+  background: rgba(0, 229, 255, 0.18);
+  border-color: #00e5ff;
+  color: #00e5ff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+}
+
+.srp-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.srp-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Custom GPX Active File Banner */
+.sports-custom-file-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: rgba(48, 209, 88, 0.12);
+  border: 1px solid rgba(48, 209, 88, 0.4);
+}
+
+.scfb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.scfb-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.scfb-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.scfb-filename {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #30d158;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scfb-meta {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scfb-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: rgba(255, 69, 58, 0.14);
+  border: 1px solid rgba(255, 69, 58, 0.35);
+  color: #ff453a;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.scfb-filename {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #30d158;
+}
+
+.scfb-meta {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
+.scfb-reset-btn {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scfb-reset-btn:hover {
+  background: rgba(255, 69, 58, 0.2);
+  border-color: #ff453a;
+  color: #ff453a;
+}
+
+/* =============================================================================
+   INTEGRIERTER STRECKEN-SLIDER DIREKT UNTER DEM HÖHENPROFIL
+   ============================================================================= */
+.cockpit-slider-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.csc-slider-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.csc-meta-live {
+  font-weight: 700;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 209, 102, 0.25);
+}
+
+.sports-route-range-slider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #30d158 0%, #00e5ff 50%, #ffd166 100%);
+  outline: none;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+.sports-route-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2.5px solid #00e5ff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.6), 0 2px 8px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.sports-route-range-slider::-webkit-slider-thumb:hover,
+.sports-route-range-slider::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.9), 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+.sports-gpx-drawer-hint {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .sports-upload-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sports-demo-block {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sdb-buttons {
+    width: 100%;
+  }
+  .sdb-buttons .sports-route-preset {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+/* In-Place Waypoints Dynamic Status Classes */
+.swt-row-completed {
+  opacity: 0.45 !important;
+  filter: grayscale(0.6);
+  background: rgba(0, 0, 0, 0.2) !important;
+  transition: opacity 0.2s, filter 0.2s;
+}
+
+.swt-row-completed:hover {
+  opacity: 0.8 !important;
+  filter: none;
+}
+
+.swt-row-active-live {
+  background: linear-gradient(90deg, rgba(48, 209, 88, 0.18), rgba(0, 229, 255, 0.08)) !important;
+  border-left: 3px solid #30d158 !important;
+  box-shadow: inset 0 0 16px rgba(48, 209, 88, 0.12);
+}
+
+.swt-completed-tag {
+  color: #30d158 !important;
+  font-weight: 800 !important;
+}
+
+.swt-live-next-tag {
+  color: #ffd166 !important;
+  font-weight: 800 !important;
+  text-shadow: 0 0 8px rgba(255, 209, 102, 0.4);
+}
+
+.swt-time-delta {
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-weight: 800;
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.swt-time-delta.delta-late {
+  background: rgba(255, 69, 58, 0.22);
+  color: #ff453a;
+  border: 1px solid rgba(255, 69, 58, 0.45);
+}
+
+.swt-time-delta.delta-early {
+  background: rgba(48, 209, 88, 0.22);
+  color: #30d158;
+  border: 1px solid rgba(48, 209, 88, 0.45);
+}
+
+@media (max-width: 768px) {
+  .sltp-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sltp-actions {
+    justify-content: stretch;
+  }
+
+  .sltp-actions .sltp-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   FEATURE 2A: SPOTLIGHT SEARCH TRIGGER & 1-CLICK GPS PILL
+   ========================================================================== */
+.spotlight-trigger-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-pill);
+  padding: 8px 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 250px;
+}
+
+.spotlight-trigger-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.stp-icon {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.stp-text {
+  flex: 1;
+  text-align: left;
+}
+
+.stp-kbd {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--ios-cyan);
+  font-weight: 700;
+}
+
+.header-gps-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.25), rgba(0, 122, 255, 0.4));
+  border: 1px solid rgba(100, 210, 255, 0.55);
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.header-gps-pill:hover {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.45), rgba(0, 122, 255, 0.65));
+  border-color: var(--ios-cyan);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.35);
+}
+
+.hgp-icon {
+  font-size: 14px;
+}
+
+/* ==========================================================================
+   FEATURE 2A: APPLE SPOTLIGHT GLOBAL SEARCH MODAL (CMD+K)
+   ========================================================================== */
+.spotlight-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+  animation: spotlightFadeIn 0.2s ease-out;
+}
+
+@keyframes spotlightFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.spotlight-modal-card {
+  width: 90%;
+  max-width: 640px;
+  background: rgba(20, 26, 40, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 229, 255, 0.25);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.spotlight-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.spotlight-icon {
+  font-size: 20px;
+  color: var(--ios-cyan);
+}
+
+.spotlight-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 17px;
+  color: #fff;
+  font-family: inherit;
+}
+
+.spotlight-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.spotlight-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.spotlight-close-btn:hover {
+  background: rgba(255, 69, 58, 0.2);
+  color: var(--ios-red);
+  border-color: rgba(255, 69, 58, 0.4);
+}
+
+.spotlight-quick-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  scrollbar-width: none;
+}
+
+.spotlight-quick-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.sqc-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.sq-chip {
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s;
+}
+
+.sq-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-color: var(--ios-cyan);
+}
+
+.spotlight-results {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.spotlight-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.spotlight-item:hover,
+.spotlight-item.selected {
+  background: rgba(0, 122, 255, 0.22);
+}
+
+.si-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.si-icon {
+  font-size: 18px;
+}
+
+.si-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.si-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: 6px;
+}
+
+.si-right {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ios-cyan);
+  font-weight: 700;
+}
+
+.spotlight-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.spotlight-footer kbd {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   FEATURE 1A: NATIVE MOBILE BOTTOM TAB BAR (iOS / TOUCH SCREENS)
+   ========================================================================== */
+.ios-status-bar-guard {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .ios-status-bar-guard {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: linear-gradient(180deg, rgba(11, 19, 30, 0.98) 0%, rgba(11, 19, 30, 0.75) 85%, transparent 100%);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  body.mobile-map-fullscreen-active .ios-status-bar-guard {
+    display: none !important;
+  }
+}
+
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .main-tab-bar {
+    display: none !important;
+  }
+
+  .app-layout {
+    padding-top: max(24px, calc(env(safe-area-inset-top, 0px) + 20px)) !important;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom, 12px)) !important;
+  }
+
+  /* Floating Liquid Glass Dock for iPhone (fliegt über dem Content am unteren Rand) */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: calc(14px + env(safe-area-inset-bottom, 8px));
+    left: 14px;
+    right: 14px;
+    max-width: 420px;
+    margin: 0 auto;
+    height: 64px;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    border-radius: 36px;
+    
+    /* Apple Vision / iOS 18 Liquid Glass Shader */
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.05) 45%,
+      rgba(15, 23, 42, 0.45) 100%
+    ), rgba(12, 19, 36, 0.65);
+    backdrop-filter: blur(30px) saturate(210%);
+    -webkit-backdrop-filter: blur(30px) saturate(210%);
+
+    /* 3D Glass Surface & Specular Rim Light */
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.45);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+
+    /* Deep Floating Drop Shadow & Inner Glass Refraction */
+    box-shadow:
+      0 20px 48px -4px rgba(0, 0, 0, 0.65),
+      0 10px 24px -2px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
+
+    z-index: 99999;
+    align-items: center;
+    justify-content: space-evenly;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Specular sheen across top edge of curved liquid glass */
+  .mobile-bottom-nav::before {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 15%;
+    right: 15%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+    pointer-events: none;
+    border-radius: 50%;
+  }
+
+  .mbn-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.62);
+    cursor: pointer;
+    flex: 1;
+    height: 100%;
+    border-radius: 24px;
+    padding: 4px 0;
+    touch-action: manipulation;
+    position: relative;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mbn-btn .mbn-icon {
+    font-size: 21px;
+    line-height: 1;
+    opacity: 0.85;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s, filter 0.22s;
+  }
+
+  .mbn-btn .mbn-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    color: rgba(255, 255, 255, 0.65);
+    transition: color 0.2s, font-weight 0.2s, text-shadow 0.2s;
+  }
+
+  .mbn-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .mbn-btn:active {
+    transform: scale(0.92);
+  }
+
+  /* Active Capsule inside Liquid Glass Dock */
+  .mbn-btn.active {
+    color: #ffffff;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.04) 100%);
+    box-shadow: 
+      inset 0 1px 1px rgba(255, 255, 255, 0.35),
+      inset 0 0 12px rgba(0, 229, 255, 0.12),
+      0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+
+  .mbn-btn.active .mbn-icon {
+    opacity: 1;
+    transform: scale(1.15) translateY(-1px);
+    filter: drop-shadow(0 2px 10px rgba(0, 229, 255, 0.65));
+  }
+
+  .mbn-btn.active .mbn-label {
+    color: #ffffff;
+    font-weight: 800;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.45);
+  }
+
+  /* Subtle bottom glow indicator pill */
+  .mbn-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    width: 14px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: var(--ios-cyan);
+    box-shadow: 0 0 6px var(--ios-cyan);
+  }
+
+  .spotlight-trigger-pill {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .stp-kbd {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   APP FOOTER & DISCREET SOURCES ROUTING
+   ========================================================================== */
+.app-footer {
+  margin-top: 48px;
+  padding: 24px 20px 48px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 20px 20px 0 0;
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.footer-app-name {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.footer-dot {
+  opacity: 0.4;
+}
+
+.footer-tagline {
+  color: var(--text-tertiary);
+}
+
+.footer-source-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.footer-source-trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.footer-source-trigger.active {
+  background: rgba(0, 229, 255, 0.14);
+  border-color: var(--ios-cyan);
+  color: #ffffff;
+}
+
+.networks-top-nav {
+  margin-bottom: 14px;
+}
+
+.networks-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.networks-back-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: var(--ios-cyan);
+}
+
+@media (max-width: 768px) {
+  .app-footer {
+    margin-top: 32px;
+    padding-bottom: 24px;
+    text-align: center;
+  }
+  .footer-container {
+    flex-direction: column;
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   FEATURE 8A: ALPINE NOTRUFNUMMERN & MESSSTATIONEN
+   ========================================================================== */
+.av-station-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.asm-dot {
+  font-size: 10px;
+}
+
+.asm-time {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.av-emergency-row {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aer-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ios-red);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.aer-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.aer-pill {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(255, 69, 58, 0.14);
+  border: 1px solid rgba(255, 69, 58, 0.35);
+  color: #ff6b6b;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.aer-pill:hover {
+  background: rgba(255, 69, 58, 0.3);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   FEATURE 10B: DYNAMISCHE HIMMELSFARBEN NACH SONNENSTAND
+   ========================================================================== */
+.ambient-glow.dawn {
+  background: radial-gradient(circle at 50% 10%, rgba(255, 120, 160, 0.35) 0%, rgba(120, 80, 200, 0.2) 40%, transparent 70%);
+}
+
+.ambient-glow.sunrise {
+  background: radial-gradient(circle at 50% 15%, rgba(255, 180, 50, 0.45) 0%, rgba(255, 100, 80, 0.25) 35%, transparent 70%);
+}
+
+.ambient-glow.golden-hour {
+  background: radial-gradient(circle at 60% 25%, rgba(255, 190, 40, 0.4) 0%, rgba(240, 120, 40, 0.25) 40%, transparent 70%);
+}
+
+.ambient-glow.alpenglow {
+  background: radial-gradient(circle at 50% 20%, rgba(255, 60, 120, 0.45) 0%, rgba(200, 40, 90, 0.3) 35%, rgba(60, 20, 120, 0.15) 60%, transparent 75%);
+}
+
+.ambient-glow.dusk {
+  background: radial-gradient(circle at 50% 20%, rgba(60, 80, 180, 0.4) 0%, rgba(180, 80, 140, 0.25) 35%, transparent 70%);
+}
+
+.ambient-glow.night {
+  background: radial-gradient(circle at 50% 10%, rgba(30, 45, 90, 0.4) 0%, rgba(10, 15, 35, 0.6) 50%, transparent 80%);
+}
+
+
+
+/* ==========================================================================
+   OPTIMIZATION 4B: RADAR CONTRAST-MODE BEI NIEDERSCHLAG
+   ========================================================================== */
+.radar-contrast-mode .leaflet-tile-pane .leaflet-layer:first-child .leaflet-tile {
+  filter: brightness(0.65) contrast(1.35) saturate(0.85);
+  transition: filter 0.35s ease;
+}
+

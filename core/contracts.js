@@ -176,6 +176,7 @@ export function validateMultiModel(mm) {
     regional: mm.regional || null,
     icon: mm.icon || null,
     weightedConsensus: mm.weightedConsensus || null,
+    ensembleSpread: mm.ensembleSpread || null,
     ecmwf: {
       name: mm.ecmwf.name || 'ECMWF IFS 0.25°',
       origin: mm.ecmwf.origin || 'Europäisches Zentrum für mittelfristige Wettervorhersage',

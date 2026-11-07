@@ -1,0 +1,1884 @@
+/* ==========================================================================
+   NAVIGATION TAB BAR
+   ========================================================================== */
+.main-tab-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(16, 22, 36, 0.85);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-pill);
+  padding: 5px 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.main-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-smooth);
+}
+
+.tab-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tab-btn.active {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* Tab panes switching with CSS Containment & content-visibility (Task 9a) */
+.tab-pane {
+  display: none;
+  width: 100%;
+  content-visibility: hidden;
+  contain: layout paint style;
+}
+
+.tab-pane.active {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: tabFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  content-visibility: visible;
+  contain: none;
+}
+
+/* ==========================================================================
+   VIEW PANELS: BERG-ENGINE & STADT-KLIMA (TAB 2)
+   Saubere, konsistente Abstände auf Mac, iPad & iPhone
+   ========================================================================== */
+#mountain-view-panel,
+#city-view-panel,
+.view-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+#mountain-view-panel>section,
+#city-view-panel>section,
+.view-panel>section {
+  width: 100%;
+  margin: 0;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   GLASS CARDS (Shared Base)
+   ========================================================================== */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner-shadow), var(--glass-card-shadow);
+  border-radius: 20px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.25s ease;
+  contain: layout paint style;
+}
+
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 16px 14px;
+    border-radius: 18px;
+  }
+}
+
+/* GPU Optimization (Task 9a): Eliminate nested blur passes that cause VRAM spikes */
+.glass-card .glass-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(18, 30, 49, 0.65) !important;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+
+  .glass-card,
+  .liquid-glass-panel,
+  .liquid-glass-dock {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(13, 27, 42, 0.94) !important;
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.card-icon {
+  font-size: 16px;
+}
+
+.card-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   TAB 1: HERO & OVERVIEW SECTION
+   ========================================================================== */
+/* Akuter Unwetter- & Gefahren-Banner */
+.hero-hazard-alert {
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.28), rgba(245, 158, 11, 0.24));
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  border-radius: 18px;
+  padding: 12px 18px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.25);
+  animation: hazardPulse 3s infinite ease-in-out;
+}
+
+@keyframes hazardPulse {
+
+  0%,
+  100% {
+    border-color: rgba(239, 68, 68, 0.5);
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2);
+  }
+
+  50% {
+    border-color: rgba(245, 158, 11, 0.9);
+    box-shadow: 0 6px 26px rgba(245, 158, 11, 0.4);
+  }
+}
+
+.hha-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.hha-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.hha-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hha-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #ff6b6b;
+  letter-spacing: 0.5px;
+}
+
+.hha-msg {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.35;
+}
+
+.hha-action-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.hha-action-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  transform: scale(1.05);
+}
+
+/* Kompakt- vs. Experten-Modus */
+.expert-mode-toggle-bar {
+  margin: 18px 0 10px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.expert-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  padding: 12px 20px;
+  color: #ffffff;
+  cursor: pointer;
+  width: 100%;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.expert-mode-btn:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: var(--ios-cyan);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.emb-icon {
+  font-size: 22px;
+}
+
+.emb-text-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  flex: 1;
+}
+
+.emb-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.emb-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.emb-arrow {
+  font-size: 14px;
+  color: var(--ios-cyan);
+  transition: transform 0.25s ease;
+}
+
+.expert-mode-btn.is-expanded .emb-arrow {
+  transform: rotate(180deg);
+}
+
+.expert-details-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.expert-details-container.is-hidden {
+  display: none !important;
+}
+
+.hero-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 24px;
+}
+
+.hero-location-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero-city-name {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.elevation-pill {
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(100, 210, 255, 0.18);
+  border: 1px solid rgba(100, 210, 255, 0.35);
+  color: #a0e1ff;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.hero-temp-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hero-main-temp {
+  display: flex;
+  align-items: flex-start;
+  font-size: 60px;
+  font-weight: 300;
+  line-height: 0.95;
+  letter-spacing: -2px;
+}
+
+.hero-deg {
+  font-size: 32px;
+  font-weight: 300;
+  margin-top: 4px;
+  opacity: 0.75;
+}
+
+.hero-condition-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hero-condition-text {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.hero-snowline-row {
+  margin-top: -2px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+}
+
+/* Stadt-Wetter: Dezent, weniger prominent, unaufdringlich */
+.hero-snowline-city {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  opacity: 0.78;
+  letter-spacing: 0.2px;
+}
+
+/* Berg-Wetter: Deutlicher (alpine Glass-Pill), aber kompakt und nicht riesig */
+.hero-snowline-mountain {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(100, 210, 255, 0.16);
+  border: 1px solid rgba(100, 210, 255, 0.38);
+  color: #64d2ff;
+  letter-spacing: 0.2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  width: fit-content;
+}
+
+.hero-snowline-mountain.freezing {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.hero-high-low {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.hero-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   24-HOUR HOURLY FORECAST SLIDER
+   ========================================================================== */
+.hourly-scroll-container {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 6px 2px 12px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.hourly-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 66px;
+  padding: 10px 8px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s ease, background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.hourly-item:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-2px);
+}
+
+.hourly-time {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.hourly-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.hourly-pop {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+  min-height: 14px;
+}
+
+.hourly-temp {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.hourly-wind {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* ==========================================================================
+   10-DAY FORECAST (Rich Multi-Metric Architecture for Mac, iPad & iPhone)
+   ========================================================================== */
+.daily-table-header {
+  display: grid;
+  grid-template-columns: 130px 175px 135px 1fr 105px 28px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px 12px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+}
+
+.daily-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.daily-item-wrapper {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: var(--transition-smooth);
+  overflow: hidden;
+}
+
+.daily-item-wrapper:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.daily-item-wrapper.expanded {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 209, 102, 0.4);
+}
+
+.daily-extended-item.is-collapsed {
+  display: none !important;
+}
+
+.daily-expand-bar {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 2px 0;
+  width: 100%;
+}
+
+.daily-expand-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  width: 100%;
+  max-width: 380px;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.daily-expand-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(100, 210, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.daily-expand-toggle-btn:active {
+  transform: scale(0.98);
+}
+
+.daily-expand-toggle-btn .det-arrow {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.daily-expand-toggle-btn.active .det-arrow {
+  transform: rotate(180deg);
+}
+
+.daily-interactive-row {
+  display: grid;
+  grid-template-columns: 130px 175px 135px 1fr 105px 28px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.daily-row-mobile-top,
+.daily-row-mobile-bottom {
+  display: contents;
+}
+
+.daily-date-cell {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.daily-condition-cell {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.daily-precip-cell {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.daily-sun-cell {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.daily-temp-cell {
+  grid-column: 5;
+  grid-row: 1;
+}
+
+.daily-action-cell {
+  grid-column: 6;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Col 1: Date */
+.daily-date-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.daily-day-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.daily-day-label .day-short {
+  display: none;
+}
+
+.daily-date-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+/* Col 2: Condition */
+.daily-condition-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.daily-icon-box {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.daily-cond-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.2px;
+}
+
+/* Col 3: Precip */
+.daily-precip-cell {
+  display: flex;
+  align-items: center;
+}
+
+.daily-precip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(100, 210, 255, 0.12);
+  border: 1px solid rgba(100, 210, 255, 0.25);
+  color: var(--ios-cyan);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.daily-precip-chip.heavy-rain {
+  background: rgba(0, 122, 255, 0.25);
+  border-color: rgba(0, 122, 255, 0.5);
+  color: #70c4ff;
+}
+
+.precip-sum {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.daily-precip-dry {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+/* Col 4: Wind */
+.daily-wind-cell {
+  display: flex;
+  align-items: center;
+}
+
+.daily-wind-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.wind-main {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.wind-gusts {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.daily-wind-chip.wind-alert .wind-gusts {
+  color: #ffd166;
+  font-weight: 700;
+}
+
+/* Col 5: Sunshine Hours, Mini-Sparkline & Sunrise/Sunset */
+.daily-sun-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.daily-sun-mini-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dsm-hours {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffd166;
+  white-space: nowrap;
+}
+
+.dsm-chart {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 16px;
+  padding: 1.5px 3px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.msb-bar {
+  width: 3.5px;
+  border-radius: 1px;
+  transition: height 0.2s ease;
+}
+
+.msb-bar.msb-full {
+  background: #fbbf24;
+  box-shadow: 0 0 4px rgba(251, 191, 36, 0.4);
+}
+
+.msb-bar.msb-mid {
+  background: #f59e0b;
+}
+
+.msb-bar.msb-low {
+  background: #d97706;
+}
+
+.msb-bar.msb-overcast {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.msb-bar.msb-night {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.daily-astro-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.dap-dot {
+  opacity: 0.4;
+  font-size: 9px;
+}
+
+/* Col 6: Temperature (Min / Max) */
+.daily-temp-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.daily-temp-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-mono, -apple-system, BlinkMacSystemFont, monospace);
+}
+
+.dt-min {
+  font-size: 14px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.dt-sep {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 400;
+}
+
+.dt-max {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+/* Col 7: Chevron */
+.daily-action-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.daily-expand-chevron {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.daily-item-wrapper.expanded .daily-expand-chevron {
+  color: #ffd166;
+  transform: rotate(90deg);
+}
+
+/* UV Chip */
+.daily-uv-cell {
+  display: flex;
+  align-items: center;
+}
+
+.daily-uv-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffd60a;
+}
+
+/* Inline Accordion Breakdown */
+.daily-inline-accordion {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 14px 16px;
+  animation: accordionSlideDown 0.22s ease-out;
+}
+
+@keyframes accordionSlideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.inline-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ish-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.ish-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+  border: 1px solid rgba(255, 209, 102, 0.25);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* 24h Inline Day Overview Chart Card (Apple Weather & Windy High-Precision Vector Design) */
+.inline-day-chart-card {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 8px 6px 6px 6px;
+  margin-bottom: 8px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  position: relative;
+}
+
+.inline-day-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  user-select: none;
+}
+
+.inline-parts-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.inline-part-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 9px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: transform 0.15s ease;
+}
+
+.inline-part-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ipc-name {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+
+.ipc-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.ipc-temp {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.ipc-rain {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+}
+
+/* Expanded Sun Section */
+.inline-sun-section {
+  margin-bottom: 12px;
+}
+
+.inline-sun-timeline-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.istb-astro-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.istb-astro-point {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.iap-icon {
+  font-size: 18px;
+}
+
+.iap-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.iap-lbl {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.iap-val {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.istb-bars-container {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.istb-bars-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 3px;
+  height: 38px;
+}
+
+.esb-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+}
+
+.esb-bar-track {
+  width: 100%;
+  max-width: 12px;
+  height: 26px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 3px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.esb-bar-fill {
+  width: 100%;
+  border-radius: 2px;
+  transition: height 0.3s ease;
+}
+
+.esb-bar-fill.msb-full {
+  background: linear-gradient(180deg, #ffd166 0%, #f59e0b 100%);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
+}
+
+.esb-bar-fill.msb-mid {
+  background: #f59e0b;
+}
+
+.esb-bar-fill.msb-low {
+  background: #d97706;
+}
+
+.esb-bar-fill.msb-overcast {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.esb-bar-fill.msb-night {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.esb-time-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  height: 10px;
+  line-height: 10px;
+}
+
+.istb-daylight-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+.istb-daylight-info strong {
+  color: #ffffff;
+}
+
+/* Key Meteorological Metrics Grid (Ultra-Kompakte High-Density Chips) */
+.inline-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+  .inline-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+  }
+}
+
+.isg-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: unset;
+}
+
+.isg-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.isg-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.isg-lbl {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.isg-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.isg-sub {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* Deep Modal Link Button */
+.inline-footer-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.inline-modal-launch-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 4px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.inline-modal-launch-btn:hover {
+  background: #ffffff;
+  color: #000000;
+  transform: translateY(-1px);
+}
+  color: #000000;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   BENTO GRID (Apple 2x2 Bento Box on Tablets/Desktop)
+   ========================================================================== */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.bento-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 160px;
+}
+
+.bento-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.bento-main-val {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+.bento-main-val small {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bento-sub-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.bento-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.uv-bar-gauge {
+  position: relative;
+  height: 6px;
+  background: linear-gradient(90deg, #30d158 0%, #ffd60a 35%, #ff9f0a 60%, #ff453a 85%, #bf5af2 100%);
+  border-radius: 4px;
+  margin: 10px 0 4px 0;
+}
+
+.uv-pointer {
+  position: absolute;
+  top: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #000;
+  transform: translateX(-50%);
+  transition: left 0.5s ease;
+}
+
+.compass-body {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
+
+.compass-dial {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.compass-n,
+.compass-e,
+.compass-s,
+.compass-w {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--text-tertiary);
+}
+
+.compass-n {
+  top: 4px;
+  color: var(--ios-red);
+}
+
+.compass-s {
+  bottom: 4px;
+}
+
+.compass-e {
+  right: 4px;
+}
+
+.compass-w {
+  left: 4px;
+}
+
+.compass-arrow {
+  width: 3px;
+  height: 42px;
+  background: linear-gradient(to bottom, var(--ios-red) 50%, rgba(255, 255, 255, 0.4) 50%);
+  border-radius: 2px;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sun-arc-wrapper {
+  margin: 6px 0;
+}
+
+.sun-arc-svg {
+  width: 100%;
+  height: 38px;
+  overflow: visible;
+}
+
+.sun-times-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   BENTO GRID: KOMPAKTE SCHLANKE KACHELN & QUICK-COCKPIT
+   ========================================================================== */
+.bento-compact-card {
+  min-height: 104px !important;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, background 0.2s ease;
+  padding: 12px 14px !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.bento-compact-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(100, 210, 255, 0.38) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.bento-compact-card:active {
+  transform: scale(0.98);
+}
+
+.bento-open-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+  background: rgba(100, 210, 255, 0.1);
+  border: 1px solid rgba(100, 210, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 8px;
+  letter-spacing: 0.3px;
+  transition: all 0.2s ease;
+}
+
+.bento-compact-card:hover .bento-open-pill {
+  background: rgba(100, 210, 255, 0.25);
+  color: #ffffff;
+}
+
+.bento-compact-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.bento-compact-body .bento-main-val {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+
+.compact-compass-wrapper {
+  margin-top: 4px;
+  align-self: flex-start;
+}
+
+.compact-compass-wrapper .compass-dial {
+  width: 50px;
+  height: 50px;
+}
+
+.compact-sun-arc {
+  margin: 2px 0;
+  max-width: 130px;
+}
+
+.compact-sun-arc .sun-arc-svg {
+  height: 24px;
+}
+
+/* ==========================================================================
+   BENTO DETAIL BOTTOM SHEET / MODAL
+   ========================================================================== */
+.bento-modal-overlay {
+  align-items: flex-end; /* Mobile Bottom Sheet */
+}
+
+@media (min-width: 769px) {
+  .bento-modal-overlay {
+    align-items: center; /* Desktop centered modal */
+  }
+}
+
+.bento-sheet-card {
+  width: 100%;
+  max-width: 620px;
+  max-height: 85vh;
+  border-radius: 28px 28px 18px 18px;
+  padding: 16px 22px 24px 22px;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow-y: auto;
+}
+
+.bento-sheet-drag-handle {
+  width: 40px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  margin: 0 auto 12px auto;
+}
+
+.bdm-header {
+  margin-bottom: 16px;
+}
+
+.bdm-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bdm-hero-box {
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.bdm-big-num {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.bdm-big-num small {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bdm-sub-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.bdm-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.bdm-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.bdm-pill-warning {
+  background: rgba(255, 159, 10, 0.15);
+  border-color: rgba(255, 159, 10, 0.35);
+  color: #ff9f0a;
+}
+
+/* Compass in Detail Modal */
+.bdm-compass-dial {
+  width: 90px;
+  height: 90px;
+  min-width: 90px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.3) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-label {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-tertiary);
+}
+.cp-label.n { top: 4px; color: #ff453a; }
+.cp-label.s { bottom: 4px; }
+.cp-label.o, .cp-label.e { right: 6px; }
+.cp-label.w { left: 6px; }
+
+.cp-needle {
+  position: absolute;
+  width: 4px;
+  height: 72px;
+  top: 9px;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cp-needle-head {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 30px solid #ff453a;
+}
+
+.cp-needle-tail {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 26px solid rgba(255, 255, 255, 0.5);
+  margin-top: 10px;
+}
+
+.cp-center-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+/* Sun Arc in Detail Modal */
+.sun-hero-box {
+  flex-direction: column;
+  padding: 16px 20px;
+}
+
+.sun-arc-full-svg {
+  width: 100%;
+  max-width: 340px;
+  height: 120px;
+  margin: 0 auto;
+}
+
+.sun-times-highlight {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sth-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sth-col.center {
+  align-items: center;
+}
+
+.sth-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.sth-val {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* UV Score in Detail Modal */
+.uv-hero-box {
+  gap: 20px;
+}
+
+.uv-score-circle {
+  width: 72px;
+  height: 72px;
+  min-width: 72px;
+  border-radius: 50%;
+  border: 3px solid #ffd166;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.usc-num {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.usc-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.uv-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.uht-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.uht-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.full-gauge {
+  margin-top: 6px;
+  height: 8px;
+}
+
+/* Detail Section Cards inside Modal */
+.bdm-section-card {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 12px 16px;
+}
+
+.bsc-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ios-cyan);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.bsc-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.bft-meter-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.bft-meter-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #30d158 0%, #ffd166 50%, #ff453a 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.sun-phase-grid,
+.snowline-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.sp-item,
+.sls-item {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px 10px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sp-label,
+.sls-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.sp-val,
+.sls-val {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sls-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.sls-status-bar {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.skin-type-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.st-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.st-row:last-child {
+  border-bottom: none;
+}
+
+.precip-hero-box,
+.humidity-hero-box,
+.pressure-hero-box {
+  justify-content: space-around;
+  text-align: center;
+}
+
+.precip-stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.precip-divider,
+.bsp-divider {
+  width: 1px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.bdm-stat-pair {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  width: 100%;
+}
+
+.bsp-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.bsp-val {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.bsp-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+

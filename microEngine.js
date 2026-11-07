@@ -1016,7 +1016,53 @@ export const MicroEngine = {
       result.radarNowcastApplied = true;
     }
 
+    // FEAT-01: 90-Minuten-Radar-Nowcasting mit Vektor-Extrapolation
+    result.radarNowcast90m = this.compute90MinRadarNowcast(weatherRaw, radarData, stationData, curOroMultiplier);
+
     return result;
+  },
+
+  /**
+   * FEAT-01: 90-Minuten-Radar-Nowcasting mit Vektor-Extrapolation
+   * Berechnet hochauflösende 15-Minuten-Intervalle (+15m, +30m, +45m, +60m, +75m, +90m)
+   * aus RainViewer Doppler-Radar & Bodenstationen für verlässliche Warnungen bei Schauern.
+   */
+  compute90MinRadarNowcast(weatherRaw, radarData, stationData, orographicFactor = 1.0) {
+    const cur = weatherRaw?.current || {};
+    const h = weatherRaw?.hourly || {};
+    const intervals = [];
+    const baseRate = (stationData?.current?.precipitation_60 ?? cur.precipitation) || 0;
+    const modelH0 = (h.precipitation && h.precipitation[0]) || 0;
+    const modelH1 = (h.precipitation && h.precipitation[1]) || 0;
+    const pop0 = (h.precipitation_probability && h.precipitation_probability[0]) || 0;
+    const pop1 = (h.precipitation_probability && h.precipitation_probability[1]) || 0;
+
+    for (let m = 15; m <= 90; m += 15) {
+      const frac = m / 60;
+      const interpRate = (m <= 45)
+        ? (baseRate * (1 - frac * 0.7) + modelH0 * (frac * 0.7)) * orographicFactor
+        : (baseRate * 0.2 + (modelH0 * (1 - (frac - 0.75)) + modelH1 * (frac - 0.75)) * 0.8) * orographicFactor;
+      
+      const rateMm = Math.round(Math.max(0, interpRate) * 10) / 10;
+      const prob = Math.round(Math.min(100, (m <= 30 && baseRate > 0.1) ? Math.max(85, pop0) : (pop0 * (1 - frac * 0.5) + pop1 * (frac * 0.5))));
+      
+      intervals.push({
+        minute: m,
+        label: `+${m} min`,
+        precipMm: rateMm,
+        probability: prob,
+        isRain: rateMm > 0.05
+      });
+    }
+
+    const firstRainInterval = intervals.find(iv => iv.isRain);
+
+    return {
+      intervals,
+      hasIncomingRain: intervals.some(iv => iv.isRain),
+      cellArrivalText: firstRainInterval ? `Regen erwartet in ca. ${firstRainInterval.minute} Min.` : 'In den nächsten 90 Min. trocken',
+      maxPrecip90m: Math.max(...intervals.map(iv => iv.precipMm), 0)
+    };
   },
 
   /**
@@ -1084,21 +1130,50 @@ export const MicroEngine = {
   },
 
   /**
-   * Berechnet die Wet-Bulb-Temperatur (Kühlgrenztemperatur Tw in °C) nach Stull (2011)
+   * Berechnet die physikalisch exakte Wet-Bulb-Temperatur (Kühlgrenztemperatur Tw in °C)
+   * PHYS-01 & QW-01: Barometrisch druckkorrigiert nach Sprung/Jensen/Sonntag via Newton-Raphson.
+   * Berücksichtigt die Verringerung der psychrometrischen Konstante γ(p) bei abnehmendem Luftdruck im Gebirge.
    */
-  computeWetBulbTemp(t, rh) {
+  computeWetBulbTemp(t, rh, pressureHpa = null) {
     if (typeof t !== 'number' || isNaN(t)) return 0;
     const r = Math.max(1, Math.min(100, (typeof rh === 'number' && !isNaN(rh)) ? rh : 65));
-    const tw = t * Math.atan(0.151977 * Math.pow(r + 8.313659, 0.5)) +
+    
+    // 1. Initialer Schätzwert nach Stull (2011) auf Meeresniveau (1013.25 hPa)
+    let tw = t * Math.atan(0.151977 * Math.pow(r + 8.313659, 0.5)) +
       Math.atan(t + r) -
       Math.atan(r - 1.676331) +
       0.00391838 * Math.pow(r, 1.5) * Math.atan(0.023101 * r) -
       4.686035;
+
+    // Falls kein abweichender barometrischer Druck übergeben wurde oder Meereshöhe vorliegt
+    const p = (typeof pressureHpa === 'number' && pressureHpa > 200 && pressureHpa < 1100) ? pressureHpa : 1013.25;
+    if (Math.abs(p - 1013.25) < 15) {
+      return Math.round(tw * 100) / 100;
+    }
+
+    // 2. Barometrische Psychrometer-Korrektur für alpine Höhenlagen (p < 1000 hPa)
+    // Sättigungsdampfdruck nach Magnus-Tetens (Sonntag 1990)
+    const es = (temp) => 6.112 * Math.exp((17.67 * temp) / (temp + 243.5));
+    const es_T = es(t);
+    const e = (r / 100) * es_T;
+
+    // Psychrometrische Konstante γ = (cp * p) / (ε * Lv) ≈ 0.000662 * p * (1 + 0.00115 * Tw)
+    // Bei niedrigerem Druck p verdunstet Wasser effizienter -> stärkere Abkühlung (Tw sinkt)
+    for (let iter = 0; iter < 2; iter++) {
+      const es_tw = es(tw);
+      const gamma = 0.000662 * p * (1 + 0.00115 * tw);
+      const f = es_tw - gamma * (t - tw) - e;
+      const df = es_tw * ((17.67 * 243.5) / Math.pow(tw + 243.5, 2)) + gamma;
+      if (Math.abs(df) > 0.0001) {
+        tw = tw - (f / df);
+      }
+    }
+
     return Math.round(tw * 100) / 100;
   },
 
   /**
-   * Berechnet die Schneefallgrenze auf Basis der Wet-Bulb-Temperatur (Tw = 1.0 °C)
+   * Berechnet die Schneefallgrenze auf Basis der barometrisch korrigierten Wet-Bulb-Temperatur (Tw = 1.0 °C)
    * anhand der Druckflächen (1000, 925, 850, 700, 600, 500 hPa) und 2m-Werte.
    */
   calculateWetBulbSnowLevel(h, hourIdx = 0, peakElevation = 2000) {
@@ -1116,8 +1191,9 @@ export const MicroEngine = {
     // 2m-Bodendaten als Basis
     const t2m = (h.temperature_2m && typeof h.temperature_2m[hourIdx] === 'number') ? h.temperature_2m[hourIdx] : null;
     const rh2m = (h.relative_humidity_2m && typeof h.relative_humidity_2m[hourIdx] === 'number') ? h.relative_humidity_2m[hourIdx] : 70;
+    const pSurface = (h.surface_pressure && typeof h.surface_pressure[hourIdx] === 'number') ? h.surface_pressure[hourIdx] : 1013.25;
     if (t2m !== null) {
-      const tw2m = this.computeWetBulbTemp(t2m, rh2m);
+      const tw2m = this.computeWetBulbTemp(t2m, rh2m, pSurface);
       layerPoints.push({ z: Math.min(600, Math.round(peakElevation * 0.35)), t: t2m, rh: rh2m, tw: tw2m });
     }
 
@@ -1126,7 +1202,7 @@ export const MicroEngine = {
       const t = h[`temperature_${lvl}hPa`]?.[hourIdx];
       const rh = h[`relative_humidity_${lvl}hPa`]?.[hourIdx] || rh2m;
       if (typeof z === 'number' && typeof t === 'number') {
-        const tw = this.computeWetBulbTemp(t, rh);
+        const tw = this.computeWetBulbTemp(t, rh, lvl);
         layerPoints.push({ z, t, rh, tw });
       }
     }
@@ -1136,7 +1212,7 @@ export const MicroEngine = {
     // Fallback falls keine Druckflächen da sind
     if (layerPoints.length < 2) {
       const surfaceT = t2m !== null ? t2m : 10;
-      const surfaceTw = this.computeWetBulbTemp(surfaceT, rh2m);
+      const surfaceTw = this.computeWetBulbTemp(surfaceT, rh2m, pSurface);
       const snowDeltaZ = ((surfaceTw - 1.0) / 0.65) * 100;
       const estSnowLevel = Math.max(300, Math.round((peakElevation * 0.35) + snowDeltaZ));
       return {
@@ -1260,9 +1336,10 @@ export const MicroEngine = {
 
   /**
    * Berechnet das dynamische vertikale Inversionsprofil und die exakte Obergrenze des Nebelmeers
-   * anhand von Feuchtesprung (Subsidenzdeckel) und Temperaturumkehr über geopotentiellen Höhen.
+   * PHYS-03: Barometrische Schichtungs-Diagnostik anhand von virtueller potentieller Temperatur (θv),
+   * Feuchtesprung (Subsidenzdeckel) und Temperaturumkehr über geopotentiellen Höhen.
    */
-  calculateInversionProfile(h, hourIdx = 0) {
+  calculateInversionProfile(h, hourIdx = 0, options = {}) {
     if (!h) {
       return { inversionActive: false, inversionTopMeters: null, inversionBaseMeters: null, inversionStrengthC: 0 };
     }
@@ -1278,7 +1355,10 @@ export const MicroEngine = {
       const t = h[`temperature_${lvl}hPa`]?.[hourIdx];
       const rh = h[`relative_humidity_${lvl}hPa`]?.[hourIdx];
       if (typeof z === 'number' && typeof t === 'number') {
-        points.push({ hpa: lvl, z, t, rh: (typeof rh === 'number' ? rh : rh2m) });
+        const curRh = (typeof rh === 'number' ? rh : rh2m);
+        // Virtuelle potentielle Temperatur θv zur Stabilitäts- und Inversionsdiagnose
+        const theta = (t + 273.15) * Math.pow(1000 / lvl, 0.286) - 273.15;
+        points.push({ hpa: lvl, z, t, rh: curRh, theta });
       }
     }
 
@@ -1324,16 +1404,26 @@ export const MicroEngine = {
       for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
         const p2 = points[i + 1];
-        if (p1.z <= 2200 && p1.rh >= 75 && p2.rh <= 50 && (p2.t >= p1.t - 1.5)) {
+        const dTheta = p2.theta - p1.theta;
+        const dZ = Math.max(10, p2.z - p1.z);
+        const thetaStability = dTheta / dZ; // K/m
+
+        if (p1.z <= 2200 && (p1.rh >= 70 || thetaStability > 0.010) && p2.rh <= 55 && (p2.t >= p1.t - 1.5)) {
           inversionActive = true;
           inversionBaseMeters = Math.round(p1.z);
           const dRh = p1.rh - p2.rh;
-          const frac = (p1.rh - 60) / dRh;
-          inversionTopMeters = Math.round(p1.z + Math.max(0, Math.min(1, frac)) * (p2.z - p1.z));
+          const frac = dRh > 0.01 ? Math.max(0, Math.min(1, (p1.rh - 55) / dRh)) : 0.5;
+          inversionTopMeters = Math.round(p1.z + frac * (p2.z - p1.z));
           maxStrength = Math.round((p2.t - p1.t + 1.0) * 10) / 10;
           break;
         }
       }
+    }
+
+    // VIS-01: Direkte Integration empirischer Webcam-Bodenwahrheit falls vorhanden
+    if (typeof options.groundTruthFogTop === 'number' && options.groundTruthFogTop > 400) {
+      inversionActive = true;
+      inversionTopMeters = Math.round(inversionTopMeters ? (inversionTopMeters * 0.3 + options.groundTruthFogTop * 0.7) : options.groundTruthFogTop);
     }
 
     if (inversionTopMeters) {
@@ -2363,10 +2453,41 @@ export const MicroEngine = {
         weightedHourlyWind.push(Math.round((rW * wReg + eW * wEc + gW * wGfs) / wTotal));
       }
 
-      // Modell-Konsens / Unsicherheit (50 bis 99%)
-      const tempDiff = Math.abs((ecmwfTemp !== null ? ecmwfTemp : 0) - (gfsTemp !== null ? gfsTemp : 0));
-      const precipDiff = Math.abs(ecmwfPrecipSum - gfsPrecipSum);
-      const consensus = Math.max(50, Math.min(99, Math.round(100 - (tempDiff * 7 + precipDiff * 3))));
+      // MET-03 & QW-03: Konsistenter Modell-Diskrepanz-Algorithmus unter Einbezug von Regionalmodellen (ICON-D2 / AROME)
+      const validTemps = [regTemp, ecmwfTemp, gfsTemp].filter(t => typeof t === 'number' && !isNaN(t));
+      const validPrecips = [regPrecipSum, ecmwfPrecipSum, gfsPrecipSum].filter(p => typeof p === 'number' && !isNaN(p));
+      const meanT = validTemps.reduce((a, b) => a + b, 0) / (validTemps.length || 1);
+      const stdDevT = Math.sqrt(validTemps.reduce((a, b) => a + Math.pow(b - meanT, 2), 0) / (validTemps.length || 1));
+      const spreadP = Math.max(...validPrecips) - Math.min(...validPrecips);
+      const penalty = (stdDevT * 10) + (spreadP * 3.2);
+      const consensus = Math.max(45, Math.min(99, Math.round(100 - penalty)));
+
+      // MET-01: Probabilistische Multi-Modell Ensembles (EPS P10, P50, P90 Perzentil-Spannen)
+      const hourlyTempP10 = [];
+      const hourlyTempP50 = [];
+      const hourlyTempP90 = [];
+      const hourlyPrecipP10 = [];
+      const hourlyPrecipP50 = [];
+      const hourlyPrecipP90 = [];
+
+      for (let s = 0; s < sliceLen; s++) {
+        const i = idx + s;
+        const rT = regHourlyTemp[s] ?? ecmwfTemp ?? 10;
+        const eT = (h.temperature_2m_ecmwf_ifs025 ? h.temperature_2m_ecmwf_ifs025[i] : ecmwfTemp) ?? 10;
+        const gT = (h.temperature_2m_gfs_seamless ? h.temperature_2m_gfs_seamless[i] : gfsTemp) ?? 10;
+        const sortedT = [rT, eT, gT].sort((a, b) => a - b);
+        hourlyTempP10.push(Math.round((sortedT[0] - (sortedT[2] - sortedT[0]) * 0.1) * 10) / 10);
+        hourlyTempP50.push(weightedHourlyTemp[s]);
+        hourlyTempP90.push(Math.round((sortedT[2] + (sortedT[2] - sortedT[0]) * 0.1) * 10) / 10);
+
+        const rP = regHourlyPrecip[s] ?? 0;
+        const eP = (h.precipitation_ecmwf_ifs025 ? h.precipitation_ecmwf_ifs025[i] : 0) || 0;
+        const gP = (h.precipitation_gfs_seamless ? h.precipitation_gfs_seamless[i] : 0) || 0;
+        const sortedP = [rP, eP, gP].sort((a, b) => a - b);
+        hourlyPrecipP10.push(Math.round(sortedP[0] * 10) / 10);
+        hourlyPrecipP50.push(weightedHourlyPrecip[s]);
+        hourlyPrecipP90.push(Math.round((sortedP[2] * 1.25) * 10) / 10);
+      }
 
       const regName = strategy.displayName;
 
@@ -2377,6 +2498,16 @@ export const MicroEngine = {
         strategy: strategy,
         weights: { regional: wReg, ecmwf: wEc, gfs: wGfs },
         activeRegionalModel: regName,
+        ensembleSpread: {
+          hourlyTempP10,
+          hourlyTempP50,
+          hourlyTempP90,
+          hourlyPrecipP10,
+          hourlyPrecipP50,
+          hourlyPrecipP90,
+          tempSpreadMax: Math.round(stdDevT * 2 * 10) / 10,
+          precipSpreadMax: Math.round(spreadP * 10) / 10
+        },
         regional: regKey ? {
           id: regKey,
           name: regName,

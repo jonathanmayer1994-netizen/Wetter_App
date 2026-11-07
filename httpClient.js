@@ -97,6 +97,13 @@ export async function resilientFetch(url, options = {}) {
 
   const fetchPromise = (async () => {
     const controller = new AbortController();
+    if (options.signal) {
+      if (options.signal.aborted) {
+        controller.abort();
+      } else {
+        options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+    }
     if (cancelCategory) {
       activeControllers.set(cancelCategory, controller);
     }

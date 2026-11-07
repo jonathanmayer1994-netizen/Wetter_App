@@ -1,0 +1,421 @@
+/* ==========================================================================
+   OPTIMIZATION 6A: INTERAKTIVE GEFAHRENROSE & SEKTOREN-DETAILS
+   ========================================================================== */
+.rose-sec {
+  cursor: pointer;
+  transition: opacity 0.2s, stroke 0.2s, stroke-width 0.2s, filter 0.2s;
+}
+
+.rose-sec:hover {
+  filter: brightness(1.25);
+  stroke: #ffffff !important;
+  stroke-width: 2px !important;
+}
+
+.rose-sec.selected-sector {
+  stroke: #00e5ff !important;
+  stroke-width: 2.5px !important;
+  filter: brightness(1.35) drop-shadow(0 0 6px rgba(0, 229, 255, 0.7));
+}
+
+.rose-sector-info {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #ffffff;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  transition: all 0.25s ease;
+}
+
+.rose-sector-info.highlight {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.4);
+}
+
+.rsi-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.rsi-text strong {
+  color: var(--ios-cyan);
+}
+
+/* ==========================================================================
+   OPTIMIZATION 7A: 24H-SLIDER JETZT-MARKER & AUTO-SCROLL
+   ========================================================================== */
+.hourly-item.current-now {
+  background: rgba(0, 122, 255, 0.24);
+  border: 1px solid rgba(0, 229, 255, 0.55);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
+  position: relative;
+}
+
+.hourly-item.current-now .hourly-time {
+  color: var(--ios-cyan);
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   HIGH-RES 5-MIN & 15-MIN FORECAST GRANULARITY STYLING
+   ========================================================================== */
+.hourly-granularity-toggle {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.hgt-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hgt-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hgt-btn.active {
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  color: #0f172a;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.35);
+}
+
+.hourly-sub-tag {
+  font-size: 8.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 8px;
+  line-height: 1.2;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.hourly-sub-tag.tag-5m {
+  background: rgba(6, 182, 212, 0.22);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+}
+
+.hourly-sub-tag.tag-15m {
+  background: rgba(168, 85, 247, 0.22);
+  color: #c084fc;
+  border: 1px solid rgba(192, 132, 252, 0.45);
+}
+
+.hourly-item.next5m {
+  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(6, 182, 212, 0.06);
+}
+
+.hourly-item.future15m {
+  border-color: rgba(192, 132, 252, 0.3);
+  background: rgba(168, 85, 247, 0.06);
+}
+
+.hourly-item.past {
+  opacity: 0.82;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.hourly-time .ht-label {
+  display: block;
+  font-weight: 700;
+}
+
+.hourly-time .ht-clock {
+  display: block;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.radar-jump-btn.highlight-5m {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #7dd3fc;
+  font-weight: 700;
+}
+
+.radar-jump-btn.highlight-15m {
+  border-color: rgba(192, 132, 252, 0.5);
+  color: #e879f9;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   OPTIMIZATION 8A: SPOTLIGHT RECENT HISTORY CHIPS
+   ========================================================================== */
+.spotlight-recent-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.spotlight-recent-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.src-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recent-chip {
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.recent-chip:hover {
+  background: rgba(0, 229, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   OPTIMIZATION 9A: NAV-WARNING-DOT (MOBILE & DESKTOP TAB BADGES)
+   ========================================================================== */
+.nav-warning-dot {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ios-red);
+  box-shadow: 0 0 8px rgba(255, 69, 58, 0.85);
+  animation: pulseDot 2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+.mbn-btn .nav-warning-dot {
+  top: 4px;
+  right: calc(50% - 16px);
+}
+
+.nav-warning-dot.dot-orange {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.85);
+}
+
+@keyframes pulseDot {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.35);
+    opacity: 0.65;
+  }
+}
+
+/* ==========================================================================
+   OPTIMIZATION 10A: BEWÖLKUNGS-DÄMPFUNG FÜR ALPENGLÜHEN & AMBIENT GLOW
+   ========================================================================== */
+.ambient-glow.overcast {
+  filter: saturate(0.35) brightness(0.6);
+  opacity: 0.55;
+}
+
+.ambient-glow.alpenglow.overcast {
+  background: radial-gradient(circle at 50% 20%, rgba(130, 70, 100, 0.28) 0%, rgba(80, 50, 90, 0.18) 35%, transparent 75%) !important;
+}
+
+/* ==========================================================================
+   A11Y & BATTERY: PREFERS REDUCED MOTION
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  #weather-canvas {
+    opacity: 0.35 !important;
+  }
+}
+
+/* ==========================================================================
+   SPORTS & GPX: STREAMLINED GLANCEABLE COCKPIT & PROGRESSIVE DISCLOSURE
+   ========================================================================== */
+.sports-hero-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(10, 132, 255, 0.05) 100%), rgba(16, 24, 40, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.sports-hero-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+
+.sports-hero-title-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+
+.sports-hero-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sports-hero-icon {
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.sports-hero-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sports-hero-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sports-hero-sub {
+  margin: 1px 0 0 0;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sports-quick-gpx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--ios-cyan);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.sports-quick-gpx-btn:hover {
+  background: rgba(10, 132, 255, 0.2);
+  border-color: rgba(10, 132, 255, 0.5);
+  color: #ffffff;
+}
+
+.sports-quick-gpx-btn:active {
+  transform: scale(0.96);
+}
+
+/* Alpine Drawer styling enhancements for Sports Setup & Waypoints */
+.sports-setup-drawer,
+.sports-waypoints-drawer {
+  transition: all 0.25s ease;
+  border-radius: 16px;
+}
+
+.sports-setup-drawer[open],
+.sports-waypoints-drawer[open] {
+  border-color: rgba(10, 132, 255, 0.35);
+}
+
+.sports-setup-drawer .alpine-drawer-summary,
+.sports-waypoints-drawer .alpine-drawer-summary {
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.sports-setup-drawer .alpine-drawer-summary:hover,
+.sports-waypoints-drawer .alpine-drawer-summary:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 600px) {
+  .sports-hero-title {
+    font-size: 13.5px;
+  }
+  .sports-quick-gpx-btn {
+    font-size: 10.5px;
+    padding: 4px 7px;
+  }
+  .sports-metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+}

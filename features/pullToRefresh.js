@@ -5,6 +5,7 @@
 
 import { GoogleSheetsSync } from '../core/googleSheetsSync.js';
 
+let startX = 0;
 let isPulling = false;
 let startY = 0;
 let currentY = 0;
@@ -20,15 +21,34 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
 
   if (!indicator) return;
 
-  function canPull() {
+  function canPull(target = null) {
     if (isRefreshing) return false;
-    // Only allow when at the very top of the page
+    
+    // Keine Geste auslösen wenn Modals, Spotlight oder Drawer offen sind
+    if (document.querySelector('.modal-overlay.active, .sheet-overlay.active, #spotlight-modal.active, .drawer-open')) {
+      return false;
+    }
+
+    // Keine Geste auf interaktiven Karten, Canvas oder Sliders
+    if (target && target.closest('#map-container, .leaflet-container, .range-slider, .track-slider, #route-scrubber, .leaflet-control, .interactive-chart')) {
+      return false;
+    }
+
+    // Scroll-Check auf Window und aktivem Tab-Container
     const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-    return scrollY <= 0;
+    if (scrollY > 0) return false;
+
+    const activeTab = document.querySelector('.tab-pane.active');
+    if (activeTab && activeTab.scrollTop > 0) {
+      return false;
+    }
+
+    return true;
   }
 
   function handleTouchStart(e) {
-    if (!canPull()) return;
+    if (!canPull(e.target)) return;
+    startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     currentY = startY;
     isPulling = false;
@@ -36,16 +56,21 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
 
   function handleTouchMove(e) {
     if (isRefreshing) return;
+    const x = e.touches[0].clientX;
     const y = e.touches[0].clientY;
-    const diff = y - startY;
+    const diffX = Math.abs(x - startX);
+    const diffY = y - startY;
 
-    if (!isPulling && diff > 10 && canPull()) {
+    // Horizontaler Wisch (z.B. Swipen durch Charts / Slider) blockiert PTR
+    if (diffX > diffY) return;
+
+    if (!isPulling && diffY > 10 && canPull(e.target)) {
       isPulling = true;
     }
 
-    if (isPulling && diff > 0) {
+    if (isPulling && diffY > 0) {
       // Damped pull distance (elastic feel)
-      const pullDist = Math.min(Math.pow(diff, 0.82) * 1.5, 90);
+      const pullDist = Math.min(Math.pow(diffY, 0.82) * 1.5, 90);
       indicator.style.height = `${pullDist}px`;
       indicator.style.opacity = `${Math.min(pullDist / 40, 1)}`;
 

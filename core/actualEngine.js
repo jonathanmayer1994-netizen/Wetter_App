@@ -563,68 +563,95 @@ export const ActualEngine = {
    * Erkennt dichten Nebel / Hochnebel via Standardabweichung der Leuchtdichte (Kontrast)
    * und Anteil an blauem Himmel.
    */
+  /**
+   * DATA-02 & VIS-01: Robuste Clientseitige Computer-Vision-Analyse von Live-Webcam-Thumbnails
+   * Nutzt CORS-Proxy-Resilience gegen Tainted Canvas & wertet Luminanz-Standardabweichung und Blau-Himmels-Anteil aus.
+   */
   async analyzeWebcamForFog(imgUrl) {
     if (!imgUrl || typeof window === 'undefined') return null;
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      const timer = setTimeout(() => resolve(null), 2500);
-      img.onload = () => {
-        clearTimeout(timer);
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 64;
-          canvas.height = 48;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          ctx.drawImage(img, 0, 0, 64, 48);
-          const data = ctx.getImageData(0, 0, 64, 48).data;
 
-          let sumLuma = 0;
-          let blueSkyPixels = 0;
-          const lumas = [];
-          const skyCheckPixels = data.length * 0.35;
+    const processImageData = (img) => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 48;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, 64, 48);
+        const data = ctx.getImageData(0, 0, 64, 48).data;
 
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-            const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-            sumLuma += luma;
-            lumas.push(luma);
+        let sumLuma = 0;
+        let blueSkyPixels = 0;
+        const lumas = [];
+        const skyCheckPixels = data.length * 0.35;
 
-            // Blauer Himmel im oberen Drittel des Bildes
-            if (i < skyCheckPixels && b > r + 20 && b > g + 10 && b > 80) {
-              blueSkyPixels++;
-            }
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+          sumLuma += luma;
+          lumas.push(luma);
+
+          // Blauer Himmel im oberen Drittel des Bildes (hoher Blauüberschuss)
+          if (i < skyCheckPixels && b > r + 20 && b > g + 10 && b > 80) {
+            blueSkyPixels++;
           }
-
-          const meanLuma = sumLuma / lumas.length;
-          let variance = 0;
-          for (const l of lumas) variance += Math.pow(l - meanLuma, 2);
-          const stdDev = Math.sqrt(variance / lumas.length);
-          const blueSkyRatio = blueSkyPixels / (skyCheckPixels / 4);
-
-          // Dichter Nebel: sehr geringer Kontrast (stdDev < 24), weißgraue Luma (> 100), 0% blauer Himmel
-          const isFoggy = stdDev < 24 && meanLuma > 100 && blueSkyRatio < 0.05;
-          const isSunny = blueSkyRatio > 0.20 || (stdDev > 50 && meanLuma > 100);
-
-          resolve({
-            isFoggy,
-            isSunny,
-            stdDev: Math.round(stdDev * 10) / 10,
-            meanLuma: Math.round(meanLuma),
-            blueSkyRatio: Math.round(blueSkyRatio * 100)
-          });
-        } catch (_) {
-          resolve(null);
         }
-      };
-      img.onerror = () => {
-        clearTimeout(timer);
-        resolve(null);
-      };
-      img.src = imgUrl;
-    });
+
+        const meanLuma = sumLuma / (lumas.length || 1);
+        let variance = 0;
+        for (const l of lumas) variance += Math.pow(l - meanLuma, 2);
+        const stdDev = Math.sqrt(variance / (lumas.length || 1));
+        const blueSkyRatio = blueSkyPixels / (skyCheckPixels / 4 || 1);
+
+        // Nacht / Dunkelheit ignorieren
+        if (meanLuma < 35) return null;
+
+        // Dichter Nebel: sehr geringer Kontrast (stdDev < 25), weißgraue Luma (> 90), 0% blauer Himmel
+        const isFoggy = stdDev < 25 && meanLuma > 90 && blueSkyRatio < 0.04;
+        const isSunny = blueSkyRatio > 0.18 || (stdDev > 48 && meanLuma > 95);
+
+        return {
+          isFoggy,
+          isSunny,
+          stdDev: Math.round(stdDev * 10) / 10,
+          meanLuma: Math.round(meanLuma),
+          blueSkyRatio: Math.round(blueSkyRatio * 100)
+        };
+      } catch (_) {
+        return null;
+      }
+    };
+
+    // Versuche zuerst CORS-Proxy um Browser-SecurityErrors (Tainted Canvas) zu verhindern
+    const cleanUrl = imgUrl.replace(/^https?:\/\//, '');
+    const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(cleanUrl)}&w=64&h=48&output=jpg`;
+
+    const loadImage = (src, useCors = true) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        if (useCors) img.crossOrigin = 'anonymous';
+        const timer = setTimeout(() => resolve(null), 3000);
+        img.onload = () => {
+          clearTimeout(timer);
+          const res = processImageData(img);
+          resolve(res);
+        };
+        img.onerror = () => {
+          clearTimeout(timer);
+          resolve(null);
+        };
+        img.src = src;
+      });
+    };
+
+    // 1. Priorität: Proxy mit garantierten CORS-Headern
+    let result = await loadImage(proxyUrl, true);
+    // 2. Fallback: Direkte URL falls Proxy nicht antwortet
+    if (!result) {
+      result = await loadImage(imgUrl, true);
+    }
+    return result;
   },
 
   /**

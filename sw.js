@@ -5,14 +5,22 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.12.1-app-icon-fix';
-const TILE_CACHE_NAME = 'best-weather-tiles-v2.0';
-const MAX_TILES = 120;
+const CACHE_NAME = 'best-weather-v2.13.0-swr-tiles600';
+const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
+const MAX_TILES = 600;
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './style.css',
+  './css/01_variables.css',
+  './css/02_base.css',
+  './css/03_overview.css',
+  './css/04_mountain.css',
+  './css/05_verification.css',
+  './css/06_map.css',
+  './css/07_sports.css',
+  './css/08_responsive.css',
   './app.js',
   './microEngine.js',
   './storage.js',
@@ -152,25 +160,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // B. Core App Assets: Network First, with Instant Cache Fallback for Offline Alpine Use
+  // B. Core App Assets: True Stale-While-Revalidate (Instant Boot from Cache, Background Revalidate)
   event.respondWith(
-    fetch(req)
-      .then((networkRes) => {
-        if (networkRes && networkRes.status === 200) {
-          const clone = networkRes.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
-        }
-        return networkRes;
-      })
-      .catch(async () => {
-        const cachedRes = await caches.match(req, { ignoreSearch: true });
-        if (cachedRes) return cachedRes;
-        // Image Fallback: Nie 503 Text zurückliefern, sondern auf gecachtes Icon fallbacken
-        if (req.destination === 'image' || url.pathname.endsWith('.png') || url.pathname.endsWith('.jpg') || url.pathname.endsWith('.ico')) {
-          const imgFallback = await caches.match('./apple-touch-icon.png', { ignoreSearch: true });
-          if (imgFallback) return imgFallback;
-        }
-        return new Response('Offline', { status: 503, statusText: 'Offline' });
-      })
+    caches.match(req, { ignoreSearch: true }).then((cachedRes) => {
+      const fetchPromise = fetch(req)
+        .then((networkRes) => {
+          if (networkRes && networkRes.status === 200) {
+            const clone = networkRes.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          }
+          return networkRes;
+        })
+        .catch(async () => {
+          if (cachedRes) return cachedRes;
+          if (req.destination === 'image' || url.pathname.endsWith('.png') || url.pathname.endsWith('.jpg') || url.pathname.endsWith('.ico')) {
+            const imgFallback = await caches.match('./apple-touch-icon.png', { ignoreSearch: true });
+            if (imgFallback) return imgFallback;
+          }
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
+        });
+
+      // Liefert gecachte Assets blitzschnell (0 ms) aus, Netzwerk-Update erfolgt asynchron
+      return cachedRes || fetchPromise;
+    })
   );
 });

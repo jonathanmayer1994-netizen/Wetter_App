@@ -1,4 +1,17 @@
 /* ==========================================================================
+   BEST WEATHER — DYNAMIC RESPONSIVE DESIGN SYSTEM (ARCH-02 MODULARIZED)
+   Compiled from /css domain modules:
+     - 01_variables.css
+     - 02_base.css
+     - 03_overview.css
+     - 04_mountain.css
+     - 05_verification.css
+     - 06_map.css
+     - 07_sports.css
+     - 08_responsive.css
+   ========================================================================== */
+
+/* ==========================================================================
    BEST WEATHER — DYNAMIC RESPONSIVE DESIGN SYSTEM (DESKTOP, IPAD & IPHONE)
    Apple iOS 18 Glassmorphism & High-Precision Alpine Meteorology
    ========================================================================== */
@@ -13,8 +26,8 @@
   --bg-gradient-bottom: #0f1c2e;
   --accent-glow: rgba(100, 210, 255, 0.22);
   --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.76);
-  --text-tertiary: rgba(255, 255, 255, 0.50);
+  --text-secondary: rgba(255, 255, 255, 0.85);
+  --text-tertiary: rgba(255, 255, 255, 0.70);
 
   /* Apple Frosted Glass Tokens */
   --glass-bg: rgba(255, 255, 255, 0.10);

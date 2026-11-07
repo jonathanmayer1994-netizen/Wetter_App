@@ -2500,8 +2500,8 @@ export async function loadUnifiedRadarEngine() {
       stations: baseLiveStations
     });
 
-    // 3. Nächste Stunde in der Zukunft (Jetzt bis +1h) im 5-Minuten-Abstand: +5m bis +60m
-    for (let m = 5; m <= 60; m += 5) {
+    // 3. Nächste 90 Minuten in der Zukunft (Jetzt bis +90m) im 5-Minuten-Abstand (FEAT-01: 90-Minuten-Nowcasting)
+    for (let m = 5; m <= 90; m += 5) {
       const fTimeMs = nowMs + m * 60000;
       const rvTile = findClosestRvTile(fTimeMs, nowcastList);
       const fDate = new Date(fTimeMs);
@@ -2525,8 +2525,8 @@ export async function loadUnifiedRadarEngine() {
       });
     }
 
-    // 4. Zukünftige 2. und 3. Stunde (+1h bis +3h) im 15-Minuten-Abstand: +75m bis +180m
-    for (let m = 75; m <= 180; m += 15) {
+    // 4. Folgende Stunden (+1h45m bis +3h) im 15-Minuten-Abstand: +105m bis +180m
+    for (let m = 105; m <= 180; m += 15) {
       const fTimeMs = nowMs + m * 60000;
       const fDate = new Date(fTimeMs);
       const timeStr = fDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
