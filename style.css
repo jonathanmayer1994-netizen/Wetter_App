@@ -1519,7 +1519,7 @@ body {
   background: rgba(15, 23, 42, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  padding: 8px 6px 6px 6px;
+  padding: 8px 8px 6px 8px;
   margin-bottom: 8px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1528,12 +1528,147 @@ body {
   position: relative;
 }
 
+/* Minimalistischer Nicht-Überdeckender Stunden-Scrubber HUD */
+.day-chart-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  margin-bottom: 6px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  min-height: 30px;
+  box-sizing: border-box;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dch-idle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  user-select: none;
+}
+
+.dch-hint-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  opacity: 0.85;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+.dch-active {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 6px;
+  animation: dchFadeIn 0.15s ease-out;
+  user-select: none;
+}
+
+@keyframes dchFadeIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dch-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2.5px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.dch-badge strong {
+  font-family: var(--font-mono, -apple-system, BlinkMacSystemFont, monospace);
+  font-weight: 800;
+}
+
+.dch-badge-time {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.dch-badge-temp {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.dch-badge-sun {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fde047;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.dch-badge-precip {
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+@media (max-width: 480px) {
+  .day-chart-hud {
+    padding: 4px 6px;
+    min-height: 28px;
+  }
+  .dch-idle {
+    font-size: 10px;
+  }
+  .dch-badge {
+    padding: 2px 5px;
+    font-size: 10px;
+    gap: 3px;
+  }
+}
+
+.day-chart-svg-wrap {
+  width: 100%;
+  position: relative;
+  touch-action: pan-y;
+}
+
 .inline-day-svg {
   display: block;
   width: 100%;
   height: auto;
   overflow: visible;
   user-select: none;
+  cursor: crosshair;
+}
+
+.day-sun-bar {
+  transition: filter 0.15s ease, fill-opacity 0.15s ease;
+}
+
+.day-sun-bar.is-scrubbed {
+  filter: brightness(1.4) drop-shadow(0 0 4px #fbbf24);
+  fill-opacity: 1 !important;
+}
+
+.day-precip-bar {
+  transition: filter 0.15s ease, fill-opacity 0.15s ease;
+}
+
+.day-precip-bar.is-scrubbed {
+  filter: brightness(1.4) drop-shadow(0 0 5px #38bdf8);
+  fill-opacity: 1 !important;
 }
 
 .inline-parts-row {

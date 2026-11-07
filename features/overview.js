@@ -824,7 +824,7 @@ export function renderDayOverviewSVG({
 
   const hasPrecip = Array.isArray(hourlyPrecip) && hourlyPrecip.some(p => p > 0.05);
   const W = isDesktop ? 680 : 380;
-  const H = hasPrecip ? (isDesktop ? 200 : 250) : (isDesktop ? 150 : 175);
+  const H = hasPrecip ? (isDesktop ? 175 : 205) : (isDesktop ? 150 : 175);
   const padLeft = isDesktop ? 26 : 22;
   const padRight = isDesktop ? 26 : 22;
   const chartW = W - padLeft - padRight; // Desktop: 628px, Mobile: 336px
@@ -859,7 +859,7 @@ export function renderDayOverviewSVG({
         const barH = Math.max(6, Math.round((sunMin / 60) * maxBarHeight));
         const by = chartBottom - barH;
         const opacity = Math.min(0.7, (sunMin / 60) * 0.45 + 0.2);
-        sunBarsHtml += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="url(#${sunGradId})" fill-opacity="${opacity.toFixed(2)}" />`;
+        sunBarsHtml += `<rect class="day-sun-bar" data-hour="${h}" x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="url(#${sunGradId})" fill-opacity="${opacity.toFixed(2)}" />`;
       }
     }
   }
@@ -902,42 +902,37 @@ export function renderDayOverviewSVG({
   const minLabelX = Math.max(padLeft + pillHalf, Math.min(W - padRight - pillHalf, minPt.x));
   const minLabelY = minPt.y > chartBottom - 20 ? (minPt.y - 11) : (minPt.y + 16);
 
-  // 3. Niederschlagsteil (Bedingt: NUR wenn es am Tag Niederschlag gibt)
+  // 3. Niederschlagsteil (Bedingt: NUR Balken pur, keine unleserlichen Zahlen-Überlappungen!)
   let precipSectionHtml = '';
+  const pBaseY = isDesktop ? 146 : 178;
   if (hasPrecip) {
     const maxPrecipVal = Math.max(2, ...hourlyPrecip);
-    const pBaseY = isDesktop ? 168 : 210;
-    const pMaxH = isDesktop ? 26 : 36;
-    const pLineY = isDesktop ? 124 : 144;
-    const pHeaderY = isDesktop ? 136 : 159;
-    const pPopY = isDesktop ? 179 : 224;
+    const pMaxH = isDesktop ? 20 : 24;
+    const pLineY = isDesktop ? 120 : 142;
+    const pHeaderY = isDesktop ? 130 : 152;
 
     let pBars = '';
     for (let h = 0; h < 24; h++) {
       const pAmt = hourlyPrecip[h] || 0;
       const popVal = (hourlyPop && hourlyPop[h]) || 0;
-      if (pAmt > 0.05 || popVal >= 20) {
+      if (pAmt > 0.05 || popVal >= 15) {
         const bx = getX(h) + (isDesktop ? 2 : 1);
         const bw = Math.max(3, (chartW / 24) - (isDesktop ? 4 : 2));
-        const bH = Math.max(5, Math.round((pAmt / maxPrecipVal) * pMaxH));
+        const bH = Math.max(4, Math.round((pAmt / maxPrecipVal) * pMaxH));
         const by = pBaseY - bH;
-        pBars += `
-          <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bH.toFixed(1)}" rx="3" fill="#38bdf8" fill-opacity="0.85" />
-          ${pAmt >= 0.1 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${(by - 3).toFixed(1)}" text-anchor="middle" font-size="${isDesktop ? '10' : '10.5'}" font-weight="800" fill="#38bdf8">${pAmt.toFixed(1)}</text>` : ''}
-          ${popVal >= 15 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${pPopY}" text-anchor="middle" font-size="${isDesktop ? '9.5' : '10'}" font-weight="700" fill="#94a3b8">${popVal}%</text>` : ''}
-        `;
+        pBars += `<rect class="day-precip-bar" data-hour="${h}" x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bH.toFixed(1)}" rx="2.5" fill="#38bdf8" fill-opacity="0.80" />`;
       }
     }
 
     precipSectionHtml = `
-      <!-- Niederschlags-Trennlinie & Sektion -->
-      <line x1="${padLeft}" y1="${pLineY}" x2="${W - padRight}" y2="${pLineY}" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1" />
-      <text x="${padLeft}" y="${pHeaderY}" font-size="${isDesktop ? '10' : '11'}" font-weight="800" fill="#38bdf8" letter-spacing="0.4">💧 NIEDERSCHLAG (mm / %)</text>
+      <!-- Niederschlags-Trennlinie & Sektion (Minimalistisches Regenprofil ohne störende Zahlenüberlappungen) -->
+      <line x1="${padLeft}" y1="${pLineY}" x2="${W - padRight}" y2="${pLineY}" stroke="rgba(255, 255, 255, 0.09)" stroke-width="1" />
+      <text x="${padLeft}" y="${pHeaderY}" font-size="${isDesktop ? '10' : '10.5'}" font-weight="800" fill="#38bdf8" letter-spacing="0.4">💧 NIEDERSCHLAG (mm / h)</text>
       ${pBars}
     `;
   }
 
-  const timeAxisY = hasPrecip ? (isDesktop ? 194 : 242) : (isDesktop ? 144 : 162);
+  const timeAxisY = hasPrecip ? (isDesktop ? 168 : 198) : (isDesktop ? 144 : 162);
   const sunriseAnchor = xSunrise < padLeft + 30 ? 'start' : 'middle';
   const sunsetAnchor = xSunset > W - padRight - 30 ? 'end' : 'middle';
 
@@ -983,6 +978,9 @@ export function renderDayOverviewSVG({
         </filter>
       </defs>
 
+      <!-- Volle Event-Erfassung für flüssigen Scrubber (über gesamte Chart-Fläche) -->
+      <rect class="svg-pointer-catch" x="0" y="0" width="${W}" height="${H}" fill="transparent" pointer-events="all" style="cursor: crosshair;" />
+
       <!-- Tageslicht-Glow Hintergrundzone zwischen Sonnenaufgang und Untergang -->
       ${xSunset > xSunrise ? `
         <rect x="${xSunrise.toFixed(1)}" y="${chartTop}" width="${(xSunset - xSunrise).toFixed(1)}" height="${chartHeight}" rx="4" fill="rgba(245, 158, 11, 0.08)" />
@@ -1022,8 +1020,157 @@ export function renderDayOverviewSVG({
       <g class="chart-time-axis" font-size="${isDesktop ? '10.5' : '11'}" font-weight="700" fill="#94a3b8">
         ${timeAxisHtml}
       </g>
+
+      <!-- Interaktiver Scrubber (Linie & Punkt auf Temperaturkurve) -->
+      <g class="chart-scrubber-group" style="display:none; pointer-events:none;">
+        <line class="scrubber-line" x1="0" y1="${chartTop - 6}" x2="0" y2="${hasPrecip ? pBaseY : chartBottom}" stroke="rgba(56, 189, 248, 0.85)" stroke-width="1.5" stroke-dasharray="3,3" />
+        <circle class="scrubber-dot-glow" cx="0" cy="0" r="7.5" fill="rgba(56, 189, 248, 0.28)" />
+        <circle class="scrubber-dot" cx="0" cy="0" r="4.2" fill="#ffffff" stroke="#38bdf8" stroke-width="2.2" />
+      </g>
     </svg>
   `;
+}
+
+/**
+ * Interaktiver Stunden-Scrubber für den 24h-Tagesverlauf
+ * Ermöglicht stufenloses Hovern & Touch-Scrubben mit minimalem HUD ohne Inhaltsverdeckung
+ */
+export function setupDayChartScrubber(chartCard, data) {
+  if (!chartCard || !data) return;
+  const svg = chartCard.querySelector('.inline-day-svg');
+  const hudIdle = chartCard.querySelector('.dch-idle');
+  const hudActive = chartCard.querySelector('.dch-active');
+  const valTime = chartCard.querySelector('.dch-val-time');
+  const valTemp = chartCard.querySelector('.dch-val-temp');
+  const valSun = chartCard.querySelector('.dch-val-sun');
+  const valPrecip = chartCard.querySelector('.dch-val-precip');
+  const scrubberGroup = svg?.querySelector('.chart-scrubber-group');
+  const scrubberLine = svg?.querySelector('.scrubber-line');
+  const scrubberDot = svg?.querySelector('.scrubber-dot');
+  const scrubberGlow = svg?.querySelector('.scrubber-dot-glow');
+
+  if (!svg || !hudActive || !scrubberGroup) return;
+
+  const isDesktop = (typeof window !== 'undefined' && window.innerWidth >= 900);
+  const W = isDesktop ? 680 : 380;
+  const padLeft = isDesktop ? 26 : 22;
+  const padRight = isDesktop ? 26 : 22;
+  const chartW = W - padLeft - padRight;
+  const chartTop = isDesktop ? 30 : 38;
+  const chartBottom = isDesktop ? 116 : 136;
+  const chartHeight = chartBottom - chartTop;
+
+  const validTemps = data.hourlyTemps;
+  const minT = (typeof data.tMin === 'number' && !isNaN(data.tMin)) ? data.tMin : Math.min(...validTemps);
+  const maxT = (typeof data.tMax === 'number' && !isNaN(data.tMax)) ? data.tMax : Math.max(...validTemps);
+  const tempRange = Math.max(2, maxT - minT);
+
+  const getX = (hour) => padLeft + (Math.max(0, Math.min(24, hour)) / 24) * chartW;
+  const getY = (t) => chartBottom - ((t - minT) / tempRange) * chartHeight;
+
+  let resetTimer = null;
+
+  function updateScrub(hour) {
+    if (hour < 0 || hour > 23) return;
+
+    if (hudIdle) hudIdle.style.display = 'none';
+    hudActive.style.display = 'flex';
+
+    if (valTime) valTime.textContent = `${String(hour).padStart(2, '0')}:00 Uhr`;
+    if (valTemp) valTemp.textContent = `${Math.round(validTemps[hour])}°`;
+
+    const sSec = (data.hourlySunSecList && data.hourlySunSecList[hour]) || 0;
+    const sMin = Math.round(sSec / 60);
+    if (valSun) valSun.textContent = `${sMin} Min.`;
+
+    const pAmt = (data.hourlyPrecip && data.hourlyPrecip[hour]) || 0;
+    const popVal = (data.hourlyPop && data.hourlyPop[hour]) || 0;
+    if (valPrecip) {
+      if (pAmt > 0.05 || popVal >= 10) {
+        valPrecip.textContent = `${pAmt.toFixed(1)} mm (${popVal}%)`;
+      } else {
+        valPrecip.textContent = `0,0 mm (0%)`;
+      }
+    }
+
+    const hX = getX(hour + 0.5);
+    const hY = getY(validTemps[hour]);
+
+    if (scrubberLine) {
+      scrubberLine.setAttribute('x1', hX.toFixed(1));
+      scrubberLine.setAttribute('x2', hX.toFixed(1));
+    }
+    if (scrubberDot) {
+      scrubberDot.setAttribute('cx', hX.toFixed(1));
+      scrubberDot.setAttribute('cy', hY.toFixed(1));
+    }
+    if (scrubberGlow) {
+      scrubberGlow.setAttribute('cx', hX.toFixed(1));
+      scrubberGlow.setAttribute('cy', hY.toFixed(1));
+    }
+    scrubberGroup.style.display = 'block';
+
+    svg.querySelectorAll('.day-sun-bar').forEach(b => {
+      b.classList.toggle('is-scrubbed', b.dataset.hour === String(hour));
+    });
+    svg.querySelectorAll('.day-precip-bar').forEach(b => {
+      b.classList.toggle('is-scrubbed', b.dataset.hour === String(hour));
+    });
+  }
+
+  function resetScrub() {
+    if (hudIdle) hudIdle.style.display = 'flex';
+    if (hudActive) hudActive.style.display = 'none';
+    if (scrubberGroup) scrubberGroup.style.display = 'none';
+    svg.querySelectorAll('.day-sun-bar.is-scrubbed').forEach(b => b.classList.remove('is-scrubbed'));
+    svg.querySelectorAll('.day-precip-bar.is-scrubbed').forEach(b => b.classList.remove('is-scrubbed'));
+  }
+
+  function handlePointer(e) {
+    if (resetTimer) {
+      clearTimeout(resetTimer);
+      resetTimer = null;
+    }
+
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width) return;
+
+    const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+    if (clientX === null) return;
+
+    const svgRelX = clientX - rect.left;
+    const scale = W / rect.width;
+    const viewBoxX = svgRelX * scale;
+
+    const chartRelX = viewBoxX - padLeft;
+    const frac = Math.max(0, Math.min(0.999, chartRelX / chartW));
+    const hour = Math.floor(frac * 24);
+
+    updateScrub(hour);
+  }
+
+  const svgWrap = chartCard.querySelector('.day-chart-svg-wrap') || svg;
+
+  svgWrap.addEventListener('pointermove', handlePointer);
+  svgWrap.addEventListener('pointerdown', handlePointer);
+  svgWrap.addEventListener('mousemove', handlePointer);
+  svgWrap.addEventListener('touchmove', handlePointer, { passive: true });
+
+  svgWrap.addEventListener('pointerleave', () => {
+    resetTimer = setTimeout(resetScrub, 1200);
+  });
+  svgWrap.addEventListener('mouseleave', () => {
+    resetTimer = setTimeout(resetScrub, 1200);
+  });
+  svgWrap.addEventListener('pointerup', () => {
+    resetTimer = setTimeout(resetScrub, 1500);
+  });
+  svgWrap.addEventListener('touchend', () => {
+    resetTimer = setTimeout(resetScrub, 1500);
+  });
+  svgWrap.addEventListener('pointercancel', () => {
+    resetTimer = setTimeout(resetScrub, 600);
+  });
 }
 
 export function render10DayForecast(daily, hourly) {
@@ -1244,8 +1391,23 @@ export function render10DayForecast(daily, hourly) {
             <span class="ish-title">⏱️ 24h-Tagesverlauf</span>
             <span class="ish-badge">☀️ ${sunHoursFormatted}${sunQuotaPct > 0 ? ` (${sunQuotaPct}% Sonne)` : ''}</span>
           </div>
-          <div class="inline-day-chart-card">
-            ${dayChartSvg}
+          <div class="inline-day-chart-card" data-day-index="${i}">
+            <!-- Minimalist Dynamic Scrubber HUD (Stunden-Details ohne Inhaltsverdeckung) -->
+            <div class="day-chart-hud" id="day-chart-hud-${i}">
+              <div class="dch-idle">
+                <span class="dch-hint-dot"></span>
+                <span class="dch-hint-text">Diagramm berühren oder mit Maus überfahren</span>
+              </div>
+              <div class="dch-active" style="display:none;">
+                <span class="dch-badge dch-badge-time"><strong class="dch-val-time">--:--</strong></span>
+                <span class="dch-badge dch-badge-temp">🌡️ <strong class="dch-val-temp">--°</strong></span>
+                <span class="dch-badge dch-badge-sun">☀️ <strong class="dch-val-sun">-- Min.</strong></span>
+                <span class="dch-badge dch-badge-precip">💧 <strong class="dch-val-precip">--</strong></span>
+              </div>
+            </div>
+            <div class="day-chart-svg-wrap">
+              ${dayChartSvg}
+            </div>
           </div>
 
           <!-- Key Meteorological Metrics -->
@@ -1307,16 +1469,28 @@ export function render10DayForecast(daily, hourly) {
       if (!isExpanded) {
         const chartCard = accordion.querySelector('.inline-day-chart-card');
         if (chartCard) {
-          chartCard.innerHTML = renderDayOverviewSVG({
+          const svgWrap = chartCard.querySelector('.day-chart-svg-wrap');
+          if (svgWrap) {
+            svgWrap.innerHTML = renderDayOverviewSVG({
+              dayIndex: i,
+              hourlyTemps,
+              hourlySunSecList,
+              hourlyPrecip,
+              hourlyPop,
+              sunriseStr,
+              sunsetStr,
+              sunriseDec,
+              sunsetDec,
+              tMin: convertTemp(minVal),
+              tMax: convertTemp(maxVal)
+            });
+          }
+          setupDayChartScrubber(chartCard, {
             dayIndex: i,
             hourlyTemps,
             hourlySunSecList,
             hourlyPrecip,
             hourlyPop,
-            sunriseStr,
-            sunsetStr,
-            sunriseDec,
-            sunsetDec,
             tMin: convertTemp(minVal),
             tMax: convertTemp(maxVal)
           });
@@ -1336,6 +1510,19 @@ export function render10DayForecast(daily, hourly) {
       modalBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         openDayDetailModal(i, daily, hourly);
+      });
+    }
+
+    const initialCard = wrapper.querySelector('.inline-day-chart-card');
+    if (initialCard) {
+      setupDayChartScrubber(initialCard, {
+        dayIndex: i,
+        hourlyTemps,
+        hourlySunSecList,
+        hourlyPrecip,
+        hourlyPop,
+        tMin: convertTemp(minVal),
+        tMax: convertTemp(maxVal)
       });
     }
 

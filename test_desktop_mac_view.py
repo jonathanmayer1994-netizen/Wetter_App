@@ -12,8 +12,9 @@ def run_desktop_verification():
         page = context.new_page()
 
         print("Navigating to http://127.0.0.1:8080 ...")
-        page.goto("http://127.0.0.1:8080", wait_until="networkidle")
-        time.sleep(2)
+        page.goto("http://127.0.0.1:8080", wait_until="domcontentloaded")
+        page.wait_for_selector("#daily-item-0 .daily-interactive-row", timeout=10000)
+        time.sleep(1)
 
         # ----------------------------------------------------------------------
         # TEST 1: Expanded Day Accordion & 24h-Tagesverlauf on Desktop
@@ -42,6 +43,46 @@ def run_desktop_verification():
         print(f"  ✓ Time axis ticks: {time_axis_text}")
         assert "03:00" in time_axis_text and "09:00" in time_axis_text and "15:00" in time_axis_text, \
             "Desktop 24h chart must display 3-hour ticks"
+
+        # Check HUD Idle state
+        hud_idle = page.locator("#inline-accordion-0 .dch-idle")
+        assert hud_idle.is_visible(), "Day chart HUD idle hint should be visible initially"
+        print("  ✓ Day chart HUD idle hint is visible")
+
+        # Check that rain bars have ZERO overlapping text labels
+        precip_texts = svg.locator("text[fill=\"#38bdf8\"]").all_text_contents()
+        # Only the section header '💧 NIEDERSCHLAG (mm / h)' is allowed, no individual bar texts!
+        precip_num_texts = [t for t in precip_texts if "%" in t or "." in t]
+        assert len(precip_num_texts) == 0, f"No crowded numbers allowed on precip bars, found: {precip_num_texts}"
+        print("  ✓ Zero crowded text numbers on precip bars (clean profile)")
+
+        # Hover over the SVG via Playwright's hover API
+        svg_wrap = page.locator("#inline-accordion-0 .day-chart-svg-wrap")
+        svg_wrap.hover()
+        time.sleep(0.3)
+
+        hud_active = page.locator("#inline-accordion-0 .dch-active")
+        assert hud_active.is_visible(), "HUD active state must be visible on hover"
+
+        time_val = page.locator("#inline-accordion-0 .dch-val-time").inner_text()
+        temp_val = page.locator("#inline-accordion-0 .dch-val-temp").inner_text()
+        sun_val = page.locator("#inline-accordion-0 .dch-val-sun").inner_text()
+        precip_val = page.locator("#inline-accordion-0 .dch-val-precip").inner_text()
+
+        print(f"  ✓ Hover Scrubber HUD: Time='{time_val}', Temp='{temp_val}', Sun='{sun_val}', Precip='{precip_val}'")
+        assert ":" in time_val, "Time must be formatted as clock time"
+        assert "°" in temp_val, "Temp must contain °"
+        assert "Min" in sun_val, "Sun must contain minutes"
+        assert "mm" in precip_val or "%" in precip_val, "Precip must contain mm and %"
+
+        # Check scrubber indicator group in SVG
+        scrubber_group = svg.locator(".chart-scrubber-group")
+        assert scrubber_group.is_visible(), "Scrubber indicator line & dot must be visible in SVG"
+        print("  ✓ Scrubber hairline and glowing dot visible on spline")
+
+        # Capture screenshot while hovered
+        page.locator("#daily-item-0").screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/desktop_accordion_hover_hud.png")
+        print("  📸 Captured artifact: desktop_accordion_hover_hud.png")
 
         # Check geometry of 2-column layout
         chart_box = chart_card.bounding_box()
