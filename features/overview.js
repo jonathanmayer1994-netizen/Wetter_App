@@ -822,18 +822,18 @@ export function renderDayOverviewSVG({
   const tempRange = Math.max(2, maxT - minT);
 
   const hasPrecip = Array.isArray(hourlyPrecip) && hourlyPrecip.some(p => p > 0.05);
-  const W = 540;
-  const H = hasPrecip ? 195 : 138;
-  const padLeft = 26;
-  const padRight = 26;
-  const chartW = W - padLeft - padRight; // 488
+  const W = 380;
+  const H = hasPrecip ? 250 : 175;
+  const padLeft = 22;
+  const padRight = 22;
+  const chartW = W - padLeft - padRight; // 336px
 
   const getX = (hour) => padLeft + (Math.max(0, Math.min(24, hour)) / 24) * chartW;
 
-  // Y-Bereich für Temperaturkurve
-  const chartTop = 44;
-  const chartBottom = 104;
-  const chartHeight = chartBottom - chartTop; // 60px
+  // Y-Bereich für Temperaturkurve: Großzügig & dynamisch (98px Hub)
+  const chartTop = 38;
+  const chartBottom = 136;
+  const chartHeight = chartBottom - chartTop; // 98px
   const getY = (t) => chartBottom - ((t - minT) / tempRange) * chartHeight;
 
   // Sonnenauf- & Untergangs-Positionen
@@ -853,10 +853,10 @@ export function renderDayOverviewSVG({
       const sunMin = Math.round(sSec / 60);
       if (sunMin >= 5) {
         const bx = getX(h) + 1;
-        const bw = Math.max(2, (chartW / 24) - 2);
-        const barH = Math.max(6, Math.round((sunMin / 60) * 34));
+        const bw = Math.max(3, (chartW / 24) - 2);
+        const barH = Math.max(8, Math.round((sunMin / 60) * 58));
         const by = chartBottom - barH;
-        const opacity = Math.min(0.65, (sunMin / 60) * 0.45 + 0.15);
+        const opacity = Math.min(0.7, (sunMin / 60) * 0.45 + 0.2);
         sunBarsHtml += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="url(#${sunGradId})" fill-opacity="${opacity.toFixed(2)}" />`;
       }
     }
@@ -893,6 +893,12 @@ export function renderDayOverviewSVG({
     if (pt.t > maxPt.t) maxPt = pt;
   }
 
+  const maxLabelX = Math.max(padLeft + 22, Math.min(W - padRight - 22, maxPt.x));
+  const maxLabelY = Math.max(34, maxPt.y - 11);
+  const minLabelX = Math.max(padLeft + 22, Math.min(W - padRight - 22, minPt.x));
+  // Wenn Tiefstwert am unteren Rand liegt, Label über dem Punkt platzieren (verhindert Kollision mit Zeitachse)
+  const minLabelY = minPt.y > chartBottom - 20 ? (minPt.y - 11) : (minPt.y + 17);
+
   // 3. Niederschlagsteil (Bedingt: NUR wenn es am Tag Niederschlag gibt)
   let precipSectionHtml = '';
   if (hasPrecip) {
@@ -903,26 +909,29 @@ export function renderDayOverviewSVG({
       const popVal = (hourlyPop && hourlyPop[h]) || 0;
       if (pAmt > 0.05 || popVal >= 20) {
         const bx = getX(h) + 1;
-        const bw = Math.max(2, (chartW / 24) - 2);
-        const bH = Math.max(5, Math.round((pAmt / maxPrecipVal) * 28));
-        const by = 164 - bH;
+        const bw = Math.max(3, (chartW / 24) - 2);
+        const bH = Math.max(6, Math.round((pAmt / maxPrecipVal) * 36));
+        const by = 210 - bH;
         pBars += `
-          <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bH.toFixed(1)}" rx="2.5" fill="#38bdf8" fill-opacity="0.82" />
-          ${pAmt >= 0.1 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${(by - 3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="700" fill="#38bdf8">${pAmt.toFixed(1)}</text>` : ''}
-          ${popVal >= 15 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="174" text-anchor="middle" font-size="7.5" font-weight="600" fill="#94a3b8">${popVal}%</text>` : ''}
+          <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bH.toFixed(1)}" rx="3" fill="#38bdf8" fill-opacity="0.85" />
+          ${pAmt >= 0.1 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${(by - 4).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#38bdf8">${pAmt.toFixed(1)}</text>` : ''}
+          ${popVal >= 15 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="224" text-anchor="middle" font-size="10" font-weight="700" fill="#94a3b8">${popVal}%</text>` : ''}
         `;
       }
     }
 
     precipSectionHtml = `
       <!-- Niederschlags-Trennlinie & Sektion -->
-      <line x1="${padLeft}" y1="122" x2="${W - padRight}" y2="122" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1" />
-      <text x="${padLeft}" y="133" font-size="8.5" font-weight="700" fill="#38bdf8" letter-spacing="0.4">💧 NIEDERSCHLAG (mm / %)</text>
+      <line x1="${padLeft}" y1="144" x2="${W - padRight}" y2="144" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1" />
+      <text x="${padLeft}" y="159" font-size="11" font-weight="800" fill="#38bdf8" letter-spacing="0.4">💧 NIEDERSCHLAG (mm / %)</text>
       ${pBars}
     `;
   }
 
-  const timeAxisY = hasPrecip ? 189 : 127;
+  const timeAxisY = hasPrecip ? 242 : 162;
+
+  const sunriseAnchor = xSunrise < padLeft + 30 ? 'start' : 'middle';
+  const sunsetAnchor = xSunset > W - padRight - 30 ? 'end' : 'middle';
 
   return `
     <svg class="inline-day-svg" viewBox="0 0 ${W} ${H}" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
@@ -934,8 +943,8 @@ export function renderDayOverviewSVG({
           <stop offset="100%" stop-color="#38bdf8" />
         </linearGradient>
         <linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.22" />
-          <stop offset="65%" stop-color="#38bdf8" stop-opacity="0.04" />
+          <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25" />
+          <stop offset="65%" stop-color="#38bdf8" stop-opacity="0.05" />
           <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
         </linearGradient>
         <linearGradient id="${sunGradId}" x1="0" y1="0" x2="0" y2="1">
@@ -943,17 +952,17 @@ export function renderDayOverviewSVG({
           <stop offset="100%" stop-color="#f59e0b" />
         </linearGradient>
         <filter id="glow_${dayIndex}" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#f59e0b" flood-opacity="0.28" />
+          <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#f59e0b" flood-opacity="0.35" />
         </filter>
       </defs>
 
       <!-- Tageslicht-Glow Hintergrundzone zwischen Sonnenaufgang und Untergang -->
       ${xSunset > xSunrise ? `
-        <rect x="${xSunrise.toFixed(1)}" y="${chartTop}" width="${(xSunset - xSunrise).toFixed(1)}" height="${chartHeight}" rx="4" fill="rgba(245, 158, 11, 0.07)" />
+        <rect x="${xSunrise.toFixed(1)}" y="${chartTop}" width="${(xSunset - xSunrise).toFixed(1)}" height="${chartHeight}" rx="4" fill="rgba(245, 158, 11, 0.08)" />
       ` : ''}
 
       <!-- Horizontale Hilfslinien -->
-      <line x1="${padLeft}" y1="${chartBottom}" x2="${W - padRight}" y2="${chartBottom}" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1" />
+      <line x1="${padLeft}" y1="${chartBottom}" x2="${W - padRight}" y2="${chartBottom}" stroke="rgba(255, 255, 255, 0.09)" stroke-width="1" />
       <line x1="${padLeft}" y1="${chartTop}" x2="${W - padRight}" y2="${chartTop}" stroke="rgba(255, 255, 255, 0.05)" stroke-dasharray="2,4" stroke-width="1" />
 
       <!-- Sonnenstunden Balken (Golden Solar Glow) -->
@@ -961,27 +970,29 @@ export function renderDayOverviewSVG({
 
       <!-- Temperaturverlauf Flächenfüllung & Spline -->
       <path d="${fillD}" fill="url(#${fillId})" />
-      <path d="${pathD}" fill="none" stroke="url(#${gradId})" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow_${dayIndex})" />
+      <path d="${pathD}" fill="none" stroke="url(#${gradId})" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow_${dayIndex})" />
 
-      <!-- Min & Max Marker -->
-      <circle cx="${maxPt.x.toFixed(1)}" cy="${maxPt.y.toFixed(1)}" r="3.8" fill="#fbbf24" stroke="#ffffff" stroke-width="1.8" />
-      <text x="${maxPt.x.toFixed(1)}" y="${(Math.max(30, maxPt.y - 8)).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="800" fill="#fde047">H ${Math.round(maxPt.t)}°</text>
+      <!-- Min & Max Marker mit Hochkontrast-Pill -->
+      <circle cx="${maxPt.x.toFixed(1)}" cy="${maxPt.y.toFixed(1)}" r="4.8" fill="#ffffff" stroke="#fbbf24" stroke-width="2.5" />
+      <rect x="${(maxLabelX - 22).toFixed(1)}" y="${(maxLabelY - 14).toFixed(1)}" width="44" height="18" rx="5" fill="rgba(15, 23, 42, 0.88)" stroke="rgba(251, 191, 36, 0.5)" stroke-width="0.8" />
+      <text x="${maxLabelX.toFixed(1)}" y="${maxLabelY.toFixed(1)}" text-anchor="middle" font-size="12.5" font-weight="800" fill="#fde047">H ${Math.round(maxPt.t)}°</text>
 
-      <circle cx="${minPt.x.toFixed(1)}" cy="${minPt.y.toFixed(1)}" r="3.8" fill="#38bdf8" stroke="#ffffff" stroke-width="1.8" />
-      <text x="${minPt.x.toFixed(1)}" y="${(Math.min(118, minPt.y + 13)).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="800" fill="#7dd3fc">T ${Math.round(minPt.t)}°</text>
+      <circle cx="${minPt.x.toFixed(1)}" cy="${minPt.y.toFixed(1)}" r="4.8" fill="#ffffff" stroke="#38bdf8" stroke-width="2.5" />
+      <rect x="${(minLabelX - 22).toFixed(1)}" y="${(minLabelY - 14).toFixed(1)}" width="44" height="18" rx="5" fill="rgba(15, 23, 42, 0.88)" stroke="rgba(56, 189, 248, 0.5)" stroke-width="0.8" />
+      <text x="${minLabelX.toFixed(1)}" y="${minLabelY.toFixed(1)}" text-anchor="middle" font-size="12.5" font-weight="800" fill="#7dd3fc">T ${Math.round(minPt.t)}°</text>
 
       <!-- Sonnenauf- & Sonnenuntergang Vertikale Linien & Meilensteine -->
-      <line x1="${xSunrise.toFixed(1)}" y1="18" x2="${xSunrise.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 191, 36, 0.7)" stroke-width="1.2" stroke-dasharray="3,3" />
-      <text x="${xSunrise.toFixed(1)}" y="14" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fbbf24">🌅 ${sunriseStr}</text>
+      <line x1="${xSunrise.toFixed(1)}" y1="24" x2="${xSunrise.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 191, 36, 0.75)" stroke-width="1.4" stroke-dasharray="3,3" />
+      <text x="${xSunrise.toFixed(1)}" y="18" text-anchor="${sunriseAnchor}" font-size="11.5" font-weight="800" fill="#fbbf24">🌅 ${sunriseStr}</text>
 
-      <line x1="${xSunset.toFixed(1)}" y1="18" x2="${xSunset.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 146, 60, 0.7)" stroke-width="1.2" stroke-dasharray="3,3" />
-      <text x="${xSunset.toFixed(1)}" y="14" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fb923c">🌇 ${sunsetStr}</text>
+      <line x1="${xSunset.toFixed(1)}" y1="24" x2="${xSunset.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 146, 60, 0.75)" stroke-width="1.4" stroke-dasharray="3,3" />
+      <text x="${xSunset.toFixed(1)}" y="18" text-anchor="${sunsetAnchor}" font-size="11.5" font-weight="800" fill="#fb923c">🌇 ${sunsetStr}</text>
 
       <!-- Niederschlag (nur wenn Niederschlag vorhanden) -->
       ${precipSectionHtml}
 
       <!-- Zeitachse (0h, 6h, 12h, 18h, 24h) -->
-      <g class="chart-time-axis" font-size="8" font-weight="600" fill="#64748b">
+      <g class="chart-time-axis" font-size="11" font-weight="700" fill="#94a3b8">
         <text x="${getX(0).toFixed(1)}" y="${timeAxisY}" text-anchor="start">00:00</text>
         <text x="${getX(6).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">06:00</text>
         <text x="${getX(12).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">12:00</text>
