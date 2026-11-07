@@ -1053,7 +1053,7 @@ body {
    ========================================================================== */
 .daily-table-header {
   display: grid;
-  grid-template-columns: 125px 165px 120px 110px 220px 95px 28px;
+  grid-template-columns: 130px 175px 135px 1fr 105px 28px;
   align-items: center;
   gap: 12px;
   padding: 8px 16px 12px 16px;
@@ -1143,7 +1143,7 @@ body {
 
 .daily-interactive-row {
   display: grid;
-  grid-template-columns: 125px 165px 120px 110px 220px 95px 28px;
+  grid-template-columns: 130px 175px 135px 1fr 105px 28px;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
@@ -1171,23 +1171,18 @@ body {
   grid-row: 1;
 }
 
-.daily-wind-cell {
+.daily-sun-cell {
   grid-column: 4;
   grid-row: 1;
 }
 
-.daily-sun-cell {
+.daily-temp-cell {
   grid-column: 5;
   grid-row: 1;
 }
 
-.daily-temp-cell {
-  grid-column: 6;
-  grid-row: 1;
-}
-
 .daily-action-cell {
-  grid-column: 7;
+  grid-column: 6;
   grid-row: 1;
   display: flex;
   align-items: center;
@@ -7457,13 +7452,13 @@ body {
    ========================================================================== */
 @media (max-width: 1024px) {
   .daily-table-header {
-    grid-template-columns: 110px 145px 105px 95px 190px 85px 24px;
+    grid-template-columns: 110px 145px 110px 1fr 90px 24px;
     gap: 10px;
     padding: 8px 14px 10px 14px;
   }
 
   .daily-interactive-row {
-    grid-template-columns: 110px 145px 105px 95px 190px 85px 24px;
+    grid-template-columns: 110px 145px 110px 1fr 90px 24px;
     gap: 10px;
     padding: 10px 14px;
   }
@@ -7483,23 +7478,18 @@ body {
     grid-row: 1;
   }
 
-  .daily-wind-cell {
+  .daily-sun-cell {
     grid-column: 4;
     grid-row: 1;
   }
 
-  .daily-sun-cell {
+  .daily-temp-cell {
     grid-column: 5;
     grid-row: 1;
   }
 
-  .daily-temp-cell {
-    grid-column: 6;
-    grid-row: 1;
-  }
-
   .daily-action-cell {
-    grid-column: 7;
+    grid-column: 6;
     grid-row: 1;
   }
 
@@ -7953,7 +7943,8 @@ body {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
+    margin-left: auto;
   }
 
   .daily-precip-chip {

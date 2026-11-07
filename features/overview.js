@@ -1198,14 +1198,6 @@ export function render10DayForecast(daily, hourly) {
               return `<span class="daily-precip-chip ${rainSum >= 5 || snowSum >= 5 ? 'heavy-rain' : ''}">${parts.join(' · ')}</span>`;
             })()}
           </div>
-
-          <!-- 7. Wind & Gusts -->
-          <div class="daily-wind-cell">
-            <span class="daily-wind-chip ${windGusts >= 45 ? 'wind-alert' : ''}">
-              <span class="wind-main">💨 ${windSpd} km/h</span>
-              ${windGusts > windSpd + 10 ? `<span class="wind-gusts">Böen ${windGusts}</span>` : ''}
-            </span>
-          </div>
         </div>
       </div>
 
