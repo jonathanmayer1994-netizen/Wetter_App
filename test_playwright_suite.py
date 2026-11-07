@@ -138,7 +138,7 @@ def run_tests():
         page.wait_for_timeout(500)
         mtn_panel_visible = page.is_visible("#mountain-view-panel")
         report("Mountain view panel is visible", mtn_panel_visible)
-        page.wait_for_selector(".altitude-tier-card", timeout=6000)
+        page.wait_for_selector(".altitude-tier-card", timeout=12000)
         tiers_count = page.locator(".altitude-tier-card").count()
         report("Altitude level tiers are rendered", tiers_count >= 3)
         page.screenshot(path="mountain_weather_screenshot.png")

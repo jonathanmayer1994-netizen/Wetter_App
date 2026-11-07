@@ -816,24 +816,25 @@ export function renderDayOverviewSVG({
   tMin,
   tMax
 }) {
+  const isDesktop = (typeof window !== 'undefined' && window.innerWidth >= 900);
   const validTemps = (Array.isArray(hourlyTemps) && hourlyTemps.length === 24) ? hourlyTemps : new Array(24).fill(10);
   const minT = (typeof tMin === 'number' && !isNaN(tMin)) ? tMin : Math.min(...validTemps);
   const maxT = (typeof tMax === 'number' && !isNaN(tMax)) ? tMax : Math.max(...validTemps);
   const tempRange = Math.max(2, maxT - minT);
 
   const hasPrecip = Array.isArray(hourlyPrecip) && hourlyPrecip.some(p => p > 0.05);
-  const W = 380;
-  const H = hasPrecip ? 250 : 175;
-  const padLeft = 22;
-  const padRight = 22;
-  const chartW = W - padLeft - padRight; // 336px
+  const W = isDesktop ? 680 : 380;
+  const H = hasPrecip ? (isDesktop ? 200 : 250) : (isDesktop ? 150 : 175);
+  const padLeft = isDesktop ? 26 : 22;
+  const padRight = isDesktop ? 26 : 22;
+  const chartW = W - padLeft - padRight; // Desktop: 628px, Mobile: 336px
 
   const getX = (hour) => padLeft + (Math.max(0, Math.min(24, hour)) / 24) * chartW;
 
-  // Y-Bereich für Temperaturkurve: Großzügig & dynamisch (98px Hub)
-  const chartTop = 38;
-  const chartBottom = 136;
-  const chartHeight = chartBottom - chartTop; // 98px
+  // Y-Bereich für Temperaturkurve
+  const chartTop = isDesktop ? 30 : 38;
+  const chartBottom = isDesktop ? 116 : 136;
+  const chartHeight = chartBottom - chartTop; // Desktop: 86px, Mobile: 98px
   const getY = (t) => chartBottom - ((t - minT) / tempRange) * chartHeight;
 
   // Sonnenauf- & Untergangs-Positionen
@@ -852,9 +853,10 @@ export function renderDayOverviewSVG({
       const sSec = hourlySunSecList[h] || 0;
       const sunMin = Math.round(sSec / 60);
       if (sunMin >= 5) {
-        const bx = getX(h) + 1;
-        const bw = Math.max(3, (chartW / 24) - 2);
-        const barH = Math.max(8, Math.round((sunMin / 60) * 58));
+        const bx = getX(h) + (isDesktop ? 2 : 1);
+        const bw = Math.max(3, (chartW / 24) - (isDesktop ? 4 : 2));
+        const maxBarHeight = isDesktop ? 48 : 58;
+        const barH = Math.max(6, Math.round((sunMin / 60) * maxBarHeight));
         const by = chartBottom - barH;
         const opacity = Math.min(0.7, (sunMin / 60) * 0.45 + 0.2);
         sunBarsHtml += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="url(#${sunGradId})" fill-opacity="${opacity.toFixed(2)}" />`;
@@ -893,45 +895,70 @@ export function renderDayOverviewSVG({
     if (pt.t > maxPt.t) maxPt = pt;
   }
 
-  const maxLabelX = Math.max(padLeft + 22, Math.min(W - padRight - 22, maxPt.x));
-  const maxLabelY = Math.max(34, maxPt.y - 11);
-  const minLabelX = Math.max(padLeft + 22, Math.min(W - padRight - 22, minPt.x));
-  // Wenn Tiefstwert am unteren Rand liegt, Label über dem Punkt platzieren (verhindert Kollision mit Zeitachse)
-  const minLabelY = minPt.y > chartBottom - 20 ? (minPt.y - 11) : (minPt.y + 17);
+  const pillWidth = 44;
+  const pillHalf = pillWidth / 2;
+  const maxLabelX = Math.max(padLeft + pillHalf, Math.min(W - padRight - pillHalf, maxPt.x));
+  const maxLabelY = Math.max(isDesktop ? 26 : 34, maxPt.y - 11);
+  const minLabelX = Math.max(padLeft + pillHalf, Math.min(W - padRight - pillHalf, minPt.x));
+  const minLabelY = minPt.y > chartBottom - 20 ? (minPt.y - 11) : (minPt.y + 16);
 
   // 3. Niederschlagsteil (Bedingt: NUR wenn es am Tag Niederschlag gibt)
   let precipSectionHtml = '';
   if (hasPrecip) {
     const maxPrecipVal = Math.max(2, ...hourlyPrecip);
+    const pBaseY = isDesktop ? 168 : 210;
+    const pMaxH = isDesktop ? 26 : 36;
+    const pLineY = isDesktop ? 124 : 144;
+    const pHeaderY = isDesktop ? 136 : 159;
+    const pPopY = isDesktop ? 179 : 224;
+
     let pBars = '';
     for (let h = 0; h < 24; h++) {
       const pAmt = hourlyPrecip[h] || 0;
       const popVal = (hourlyPop && hourlyPop[h]) || 0;
       if (pAmt > 0.05 || popVal >= 20) {
-        const bx = getX(h) + 1;
-        const bw = Math.max(3, (chartW / 24) - 2);
-        const bH = Math.max(6, Math.round((pAmt / maxPrecipVal) * 36));
-        const by = 210 - bH;
+        const bx = getX(h) + (isDesktop ? 2 : 1);
+        const bw = Math.max(3, (chartW / 24) - (isDesktop ? 4 : 2));
+        const bH = Math.max(5, Math.round((pAmt / maxPrecipVal) * pMaxH));
+        const by = pBaseY - bH;
         pBars += `
           <rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bH.toFixed(1)}" rx="3" fill="#38bdf8" fill-opacity="0.85" />
-          ${pAmt >= 0.1 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${(by - 4).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#38bdf8">${pAmt.toFixed(1)}</text>` : ''}
-          ${popVal >= 15 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="224" text-anchor="middle" font-size="10" font-weight="700" fill="#94a3b8">${popVal}%</text>` : ''}
+          ${pAmt >= 0.1 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${(by - 3).toFixed(1)}" text-anchor="middle" font-size="${isDesktop ? '10' : '10.5'}" font-weight="800" fill="#38bdf8">${pAmt.toFixed(1)}</text>` : ''}
+          ${popVal >= 15 ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${pPopY}" text-anchor="middle" font-size="${isDesktop ? '9.5' : '10'}" font-weight="700" fill="#94a3b8">${popVal}%</text>` : ''}
         `;
       }
     }
 
     precipSectionHtml = `
       <!-- Niederschlags-Trennlinie & Sektion -->
-      <line x1="${padLeft}" y1="144" x2="${W - padRight}" y2="144" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1" />
-      <text x="${padLeft}" y="159" font-size="11" font-weight="800" fill="#38bdf8" letter-spacing="0.4">💧 NIEDERSCHLAG (mm / %)</text>
+      <line x1="${padLeft}" y1="${pLineY}" x2="${W - padRight}" y2="${pLineY}" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1" />
+      <text x="${padLeft}" y="${pHeaderY}" font-size="${isDesktop ? '10' : '11'}" font-weight="800" fill="#38bdf8" letter-spacing="0.4">💧 NIEDERSCHLAG (mm / %)</text>
       ${pBars}
     `;
   }
 
-  const timeAxisY = hasPrecip ? 242 : 162;
-
+  const timeAxisY = hasPrecip ? (isDesktop ? 194 : 242) : (isDesktop ? 144 : 162);
   const sunriseAnchor = xSunrise < padLeft + 30 ? 'start' : 'middle';
   const sunsetAnchor = xSunset > W - padRight - 30 ? 'end' : 'middle';
+
+  // Zeitachsen-Beschriftung (Desktop: präzise 3h-Intervalle, Mobile: 6h-Intervalle)
+  let timeAxisHtml = '';
+  if (isDesktop) {
+    const hours = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+    timeAxisHtml = hours.map(h => {
+      const anchor = h === 0 ? 'start' : (h === 24 ? 'end' : 'middle');
+      const label = `${String(h).padStart(2, '0')}:00`;
+      return `<text x="${getX(h).toFixed(1)}" y="${timeAxisY}" text-anchor="${anchor}">${label}</text>`;
+    }).join('');
+  } else {
+    timeAxisHtml = `
+      <text x="${getX(0).toFixed(1)}" y="${timeAxisY}" text-anchor="start">00:00</text>
+      <text x="${getX(6).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">06:00</text>
+      <text x="${getX(12).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">12:00</text>
+      <text x="${getX(18).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">18:00</text>
+      <text x="${getX(24).toFixed(1)}" y="${timeAxisY}" text-anchor="end">24:00</text>
+    `;
+  }
 
   return `
     <svg class="inline-day-svg" viewBox="0 0 ${W} ${H}" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
@@ -970,34 +997,30 @@ export function renderDayOverviewSVG({
 
       <!-- Temperaturverlauf Flächenfüllung & Spline -->
       <path d="${fillD}" fill="url(#${fillId})" />
-      <path d="${pathD}" fill="none" stroke="url(#${gradId})" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow_${dayIndex})" />
+      <path d="${pathD}" fill="none" stroke="url(#${gradId})" stroke-width="${isDesktop ? '2.8' : '3.2'}" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow_${dayIndex})" />
 
       <!-- Min & Max Marker mit Hochkontrast-Pill -->
-      <circle cx="${maxPt.x.toFixed(1)}" cy="${maxPt.y.toFixed(1)}" r="4.8" fill="#ffffff" stroke="#fbbf24" stroke-width="2.5" />
-      <rect x="${(maxLabelX - 22).toFixed(1)}" y="${(maxLabelY - 14).toFixed(1)}" width="44" height="18" rx="5" fill="rgba(15, 23, 42, 0.88)" stroke="rgba(251, 191, 36, 0.5)" stroke-width="0.8" />
-      <text x="${maxLabelX.toFixed(1)}" y="${maxLabelY.toFixed(1)}" text-anchor="middle" font-size="12.5" font-weight="800" fill="#fde047">H ${Math.round(maxPt.t)}°</text>
+      <circle cx="${maxPt.x.toFixed(1)}" cy="${maxPt.y.toFixed(1)}" r="${isDesktop ? '4.2' : '4.8'}" fill="#ffffff" stroke="#fbbf24" stroke-width="${isDesktop ? '2' : '2.5'}" />
+      <rect x="${(maxLabelX - pillHalf).toFixed(1)}" y="${(maxLabelY - 14).toFixed(1)}" width="${pillWidth}" height="${isDesktop ? '17' : '18'}" rx="5" fill="rgba(15, 23, 42, 0.88)" stroke="rgba(251, 191, 36, 0.5)" stroke-width="0.8" />
+      <text x="${maxLabelX.toFixed(1)}" y="${maxLabelY.toFixed(1)}" text-anchor="middle" font-size="${isDesktop ? '11.5' : '12.5'}" font-weight="800" fill="#fde047">H ${Math.round(maxPt.t)}°</text>
 
-      <circle cx="${minPt.x.toFixed(1)}" cy="${minPt.y.toFixed(1)}" r="4.8" fill="#ffffff" stroke="#38bdf8" stroke-width="2.5" />
-      <rect x="${(minLabelX - 22).toFixed(1)}" y="${(minLabelY - 14).toFixed(1)}" width="44" height="18" rx="5" fill="rgba(15, 23, 42, 0.88)" stroke="rgba(56, 189, 248, 0.5)" stroke-width="0.8" />
-      <text x="${minLabelX.toFixed(1)}" y="${minLabelY.toFixed(1)}" text-anchor="middle" font-size="12.5" font-weight="800" fill="#7dd3fc">T ${Math.round(minPt.t)}°</text>
+      <circle cx="${minPt.x.toFixed(1)}" cy="${minPt.y.toFixed(1)}" r="${isDesktop ? '4.2' : '4.8'}" fill="#ffffff" stroke="#38bdf8" stroke-width="${isDesktop ? '2' : '2.5'}" />
+      <rect x="${(minLabelX - pillHalf).toFixed(1)}" y="${(minLabelY - 14).toFixed(1)}" width="${pillWidth}" height="${isDesktop ? '17' : '18'}" rx="5" fill="rgba(15, 23, 42, 0.88)" stroke="rgba(56, 189, 248, 0.5)" stroke-width="0.8" />
+      <text x="${minLabelX.toFixed(1)}" y="${minLabelY.toFixed(1)}" text-anchor="middle" font-size="${isDesktop ? '11.5' : '12.5'}" font-weight="800" fill="#7dd3fc">T ${Math.round(minPt.t)}°</text>
 
       <!-- Sonnenauf- & Sonnenuntergang Vertikale Linien & Meilensteine -->
-      <line x1="${xSunrise.toFixed(1)}" y1="24" x2="${xSunrise.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 191, 36, 0.75)" stroke-width="1.4" stroke-dasharray="3,3" />
-      <text x="${xSunrise.toFixed(1)}" y="18" text-anchor="${sunriseAnchor}" font-size="11.5" font-weight="800" fill="#fbbf24">🌅 ${sunriseStr}</text>
+      <line x1="${xSunrise.toFixed(1)}" y1="22" x2="${xSunrise.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 191, 36, 0.75)" stroke-width="1.3" stroke-dasharray="3,3" />
+      <text x="${xSunrise.toFixed(1)}" y="16" text-anchor="${sunriseAnchor}" font-size="${isDesktop ? '11' : '11.5'}" font-weight="800" fill="#fbbf24">🌅 ${sunriseStr}</text>
 
-      <line x1="${xSunset.toFixed(1)}" y1="24" x2="${xSunset.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 146, 60, 0.75)" stroke-width="1.4" stroke-dasharray="3,3" />
-      <text x="${xSunset.toFixed(1)}" y="18" text-anchor="${sunsetAnchor}" font-size="11.5" font-weight="800" fill="#fb923c">🌇 ${sunsetStr}</text>
+      <line x1="${xSunset.toFixed(1)}" y1="22" x2="${xSunset.toFixed(1)}" y2="${chartBottom}" stroke="rgba(251, 146, 60, 0.75)" stroke-width="1.3" stroke-dasharray="3,3" />
+      <text x="${xSunset.toFixed(1)}" y="16" text-anchor="${sunsetAnchor}" font-size="${isDesktop ? '11' : '11.5'}" font-weight="800" fill="#fb923c">🌇 ${sunsetStr}</text>
 
       <!-- Niederschlag (nur wenn Niederschlag vorhanden) -->
       ${precipSectionHtml}
 
-      <!-- Zeitachse (0h, 6h, 12h, 18h, 24h) -->
-      <g class="chart-time-axis" font-size="11" font-weight="700" fill="#94a3b8">
-        <text x="${getX(0).toFixed(1)}" y="${timeAxisY}" text-anchor="start">00:00</text>
-        <text x="${getX(6).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">06:00</text>
-        <text x="${getX(12).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">12:00</text>
-        <text x="${getX(18).toFixed(1)}" y="${timeAxisY}" text-anchor="middle">18:00</text>
-        <text x="${getX(24).toFixed(1)}" y="${timeAxisY}" text-anchor="end">24:00</text>
+      <!-- Zeitachse -->
+      <g class="chart-time-axis" font-size="${isDesktop ? '10.5' : '11'}" font-weight="700" fill="#94a3b8">
+        ${timeAxisHtml}
       </g>
     </svg>
   `;
@@ -1280,6 +1303,25 @@ export function render10DayForecast(daily, hourly) {
       accordion.style.display = isExpanded ? 'none' : 'block';
       wrapper.classList.toggle('expanded', !isExpanded);
       rowElem.setAttribute('aria-expanded', !isExpanded ? 'true' : 'false');
+
+      if (!isExpanded) {
+        const chartCard = accordion.querySelector('.inline-day-chart-card');
+        if (chartCard) {
+          chartCard.innerHTML = renderDayOverviewSVG({
+            dayIndex: i,
+            hourlyTemps,
+            hourlySunSecList,
+            hourlyPrecip,
+            hourlyPop,
+            sunriseStr,
+            sunsetStr,
+            sunriseDec,
+            sunsetDec,
+            tMin: convertTemp(minVal),
+            tMax: convertTemp(maxVal)
+          });
+        }
+      }
     });
 
     rowElem.addEventListener('keydown', (e) => {

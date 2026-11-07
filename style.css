@@ -1805,8 +1805,89 @@ body {
   color: #000000;
   transform: translateY(-1px);
 }
-  color: #000000;
-  transform: translateY(-1px);
+
+/* ==========================================================================
+   DESKTOP 2-COLUMN ACCORDION GRID (min-width: 900px)
+   Apple Weather / Windy Desktop High-Density Layout
+   ========================================================================== */
+@media (min-width: 900px) {
+  .inline-accordion-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-rows: auto 1fr auto;
+    column-gap: 20px;
+    row-gap: 8px;
+    align-items: stretch;
+  }
+
+  .inline-section-header {
+    grid-column: 1 / 2;
+    grid-row: 1;
+    margin-bottom: 0;
+  }
+
+  .inline-day-chart-card {
+    grid-column: 1 / 2;
+    grid-row: 2 / 4;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 14px 8px 14px;
+    max-height: 240px;
+  }
+
+  .inline-day-chart-card .inline-day-svg {
+    max-height: 220px;
+    width: 100%;
+    height: auto;
+  }
+
+  .inline-stats-grid {
+    grid-column: 2 / 3;
+    grid-row: 2;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+    margin-bottom: 0;
+    align-content: start;
+  }
+
+  .isg-card {
+    padding: 9px 12px;
+    border-radius: 12px;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+  }
+
+  .isg-icon {
+    font-size: 18px;
+  }
+
+  .isg-lbl {
+    font-size: 9px;
+    letter-spacing: 0.3px;
+  }
+
+  .isg-val {
+    font-size: 13px;
+  }
+
+  .isg-sub {
+    font-size: 10px;
+  }
+
+  .inline-footer-actions {
+    grid-column: 2 / 3;
+    grid-row: 3;
+    margin-top: 4px;
+  }
+
+  .inline-modal-launch-btn {
+    width: 100%;
+    padding: 9px 14px;
+    font-size: 12px;
+  }
 }
 
 /* ==========================================================================
@@ -5141,6 +5222,9 @@ body {
   left: 14px;
   width: 380px;
   max-width: calc(100vw - 28px);
+  max-height: calc(100% - 70px);
+  display: flex;
+  flex-direction: column;
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
@@ -5150,6 +5234,29 @@ body {
   z-index: 100010;
   overflow: hidden;
   animation: mldPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 769px) {
+  .map-layer-drawer {
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 440px !important;
+    max-width: calc(100% - 40px) !important;
+    max-height: calc(100% - 40px) !important;
+    animation: mldCenterIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+}
+
+@keyframes mldCenterIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 @keyframes mldPopIn {
@@ -5164,6 +5271,7 @@ body {
 }
 
 .mld-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5219,11 +5327,12 @@ body {
 }
 
 .mld-body {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-height: calc(82vh - 120px);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -5360,9 +5469,10 @@ body {
 }
 
 .mld-footer {
+  flex-shrink: 0;
   padding: 12px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(15, 23, 42, 0.98);
 }
 
 .mld-done-btn {

@@ -419,6 +419,9 @@
   left: 14px;
   width: 380px;
   max-width: calc(100vw - 28px);
+  max-height: calc(100% - 70px);
+  display: flex;
+  flex-direction: column;
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
@@ -428,6 +431,29 @@
   z-index: 100010;
   overflow: hidden;
   animation: mldPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 769px) {
+  .map-layer-drawer {
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 440px !important;
+    max-width: calc(100% - 40px) !important;
+    max-height: calc(100% - 40px) !important;
+    animation: mldCenterIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+}
+
+@keyframes mldCenterIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 @keyframes mldPopIn {
@@ -442,6 +468,7 @@
 }
 
 .mld-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -497,11 +524,12 @@
 }
 
 .mld-body {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-height: calc(82vh - 120px);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -638,9 +666,10 @@
 }
 
 .mld-footer {
+  flex-shrink: 0;
   padding: 12px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(15, 23, 42, 0.98);
 }
 
 .mld-done-btn {

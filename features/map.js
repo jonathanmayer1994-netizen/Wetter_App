@@ -142,7 +142,7 @@ export function initLeafletMap() {
   function openMapLayerDrawer() {
     if (layerDrawer) {
       layerDrawer.classList.add('is-open');
-      layerDrawer.style.display = 'block';
+      layerDrawer.style.display = 'flex';
     }
     if (layerBackdrop) {
       layerBackdrop.classList.add('is-open');

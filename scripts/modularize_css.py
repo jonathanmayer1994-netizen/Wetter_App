@@ -78,3 +78,4 @@ if __name__ == '__main__':
         compile_css()
     else:
         split_style_css()
+
