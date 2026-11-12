@@ -5,7 +5,7 @@
 
 import { state } from '../core/state.js';
 import { escapeHtml } from '../httpClient.js';
-import { convertTemp } from './overview.js';
+import { convertTemp, getTodayDailyIndex, getClosestHourlyIndex } from './overview.js';
 
 let isInitialized = false;
 
@@ -92,15 +92,16 @@ export function openBentoSheet(type) {
 
   const w = state.weatherData;
   const m = state.microData;
+  const hIdx = getClosestHourlyIndex(w?.hourly);
   const cur = w ? (w.current || (w.hourly ? {
-    temperature_2m: w.hourly.temperature_2m[0],
-    relative_humidity_2m: w.hourly.relative_humidity_2m ? w.hourly.relative_humidity_2m[0] : 70,
-    wind_speed_10m: w.hourly.wind_speed_10m ? w.hourly.wind_speed_10m[0] : 10,
-    wind_direction_10m: w.hourly.wind_direction_10m ? w.hourly.wind_direction_10m[0] : 0,
-    wind_gusts_10m: w.hourly.wind_gusts_10m ? w.hourly.wind_gusts_10m[0] : 15,
-    uv_index: w.hourly.uv_index ? w.hourly.uv_index[0] : 0,
-    pressure_msl: w.hourly.pressure_msl ? w.hourly.pressure_msl[0] : 1013,
-    surface_pressure: w.hourly.surface_pressure ? w.hourly.surface_pressure[0] : 1013
+    temperature_2m: w.hourly.temperature_2m[hIdx],
+    relative_humidity_2m: w.hourly.relative_humidity_2m ? w.hourly.relative_humidity_2m[hIdx] : 70,
+    wind_speed_10m: w.hourly.wind_speed_10m ? w.hourly.wind_speed_10m[hIdx] : 10,
+    wind_direction_10m: w.hourly.wind_direction_10m ? w.hourly.wind_direction_10m[hIdx] : 0,
+    wind_gusts_10m: w.hourly.wind_gusts_10m ? w.hourly.wind_gusts_10m[hIdx] : 15,
+    uv_index: w.hourly.uv_index ? w.hourly.uv_index[hIdx] : 0,
+    pressure_msl: w.hourly.pressure_msl ? w.hourly.pressure_msl[hIdx] : 1013,
+    surface_pressure: w.hourly.surface_pressure ? w.hourly.surface_pressure[hIdx] : 1013
   } : {})) : {};
 
   const daily = w ? w.daily : null;
@@ -241,9 +242,10 @@ function renderSunSheet(daily, loc, titleEl, subtitleEl, bodyEl) {
   let sunProgressPct = 50;
   let isSunUp = true;
 
+  const todayIdx = getTodayDailyIndex(daily).idx;
   if (daily && daily.sunrise && daily.sunset && daily.sunrise.length > 0) {
-    const rise = new Date(daily.sunrise[0]);
-    const set = new Date(daily.sunset[0]);
+    const rise = new Date(daily.sunrise[todayIdx] || daily.sunrise[0]);
+    const set = new Date(daily.sunset[todayIdx] || daily.sunset[0]);
     const now = new Date();
 
     sunriseStr = rise.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -427,12 +429,14 @@ function renderPrecipSheet(cur, daily, hourly, loc, micro, titleEl, subtitleEl, 
   if (titleEl) titleEl.innerText = '🌧️ Niederschlag & Schneefallgrenze';
   if (subtitleEl) subtitleEl.innerText = '24h Akkumulation, Schneefallgrenze und Niederschlagsphase';
 
-  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum[0] != null) ? Number(daily.precipitation_sum[0]) : 0;
-  const pop = (daily && daily.precipitation_probability_max && daily.precipitation_probability_max[0] != null) ? Math.round(daily.precipitation_probability_max[0]) : 0;
+  const todayIdx = getTodayDailyIndex(daily).idx;
+  const hIdx = getClosestHourlyIndex(hourly);
+  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum[todayIdx] != null) ? Number(daily.precipitation_sum[todayIdx]) : 0;
+  const pop = (daily && daily.precipitation_probability_max && daily.precipitation_probability_max[todayIdx] != null) ? Math.round(daily.precipitation_probability_max[todayIdx]) : 0;
   
   const elev = loc.elevation || 520;
   const freezingLevel = (micro && micro.atmosphere && micro.atmosphere.freezingLevelMeters) ||
-    (hourly && hourly.freezing_level_height ? hourly.freezing_level_height[0] : 2200);
+    (hourly && hourly.freezing_level_height ? hourly.freezing_level_height[hIdx] : 2200);
   const snowLevel = (micro && micro.atmosphere && micro.atmosphere.snowLevelMeters) || Math.max(0, freezingLevel - 300);
 
   let phase = 'Regen';

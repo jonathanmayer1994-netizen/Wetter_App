@@ -8,11 +8,11 @@
   
   <!-- Apple Web App Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Best Weather">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.3.5">
-  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2.3.5">
-  <link rel="manifest" href="manifest.json?v=2.3.5">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.5.0">
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2.5.0">
+  <link rel="manifest" href="manifest.json?v=2.5.0">
   <meta name="theme-color" content="#0d1b2a">
 
   <!-- Typography -->
@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.3.5">
+  <link rel="stylesheet" href="style.css?v=2.6.0">
 </head>
 <body class="weather-clear-day">
   <!-- Dynamic Atmospheric Background Canvas -->
@@ -36,18 +36,18 @@
   <!-- iOS Safe Area Status Bar Guard to prevent content blur below Dynamic Island / status bar -->
   <div class="ios-status-bar-guard" aria-hidden="true"></div>
 
-  <!-- PULL-DOWN-TO-REFRESH INDICATOR (Native Apple Feel) -->
-  <div id="pull-to-refresh" class="ptr-indicator" aria-hidden="true">
-    <div class="ptr-inner">
-      <span class="ptr-arrow" id="ptr-arrow">↓</span>
-      <span class="ptr-spinner" id="ptr-spinner"></span>
-      <span class="ptr-text" id="ptr-text">Nach unten ziehen zum Aktualisieren</span>
-    </div>
-  </div>
-
   <!-- Main Responsive Layout Wrapper (Dynamic for iPhone, iPad & Desktop) -->
   <div class="app-layout">
-    
+
+    <!-- PULL-DOWN-TO-REFRESH INDICATOR (In-Flow above App Header, seamless on live sky) -->
+    <div id="pull-to-refresh" class="ptr-indicator" aria-hidden="true">
+      <div class="ptr-inner">
+        <span class="ptr-arrow" id="ptr-arrow">↓</span>
+        <span class="ptr-spinner" id="ptr-spinner"></span>
+        <span class="ptr-text" id="ptr-text">Nach unten ziehen zum Aktualisieren</span>
+      </div>
+    </div>
+
     <!-- Top Global App Bar -->
     <header class="global-navbar">
       <div class="nav-brand">
@@ -1439,36 +1439,132 @@
               <span>2D-GROSSRAUMRADAR & 48H-MODELLPROGNOSE (DWD & ECMWF)</span>
             </div>
           </div>
-          <!-- Fullscreen-capable Leaflet Map View with Floating Controls Dock -->
-          <div class="fullscreen-map-wrapper" id="fullscreen-map-wrapper">
+          <!-- Fullscreen-capable MeteoSwiss-Style Map View with Floating Controls Dock -->
+          <div class="fullscreen-map-wrapper ms-map-theme" id="fullscreen-map-wrapper">
             <div id="interactive-map"></div>
-            <canvas id="wind-flow-canvas" class="wind-flow-canvas" role="img" aria-label="Animiertes Windströmungsfeld auf der Wetterkarte" style="display:none;"></canvas>
+            <canvas id="wind-flow-canvas" class="wind-flow-canvas" role="img" aria-label="Animiertes MeteoSwiss-Wetterfeld auf der Karte" style="display:none;"></canvas>
 
-            <!-- Dedicated Mobile Fullscreen Close Button (Tipp auf X schließt die Vollbild-Karte und kehrt zum Menü zurück) -->
-            <button class="map-mobile-close-btn" id="map-mobile-close-btn" type="button" title="Vollbild-Karte schließen" aria-label="Karte schließen">
-              <span class="mmcb-icon">✕</span>
-            </button>
+            <!-- 1. METEOSWISS ANIMATIONEN HEADER BAR -->
+            <div class="ms-map-header-bar" id="ms-map-header-bar">
+              <div class="ms-header-top-row">
+                <!-- Left trigger pill (remains compact & left of close btn) -->
+                <div class="map-floating-topbar" id="map-floating-topbar">
+                  <button class="map-layer-pill" id="map-layer-pill" type="button" aria-expanded="false" aria-controls="map-layer-drawer" title="Alle Wetterebenen & Kartenstile">
+                    <span class="mlp-icon" id="mlp-icon">🌧️</span>
+                    <span class="mlp-text" id="mlp-text">48h Radar</span>
+                    <span class="mlp-tag" id="mlp-tag">Relief</span>
+                    <span class="mlp-chevron">▾</span>
+                  </button>
+                </div>
 
-            <!-- 1. SLEEK FLOATING TOP BAR: Apple Weather / Windy Style Layer Pill -->
-            <div class="map-floating-topbar" id="map-floating-topbar">
-              <button class="map-layer-pill" id="map-layer-pill" type="button" aria-expanded="false" aria-controls="map-layer-drawer" title="Wetterebenen und Kartenstil anpassen">
-                <span class="mlp-icon" id="mlp-icon">🌧️</span>
-                <span class="mlp-text" id="mlp-text">48h Radar</span>
-                <span class="mlp-tag" id="mlp-tag">Topo</span>
-                <span class="mlp-chevron">▾</span>
+                <!-- Centered MeteoSwiss Title -->
+                <div class="ms-title-stack">
+                  <div class="ms-title-main">Animationen</div>
+                  <div class="ms-title-sub" id="map-overlay-subtitle">Niederschlag &amp; Niederschlagstyp</div>
+                </div>
+
+                <!-- Right actions: Info/Legend Toggle & Mobile Fullscreen Close '✕' -->
+                <div class="ms-header-right-actions">
+                  <button class="ms-info-btn" id="map-legend-toggle-btn" type="button" title="Radar-Farbskala &amp; Legende ein-/ausblenden" aria-label="Legende umschalten" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9.5"></circle>
+                      <line x1="12" y1="11" x2="12" y2="16"></line>
+                      <circle cx="12" cy="7.5" r="0.8" fill="currentColor" stroke="none"></circle>
+                    </svg>
+                  </button>
+                  <button class="map-mobile-close-btn" id="map-mobile-close-btn" type="button" title="Vollbild-Karte schließen" aria-label="Karte schließen">
+                    <span class="mmcb-icon">✕</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 4-Tab Segmented Mode Switcher (MeteoSwiss Style) -->
+              <div class="ms-segmented-wrap" id="ms-segmented-wrap">
+                <div class="ms-segmented-bar" role="tablist" aria-label="Wetterebenen Schnellwahl">
+                  <button class="ms-seg-btn active" data-overlay="precip" type="button" role="tab" aria-selected="true" title="Niederschlag &amp; Niederschlagstyp">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true">
+                      <path d="M12.5 3.2c0 0-4.2 5.1-4.2 8.1a4.2 4.2 0 0 0 8.4 0c0-3-4.2-8.1-4.2-8.1zm-5.8 9.2c0 0-2.6 3.2-2.6 5.1a2.6 2.6 0 0 0 5.2 0c0-1.9-2.6-5.1-2.6-5.1zm11.2 1.8c0 0-2.2 2.7-2.2 4.3a2.2 2.2 0 0 0 4.4 0c0-1.6-2.2-4.3-2.2-4.3z"/>
+                    </svg>
+                  </button>
+                  <button class="ms-seg-btn" data-overlay="wind" type="button" role="tab" aria-selected="false" title="Wind &amp; Böen">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M17.5 14a3.5 3.5 0 0 0 0-7 4.8 4.8 0 0 0-9.3-1.1A3.6 3.6 0 0 0 4 9.5a3.5 3.5 0 0 0 3.5 3.5H17.5z"/>
+                      <path d="M4 16.5h9.5a2 2 0 1 0-2-2"/>
+                      <path d="M6 19.5h7.5"/>
+                    </svg>
+                  </button>
+                  <button class="ms-seg-btn" data-overlay="clouds" type="button" role="tab" aria-selected="false" title="Bewölkung &amp; Hochnebel">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M17.5 14.5H7.2a3.7 3.7 0 0 1-.4-7.4 4.9 4.9 0 0 1 9.5-1.2 3.8 3.8 0 0 1 1.2 8.6z" fill="currentColor" fill-opacity="0.22"/>
+                      <line x1="8" y1="17.5" x2="7.3" y2="19.5"/>
+                      <line x1="12" y1="17.5" x2="11.3" y2="19.5"/>
+                      <line x1="16" y1="17.5" x2="15.3" y2="19.5"/>
+                    </svg>
+                  </button>
+                  <button class="ms-seg-btn" data-overlay="temp" type="button" role="tab" aria-selected="false" title="Temperatur &amp; 0°C-Grenze">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z"/>
+                      <circle cx="12" cy="17.5" r="1.4" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Collapse / Expand Chevron Notch -->
+              <button class="ms-header-collapse-tab" id="ms-header-collapse-btn" type="button" title="Kopfleiste ein-/ausklappen" aria-label="Kopfleiste ein-/ausklappen">
+                <svg viewBox="0 0 20 12" width="16" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="4 3 10 9 16 3"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Subtle Top-Left & Top-Right Radar Attribution / Watermark -->
+            <div class="ms-map-attribution" aria-hidden="true">© Map</div>
+            <div class="ms-radar-watermark" id="ms-radar-watermark">--.--.-- | --:--</div>
+
+            <!-- Right-Edge MeteoSwiss Quick Layer FAB Stack -->
+            <div class="ms-right-fab-stack" id="ms-right-fab-stack" role="toolbar" aria-label="Karten-Schnellfunktionen">
+              <button class="ms-fab-btn" id="ms-fab-lightning" type="button" title="Blitze &amp; Gewitter auf Karte anzeigen" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                  <path d="M13 2L4.5 13.5h5.8L9 22l9.5-11.5h-5.8L13 2z"/>
+                </svg>
+              </button>
+              <button class="ms-fab-btn is-active" id="ms-fab-stratus" type="button" title="Nebel / Hochnebel (tiefe Bewölkung) ein-/ausblenden" aria-pressed="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                  <circle cx="9" cy="10" r="3"/>
+                  <circle cx="15" cy="9.5" r="2.6"/>
+                  <circle cx="12" cy="15.5" r="2.8"/>
+                </svg>
+              </button>
+              <button class="ms-fab-btn is-phase-active" id="ms-fab-precip-type" type="button" title="Niederschlagstyp (Regen / Schneeregen / Schnee) umschalten" aria-pressed="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="4" y1="20" x2="20" y2="4" stroke-opacity="0.7"/>
+                  <path d="M8.5 5v6M5.8 6.5l5.4 3M11.2 6.5l-5.4 3"/>
+                  <path d="M16 12.2c0 0-2.6 3.1-2.6 4.9a2.6 2.6 0 0 0 5.2 0c0-1.8-2.6-4.9-2.6-4.9z" fill="currentColor" stroke="none"/>
+                </svg>
+              </button>
+              <button class="ms-fab-btn" id="ms-fab-recenter" type="button" title="Auf meinen aktuellen Standort zentrieren" aria-label="Standort zentrieren">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="5"/>
+                  <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                  <line x1="12" y1="2" x2="12" y2="5"/>
+                  <line x1="12" y1="19" x2="12" y2="22"/>
+                  <line x1="2" y1="12" x2="5" y2="12"/>
+                  <line x1="19" y1="12" x2="22" y2="12"/>
+                </svg>
               </button>
             </div>
 
             <!-- Layer Backdrop Overlay (Soft blur when layer sheet is open) -->
             <div class="map-layer-backdrop" id="map-layer-backdrop" style="display:none;"></div>
 
-            <!-- 2. LAYER & KARTENSTIL DRAWER / SHEET (Apple iOS & Windy Grade) -->
+            <!-- 2. LAYER & KARTENSTIL DRAWER / SHEET -->
             <div class="map-layer-drawer" id="map-layer-drawer" role="dialog" aria-modal="true" aria-labelledby="mld-title" style="display:none;">
               <div class="mld-header">
                 <div class="mld-title-group">
                   <span class="mld-icon">🗺️</span>
                   <div>
-                    <h3 class="mld-title" id="mld-title">Ebenen & Kartenstil</h3>
+                    <h3 class="mld-title" id="mld-title">Ebenen &amp; Kartenstil</h3>
                     <span class="mld-subtitle">Wetterdaten und Kartendarstellung wählen</span>
                   </div>
                 </div>
@@ -1486,7 +1582,7 @@
                       <span class="mob-icon">🌧️❄️</span>
                       <div class="mob-text">
                         <span class="mob-name">48h Radar</span>
-                        <span class="mob-desc">Regen & Schnee</span>
+                        <span class="mob-desc">Regen, Schnee &amp; Typ</span>
                       </div>
                       <span class="mob-check">✓</span>
                     </button>
@@ -1494,7 +1590,7 @@
                     <button class="map-overlay-btn" data-overlay="wind" type="button">
                       <span class="mob-icon">💨</span>
                       <div class="mob-text">
-                        <span class="mob-name">Wind & Böen</span>
+                        <span class="mob-name">Wind &amp; Böen</span>
                         <span class="mob-desc">Strömungsfeld</span>
                       </div>
                       <span class="mob-check">✓</span>
@@ -1513,7 +1609,7 @@
                       <span class="mob-icon">☁️</span>
                       <div class="mob-text">
                         <span class="mob-name">Bewölkung</span>
-                        <span class="mob-desc">Wolkenfelder</span>
+                        <span class="mob-desc">Wolken &amp; Hochnebel</span>
                       </div>
                       <span class="mob-check">✓</span>
                     </button>
@@ -1522,7 +1618,7 @@
                       <span class="mob-icon">🌡️</span>
                       <div class="mob-text">
                         <span class="mob-name">Temperatur</span>
-                        <span class="mob-desc">Höhen- & Frostgrenzen</span>
+                        <span class="mob-desc">Höhen- &amp; Frostgrenzen</span>
                       </div>
                       <span class="mob-check">✓</span>
                     </button>
@@ -1531,7 +1627,7 @@
                       <span class="mob-icon">⏲️</span>
                       <div class="mob-text">
                         <span class="mob-name">Luftdruck</span>
-                        <span class="mob-desc">Isobaren & Fronten</span>
+                        <span class="mob-desc">Isobaren &amp; Fronten</span>
                       </div>
                       <span class="mob-check">✓</span>
                     </button>
@@ -1544,20 +1640,29 @@
                     <span class="mld-section-label">Karten-Stil</span>
                   </div>
                   <div class="mld-grid mld-grid-bases">
-                    <button class="map-base-btn active" data-base="osm-outdoor" type="button">
+                    <button class="map-base-btn active" data-base="osm-dark" type="button">
                       <span class="mbb-icon">🏔️</span>
                       <div class="mbb-text">
+                        <span class="mbb-name">Alpin-Dunkel</span>
+                        <span class="mbb-desc">MeteoSwiss 3D Relief</span>
+                      </div>
+                      <span class="mbb-check">✓</span>
+                    </button>
+
+                    <button class="map-base-btn" data-base="osm-outdoor" type="button">
+                      <span class="mbb-icon">🗺️</span>
+                      <div class="mbb-text">
                         <span class="mbb-name">Topo / Alpin</span>
-                        <span class="mbb-desc">Höhenlinien & Relief</span>
+                        <span class="mbb-desc">OpenTopoMap Höhenlinien</span>
                       </div>
                       <span class="mbb-check">✓</span>
                     </button>
 
                     <button class="map-base-btn" data-base="osm-standard" type="button">
-                      <span class="mbb-icon">🗺️</span>
+                      <span class="mbb-icon">🛣️</span>
                       <div class="mbb-text">
                         <span class="mbb-name">Standard</span>
-                        <span class="mbb-desc">Straßen & Orte</span>
+                        <span class="mbb-desc">Straßen &amp; Orte</span>
                       </div>
                       <span class="mbb-check">✓</span>
                     </button>
@@ -1566,16 +1671,7 @@
                       <span class="mbb-icon">🛰️</span>
                       <div class="mbb-text">
                         <span class="mbb-name">Satellit</span>
-                        <span class="mbb-desc">Luftbild mit Beschriftung</span>
-                      </div>
-                      <span class="mbb-check">✓</span>
-                    </button>
-
-                    <button class="map-base-btn" data-base="osm-dark" type="button">
-                      <span class="mbb-icon">🌙</span>
-                      <div class="mbb-text">
-                        <span class="mbb-name">Dunkel</span>
-                        <span class="mbb-desc">Nachtkontrast</span>
+                        <span class="mbb-desc">Luftbild mit Orten</span>
                       </div>
                       <span class="mbb-check">✓</span>
                     </button>
@@ -1585,7 +1681,7 @@
                 <!-- SECTION 3: SCHNELL-NAVIGATION & AKTIONEN -->
                 <div class="mld-section">
                   <div class="mld-section-header">
-                    <span class="mld-section-label">Navigation & Aktionen</span>
+                    <span class="mld-section-label">Navigation &amp; Aktionen</span>
                   </div>
                   <div class="mld-actions-flex">
                     <button class="mld-action-chip" id="mld-recenter-btn" type="button">
@@ -1606,9 +1702,8 @@
               </div>
             </div>
 
-            <!-- Floating Left HUD Stack: High-Precision Wind Compass & Point Weather Tile -->
+            <!-- Floating Left HUD Stack: High-Precision Wind Compass & Compact Point Weather Pill -->
             <div class="map-left-hud-stack" id="map-left-hud-stack">
-              <!-- Floating High-Precision Wind Compass Widget (Aktiv bei Wind-Overlay) -->
               <div class="map-wind-compass-widget" id="map-wind-compass-widget" style="display:none;" role="region" aria-label="Windkompass und Windgeschwindigkeit">
                 <div class="mwc-compass-dial">
                   <div class="mwc-outer-ring">
@@ -1636,7 +1731,7 @@
                 </div>
               </div>
 
-              <!-- Floating Current Location Weather Tile (Aktuelles Wetter zum gesetzten Kartenpunkt) -->
+              <!-- Floating Point Weather Card -->
               <div class="map-point-weather-card" id="map-point-weather-card" role="region" aria-label="Aktuelles Wetter für ausgewählten Punkt">
                 <div class="mpw-header">
                   <div class="mpw-title-wrap">
@@ -1678,16 +1773,13 @@
                   </div>
                 </div>
 
-                <!-- Front- & Wind-Zugrichtung (Fix unter dem Kartenpunkt-Bereich) -->
-                <div class="mpw-front-motion" id="mpw-front-motion" title="Aktuelle Zugrichtung der Wetterfront & Strömung">
+                <div class="mpw-front-motion" id="mpw-front-motion" title="Aktuelle Zugrichtung der Wetterfront &amp; Strömung">
                   <span class="mpw-fm-icon">🧭</span>
                   <span class="mpw-fm-title">Zugrichtung:</span>
                   <span class="mpw-fm-val" id="mpw-front-motion-val">WNW ➔ OSO (15 km/h)</span>
                 </div>
               </div>
             </div>
-
-
 
             <!-- Floating GPX Tour Active Banner -->
             <div class="gpx-active-tour-banner" id="gpx-active-tour-banner" style="display:none;">
@@ -1714,9 +1806,9 @@
               <div class="tab-advice" id="tab-advice">⚠️ Grate, Gipfel und Klettersteige unverzüglich verlassen!</div>
             </div>
 
-            <!-- Precipitation & Weather Color Legend (Top Right) -->
+            <!-- Precipitation & Weather Color Legend (Toggleable via ⓘ on Mobile, visible on Desktop) -->
             <div class="map-legend-card" id="map-legend-card">
-              <div class="legend-title" id="map-legend-title">Niederschlagsintensität & Typ:</div>
+              <div class="legend-title" id="map-legend-title">Niederschlagsintensität &amp; Typ:</div>
               <div class="legend-gradient-bar" id="map-legend-bar"></div>
               <div class="legend-scale-labels" id="map-legend-labels">
                 <span>Leicht</span>
@@ -1728,33 +1820,54 @@
             </div>
 
             <!-- =================================================================== -->
-            <!-- 2. HIGH-END 48H RADAR TIMELINE PLAYER (APPLE WEATHER / WINDY STYLE) -->
+            <!-- METEOSWISS-GRADE 48H TIMELINE PLAYER DOCK                           -->
             <!-- =================================================================== -->
-            <div class="radar-floating-controls modern-radar-player" id="radar-floating-controls">
-              <!-- Top Row: Mode Chip, Dynamic Time Banner & Collapse Toggle -->
-              <div class="radar-player-topline">
+            <div class="radar-floating-controls modern-radar-player ms-timeline-dock" id="radar-floating-controls">
+              <!-- Compact Status / Time Strip with Callout Badge -->
+              <div class="radar-player-topline ms-timeline-topline">
                 <div class="radar-info-left">
-                  <span class="radar-mode-chip" id="radar-mode-chip">🔮 48h Prognose-Radar</span>
-                  <span class="radar-time-banner" id="radar-time-display">Heute, 14:00 Uhr • +2 Std. Zukunft</span>
+                  <span class="radar-mode-chip" id="radar-mode-chip">🔴 Messung / Live</span>
+                  <span class="radar-time-banner" id="radar-time-display">Heute, 14:55 Uhr • Live</span>
                 </div>
                 <div class="radar-top-actions">
+                  <div class="ms-callout-badge" id="ms-timeline-callout">
+                    <span class="mscb-time" id="mscb-time">14:55</span>
+                    <span class="mscb-sep">·</span>
+                    <span class="mscb-day" id="mscb-day">Heute</span>
+                    <span class="mscb-kind is-live" id="mscb-kind">Messung</span>
+                  </div>
                   <button id="radar-player-toggle-btn" class="radar-player-toggle-btn" title="Player minimieren / vergrößern" aria-label="Player ein-/ausklappen">▾</button>
                 </div>
               </div>
 
-              <!-- Middle: Full-Width Apple-Grade Timeline Slider & Clear Markers -->
-              <div class="radar-slider-container">
-                <div class="radar-slider-track-wrap">
-                  <input type="range" id="radar-time-slider" min="0" max="60" value="12" step="1" aria-label="Zeitleiste 48h Radar">
-                </div>
-                <div class="radar-timeline-markers">
-                  <span class="rtm-past">-1h (15m)</span>
-                  <span class="rtm-now">🔴 JETZT</span>
-                  <span class="rtm-future" style="color:#38bdf8;">+1h (5m Nowcast)</span>
-                  <span class="rtm-future" style="color:#c084fc;">+3h (15m)</span>
-                  <span class="rtm-future rtm-hide-mobile">+12h</span>
-                  <span class="rtm-future">+24h</span>
-                  <span class="rtm-future">+48h</span>
+              <!-- MeteoSwiss Timeline Track: Left Play Button + Measurement/Forecast Axis -->
+              <div class="ms-timeline-main-row">
+                <button id="radar-play-btn" class="ms-play-btn" type="button" title="Animation abspielen / pausieren" aria-label="Radar-Animation abspielen">▶</button>
+
+                <div class="radar-slider-container ms-axis-container">
+                  <div class="ms-axis-ticks" id="ms-axis-ticks">
+                    <span class="ms-tick">-1h</span>
+                    <span class="ms-tick ms-tick-now">Jetzt</span>
+                    <span class="ms-tick">+1h</span>
+                    <span class="ms-tick">+3h</span>
+                    <span class="ms-tick rtm-hide-mobile">+12h</span>
+                    <span class="ms-tick">+24h</span>
+                    <span class="ms-tick">+48h</span>
+                  </div>
+                  <div class="radar-slider-track-wrap ms-axis-track-wrap">
+                    <div class="ms-axis-bars" aria-hidden="true">
+                      <span class="ms-bar-measured" id="ms-bar-measured"></span>
+                      <span class="ms-dot-now" id="ms-dot-now"></span>
+                      <span class="ms-bar-forecast" id="ms-bar-forecast"></span>
+                    </div>
+                    <div class="ms-scrubber-needle" id="ms-scrubber-needle" aria-hidden="true"></div>
+                    <input type="range" id="radar-time-slider" min="0" max="60" value="4" step="1" aria-label="Zeitleiste 48h Radar">
+                  </div>
+                  <div class="radar-timeline-markers ms-axis-subline">
+                    <span class="ms-sub-left"><span class="ms-line-sample measured"></span>Messung</span>
+                    <span class="ms-sub-mid"><span class="ms-line-sample forecast"></span>Prognose</span>
+                    <span class="ms-sub-right" id="ms-phase-axis-label">Niederschlagstyp</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2885,13 +2998,25 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.4.1"></script>
+  <script type="module" src="app.js?v=2.6.0"></script>
 
   <!-- Service Worker Registration für Alpine Offline PWA -->
   <script>
     if ('serviceWorker' in navigator) {
+      let swRefreshing = false;
+      const hadController = Boolean(navigator.serviceWorker.controller);
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController || swRefreshing) return;
+        try {
+          if (sessionStorage.getItem('bw_sw_reloaded_v222')) return;
+          sessionStorage.setItem('bw_sw_reloaded_v222', '1');
+        } catch (_) {}
+        swRefreshing = true;
+        window.location.reload();
+      });
+
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then((reg) => {
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
           if (reg) reg.update();
         }).catch((err) => {
           console.warn('Service Worker Registrierung:', err);

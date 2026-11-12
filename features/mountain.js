@@ -8,8 +8,9 @@ import { state } from '../core/state.js';
 import { WMO_CODES } from '../core/constants.js';
 import { MicroEngine } from '../microEngine.js';
 import { ActualEngine } from '../core/actualEngine.js';
-import { escapeHtml } from '../httpClient.js';
+import { escapeHtml, getLocalDateKey } from '../httpClient.js';
 import { updateNavigationWarningBadges } from './search.js';
+import { getTodayDailyIndex, getClosestHourlyIndex } from './overview.js';
 
 export function convertTemp(celsius) {
   if (state.unit === 'fahrenheit') {
@@ -508,8 +509,9 @@ export function renderCityPanel() {
   if (comfortLabel) comfortLabel.innerText = comfortText;
 
   // 4. Nachtkühlung & Lüftungsfenster
-  let tMinTonight = (daily && daily.temperature_2m_min && daily.temperature_2m_min[0] !== undefined)
-    ? Math.round(daily.temperature_2m_min[0])
+  const todayIdx = getTodayDailyIndex(daily).idx;
+  let tMinTonight = (daily && daily.temperature_2m_min && daily.temperature_2m_min[todayIdx] !== undefined)
+    ? Math.round(daily.temperature_2m_min[todayIdx])
     : (t - 4);
   
   const nightCoolingEl = document.getElementById('city-night-cooling');
@@ -592,15 +594,22 @@ export function renderCityPanel() {
 
 function renderCityTimeline(hourly, uhiDelta) {
   const container = document.getElementById('city-timeline-list');
-  if (!container || !hourly || !hourly.time) return;
+  if (!container || !hourly || !hourly.time || hourly.time.length === 0) return;
 
   const fragment = document.createDocumentFragment();
-  const maxHours = Math.min(24, hourly.time.length);
+  const startIdx = getClosestHourlyIndex(hourly);
+  const endIdx = Math.min(hourly.time.length, startIdx + 24);
 
-  for (let i = 0; i < maxHours; i++) {
-    const timeStr = new Date(hourly.time[i]).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    const rawT = hourly.temperature_2m ? hourly.temperature_2m[i] : 15;
-    const isDayTime = i >= 7 && i <= 20;
+  for (let i = startIdx; i < endIdx; i++) {
+    const dt = new Date(hourly.time[i]);
+    const hourNum = isNaN(dt.getTime()) ? (i % 24) : dt.getHours();
+    const timeStr = isNaN(dt.getTime())
+      ? `${String(hourNum).padStart(2, '0')}:00`
+      : dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const rawT = hourly.temperature_2m && hourly.temperature_2m[i] !== undefined ? hourly.temperature_2m[i] : 15;
+    const isDayTime = (hourly.is_day && hourly.is_day[i] !== undefined)
+      ? hourly.is_day[i] === 1
+      : (hourNum >= 7 && hourNum <= 20);
     const itemUhi = isDayTime ? uhiDelta * 0.8 : uhiDelta * 1.2;
     const cityT = Math.round(rawT + itemUhi);
 
@@ -1103,26 +1112,25 @@ export function updateAltitudeSliderLabel() {
 // Dynamische automatische Anpassung an die Jetzt-Zeit (fortlaufend in die Zukunft)
 if (typeof window !== 'undefined') {
   let lastCheckedHour = new Date().getHours();
-  setInterval(() => {
-    const curH = new Date().getHours();
-    if (curH !== lastCheckedHour) {
+  let lastCheckedDayKey = getLocalDateKey(new Date());
+  const refreshTab2OnTimeChange = () => {
+    const now = new Date();
+    const curH = now.getHours();
+    const curDayKey = getLocalDateKey(now);
+    if (curH !== lastCheckedHour || curDayKey !== lastCheckedDayKey) {
       lastCheckedHour = curH;
-      if (state.currentTab === 'tab-mountain' && state.microData) {
-        renderAltitudeHoursScroller();
-        selectAltitudeHour(state.selectedAltitudeHour || 0, false);
+      lastCheckedDayKey = curDayKey;
+      if (state.activeTab === 'tab-mountain' && (state.microData || state.weatherData)) {
+        if (state.currentLocation?.isMountain && state.microData) {
+          renderAltitudeHoursScroller();
+          selectAltitudeHour(state.selectedAltitudeHour || 0, false);
+        } else if (!state.currentLocation?.isMountain && state.weatherData) {
+          renderCityPanel();
+        }
       }
     }
-  }, 30000);
-
-  window.addEventListener('focus', () => {
-    const curH = new Date().getHours();
-    if (curH !== lastCheckedHour) {
-      lastCheckedHour = curH;
-      if (state.currentTab === 'tab-mountain' && state.microData) {
-        renderAltitudeHoursScroller();
-        selectAltitudeHour(state.selectedAltitudeHour || 0, false);
-      }
-    }
-  });
+  };
+  setInterval(refreshTab2OnTimeChange, 30000);
+  window.addEventListener('focus', refreshTab2OnTimeChange);
 }
 

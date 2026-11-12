@@ -8,9 +8,62 @@ import { MicroEngine } from '../microEngine.js';
 import { state } from '../core/state.js';
 import { WMO_CODES } from '../core/constants.js';
 import { MeteogramCanvas } from './meteogram/meteogramCanvas.js';
-import { escapeHtml } from '../httpClient.js';
+import { escapeHtml, getLocalDateKey } from '../httpClient.js';
 import { updateFavStarUI } from './favorites.js';
 import { AlpineStorage } from '../storage.js';
+
+export function parseLocalDateKey(dateStr) {
+  const s = String(dateStr || '').slice(0, 10);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) {
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+  }
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+export function getTodayDailyIndex(daily) {
+  const todayKey = getLocalDateKey(new Date());
+  if (!daily || !Array.isArray(daily.time) || daily.time.length === 0) {
+    return { idx: 0, todayKey, isExactToday: false, isAllPast: false };
+  }
+  const exactIdx = daily.time.findIndex(t => String(t).slice(0, 10) === todayKey);
+  if (exactIdx >= 0) {
+    return { idx: exactIdx, todayKey, isExactToday: true, isAllPast: false };
+  }
+  const futureIdx = daily.time.findIndex(t => String(t).slice(0, 10) > todayKey);
+  if (futureIdx >= 0) {
+    return { idx: futureIdx, todayKey, isExactToday: false, isAllPast: false };
+  }
+  return { idx: daily.time.length - 1, todayKey, isExactToday: false, isAllPast: true };
+}
+
+export function getClosestHourlyIndex(hourly, nowMs = Date.now()) {
+  if (!hourly || !Array.isArray(hourly.time) || hourly.time.length === 0) return 0;
+  let bestIdx = 0;
+  let minDiff = Infinity;
+  for (let i = 0; i < hourly.time.length; i++) {
+    const tMs = new Date(hourly.time[i]).getTime();
+    if (!Number.isFinite(tMs)) continue;
+    const diff = Math.abs(tMs - nowMs);
+    if (diff < minDiff) {
+      minDiff = diff;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
+export function getDayHourlyStartIndex(dateKey, rawDayIdx, hourly) {
+  const defaultIdx = rawDayIdx * 24;
+  if (!hourly || !Array.isArray(hourly.time) || hourly.time.length === 0) return defaultIdx;
+  const key = String(dateKey || '').slice(0, 10);
+  if (hourly.time[defaultIdx] && String(hourly.time[defaultIdx]).slice(0, 10) === key) {
+    return defaultIdx;
+  }
+  const matched = hourly.time.findIndex(t => String(t).slice(0, 10) === key);
+  return matched >= 0 ? matched : Math.min(defaultIdx, Math.max(0, hourly.time.length - 1));
+}
 
 export function convertTemp(celsius) {
   if (state.unit === 'fahrenheit') {
@@ -89,8 +142,10 @@ export function updateAlpineSkyIllumination(weatherData, elevation) {
   }
 
   const now = new Date();
-  const sunriseStr = weatherData.daily.sunrise[0];
-  const sunsetStr = weatherData.daily.sunset[0];
+  const todayIdx = getTodayDailyIndex(weatherData.daily).idx;
+  const curHourIdx = getClosestHourlyIndex(weatherData.hourly, now.getTime());
+  const sunriseStr = weatherData.daily.sunrise[todayIdx] || weatherData.daily.sunrise[0];
+  const sunsetStr = weatherData.daily.sunset[todayIdx] || weatherData.daily.sunset[0];
   if (!sunriseStr || !sunsetStr) return;
 
   const sunrise = new Date(sunriseStr);
@@ -125,7 +180,7 @@ export function updateAlpineSkyIllumination(weatherData, elevation) {
 
   // Feature 10A: Bewölkungs-Dämpfung bei Hochnebel/Regen (Dämpft Licht sanft ab)
   const cur = weatherData.current || (weatherData.hourly ? {
-    cloud_cover: weatherData.hourly.cloud_cover ? weatherData.hourly.cloud_cover[0] : 0
+    cloud_cover: weatherData.hourly.cloud_cover ? weatherData.hourly.cloud_cover[curHourIdx] : 0
   } : null);
   const cloudCover = cur && cur.cloud_cover !== undefined ? cur.cloud_cover : 0;
   if (cloudCover >= 75) {
@@ -141,20 +196,24 @@ export function renderOverviewTab() {
   const m = state.microData;
   if (!w) return;
 
+  const curHourIdx = getClosestHourlyIndex(w.hourly);
+  const daily = w.daily;
+  const todayInfo = getTodayDailyIndex(daily);
+  const todayIdx = todayInfo.idx;
+
   const cur = w.current || (w.hourly ? {
-    temperature_2m: w.hourly.temperature_2m[0],
-    apparent_temperature: w.hourly.apparent_temperature ? w.hourly.apparent_temperature[0] : w.hourly.temperature_2m[0],
-    is_day: 1,
-    weather_code: w.hourly.weather_code ? w.hourly.weather_code[0] : 0,
-    wind_speed_10m: w.hourly.wind_speed_10m ? w.hourly.wind_speed_10m[0] : 10,
-    wind_direction_10m: 180,
-    relative_humidity_2m: 60,
-    pressure_msl: 1013
+    temperature_2m: w.hourly.temperature_2m[curHourIdx],
+    apparent_temperature: w.hourly.apparent_temperature ? w.hourly.apparent_temperature[curHourIdx] : w.hourly.temperature_2m[curHourIdx],
+    is_day: w.hourly.is_day ? w.hourly.is_day[curHourIdx] : 1,
+    weather_code: w.hourly.weather_code ? w.hourly.weather_code[curHourIdx] : 0,
+    wind_speed_10m: w.hourly.wind_speed_10m ? w.hourly.wind_speed_10m[curHourIdx] : 10,
+    wind_direction_10m: w.hourly.wind_direction_10m ? w.hourly.wind_direction_10m[curHourIdx] : 180,
+    relative_humidity_2m: w.hourly.relative_humidity_2m ? w.hourly.relative_humidity_2m[curHourIdx] : 60,
+    pressure_msl: w.hourly.pressure_msl ? w.hourly.pressure_msl[curHourIdx] : 1013
   } : null);
 
   if (!cur) return;
 
-  const daily = w.daily;
   const isDay = cur.is_day === 1;
   const code = WMO_CODES[cur.weather_code] || WMO_CODES[0];
   const theme = isDay ? code.theme : code.themeNight;
@@ -200,17 +259,17 @@ export function renderOverviewTab() {
   // Präzise Bestimmung von Niederschlagstyp (Schnee/Schneeregen/Regen) und Schneefallgrenze / 0°C-Niveau
   const curPrecip = (m && m.microWeather && m.microWeather.precipitationMm !== undefined)
     ? m.microWeather.precipitationMm
-    : (cur.precipitation || (w.hourly && w.hourly.precipitation ? w.hourly.precipitation[0] : 0));
+    : (cur.precipitation || (w.hourly && w.hourly.precipitation ? w.hourly.precipitation[curHourIdx] : 0));
   const isPrecipWmo = (cur.weather_code >= 51 && cur.weather_code <= 99);
   const isPrecip = curPrecip >= 0.05 || isPrecipWmo;
 
   // Schneefallgrenze (Wet-Bulb) und 0°C-Niveau aus MicroEngine oder Modell
   const snowLevel = (m && m.atmosphere && m.atmosphere.snowLevelMeters) ||
     (m && m.microWeather && m.microWeather.snowLevelMeters) ||
-    (w.hourly && w.hourly.freezing_level_height ? w.hourly.freezing_level_height[0] : null);
+    (w.hourly && w.hourly.freezing_level_height ? w.hourly.freezing_level_height[curHourIdx] : null);
   const freezingLevel = (m && m.atmosphere && m.atmosphere.freezingLevelMeters) ||
     (m && m.microWeather && m.microWeather.freezingLevelMeters) ||
-    (w.hourly && w.hourly.freezing_level_height ? w.hourly.freezing_level_height[0] : null);
+    (w.hourly && w.hourly.freezing_level_height ? w.hourly.freezing_level_height[curHourIdx] : null);
 
   let conditionLabel = code.label;
 
@@ -273,7 +332,7 @@ export function renderOverviewTab() {
       }
     } else {
       // Trocken: Cloud-Cover in die Bedingung einbeziehen (Hero und Karte konsistent)
-      const cloud = cur.cloud_cover !== undefined ? cur.cloud_cover : (w.hourly && w.hourly.cloud_cover ? w.hourly.cloud_cover[0] : 0);
+      const cloud = cur.cloud_cover !== undefined ? cur.cloud_cover : (w.hourly && w.hourly.cloud_cover ? w.hourly.cloud_cover[curHourIdx] : 0);
       if (isMountainSummitAboveFog && m && m.atmosphere && m.atmosphere.freezingLevelMeters > state.currentLocation.elevation + 400 && cloud < 45) {
         conditionLabel = 'Klar / Wolkenlos';
         const iconEl = document.getElementById('hero-weather-icon');
@@ -346,8 +405,8 @@ export function renderOverviewTab() {
   }
 
   if (daily && daily.temperature_2m_max && daily.temperature_2m_max.length > 0) {
-    document.getElementById('hero-temp-max').innerText = `${Math.round(convertTemp(daily.temperature_2m_max[0]))}°`;
-    document.getElementById('hero-temp-min').innerText = `${Math.round(convertTemp(daily.temperature_2m_min[0]))}°`;
+    document.getElementById('hero-temp-max').innerText = `${Math.round(convertTemp(daily.temperature_2m_max[todayIdx]))}°`;
+    document.getElementById('hero-temp-min').innerText = `${Math.round(convertTemp(daily.temperature_2m_min[todayIdx]))}°`;
   }
   document.getElementById('hero-temp-apparent').innerText = `${Math.round(convertTemp(cur.apparent_temperature))}°`;
 
@@ -371,6 +430,9 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
   const alertBox = document.getElementById('hero-hazard-alert');
   if (!alertBox) return;
 
+  const curHourIdx = getClosestHourlyIndex(hourly);
+  const todayIdx = getTodayDailyIndex(daily).idx;
+
   const iconElem = document.getElementById('hha-icon');
   const badgeElem = document.getElementById('hha-badge');
   const msgElem = document.getElementById('hha-msg');
@@ -380,7 +442,7 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
 
   // 1. Akutes Gewitter & Blitzschlag (Priorität 1)
   const isThunder = [95, 96, 99].includes(cur.weather_code) ||
-    (hourly && hourly.weather_code && [95, 96, 99].includes(hourly.weather_code[0]));
+    (hourly && hourly.weather_code && [95, 96, 99].includes(hourly.weather_code[curHourIdx]));
   if (isThunder) {
     const isSevere = cur.weather_code === 96 || cur.weather_code === 99;
     hazard = {
@@ -400,7 +462,7 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
   // 2. Schwere Sturmböen / Orkan (Priorität 2: >= 75 km/h)
   if (!hazard) {
     const curGust = cur.wind_gusts_10m || cur.wind_speed_10m || 0;
-    const maxDailyGust = (daily && daily.wind_gusts_10m_max && daily.wind_gusts_10m_max[0]) || 0;
+    const maxDailyGust = (daily && daily.wind_gusts_10m_max && daily.wind_gusts_10m_max[todayIdx]) || 0;
     const peakGust = Math.round(Math.max(curGust, maxDailyGust));
     if (peakGust >= 75) {
       hazard = {
@@ -440,7 +502,7 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
 
   // 4. Starkregen / Flutgefahr (Priorität 4: >= 10 mm/h oder >= 35 mm/d)
   if (!hazard) {
-    const precipSum = (daily && daily.precipitation_sum && daily.precipitation_sum[0]) || 0;
+    const precipSum = (daily && daily.precipitation_sum && daily.precipitation_sum[todayIdx]) || 0;
     const curPrecip = cur.precipitation || 0;
     if (curPrecip >= 10 || precipSum >= 35 || [65, 67, 82].includes(cur.weather_code)) {
       hazard = {
@@ -461,7 +523,7 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
   // 5. Glatteis & Gefrierender Regen (Priorität 5)
   if (!hazard) {
     const isFreezing = [66, 67].includes(cur.weather_code) ||
-      (cur.temperature_2m <= 0.5 && (cur.precipitation > 0 || (hourly && hourly.precipitation && hourly.precipitation[0] > 0)));
+      (cur.temperature_2m <= 0.5 && (cur.precipitation > 0 || (hourly && hourly.precipitation && hourly.precipitation[curHourIdx] > 0)));
     if (isFreezing) {
       hazard = {
         icon: '🧊',
@@ -676,16 +738,8 @@ export function renderHourlySlider(hourly) {
   container.innerHTML = '';
   const nowMs = Date.now();
 
-  // Finde den Index der aktuellen Stunde
-  let currentClosestIdx = 0;
-  let minDiff = Infinity;
-  for (let i = 0; i < Math.min(48, hourly.time.length); i++) {
-    const diff = Math.abs(new Date(hourly.time[i]).getTime() - nowMs);
-    if (diff < minDiff) {
-      minDiff = diff;
-      currentClosestIdx = i;
-    }
-  }
+  // Finde den Index der aktuellen Stunde (ohne künstliches 48h-Limit)
+  const currentClosestIdx = getClosestHourlyIndex(hourly, nowMs);
 
   const isHighRes = (state.overviewHourlyMode !== 'hourly');
   const fragment = document.createDocumentFragment();
@@ -1181,18 +1235,44 @@ export function render10DayForecast(daily, hourly) {
   const weekdaysShort = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   const weekdaysFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
+  const todayKey = getLocalDateKey(new Date());
+  let visibleDayIndices = [];
+  for (let i = 0; i < daily.time.length; i++) {
+    const dk = String(daily.time[i] || '').slice(0, 10);
+    if (!dk || dk >= todayKey) {
+      visibleDayIndices.push(i);
+      if (visibleDayIndices.length >= 10) break;
+    }
+  }
+  let allPastFallback = false;
+  if (visibleDayIndices.length === 0) {
+    allPastFallback = true;
+    const startTail = Math.max(0, daily.time.length - 10);
+    for (let i = startTail; i < daily.time.length; i++) {
+      visibleDayIndices.push(i);
+    }
+    const lastCachedDate = parseLocalDateKey(String(daily.time[daily.time.length - 1] || '').slice(0, 10));
+    const staleNotice = document.createElement('div');
+    staleNotice.className = 'daily-stale-notice';
+    staleNotice.style.cssText = 'padding:8px 12px;margin-bottom:8px;border-radius:12px;background:rgba(245,158,11,0.16);border:1px solid rgba(245,158,11,0.4);color:#fde68a;font-size:12px;font-weight:700;';
+    staleNotice.innerText = `⚠️ Offline-/Cache-Stand (bis ${lastCachedDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}) — zum Aktualisieren auf heute nach unten ziehen.`;
+    fragment.appendChild(staleNotice);
+  }
+
   let gMin = Infinity, gMax = -Infinity;
-  const count = Math.min(10, daily.time.length);
-  for (let i = 0; i < count; i++) {
-    if (daily.temperature_2m_min[i] < gMin) gMin = daily.temperature_2m_min[i];
-    if (daily.temperature_2m_max[i] > gMax) gMax = daily.temperature_2m_max[i];
+  const count = visibleDayIndices.length;
+  for (const rawIdx of visibleDayIndices) {
+    if (daily.temperature_2m_min[rawIdx] < gMin) gMin = daily.temperature_2m_min[rawIdx];
+    if (daily.temperature_2m_max[rawIdx] > gMax) gMax = daily.temperature_2m_max[rawIdx];
   }
   const totalRange = (gMax - gMin) || 1;
   const curTemp = state.weatherData?.current ? state.weatherData.current.temperature_2m : null;
 
-  for (let i = 0; i < count; i++) {
-    const d = new Date(daily.time[i]);
-    const isToday = i === 0;
+  for (let visibleIdx = 0; visibleIdx < count; visibleIdx++) {
+    const i = visibleDayIndices[visibleIdx];
+    const dateKey = String(daily.time[i] || '').slice(0, 10);
+    const d = parseLocalDateKey(dateKey || daily.time[i]);
+    const isToday = Boolean(dateKey && dateKey === todayKey);
     const dayNameShort = isToday ? 'Heute' : weekdaysShort[d.getDay()];
     const dayNameFull = isToday ? 'Heute' : weekdaysFull[d.getDay()];
     const dateShort = d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
@@ -1208,8 +1288,8 @@ export function render10DayForecast(daily, hourly) {
     const minVal = daily.temperature_2m_min[i];
     const maxVal = daily.temperature_2m_max[i];
 
-    // 24h-Stundenarrays für diesen spezifischen Tag extrahieren
-    const dayStartHourIdx = i * 24;
+    // 24h-Stundenarrays für diesen spezifischen Tag extrahieren (per Datum-Abgleich)
+    const dayStartHourIdx = getDayHourlyStartIndex(dateKey, i, hourly);
     const hourlyTemps = [];
     const hourlySunSecList = [];
     const hourlyPrecip = [];
@@ -1312,7 +1392,7 @@ export function render10DayForecast(daily, hourly) {
       tMax: convertTemp(maxVal)
     });
 
-    const isExtended = i >= 3;
+    const isExtended = visibleIdx >= 3;
     const wrapper = document.createElement('div');
     wrapper.className = `daily-item-wrapper ${isExtended ? 'daily-extended-item is-collapsed' : ''}`;
     wrapper.id = `daily-item-${i}`;
@@ -1669,8 +1749,13 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
   const rawH = state.weatherData ? state.weatherData.hourly : null;
   if (!rawH || !rawH.time) return;
 
+  const curHourIdx = getClosestHourlyIndex(rawH);
+  const alignedTimes = (mm && Array.isArray(mm.hourlyTime) && mm.hourlyTime.length >= 2)
+    ? mm.hourlyTime
+    : rawH.time.slice(curHourIdx);
+
   // Zeitbasis: bis zu 168 Stunden (7 Tage) oder min. 72 Stunden
-  const count = Math.min(168, rawH.time.length);
+  const count = Math.min(168, alignedTimes.length);
   if (count < 2) return;
 
   // Datenreihen extrahieren
@@ -1683,7 +1768,7 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
     unit = state.unit === 'fahrenheit' ? '°F' : '°C';
     const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyTemp) && mm.regional.hourlyTemp.length > 0)
       ? mm.regional.hourlyTemp
-      : (rawH.temperature_2m || []);
+      : (rawH.temperature_2m || []).slice(curHourIdx);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyTemp) ? mm.ecmwf.hourlyTemp : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyTemp) ? mm.gfs.hourlyTemp : [];
 
@@ -1700,7 +1785,7 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
     unit = 'mm';
     const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyPrecip) && mm.regional.hourlyPrecip.length > 0)
       ? mm.regional.hourlyPrecip
-      : (rawH.precipitation || []);
+      : (rawH.precipitation || []).slice(curHourIdx);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyPrecip) ? mm.ecmwf.hourlyPrecip : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyPrecip) ? mm.gfs.hourlyPrecip : [];
 
@@ -1717,7 +1802,7 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
     unit = 'km/h';
     const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyWind) && mm.regional.hourlyWind.length > 0)
       ? mm.regional.hourlyWind
-      : (rawH.wind_speed_10m || []);
+      : (rawH.wind_speed_10m || []).slice(curHourIdx);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyWind) ? mm.ecmwf.hourlyWind : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyWind) ? mm.gfs.hourlyWind : [];
 
@@ -1780,7 +1865,7 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
         ecmwfData,
         gfsData,
         iconData,
-        timestamps: rawH.time,
+        timestamps: alignedTimes,
         metric,
         unit,
         minVal,
@@ -1829,7 +1914,8 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
   const daysMap = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   for (let i = 0; i < count; i += 24) {
     const x = getX(i);
-    const date = new Date(rawH.time[i]);
+    const date = new Date(alignedTimes[i] || rawH.time[i]);
+    if (isNaN(date.getTime())) continue;
     const dayName = daysMap[date.getDay()];
     const dateNum = date.getDate();
     dayMarkersHtml += `
@@ -1906,9 +1992,9 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
       dotIcon.style.display = 'block';
 
       if (tooltip) {
-        const d = new Date(rawH.time[idx]);
-        const dayStr = d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
-        const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const d = new Date(alignedTimes[idx] || rawH.time[idx]);
+        const dayStr = isNaN(d.getTime()) ? '' : d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+        const timeStr = isNaN(d.getTime()) ? '--:--' : d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
         const delta = Math.abs(ecmwfData[idx] - gfsData[idx]).toFixed(1);
 
         tooltip.innerHTML = `
@@ -2029,11 +2115,13 @@ export function calculateMoonPhase(date) {
  */
 export function openDayDetailModal(dayIndex, daily, hourly) {
   const modal = document.getElementById('day-detail-modal');
-  if (!modal) return;
+  if (!modal || !daily || !Array.isArray(daily.time) || dayIndex < 0 || dayIndex >= daily.time.length) return;
 
-  const d = new Date(daily.time[dayIndex]);
+  const dateKey = String(daily.time[dayIndex] || '').slice(0, 10);
+  const d = parseLocalDateKey(dateKey || daily.time[dayIndex]);
+  const isToday = Boolean(dateKey && dateKey === getLocalDateKey(new Date()));
   const dateStr = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const syn = MicroEngine.computeRepresentativeDailyCondition(dayIndex, daily, hourly, dayIndex === 0, state.weatherData?.current);
+  const syn = MicroEngine.computeRepresentativeDailyCondition(dayIndex, daily, hourly, isToday, state.weatherData?.current);
 
   // 1. Header & Ort
   const locBadge = document.getElementById('modal-location-badge');
@@ -2046,7 +2134,7 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
   document.getElementById('modal-day-condition').innerText = `${syn.icon} ${syn.label} • ${syn.synopNote}`;
 
   // 2. Extrahiere die 24 Stunden dieses spezifischen Tages
-  const dayStartHourIdx = dayIndex * 24;
+  const dayStartHourIdx = getDayHourlyStartIndex(dateKey, dayIndex, hourly);
   const dayEndHourIdx = dayStartHourIdx + 24;
 
   const hoursTemp = (hourly && hourly.temperature_2m) ? hourly.temperature_2m.slice(dayStartHourIdx, dayEndHourIdx) : [];
@@ -2174,7 +2262,9 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
 
   for (const part of dayParts) {
     const pIdx = dayStartHourIdx + part.hourOffset;
-    const pCode = (hourly && hourly.weather_code && hourly.weather_code[pIdx] !== undefined) ? hourly.weather_code[pIdx] : code;
+    const pCode = (hourly && hourly.weather_code && hourly.weather_code[pIdx] !== undefined)
+      ? hourly.weather_code[pIdx]
+      : (daily.weather_code && daily.weather_code[dayIndex] !== undefined ? daily.weather_code[dayIndex] : 0);
     const pInfo = WMO_CODES[pCode] || WMO_CODES[0];
     const pTemp = (hourly && hourly.temperature_2m && hourly.temperature_2m[pIdx] !== undefined)
       ? Math.round(convertTemp(hourly.temperature_2m[pIdx]))
@@ -2380,6 +2470,9 @@ if (typeof document !== 'undefined') {
 }
 
 export function renderBentoGrid(cur, daily, hourly) {
+  const todayIdx = getTodayDailyIndex(daily).idx;
+  const curHourIdx = getClosestHourlyIndex(hourly);
+
   const uv = cur.uv_index !== undefined ? Math.round(cur.uv_index) : 0;
   document.getElementById('uv-index-val').innerText = uv;
   document.getElementById('uv-gauge-pointer').style.left = `${Math.min(100, (uv / 11) * 100)}%`;
@@ -2393,20 +2486,20 @@ export function renderBentoGrid(cur, daily, hourly) {
   document.getElementById('wind-gusts-text').innerText = `Böenspitzen bis ${windGusts} km/h`;
 
   if (daily && daily.sunrise && daily.sunset && daily.sunrise.length > 0) {
-    const sunrise = new Date(daily.sunrise[0]);
-    const sunset = new Date(daily.sunset[0]);
+    const sunrise = new Date(daily.sunrise[todayIdx] || daily.sunrise[0]);
+    const sunset = new Date(daily.sunset[todayIdx] || daily.sunset[0]);
     document.getElementById('sunrise-time-val').innerText = sunrise.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     document.getElementById('sunset-time-val').innerText = sunset.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     const diffHours = ((sunset - sunrise) / (1000 * 60 * 60)).toFixed(1);
     document.getElementById('daylight-hours-val').innerText = `${diffHours} h Licht`;
   }
 
-  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum[0] != null) ? Number(daily.precipitation_sum[0]) : 0;
+  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum[todayIdx] != null) ? Number(daily.precipitation_sum[todayIdx]) : 0;
   document.getElementById('precip-total-val').innerHTML = `${pSum.toFixed(1)} <small>mm</small>`;
   const pHintEl = document.getElementById('precip-forecast-hint');
   if (pHintEl) {
     if (pSum > 0) {
-      const fl = (hourly && hourly.freezing_level_height && hourly.freezing_level_height.length) ? hourly.freezing_level_height[0] : null;
+      const fl = (hourly && hourly.freezing_level_height && hourly.freezing_level_height.length) ? hourly.freezing_level_height[curHourIdx] : null;
       if (fl) {
         pHintEl.innerText = `Niederschlag aktiv • Schneefallgrenze bei ca. ${Math.round(fl).toLocaleString('de-DE')} m`;
       } else {

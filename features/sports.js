@@ -939,8 +939,8 @@ export async function fetchHourlyForRoute(lat, lon) {
   }
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height&forecast_days=7&timezone=auto`;
-    const data = await resilientFetch(url, { ttlMs: 5 * 60 * 1000 });
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height&forecast_days=7&timezone=auto`;
+    const data = await resilientFetch(url, { ttlMs: 30 * 60 * 1000, persist: true });
     if (data && data.hourly && data.hourly.time && data.hourly.time.length > 0) {
       state.sports.cachedForecasts[cacheKey] = data.hourly;
       return data.hourly;

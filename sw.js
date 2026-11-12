@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.13.0-swr-tiles600';
+const CACHE_NAME = 'best-weather-v2.22.0-meteoswiss-map-rebuild';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
 const MAX_TILES = 600;
 
@@ -150,9 +150,11 @@ self.addEventListener('fetch', (event) => {
           return networkRes;
         })
         .catch(async () => {
-          const cached = await caches.match(req, { ignoreSearch: true });
+          const cached = await caches.match(req);
           if (cached) return cached;
           return new Response(JSON.stringify({ offline: true, error: 'Offline im Alpingebiet (Kein Netzempfang)' }), {
+            status: 503,
+            statusText: 'Service Unavailable',
             headers: { 'Content-Type': 'application/json' }
           });
         })
@@ -160,7 +162,42 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // B. Core App Assets: True Stale-While-Revalidate (Instant Boot from Cache, Background Revalidate)
+  // B. Same-Origin App Shell, HTML, JS & CSS: Network-First (immer aktuelle Version bei Online-Nutzung, Offline-Fallback aus Cache)
+  const isSameOrigin = url.origin === self.location.origin;
+  const isCodeOrMarkup = isSameOrigin && (
+    req.mode === 'navigate' ||
+    url.pathname === '/' ||
+    url.pathname.endsWith('/') ||
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.json')
+  );
+
+  if (isCodeOrMarkup) {
+    event.respondWith(
+      fetch(req)
+        .then((networkRes) => {
+          if (networkRes && networkRes.status === 200) {
+            const clone = networkRes.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          }
+          return networkRes;
+        })
+        .catch(async () => {
+          const cached = await caches.match(req, { ignoreSearch: true });
+          if (cached) return cached;
+          if (req.mode === 'navigate') {
+            const indexFallback = await caches.match('./index.html', { ignoreSearch: true });
+            if (indexFallback) return indexFallback;
+          }
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
+        })
+    );
+    return;
+  }
+
+  // C. Statische Medien, Icons, Fonts & CDN-Assets: Stale-While-Revalidate
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then((cachedRes) => {
       const fetchPromise = fetch(req)
@@ -180,7 +217,6 @@ self.addEventListener('fetch', (event) => {
           return new Response('Offline', { status: 503, statusText: 'Offline' });
         });
 
-      // Liefert gecachte Assets blitzschnell (0 ms) aus, Netzwerk-Update erfolgt asynchron
       return cachedRes || fetchPromise;
     })
   );

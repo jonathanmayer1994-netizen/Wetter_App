@@ -77,12 +77,25 @@
   box-shadow: 0 4px 14px rgba(10, 132, 255, 0.45);
 }
 
-/* OSM Dunkelmodus: Native Dark Matter Kacheln benötigen keine künstliche CSS-Invertierung */
+/* MeteoSwiss 3D Relief Tiles (Esri Dark Base + Native Dark 3D Relief + Crisp White Labels Above Canvas) */
 .osm-dark-tiles .leaflet-tile {
   image-rendering: -webkit-optimize-contrast;
 }
 
-/* Wind Flow Canvas */
+.osm-dark-tiles .leaflet-tile-pane {
+  filter: brightness(0.62) contrast(1.14);
+}
+
+.osm-dark-tiles .ms-hillshade-tile {
+  filter: contrast(1.52) brightness(0.74) saturate(0.15);
+  opacity: 0.64 !important;
+}
+
+.osm-dark-tiles .ms-labels-tile {
+  filter: contrast(1.18) brightness(1.08) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
+}
+
+/* Wind Flow Canvas (Inside Leaflet overlayPane z-index 400 -> STRICTLY below labelsOverlayPane 450 & beacon 600+) */
 .wind-flow-canvas {
   position: absolute;
   top: 0;
@@ -90,7 +103,7 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 350;
+  z-index: 400;
 }
 
 /* Wetter-Station-Marker auf der Karte */
@@ -127,15 +140,15 @@
 }
 
 .wsm-snow {
-  background: rgba(217, 70, 239, 0.25) !important;
-  border-color: #d946ef !important;
-  color: #fdf4ff !important;
-  box-shadow: 0 0 12px rgba(217, 70, 239, 0.6) !important;
+  background: rgba(96, 184, 244, 0.25) !important;
+  border-color: #60b8f4 !important;
+  color: #f0f9ff !important;
+  box-shadow: 0 0 12px rgba(96, 184, 244, 0.55) !important;
 }
 
 .wsm-rain {
-  border-color: #0099ff !important;
-  color: #78d6ff !important;
+  border-color: #1024e2 !important;
+  color: #93c5fd !important;
 }
 
 .wsm-wind-arrow {
@@ -298,9 +311,9 @@
 .fullscreen-map-wrapper {
   position: relative;
   width: 100%;
-  height: calc(100vh - 210px);
-  height: calc(100dvh - 210px);
-  min-height: 640px;
+  height: calc(100vh - 216px);
+  height: calc(100dvh - 216px);
+  min-height: 520px;
   border-radius: 20px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -310,12 +323,262 @@
 #interactive-map {
   width: 100%;
   height: 100%;
-  background: #0f172a;
+  background: #22252a;
   z-index: 10;
 }
 
 #interactive-map .leaflet-tile {
   image-rendering: -webkit-optimize-contrast;
+}
+
+/* =============================================================================
+ * METEOSWISS ANIMATIONEN HEADER BAR, SEGMENTED SWITCHER & RIGHT FAB STACK
+ * ============================================================================= */
+.ms-map-header-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 560;
+  background: linear-gradient(180deg, rgba(23, 25, 29, 0.96) 0%, rgba(23, 25, 29, 0.88) 100%);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+  padding: 10px 14px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: padding 0.22s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.ms-header-top-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.ms-map-theme .map-floating-topbar {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: 2;
+  justify-self: start;
+}
+
+.ms-title-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.ms-title-main {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.25px;
+  white-space: nowrap;
+}
+
+.ms-title-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.68);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.ms-header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+}
+
+.ms-info-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.ms-info-btn:hover,
+.ms-info-btn.is-active {
+  background: rgba(56, 189, 248, 0.24);
+  border-color: #7dd3fc;
+  color: #ffffff;
+}
+
+.ms-segmented-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.ms-segmented-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  width: 100%;
+  max-width: 440px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.ms-seg-btn {
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ms-seg-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.ms-seg-btn.active {
+  background: #0d0f12;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.ms-header-collapse-tab {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 18px;
+  border-radius: 0 0 18px 18px;
+  background: rgba(23, 25, 29, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: none;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.ms-header-collapse-tab svg {
+  transition: transform 0.22s ease;
+}
+
+.ms-map-header-bar.is-collapsed {
+  padding-bottom: 8px;
+  gap: 0;
+}
+
+.ms-map-header-bar.is-collapsed .ms-segmented-wrap {
+  display: none;
+}
+
+.ms-map-header-bar.is-collapsed .ms-header-collapse-tab svg {
+  transform: rotate(180deg);
+}
+
+.ms-map-attribution {
+  position: absolute;
+  top: 108px;
+  left: 12px;
+  z-index: 445;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(23, 25, 29, 0.46);
+  padding: 2px 7px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.ms-radar-watermark {
+  position: absolute;
+  top: 108px;
+  right: 12px;
+  z-index: 445;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.80);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.2px;
+  pointer-events: none;
+}
+
+.ms-right-fab-stack {
+  position: absolute;
+  right: 14px;
+  bottom: 132px;
+  z-index: 480;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ms-fab-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(34, 38, 46, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: rgba(255, 255, 255, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  transition: all 0.18s ease;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ms-fab-btn:hover {
+  transform: scale(1.06);
+  border-color: rgba(255, 255, 255, 0.42);
+  color: #ffffff;
+}
+
+.ms-fab-btn.is-active {
+  background: rgba(56, 189, 248, 0.26);
+  border-color: rgba(125, 211, 252, 0.78);
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.34);
+}
+
+.ms-fab-btn.is-phase-active {
+  background: rgba(74, 144, 184, 0.88);
+  border-color: rgba(186, 230, 253, 0.88);
+  color: #ffffff;
+  box-shadow: 0 4px 18px rgba(56, 189, 248, 0.42);
 }
 
 /* =============================================================================
@@ -696,21 +959,21 @@
 
 .map-legend-card {
   position: absolute;
-  top: 72px;
+  top: 132px;
   right: 14px;
-  background: rgba(15, 23, 42, 0.90);
+  background: rgba(23, 25, 29, 0.90);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 12px;
   padding: 8px 12px;
-  z-index: 450;
+  z-index: 455;
   display: flex;
   flex-direction: column;
   gap: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  min-width: 260px;
-  max-width: 330px;
+  min-width: 276px;
+  max-width: 368px;
 }
 
 .legend-title {
@@ -723,7 +986,7 @@
   width: 100%;
   height: 7px;
   border-radius: 4px;
-  background: linear-gradient(90deg, #78d6ff, #0099ff, #00e600, #ffcc00, #ff3300, #cc00ff);
+  background: linear-gradient(90deg, #68d4f6, #409cff, #1c5cf0, #0e2acc, #14ae3a, #a2e61c, #fad214, #f97316, #dc2222);
 }
 
 .legend-scale-labels {
@@ -731,6 +994,57 @@
   justify-content: space-between;
   font-size: 9px;
   color: var(--text-tertiary);
+}
+
+.legend-precip-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  margin: 3px 0 2px 0;
+}
+
+.legend-precip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-phase-tag {
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+  min-width: 48px;
+  letter-spacing: 0.2px;
+}
+
+.legend-phase-tag.rain { color: #60a5fa; }
+.legend-phase-tag.mix { color: #34d399; min-width: 42px; }
+.legend-phase-tag.snow { color: #bae6fd; min-width: 50px; }
+
+.legend-swatch-strip {
+  display: flex;
+  flex: 1;
+  gap: 1.5px;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.85);
+}
+
+.legend-strip-half {
+  flex: 1;
+  min-width: 68px;
+}
+
+.legend-swatch-item {
+  flex: 1;
+  text-align: center;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 2px 0;
+  line-height: 1.15;
+  letter-spacing: -0.25px;
+  white-space: nowrap;
 }
 
 /* Radar Echo Station Micro-Badge */
@@ -755,15 +1069,15 @@
 }
 
 .radar-station-echo-pin.snow-echo {
-  background: rgba(30, 27, 75, 0.88);
-  border: 1px solid rgba(192, 132, 252, 0.8);
-  color: #f5d0fe;
+  background: rgba(12, 46, 86, 0.88);
+  border: 1px solid rgba(142, 212, 252, 0.8);
+  color: #e0f2fe;
 }
 
 .radar-station-echo-pin.rain-echo {
   background: rgba(15, 23, 42, 0.88);
-  border: 1px solid rgba(56, 189, 248, 0.8);
-  color: #7dd3fc;
+  border: 1px solid rgba(96, 165, 250, 0.8);
+  color: #bfdbfe;
 }
 
 /* =============================================================================
@@ -822,13 +1136,13 @@
  * ============================================================================= */
 .map-left-hud-stack {
   position: absolute;
-  top: 72px;
+  top: 132px;
   left: 14px;
   z-index: 450;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 360px;
+  max-width: 380px;
   pointer-events: none;
 }
 
@@ -1036,7 +1350,7 @@
   font-weight: 500;
   color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
-  max-width: 95px;
+  max-width: 112px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -1257,57 +1571,75 @@
 }
 
 /* =============================================================================
- * USER LOCATION BEACON PIN (NO WHITE BOX, PULSING RADAR RING)
+ * USER LOCATION BEACON PIN (METEOSWISS PULSING RED HALO + CRISP DOT)
  * ============================================================================= */
 .custom-location-beacon-container {
   background: transparent !important;
   border: none !important;
 }
 
-.user-location-beacon {
+.user-location-beacon,
+.ms-beacon {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 72px;
+  height: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
 
+.beacon-halo-disk {
+  position: absolute;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(220, 38, 38, 0.30) 0%, rgba(220, 38, 38, 0.18) 65%, rgba(220, 38, 38, 0.05) 100%);
+  pointer-events: none;
+}
+
 .beacon-pulse-ring {
   position: absolute;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2px solid #38bdf8;
-  background: rgba(56, 189, 248, 0.3);
-  animation: beacon-wave 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  border: 1.8px solid rgba(239, 68, 68, 0.85);
+  background: rgba(220, 38, 38, 0.24);
+  animation: beacon-wave 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
   pointer-events: none;
 }
 
 @keyframes beacon-wave {
   0% {
-    transform: scale(0.6);
-    opacity: 1;
+    transform: scale(0.7);
+    opacity: 0.95;
   }
 
   100% {
-    transform: scale(2.2);
+    transform: scale(2.8);
     opacity: 0;
   }
 }
 
 .beacon-core-dot {
   position: relative;
-  font-size: 18px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6));
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #dc2626;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.7), 0 0 8px rgba(220, 38, 38, 0.7);
   z-index: 2;
   transition: transform 0.2s ease;
 }
 
-.user-location-beacon:hover .beacon-core-dot {
+.user-location-beacon:hover .beacon-core-dot,
+.ms-beacon:hover .beacon-core-dot {
   transform: scale(1.25);
+}
+
+.map-legend-card.ms-legend-force-open {
+  display: flex !important;
 }
 
 /* =============================================================================
@@ -1383,70 +1715,71 @@
 }
 
 /* =============================================================================
- * 24H RADAR TIMELINE PLAYER DOCK — APPLE LIQUID GLASS (MAC, IPAD & IPHONE)
+ * METEOSWISS 48H TIMELINE PLAYER DOCK (MAC, IPAD & IPHONE)
  * ============================================================================= */
 .modern-radar-player,
-#radar-floating-controls {
+#radar-floating-controls,
+.ms-timeline-dock {
   position: absolute;
-  bottom: 16px;
+  bottom: 14px;
   left: 16px;
   right: 16px;
-  max-width: 760px;
+  max-width: 780px;
   margin: 0 auto;
   z-index: 500;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 20px;
-  padding: 10px 18px 12px 18px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  background: rgba(23, 25, 29, 0.90);
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 9px 14px 10px 14px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
   display: flex !important;
   flex-direction: column;
-  gap: 8px;
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 6px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   -webkit-user-select: none;
 }
 
-/* TOPLINE: Mode Chip, Time Display, and Collapse Button */
-.radar-player-topline {
+/* TOPLINE: Mode Chip, Time Display, MeteoSwiss Callout Badge & Collapse Button */
+.radar-player-topline,
+.ms-timeline-topline {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  min-height: 28px;
+  gap: 10px;
+  min-height: 26px;
 }
 
 .radar-info-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   flex: 1;
 }
 
 .radar-mode-chip {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
-  background: rgba(10, 132, 255, 0.22);
-  border: 1px solid rgba(10, 132, 255, 0.45);
-  color: #64d2ff;
-  padding: 3px 9px;
-  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.42);
+  color: #fca5a5;
+  padding: 2.5px 8px;
+  border-radius: 7px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.35px;
   white-space: nowrap;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(10, 132, 255, 0.2);
 }
 
 .radar-time-banner {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: #ffffff;
+  color: #f8fafc;
   font-family: var(--font-mono);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.15px;
   white-space: nowrap;
   overflow: visible;
   min-width: 0;
@@ -1459,13 +1792,59 @@
   flex-shrink: 0;
 }
 
+.ms-callout-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2.5px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+  font-weight: 700;
+  color: #e2e8f0;
+  white-space: nowrap;
+}
+
+.mscb-time {
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.mscb-sep {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mscb-day {
+  color: rgba(226, 232, 240, 0.9);
+  font-weight: 600;
+}
+
+.mscb-kind {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(125, 211, 252, 0.18);
+  color: #7dd3fc;
+  border: 1px solid rgba(125, 211, 252, 0.38);
+  letter-spacing: 0.25px;
+}
+
+.mscb-kind.is-live {
+  background: rgba(220, 38, 38, 0.24);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
 .radar-player-toggle-btn {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.16);
   color: var(--text-secondary);
   border-radius: 8px;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -1483,99 +1862,192 @@
   transform: scale(1.06);
 }
 
-/* MIDDLE: Full-Width Interactive Timeline Scrubber */
-.radar-slider-container {
+/* MAIN TIMELINE ROW: Left Play Button + Measured/Forecast Axis Track */
+.ms-timeline-main-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   width: 100%;
+}
+
+.ms-play-btn {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.11);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  touch-action: manipulation;
+}
+
+.ms-play-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.04);
+}
+
+.ms-play-btn:active {
+  transform: scale(0.94);
+}
+
+.radar-slider-container,
+.ms-axis-container {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
-.radar-slider-track-wrap {
-  width: 100%;
-  position: relative;
-  display: flex;
-  align-items: center;
-  padding: 4px 0;
-}
-
-#radar-time-slider {
-  width: 100%;
-  height: 8px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: linear-gradient(90deg, #ff453a 0%, #ff9f0a 15%, #0a84ff 22%, #00e5ff 45%, #30d158 65%, #bf5af2 85%, #ff375f 100%);
-  border-radius: 999px;
-  outline: none;
-  cursor: pointer;
-  margin: 0;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(255, 255, 255, 0.1);
-  touch-action: pan-x;
-}
-
-#radar-time-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2.5px solid #0a84ff;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.15);
-  cursor: grab;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-#radar-time-slider:active::-webkit-slider-thumb {
-  cursor: grabbing;
-  transform: scale(1.2);
-  box-shadow: 0 0 0 6px rgba(10, 132, 255, 0.35), 0 4px 14px rgba(0, 0, 0, 0.5);
-}
-
-#radar-time-slider::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2.5px solid #0a84ff;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
-  cursor: grab;
-}
-
-.radar-timeline-markers {
+.ms-axis-ticks {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  font-family: var(--font-mono);
+  font-size: 10.5px;
   font-weight: 700;
-  padding: 0 4px;
+  color: rgba(226, 232, 240, 0.85);
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
 }
 
-.rtm-past {
-  color: #ff9f0a;
+.ms-tick-now {
+  color: #f87171;
+  font-weight: 800;
 }
 
-.rtm-now {
-  color: #ff453a;
-  font-weight: 900;
-  letter-spacing: 0.3px;
+.radar-slider-track-wrap,
+.ms-axis-track-wrap {
+  width: 100%;
+  height: 22px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0;
 }
 
-.rtm-future {
-  color: #64d2ff;
+.ms-axis-bars {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  pointer-events: none;
 }
 
-/* MINIMIZED COLLAPSED STATE (APPLE FLOATING CAPSULE) */
+.ms-bar-measured {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 4px;
+  width: 8%;
+  background: #ffffff;
+  border-radius: 999px 0 0 999px;
+}
+
+.ms-dot-now {
+  position: absolute;
+  top: 50%;
+  left: 8%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 1.5px solid #ffffff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.85);
+  z-index: 2;
+}
+
+.ms-bar-forecast {
+  position: absolute;
+  top: 0;
+  left: 8%;
+  width: 92%;
+  height: 4px;
+  background: linear-gradient(90deg, #7dd3fc 0%, #38bdf8 60%, #818cf8 100%);
+  border-radius: 0 999px 999px 0;
+}
+
+.ms-scrubber-needle {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 8%;
+  width: 2.5px;
+  background: #ffffff;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.85), 0 0 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  z-index: 3;
+}
+
+#radar-time-slider {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 4;
+  touch-action: pan-x;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.radar-timeline-markers,
+.ms-axis-subline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: rgba(203, 213, 225, 0.78);
+  font-weight: 600;
+  padding: 0 2px;
+}
+
+.ms-sub-left,
+.ms-sub-mid,
+.ms-sub-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ms-line-sample {
+  display: inline-block;
+  width: 16px;
+  height: 2.5px;
+  border-radius: 2px;
+}
+
+.ms-line-sample.measured {
+  background: #ffffff;
+}
+
+.ms-line-sample.forecast {
+  background: #7dd3fc;
+}
+
+/* MINIMIZED COLLAPSED STATE */
 .modern-radar-player.is-collapsed {
-  padding: 8px 14px;
+  padding: 7px 14px;
   gap: 0;
   border-radius: 999px;
-  max-width: 440px;
+  max-width: 480px;
   cursor: pointer;
 }
 
+.modern-radar-player.is-collapsed .ms-timeline-main-row,
 .modern-radar-player.is-collapsed .radar-slider-container {
   display: none !important;
 }
@@ -1591,42 +2063,55 @@
 
 /* IPAD & TABLET (641px - 1024px) */
 @media (max-width: 1024px) {
-  #radar-floating-controls {
-    bottom: 14px;
-    left: 14px;
-    right: 14px;
-    padding: 10px 16px;
-    gap: 7px;
+  #radar-floating-controls,
+  .ms-timeline-dock {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    padding: 8px 12px 9px 12px;
+    gap: 5px;
   }
 }
 
 /* IPHONE & MOBILE (< 640px) */
 @media (max-width: 640px) {
-  #radar-floating-controls {
+  #radar-floating-controls,
+  .ms-timeline-dock {
     bottom: max(10px, env(safe-area-inset-bottom, 10px));
     left: 10px;
     right: 10px;
-    padding: 7px 12px 9px 12px;
-    border-radius: 18px;
-    gap: 5px;
+    padding: 7px 10px 8px 10px;
+    border-radius: 16px;
+    gap: 4px;
   }
 
-  .radar-player-topline {
-    gap: 8px;
-    min-height: 24px;
+  .radar-player-topline,
+  .ms-timeline-topline {
+    gap: 6px;
+    min-height: 22px;
   }
 
   .radar-mode-chip {
-    font-size: 10px;
-    padding: 2.5px 8px;
+    display: none !important;
   }
 
   .radar-time-banner {
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
     white-space: nowrap;
     overflow: visible;
     text-overflow: clip;
+  }
+
+  .ms-callout-badge {
+    padding: 2px 6px;
+    font-size: 10px;
+    gap: 4px;
+  }
+
+  .mscb-kind {
+    font-size: 9px;
+    padding: 1px 5px;
   }
 
   .radar-player-toggle-btn {
@@ -1635,22 +2120,29 @@
     font-size: 12px;
   }
 
-  /* Full-width slider with no collision */
-  #radar-time-slider {
-    height: 7px;
+  .ms-timeline-main-row {
+    gap: 9px;
   }
 
-  #radar-time-slider::-webkit-slider-thumb {
-    width: 22px;
-    height: 22px;
+  .ms-play-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    border-radius: 9px;
   }
 
-  .radar-timeline-markers {
+  .ms-axis-ticks {
     font-size: 9px;
   }
 
+  .ms-axis-ticks .rtm-hide-mobile,
   .radar-timeline-markers .rtm-hide-mobile {
     display: none !important;
+  }
+
+  .radar-timeline-markers,
+  .ms-axis-subline {
+    font-size: 9px;
   }
 }
 
@@ -1960,35 +2452,48 @@
   font-family: var(--font-mono);
 }
 
-/* PULL-DOWN-TO-REFRESH COMPONENT (APPLE LIQUID GLASS) */
+/* PULL-DOWN-TO-REFRESH COMPONENT (IN-FLOW APPLE LIQUID GLASS PILL) */
 .ptr-indicator {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  width: 100%;
   height: 0;
-  max-height: 90px;
-  z-index: 999999;
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  max-height: 92px;
+  margin: 0 0 calc(-1 * var(--app-layout-gap, 20px)) 0;
+  padding: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  z-index: 90;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   pointer-events: none;
   opacity: 0;
-  transition: height 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  transition: height 0.24s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
   user-select: none;
   -webkit-user-select: none;
 }
 
+.ptr-indicator.ptr-ready .ptr-arrow {
+  color: #38bdf8;
+}
+
+.ptr-indicator.ptr-success .ptr-text {
+  color: #30d158;
+}
+
 .ptr-inner {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 16px;
+  gap: 9px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .ptr-arrow {
@@ -2842,7 +3347,8 @@
    ========================================================================== */
 @media (min-width: 769px) and (max-width: 1024px) {
   .app-layout {
-    gap: 18px;
+    --app-layout-gap: 18px;
+    gap: var(--app-layout-gap);
     padding: 16px 20px 50px 20px;
   }
 

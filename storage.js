@@ -209,7 +209,7 @@ export const AlpineStorage = {
   },
 
   /**
-   * Holt die zuletzt gecachten Wetterdaten
+   * Holt die gecachten Wetterdaten (bevorzugt passend zum Standort, sonst den zeitlich neuesten Eintrag)
    */
   async getCachedWeather(locKey = null) {
     try {
@@ -219,13 +219,43 @@ export const AlpineStorage = {
         const store = tx.objectStore('weather');
         if (locKey) {
           const req = store.get(locKey);
-          req.onsuccess = () => resolve(req.result || null);
+          req.onsuccess = () => {
+            if (req.result) {
+              resolve(req.result);
+              return;
+            }
+            // Fallback: zeitlich neuesten Eintrag wählen (nicht alphabetisch nach Koordinaten!)
+            let newest = null;
+            const cReq = store.openCursor();
+            cReq.onsuccess = (ev) => {
+              const cursor = ev.target.result;
+              if (cursor) {
+                const val = cursor.value;
+                if (!newest || (val?.timestamp || 0) > (newest?.timestamp || 0)) {
+                  newest = val;
+                }
+                cursor.continue();
+              } else {
+                resolve(newest);
+              }
+            };
+            cReq.onerror = () => resolve(null);
+          };
           req.onerror = () => resolve(null);
         } else {
-          const req = store.openCursor(null, 'prev');
+          let newest = null;
+          const req = store.openCursor();
           req.onsuccess = (e) => {
             const cursor = e.target.result;
-            resolve(cursor ? cursor.value : null);
+            if (cursor) {
+              const val = cursor.value;
+              if (!newest || (val?.timestamp || 0) > (newest?.timestamp || 0)) {
+                newest = val;
+              }
+              cursor.continue();
+            } else {
+              resolve(newest);
+            }
           };
           req.onerror = () => resolve(null);
         }
@@ -266,6 +296,44 @@ export const AlpineStorage = {
         return raw;
       }
     } catch (e) {
+      return defaultVal;
+    }
+  },
+
+  /**
+   * Persistiert Metadaten zusätzlich in IndexedDB (überlebt Safari/PWA Session-Resets)
+   */
+  async setMeta(key, value) {
+    this.safeSetItem(key, value);
+    try {
+      const db = await getDB();
+      return await new Promise((resolve) => {
+        const tx = db.transaction('meta', 'readwrite');
+        tx.objectStore('meta').put({ key, value, timestamp: Date.now() });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch (_) {
+      return false;
+    }
+  },
+
+  async getMeta(key, defaultVal = null) {
+    const lsVal = this.safeGetItem(key, null);
+    if (lsVal !== null) return lsVal;
+    try {
+      const db = await getDB();
+      return await new Promise((resolve) => {
+        const tx = db.transaction('meta', 'readonly');
+        const req = tx.objectStore('meta').get(key);
+        req.onsuccess = () => {
+          const val = (req.result && req.result.value !== undefined) ? req.result.value : defaultVal;
+          if (val !== null && val !== undefined) this.safeSetItem(key, val);
+          resolve(val);
+        };
+        req.onerror = () => resolve(defaultVal);
+      });
+    } catch (_) {
       return defaultVal;
     }
   }

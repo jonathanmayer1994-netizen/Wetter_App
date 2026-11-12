@@ -95,18 +95,33 @@ export const REGIONAL_STATIONS = [
   { name: 'Salzburg', lat: 47.809, lon: 13.055, elevation: 424, isMountain: false },
   { name: 'Nebelhorn', lat: 47.421, lon: 10.345, elevation: 2224, isMountain: true },
   { name: 'Oberstdorf', lat: 47.408, lon: 10.279, elevation: 813, isMountain: false },
+  { name: 'Kempten (Allgäu)', lat: 47.728, lon: 10.313, elevation: 674, isMountain: false },
+  { name: 'Imst (Tirol)', lat: 47.243, lon: 10.740, elevation: 827, isMountain: false },
+  { name: 'St. Anton (Arlberg)', lat: 47.131, lon: 10.268, elevation: 1304, isMountain: true },
+  { name: 'Feldkirch', lat: 47.236, lon: 9.594, elevation: 459, isMountain: false },
   { name: 'Matterhorn', lat: 45.976, lon: 7.749, elevation: 4478, isMountain: true },
   { name: 'Zermatt', lat: 46.020, lon: 7.749, elevation: 1620, isMountain: false },
+  { name: 'Jungfraujoch', lat: 46.547, lon: 7.985, elevation: 3463, isMountain: true },
   { name: 'Mont Blanc', lat: 45.832, lon: 6.865, elevation: 4808, isMountain: true },
   { name: 'Feldberg', lat: 47.874, lon: 8.004, elevation: 1493, isMountain: true },
   { name: 'Zürich', lat: 47.376, lon: 8.541, elevation: 408, isMountain: false },
+  { name: 'Bern', lat: 46.948, lon: 7.447, elevation: 542, isMountain: false },
+  { name: 'Konstanz', lat: 47.659, lon: 9.175, elevation: 405, isMountain: false },
   { name: 'St. Moritz', lat: 46.498, lon: 9.839, elevation: 1822, isMountain: true },
   { name: 'Bozen', lat: 46.498, lon: 11.354, elevation: 262, isMountain: false },
+  { name: 'Bruneck (Dolomiten)', lat: 46.798, lon: 11.936, elevation: 835, isMountain: false },
+  { name: 'Mailand', lat: 45.464, lon: 9.190, elevation: 120, isMountain: false },
   { name: 'Watzmann', lat: 47.554, lon: 12.921, elevation: 2713, isMountain: true },
+  { name: 'Ulm', lat: 48.399, lon: 9.991, elevation: 479, isMountain: false },
+  { name: 'Regensburg', lat: 49.013, lon: 12.101, elevation: 337, isMountain: false },
+  { name: 'Passau', lat: 48.574, lon: 13.457, elevation: 312, isMountain: false },
   { name: 'Stuttgart', lat: 48.775, lon: 9.182, elevation: 245, isMountain: false },
   { name: 'Nürnberg', lat: 49.452, lon: 11.076, elevation: 309, isMountain: false },
   { name: 'Frankfurt', lat: 50.110, lon: 8.682, elevation: 112, isMountain: false },
-  { name: 'Wien', lat: 48.208, lon: 16.373, elevation: 171, isMountain: false }
+  { name: 'Köln', lat: 50.937, lon: 6.960, elevation: 53, isMountain: false },
+  { name: 'Graz', lat: 47.070, lon: 15.439, elevation: 353, isMountain: false },
+  { name: 'Wien', lat: 48.208, lon: 16.373, elevation: 171, isMountain: false },
+  { name: 'Berlin', lat: 52.520, lon: 13.405, elevation: 34, isMountain: false }
 ];
 
 export const BASE_LAYERS = {
@@ -135,16 +150,18 @@ export const BASE_LAYERS = {
     isDark: false
   },
   'osm-dark': {
-    name: 'Dunkel (High Contrast)',
+    name: 'Alpin-Dunkel (MeteoSwiss Relief)',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-    fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}',
+    hillshadeUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}',
     options: {
       maxNativeZoom: 16,
       maxZoom: 20,
       attribution: '© Esri, HERE, Garmin, © OpenStreetMap'
     },
-    labelsUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-    isDark: false
+    labelsUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    labelsFallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+    isDark: true
   },
   'satellite': {
     name: 'Satellit (HD Luftbild)',

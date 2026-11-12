@@ -472,9 +472,9 @@ def run_tests():
         time_text_mid = page.inner_text("#radar-time-display")
         report("Scrubbing slider updates radar time display smoothly", len(time_text_mid) > 5)
 
-        # Verify redundant transport bar and jump buttons are completely removed from DOM
+        # Verify MeteoSwiss left Play button IS visible and redundant step/jump buttons are removed
         play_btn = page.query_selector("#radar-play-btn")
-        report("Radar play button cleanly removed from DOM", play_btn is None)
+        report("MeteoSwiss play button is present and visible", play_btn is not None and page.is_visible("#radar-play-btn"))
         next_btn = page.query_selector("#radar-next-btn")
         report("Radar step buttons cleanly removed from DOM", next_btn is None)
         jump_btns = page.query_selector(".radar-jump-btn")

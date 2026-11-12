@@ -15,6 +15,19 @@ let onLoadLocationCallback = null;
 let onRenderOverviewCallback = null;
 let onRenderAdaptiveTab2Callback = null;
 
+async function fetchElevationPoint(lat, lon) {
+  try {
+    const elData = await resilientFetch(
+      `https://api.open-meteo.com/v1/elevation?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}`,
+      { ttlMs: 30 * 24 * 60 * 60 * 1000, persist: true }
+    );
+    if (elData && elData.elevation && elData.elevation[0] !== undefined) {
+      return Math.round(elData.elevation[0]);
+    }
+  } catch (_) {}
+  return 500;
+}
+
 export function initSearchHandlers({ onLoadLocation, onRenderOverview, onRenderAdaptiveTab2 }) {
   if (onLoadLocation) onLoadLocationCallback = onLoadLocation;
   if (onRenderOverview) onRenderOverviewCallback = onRenderOverview;
@@ -220,7 +233,21 @@ export function determineIfMountain(name, featureCode, elevation) {
   return false;
 }
 
-export function triggerExactGps(options = {}) {
+const GPS_PERM_META_KEY = 'best_weather_gps_permission_v1';
+
+async function getGeolocationPermissionState() {
+  if (typeof navigator === 'undefined' || !navigator.permissions || typeof navigator.permissions.query !== 'function') {
+    return 'unsupported';
+  }
+  try {
+    const status = await navigator.permissions.query({ name: 'geolocation' });
+    return status && status.state ? status.state : 'unsupported';
+  } catch (_) {
+    return 'unsupported';
+  }
+}
+
+export async function triggerExactGps(options = {}) {
   const isStartup = !!(options && options.isStartup);
   const quickGpsBtn = document.getElementById('quick-gps-btn');
   const gpsBtn = document.getElementById('gps-btn');
@@ -232,17 +259,53 @@ export function triggerExactGps(options = {}) {
     return;
   }
 
-  if (quickGpsBtn) {
-    quickGpsBtn.style.opacity = '0.6';
-    const txt = quickGpsBtn.querySelector('.hgp-text');
-    if (txt) txt.innerText = 'Ermittle Standort... 🛰️';
+  // Beim App-Start NIEMALS erneut eine Browser-/iOS-Abfrage erzwingen, wenn bereits einmal bestätigt/abgelehnt wurde
+  if (isStartup) {
+    const prevLsGps = AlpineStorage.safeGetItem('best_weather_last_gps', null);
+    const [permState, storedPerm, idbLastGps] = await Promise.all([
+      getGeolocationPermissionState(),
+      AlpineStorage.getMeta(GPS_PERM_META_KEY, null),
+      AlpineStorage.getMeta('best_weather_last_gps', null)
+    ]);
+
+    if (permState === 'denied') {
+      AlpineStorage.setMeta(GPS_PERM_META_KEY, { status: 'denied', updatedAt: Date.now() });
+      return;
+    }
+
+    const cachedGps = prevLsGps || idbLastGps;
+    if (!prevLsGps && idbLastGps) {
+      AlpineStorage.safeSetItem('best_weather_last_gps', idbLastGps);
+      selectExactLocation(idbLastGps);
+    }
+
+    // Nur im Hintergrund still aktualisieren wenn der Browser/OS die Berechtigung dauerhaft erteilt hat ('granted')
+    // oder beim allerersten Start (noch nie abgefragt & noch kein gespeicherter GPS-Standort)
+    const alreadyInteracted = !!(cachedGps || (storedPerm && storedPerm.status));
+    if (permState !== 'granted' && alreadyInteracted) {
+      return;
+    }
+
+    // Merke sofort vor dem System-Dialog, dass bereits einmal angefragt wurde
+    if (!storedPerm) {
+      AlpineStorage.setMeta(GPS_PERM_META_KEY, { status: 'prompted', updatedAt: Date.now() });
+    }
+  } else {
+    if (quickGpsBtn) {
+      quickGpsBtn.style.opacity = '0.6';
+      const txt = quickGpsBtn.querySelector('.hgp-text');
+      if (txt) txt.innerText = 'Ermittle Standort... 🛰️';
+    }
+    if (gpsBtn) gpsBtn.style.opacity = '0.5';
   }
-  if (gpsBtn) gpsBtn.style.opacity = '0.5';
 
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
+
+      // Bestätigung dauerhaft in LocalStorage + IndexedDB sichern
+      AlpineStorage.setMeta(GPS_PERM_META_KEY, { status: 'granted', updatedAt: Date.now() });
 
       if (quickGpsBtn) {
         quickGpsBtn.style.opacity = '1';
@@ -251,26 +314,27 @@ export function triggerExactGps(options = {}) {
       }
       if (gpsBtn) gpsBtn.style.opacity = '1';
 
-      let gpsElev = 500;
-      try {
-        const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
-        const elData = await elRes.json();
-        if (elData.elevation && elData.elevation[0] !== undefined) {
-          gpsElev = Math.round(elData.elevation[0]);
-        }
-      } catch(e) {}
+      const cachedGps = AlpineStorage.safeGetItem('best_weather_last_gps', null);
+      const canReuseCachedGps = isStartup && cachedGps &&
+        Math.abs((cachedGps.lat || 0) - lat) < 0.005 &&
+        Math.abs((cachedGps.lon || 0) - lon) < 0.005 &&
+        Number.isFinite(cachedGps.elevation);
 
-      let locationName = 'Mein Standort';
-      try {
-        const revRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}&localityLanguage=de`);
-        if (revRes.ok) {
-          const revData = await revRes.json();
-          const place = revData.locality || revData.city || revData.principalSubdivision;
+      let gpsElev = canReuseCachedGps ? cachedGps.elevation : await fetchElevationPoint(lat, lon);
+      let locationName = canReuseCachedGps && cachedGps.name ? cachedGps.name : 'Mein Standort';
+
+      if (!canReuseCachedGps) {
+        try {
+          const revData = await resilientFetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&localityLanguage=de`,
+            { ttlMs: 24 * 60 * 60 * 1000, persist: true }
+          );
+          const place = revData && (revData.locality || revData.city || revData.principalSubdivision);
           if (place) {
             locationName = `Mein Standort (${place})`;
           }
-        }
-      } catch (e) {}
+        } catch (_) {}
+      }
 
       const locObj = {
         name: locationName,
@@ -281,8 +345,8 @@ export function triggerExactGps(options = {}) {
         isGps: true
       };
 
-      // In persistent storage sichern für sofortigen Start beim nächsten Öffnen
-      AlpineStorage.safeSetItem('best_weather_last_gps', locObj);
+      // In persistent storage (LocalStorage + IndexedDB) sichern für sofortigen Start ohne erneute Abfrage
+      AlpineStorage.setMeta('best_weather_last_gps', locObj);
 
       // Falls beim Start bereits fast identische Koordinaten geladen sind, nur Objekt aktualisieren
       const isAlreadyLoaded = isStartup && state.weatherData &&
@@ -298,6 +362,9 @@ export function triggerExactGps(options = {}) {
       }
     },
     (err) => {
+      if (err && err.code === 1) {
+        AlpineStorage.setMeta(GPS_PERM_META_KEY, { status: 'denied', updatedAt: Date.now() });
+      }
       if (quickGpsBtn) {
         quickGpsBtn.style.opacity = '1';
         const txt = quickGpsBtn.querySelector('.hgp-text');
@@ -309,7 +376,7 @@ export function triggerExactGps(options = {}) {
         alert('GPS-Standort konnte nicht ermittelt werden. Bitte Standortfreigabe in den Geräteeinstellungen prüfen.');
       }
     },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    { enableHighAccuracy: !isStartup, timeout: 10000, maximumAge: 300000 }
   );
 }
 window.triggerExactGps = triggerExactGps;
@@ -363,7 +430,7 @@ export function setupSearch(options = {}) {
     debounceTimer = setTimeout(async () => {
       try {
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=de&format=json`;
-        const data = await resilientFetch(url, { cancelCategory: 'main_search', ttlMs: 60000 });
+        const data = await resilientFetch(url, { cancelCategory: 'main_search', ttlMs: 24 * 60 * 60 * 1000, persist: true });
 
         dropdown.innerHTML = '';
         if (data.results && data.results.length > 0) {
@@ -474,12 +541,7 @@ export function setupSearch(options = {}) {
         const lat = parseFloat(coordMatch[1]);
         const lon = parseFloat(coordMatch[2]);
         if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-          let elev = 500;
-          try {
-            const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
-            const elData = await elRes.json();
-            if (elData.elevation && elData.elevation[0] !== undefined) elev = Math.round(elData.elevation[0]);
-          } catch(err) {}
+          const elev = await fetchElevationPoint(lat, lon);
           selectExactLocation({
             name: `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`,
             lat,
@@ -496,8 +558,7 @@ export function setupSearch(options = {}) {
 
       try {
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=de&format=json`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await resilientFetch(url, { ttlMs: 24 * 60 * 60 * 1000, persist: true });
         if (data.results && data.results.length > 0) {
           const item = data.results[0];
           const nLower = item.name.toLowerCase();
@@ -539,7 +600,7 @@ export function setupSearch(options = {}) {
   });
 
   if (gpsBtn) {
-    gpsBtn.addEventListener('click', triggerExactGps);
+    gpsBtn.addEventListener('click', () => triggerExactGps({ isStartup: false }));
   }
 
   if (unitBtn) {
@@ -665,7 +726,7 @@ export function setupSpotlightAndQuickGps() {
   });
 
   if (quickGpsBtn) {
-    quickGpsBtn.addEventListener('click', triggerExactGps);
+    quickGpsBtn.addEventListener('click', () => triggerExactGps({ isStartup: false }));
   }
 
   input.addEventListener('input', (e) => {
@@ -684,12 +745,7 @@ export function setupSpotlightAndQuickGps() {
         const lat = parseFloat(coordMatch[1]);
         const lon = parseFloat(coordMatch[2]);
         if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-          let elev = 500;
-          try {
-            const elRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(5)}&longitude=${lon.toFixed(5)}`);
-            const elData = await elRes.json();
-            if (elData.elevation && elData.elevation[0] !== undefined) elev = Math.round(elData.elevation[0]);
-          } catch(err) {}
+          const elev = await fetchElevationPoint(lat, lon);
 
           resultsContainer.innerHTML = '';
           const row = document.createElement('div');
@@ -722,7 +778,7 @@ export function setupSpotlightAndQuickGps() {
 
       try {
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=de&format=json`;
-        const data = await resilientFetch(url, { cancelCategory: 'spotlight_search', ttlMs: 60000 });
+        const data = await resilientFetch(url, { cancelCategory: 'spotlight_search', ttlMs: 24 * 60 * 60 * 1000, persist: true });
 
         if (data.results && data.results.length > 0) {
           const scored = data.results.map(item => {

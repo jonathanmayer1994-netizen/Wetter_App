@@ -3,11 +3,12 @@
    ========================================================================== */
 @media (max-width: 768px) {
   .app-layout {
+    --app-layout-gap: 14px;
     padding-top: max(24px, calc(env(safe-area-inset-top, 0px) + 20px)) !important;
     padding-bottom: calc(108px + env(safe-area-inset-bottom, 12px)) !important;
     padding-left: max(14px, env(safe-area-inset-left, 14px)) !important;
     padding-right: max(14px, env(safe-area-inset-right, 14px)) !important;
-    gap: 14px;
+    gap: var(--app-layout-gap);
   }
 
   .tab-pane.active,
@@ -632,33 +633,109 @@
     height: 100vh !important;
   }
 
+  /* MeteoSwiss Animationen Header Bar on Mobile Fullscreen */
+  .ms-map-header-bar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 100002 !important;
+    padding: calc(env(safe-area-inset-top, 10px) + 6px) 10px 8px 10px !important;
+    gap: 6px !important;
+  }
+
+  .ms-header-top-row {
+    grid-template-columns: minmax(0, auto) 1fr auto;
+    gap: 6px;
+    min-height: 40px;
+  }
+
+  .ms-title-main {
+    font-size: 15px;
+  }
+
+  .ms-title-sub {
+    font-size: 10px;
+    max-width: 165px;
+  }
+
+  .ms-info-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .ms-segmented-bar {
+    max-width: none;
+    padding: 2.5px;
+    gap: 2px;
+  }
+
+  .ms-seg-btn {
+    height: 28px;
+  }
+
+  .ms-header-collapse-tab {
+    bottom: -16px;
+    width: 44px;
+    height: 16px;
+  }
+
+  .ms-map-attribution,
+  .ms-radar-watermark {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 10px) + 104px) !important;
+    z-index: 100000 !important;
+  }
+
+  #fullscreen-map-wrapper:has(.ms-map-header-bar.is-collapsed) .ms-map-attribution,
+  #fullscreen-map-wrapper:has(.ms-map-header-bar.is-collapsed) .ms-radar-watermark {
+    top: calc(env(safe-area-inset-top, 10px) + 62px) !important;
+  }
+
+  .ms-right-fab-stack {
+    position: fixed !important;
+    right: 10px !important;
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 116px) !important;
+    z-index: 100001 !important;
+    gap: 7px !important;
+  }
+
+  .ms-fab-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  #fullscreen-map-wrapper:has(#radar-floating-controls.is-collapsed) .ms-right-fab-stack,
+  body.mobile-map-fullscreen-active:has(#radar-floating-controls.is-collapsed) .ms-right-fab-stack {
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 56px) !important;
+  }
+
   /* Dedicated Mobile Close "X" Button */
   .map-mobile-close-btn {
     display: flex !important;
     align-items: center;
     justify-content: center;
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 20px) + 12px);
-    right: 12px;
+    position: relative;
+    top: auto;
+    right: auto;
     z-index: 100005;
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
-    background: rgba(15, 23, 42, 0.92);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
     color: #ffffff;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 12px rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
     cursor: pointer;
-    font-size: 19px;
+    font-size: 17px;
     font-weight: 700;
     line-height: 1;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     -webkit-tap-highlight-color: transparent;
     user-select: none;
-    isolation: isolate;
-    transform: translateZ(0);
+    flex-shrink: 0;
   }
 
   .map-mobile-close-btn:active {
@@ -675,27 +752,35 @@
     line-height: 1;
   }
 
-  /* 1. Mobile Floating Topbar: Single Layer Trigger Pill (Zero Overflow, Zero Clutter) */
-  .map-floating-topbar {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 20px) + 12px);
-    left: 12px;
-    right: auto;
-    z-index: 100002;
+  /* 1. Mobile Floating Topbar: Compact Layer Trigger Pill inside Header Bar */
+  .map-floating-topbar,
+  .ms-map-theme .map-floating-topbar {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: 100003 !important;
     padding: 0;
     gap: 0;
     background: transparent;
     border: none;
     box-shadow: none;
     overflow: visible;
+    justify-self: start;
   }
 
   .map-layer-pill {
-    padding: 8px 14px;
-    font-size: 13px;
+    padding: 5px 9px;
+    font-size: 11px;
+    gap: 5px;
     border-radius: 9999px;
-    background: rgba(15, 23, 42, 0.92);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .map-layer-pill .mlp-tag {
+    display: none !important;
   }
 
   /* Mobile Bottom Sheet for Ebenen & Kartenstil */
@@ -729,33 +814,37 @@
     z-index: 100008 !important;
   }
 
-  /* 2. Floating HUD: Windkompass (Oben links) & Point Weather Card (Unten links über Player) */
+  /* 2. Floating HUD: Windkompass (Oben links unter Header) & Point Weather Card (Unten links über Timeline) */
   .map-left-hud-stack {
     display: contents !important;
   }
 
-  /* Windkompass — 100% Perfekt auf Mobile abgestimmt (Weder zu groß noch zu klein!) */
+  /* Windkompass — 100% Kollisionsfrei auf Mobile */
   .map-wind-compass-widget {
     position: fixed !important;
-    top: calc(env(safe-area-inset-top, 20px) + 68px) !important;
-    left: 12px !important;
+    top: calc(env(safe-area-inset-top, 10px) + 124px) !important;
+    left: 10px !important;
     z-index: 100001 !important;
     width: fit-content !important;
     min-width: unset !important;
     max-width: 240px !important;
     padding: 5px 10px !important;
     gap: 10px !important;
-    background: rgba(15, 23, 42, 0.94) !important;
+    background: rgba(23, 25, 29, 0.94) !important;
     backdrop-filter: blur(24px) !important;
     -webkit-backdrop-filter: blur(24px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 14px !important;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
     cursor: pointer !important;
     user-select: none !important;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
     isolation: isolate !important;
     transform: translateZ(0) !important;
+  }
+
+  #fullscreen-map-wrapper:has(.ms-map-header-bar.is-collapsed) .map-wind-compass-widget {
+    top: calc(env(safe-area-inset-top, 10px) + 82px) !important;
   }
 
   .mwc-compass-dial {
@@ -850,21 +939,21 @@
     gap: 8px;
   }
 
-  /* Point Weather Card on Mobile — Sitzt ergonomisch unten links über dem Player (100% kollisionsfrei) */
+  /* Point Weather Card on Mobile — Sitzt ergonomisch unten links über Timeline, links neben FABs */
   .map-point-weather-card {
     position: fixed !important;
     top: auto !important;
-    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 96px) !important;
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 116px) !important;
     left: 10px !important;
     z-index: 100001 !important;
     width: fit-content !important;
     min-width: unset !important;
-    max-width: calc(100vw - 20px) !important;
-    background: rgba(15, 23, 42, 0.90) !important;
-    backdrop-filter: blur(24px) !important;
-    -webkit-backdrop-filter: blur(24px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    border-radius: 16px !important;
+    max-width: calc(100vw - 72px) !important;
+    background: rgba(23, 25, 29, 0.90) !important;
+    backdrop-filter: blur(22px) !important;
+    -webkit-backdrop-filter: blur(22px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 14px !important;
     padding: 6px 10px !important;
     gap: 5px !important;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
@@ -878,7 +967,7 @@
   .mpw-name {
     font-size: 12px;
     font-weight: 700;
-    max-width: 120px;
+    max-width: 145px;
   }
 
   .mpw-badge {
@@ -936,7 +1025,8 @@
 
   /* Auf Mobile standardmäßig als ultra-kompakte Kapsel; per Klick aufklappbar */
   .map-point-weather-card.collapsed .mpw-body,
-  .map-point-weather-card.collapsed .mpw-front-motion {
+  .map-point-weather-card.collapsed .mpw-front-motion,
+  .map-point-weather-card.collapsed .mpw-elevation-chip {
     display: none !important;
   }
   .map-point-weather-card.collapsed {
@@ -955,98 +1045,66 @@
   /* Dynamische Positionierung der Point-Weather-Card bei eingeklapptem Player */
   #fullscreen-map-wrapper:has(#radar-floating-controls.is-collapsed) .map-point-weather-card,
   body.mobile-map-fullscreen-active:has(#radar-floating-controls.is-collapsed) .map-point-weather-card {
-    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 52px) !important;
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 54px) !important;
   }
 
   /* Eingeklappter Radar-Player auf Mobile: Schlanke zentrierte Pill */
   .modern-radar-player.is-collapsed {
     padding: 6px 14px;
     border-radius: 999px;
-    max-width: 320px;
+    max-width: 340px;
     margin: 0 auto;
     bottom: max(10px, env(safe-area-inset-bottom, 10px));
   }
 
-  .map-zoom-action-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-  }
-
-  .map-zoom-action-btn:active {
-    transform: scale(0.92);
-    background: rgba(56, 189, 248, 0.3);
-  }
-
-  /* 4. Niederschlags- & Farb-Legende (Auf Mobile ausgeblendet, um den Screen nicht zu überfrachten) */
+  /* 4. Niederschlags- & Farb-Legende (Auf Mobile über Info-Button ⓘ ein-/ausblendbar) */
   .map-legend-card {
     display: none !important;
   }
 
+  .map-legend-card.ms-legend-force-open {
+    display: flex !important;
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 10px) + 122px) !important;
+    left: 10px !important;
+    right: 10px !important;
+    min-width: unset !important;
+    max-width: none !important;
+    z-index: 100004 !important;
+  }
+
   .legend-title {
-    font-size: 8.5px;
+    font-size: 9.5px;
     font-weight: 700;
   }
 
-  .legend-gradient-bar {
-    width: 95px;
-    height: 5px;
-    margin: 3px 0;
-  }
-
-  .legend-scale-labels {
-    font-size: 7.5px;
-    width: 95px;
-  }
-
-  /* 5. Streamlined Radar Timeline Scrubber (Unten verankert — Schlank & Zero-Kollision) */
-  .modern-radar-player {
-    position: fixed;
-    bottom: max(10px, env(safe-area-inset-bottom, 10px));
-    left: 10px;
-    right: 10px;
-    z-index: 100002;
-    padding: 7px 12px 9px 12px;
-    gap: 5px;
-    background: rgba(15, 23, 42, 0.92);
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 18px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
-  }
-
-  .radar-mode-chip {
-    font-size: 10px;
-    padding: 2.5px 8px;
-    font-weight: 800;
+  /* 5. MeteoSwiss 48h Timeline Dock (Unten verankert — Schlank & Zero-Kollision) */
+  .modern-radar-player,
+  #radar-floating-controls,
+  .ms-timeline-dock {
+    position: fixed !important;
+    top: auto !important;
+    bottom: max(10px, env(safe-area-inset-bottom, 10px)) !important;
+    left: 10px !important;
+    right: 10px !important;
+    z-index: 100002 !important;
+    padding: 7px 10px 8px 10px !important;
+    gap: 4px !important;
+    background: rgba(23, 25, 29, 0.92) !important;
+    backdrop-filter: blur(26px) !important;
+    -webkit-backdrop-filter: blur(26px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6) !important;
   }
 
   .radar-time-banner {
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
     color: #ffffff;
     white-space: nowrap;
     overflow: visible;
     text-overflow: clip;
-  }
-
-  .radar-slider-container {
-    padding: 1px 2px;
-    gap: 2px;
-  }
-
-  .radar-timeline-markers {
-    font-size: 9px;
-    padding: 0 3px;
-    margin-top: 1px;
   }
 }
 
@@ -5512,13 +5570,48 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     left: 0;
     right: 0;
     height: env(safe-area-inset-top, 0px);
-    background: linear-gradient(180deg, rgba(11, 19, 30, 0.98) 0%, rgba(11, 19, 30, 0.75) 85%, transparent 100%);
+    background: linear-gradient(180deg, rgba(11, 19, 30, 0.45) 0%, rgba(11, 19, 30, 0.14) 70%, transparent 100%);
     pointer-events: none;
     z-index: 9999;
   }
 
   body.mobile-map-fullscreen-active .ios-status-bar-guard {
     display: none !important;
+  }
+}
+
+/* Lock outer document on mobile/touch iOS so Safari/PWA UIScrollView NEVER rubber-bands
+   past the top edge of the app UI (prevents white/grey gap above the live sky canvas). */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  html,
+  body {
+    height: 100%;
+    height: 100dvh;
+    min-height: 0;
+    overflow-y: hidden !important;
+    overflow-x: clip !important;
+    overscroll-behavior: none !important;
+  }
+
+  body {
+    position: fixed;
+    inset: 0;
+  }
+
+  .app-layout {
+    height: 100%;
+    height: 100dvh;
+    min-height: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior-y: none !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  body.mobile-map-fullscreen-active .app-layout,
+  body.sports-map-fullscreen-active .app-layout {
+    overflow: hidden !important;
   }
 }
 

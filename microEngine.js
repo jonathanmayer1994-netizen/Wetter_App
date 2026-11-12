@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { resilientFetch } from './httpClient.js';
+import { resilientFetch, HttpStatusError, isApiCoolingDown } from './httpClient.js';
 import { physicsBridge } from './core/physicsBridge.js';
 import { validateCurrentWeather, validateHourlyWeather, validateMultiModel } from './core/contracts.js';
 
@@ -18,7 +18,7 @@ export const MicroEngine = {
    * Respektiert exakt die offizielle Höhe des Ortes/Berges und unterscheidet
    * sauber zwischen Stadt/Flachland und Hochgebirge.
    */
-  async getMicroScaleWeather(lat, lon, officialElevation = null, isMountain = false, customTilt = null, customAzimuth = null, country = null) {
+  async getMicroScaleWeather(lat, lon, officialElevation = null, isMountain = false, customTilt = null, customAzimuth = null, country = null, options = {}) {
     // 1. Lokale Geländegeometrie analysieren
     let terrain = {
       elevation: officialElevation !== null ? officialElevation : 500,
@@ -33,7 +33,7 @@ export const MicroEngine = {
 
     if (isMountain) {
       try {
-        const analyzed = await this.analyzeMicroTerrain(lat, lon, 14);
+        const analyzed = await this.analyzeMicroTerrain(lat, lon, 14, options);
         terrain.tilt = analyzed.tilt;
         terrain.openMeteoAzimuth = analyzed.openMeteoAzimuth;
         terrain.compassAzimuth = analyzed.compassAzimuth;
@@ -72,12 +72,16 @@ export const MicroEngine = {
     }
 
     // 2. Open-Meteo Daten, Stationsdaten (Bright Sky/DWD), Modell-Historie, Radar & Alpen-Druckgradient parallel abrufen
+    const reqOpts = {
+      ...(options && options.signal ? { signal: options.signal } : {}),
+      ...(options && options.forceRefresh ? { forceRefresh: true } : {})
+    };
     const [weatherRaw, stationData, modelHistory, radarData, alpineFoehn] = await Promise.all([
-      this.fetchOpenMeteoMultiLayer(lat, lon, terrain),
-      this.fetchStationData(lat, lon, terrain, isMountain, country),
-      this.fetchModelHistory(lat, lon, terrain.elevation),
-      this.fetchRadarNowcastData(lat, lon),
-      this.fetchAlpinePressureGradient(lat, lon)
+      this.fetchOpenMeteoMultiLayer(lat, lon, terrain, reqOpts),
+      this.fetchStationData(lat, lon, terrain, isMountain, country, reqOpts),
+      this.fetchModelHistory(lat, lon, terrain.elevation, reqOpts),
+      this.fetchRadarNowcastData(lat, lon, reqOpts),
+      this.fetchAlpinePressureGradient(lat, lon, reqOpts)
     ]);
 
     // 2b. Dynamische Bias-Korrektur anwenden, BEVOR microWeather.temperature10m berechnet wird
@@ -120,22 +124,25 @@ export const MicroEngine = {
   /**
    * STUFE 1: Lädt Terrain-RGB Kachel oder berechnet Hangneigung
    */
-  async analyzeMicroTerrain(lat, lon, zoom = 14) {
+  async analyzeMicroTerrain(lat, lon, zoom = 14, options = {}) {
+    const qLat = Math.round(lat * 1000) / 1000;
+    const qLon = Math.round(lon * 1000) / 1000;
     const dLat = 0.0025;
     const dLon = 0.0035;
     const points = [
-      { lat, lon },
-      { lat: lat + dLat, lon },
-      { lat: lat - dLat, lon },
-      { lat, lon: lon + dLon },
-      { lat, lon: lon - dLon }
+      { lat: qLat, lon: qLon },
+      { lat: qLat + dLat, lon: qLon },
+      { lat: qLat - dLat, lon: qLon },
+      { lat: qLat, lon: qLon + dLon },
+      { lat: qLat, lon: qLon - dLon }
     ];
 
-    const latStr = points.map(p => p.lat.toFixed(5)).join(',');
-    const lonStr = points.map(p => p.lon.toFixed(5)).join(',');
+    const latStr = points.map(p => p.lat.toFixed(4)).join(',');
+    const lonStr = points.map(p => p.lon.toFixed(4)).join(',');
     const data = await resilientFetch(`https://api.open-meteo.com/v1/elevation?latitude=${latStr}&longitude=${lonStr}`, {
-      cancelCategory: 'micro-elevation',
-      ttlMs: 15 * 60 * 1000
+      ttlMs: 30 * 24 * 60 * 60 * 1000, // 30 Tage Cache in localStorage (Gelände ändert sich nicht)
+      persist: true,
+      signal: options?.signal
     });
 
     const z0 = data.elevation[0] || 500;
@@ -335,7 +342,7 @@ export const MicroEngine = {
    * STUFE 2: Ruft Open-Meteo mit current, hourly (inkl. Druckschichten) und daily (10 Tage) ab
    * Verwendet dynamisch das prioritäre regionale High-Res Modell (ICON-D2 / AROME / ICON-EU / UKV)
    */
-  async fetchOpenMeteoMultiLayer(lat, lon, terrain) {
+  async fetchOpenMeteoMultiLayer(lat, lon, terrain, options = {}) {
     const levels = [1000, 925, 850, 700, 600, 500];
     const pressureVars = levels.flatMap((hpa) => [
       `temperature_${hpa}hPa`,
@@ -410,8 +417,8 @@ export const MicroEngine = {
     ].join(",");
 
     const params = new URLSearchParams({
-      latitude: lat.toFixed(5),
-      longitude: lon.toFixed(5),
+      latitude: Number(lat).toFixed(3),
+      longitude: Number(lon).toFixed(3),
       elevation: Math.round(terrain.elevation).toString(),
       tilt: Math.round(terrain.tilt).toString(),
       azimuth: Math.round(terrain.openMeteoAzimuth).toString(),
@@ -429,8 +436,10 @@ export const MicroEngine = {
     // Daher lassen wir den 10-Tage-Forecast nahtlos auf Best-Match laufen.
 
     let raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
-      cancelCategory: 'micro-weather-forecast',
-      ttlMs: 3 * 60 * 1000
+      ttlMs: 30 * 60 * 1000, // 30 Minuten L1/L2 Cache (spart massive Open-Meteo Quota)
+      persist: true,
+      signal: options?.signal,
+      forceRefresh: Boolean(options?.forceRefresh)
     });
 
     if (raw) {
@@ -599,17 +608,18 @@ export const MicroEngine = {
     return bestStation;
   },
 
-  async fetchStationData(lat, lon, terrain = {}, isMountain = false, country = null) {
+  async fetchStationData(lat, lon, terrain = {}, isMountain = false, country = null, options = {}) {
     try {
       const elev = terrain.elevation || 500;
       const best = this.selectBestStation(lat, lon, elev, terrain, isMountain, country);
       if (!best) return null;
+      const forceRefresh = Boolean(options?.forceRefresh);
 
       // 1. ZAMG (Österreich) via GeoSphere Austria TAWES API (CORS: *)
       if (best.network === 'ZAMG' && best.zamgId) {
         try {
           const url = `https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min?parameters=TL&station_ids=${best.zamgId}`;
-          const res = await resilientFetch(url, { cancelCategory: 'station-zamg', ttlMs: 4000 });
+          const res = await resilientFetch(url, { ttlMs: 10 * 60 * 1000, persist: true, signal: options?.signal, forceRefresh });
           const feat = res?.features?.[0];
           const t = feat?.properties?.parameters?.TL?.data?.[0];
           if (typeof t === 'number') {
@@ -643,8 +653,8 @@ export const MicroEngine = {
       // 2. DWD (Deutschland) via Bright Sky
       if (best.network === 'DWD') {
         try {
-          const curUrl = `https://api.brightsky.dev/current_weather?lat=${best.lat.toFixed(4)}&lon=${best.lon.toFixed(4)}`;
-          const curData = await resilientFetch(curUrl, { cancelCategory: 'brightsky-current', ttlMs: 4000 });
+          const curUrl = `https://api.brightsky.dev/current_weather?lat=${best.lat.toFixed(3)}&lon=${best.lon.toFixed(3)}`;
+          const curData = await resilientFetch(curUrl, { ttlMs: 10 * 60 * 1000, persist: true, signal: options?.signal, forceRefresh });
           if (curData && curData.weather) {
             const src = curData.sources?.[0] || {};
             return {
@@ -671,8 +681,8 @@ export const MicroEngine = {
 
       // 3. MeteoSwiss / Météo-France / Südtirol Open Data / LAWIS (oder Fallback bei DWD/ZAMG Ausfall)
       const model = (best.network === 'Météo-France') ? 'meteofrance_arome_france' : 'icon_eu';
-      const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${best.lat.toFixed(4)}&longitude=${best.lon.toFixed(4)}&elevation=${best.elevation}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure&hourly=temperature_2m,precipitation&past_hours=12&forecast_hours=3&timezone=UTC&models=${model}`;
-      const data = await resilientFetch(omUrl, { cancelCategory: 'station-highres-point', ttlMs: 4000 });
+      const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${best.lat.toFixed(3)}&longitude=${best.lon.toFixed(3)}&elevation=${best.elevation}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure&hourly=temperature_2m,precipitation&past_hours=12&forecast_hours=3&timezone=UTC&models=${model}`;
+      const data = await resilientFetch(omUrl, { ttlMs: 30 * 60 * 1000, persist: true, signal: options?.signal, forceRefresh });
       const cur = data?.current;
       if (cur && typeof cur.temperature_2m === 'number') {
         const hist = [];
@@ -719,12 +729,14 @@ export const MicroEngine = {
   /**
    * STUFE 2d: Modell-Historie der letzten 12 h zur exakten Bias-Referenz
    */
-  async fetchModelHistory(lat, lon, elevation) {
+  async fetchModelHistory(lat, lon, elevation, options = {}) {
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&elevation=${Math.round(elevation)}&hourly=temperature_2m,precipitation,wind_speed_10m&past_hours=12&forecast_hours=1&timezone=UTC`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&elevation=${Math.round(elevation)}&hourly=temperature_2m,precipitation,wind_speed_10m&past_hours=12&forecast_hours=1&timezone=UTC`;
       const data = await resilientFetch(url, {
-        cancelCategory: 'model-history',
-        ttlMs: 4000
+        ttlMs: 60 * 60 * 1000, // 60 Minuten persistenter Cache (Historie ändert sich stündlich nur am Rand)
+        persist: true,
+        signal: options?.signal,
+        forceRefresh: Boolean(options?.forceRefresh)
       });
       return (data && data.hourly) ? data.hourly : null;
     } catch (e) {
@@ -736,11 +748,13 @@ export const MicroEngine = {
   /**
    * STUFE 2e: RainViewer Radar-Nowcast Metadaten
    */
-  async fetchRadarNowcastData(lat, lon) {
+  async fetchRadarNowcastData(lat, lon, options = {}) {
     try {
       const data = await resilientFetch('https://api.rainviewer.com/public/weather-maps.json', {
-        cancelCategory: 'rainviewer-meta',
-        ttlMs: 3000
+        ttlMs: 5 * 60 * 1000,
+        persist: true,
+        signal: options?.signal,
+        forceRefresh: Boolean(options?.forceRefresh)
       });
       return data || null;
     } catch (e) {
@@ -783,7 +797,7 @@ export const MicroEngine = {
     let curIdx = 0;
     let minDiff = Infinity;
     if (h && h.time) {
-      for (let i = 0; i < Math.min(36, h.time.length); i++) {
+      for (let i = 0; i < h.time.length; i++) {
         const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
         if (diff < minDiff) {
           minDiff = diff;
@@ -1442,15 +1456,16 @@ export const MicroEngine = {
    * Synoptischer transalpiner Druckgradient (Süd- vs. Nordalpen) zur Föhndiagnose
    * Δp = p_msl(Süd: Bozen/Lugano) - p_msl(Nord: Innsbruck/Kempten)
    */
-  async fetchAlpinePressureGradient(lat = 47.5, lon = 10.3) {
+  async fetchAlpinePressureGradient(lat = 47.5, lon = 10.3, options = {}) {
     const now = Date.now();
-    if (this._foehnCache && (now - this._foehnCache.timestamp < 15 * 60 * 1000)) {
+    const forceRefresh = Boolean(options?.forceRefresh);
+    if (!forceRefresh && this._foehnCache && (now - this._foehnCache.timestamp < 30 * 60 * 1000)) {
       return this._foehnCache.data;
     }
 
     try {
       const url = 'https://api.open-meteo.com/v1/forecast?latitude=46.50,47.26&longitude=11.35,11.40&current=pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m';
-      const res = await resilientFetch(url, { cancelCategory: 'foehn-gradient', ttlMs: 15 * 60 * 1000 });
+      const res = await resilientFetch(url, { ttlMs: 30 * 60 * 1000, persist: true, signal: options?.signal, forceRefresh });
       if (Array.isArray(res) && res.length === 2) {
         const pSouth = res[0].current?.pressure_msl || 1015;
         const pNorth = res[1].current?.pressure_msl || 1015;
@@ -2329,23 +2344,37 @@ export const MicroEngine = {
    * Priorisiert dynamisch regionale High-Res-Modelle (ICON-D2 / AROME / UKV / ICON-EU)
    * und gewichtet diese in Städten (55%) und Bergen (50%) stärker als ECMWF (30-35%) und GFS (15%)
    */
-  async fetchMultiModelComparison(lat, lon, elevation = 500, isMountain = false) {
+  async fetchMultiModelComparison(lat, lon, elevation = 500, isMountain = false, options = {}) {
     try {
       const strategy = this.getRegionalModelPriority(lat, lon, elevation);
+      const qLat = Number(lat).toFixed(3);
+      const qLon = Number(lon).toFixed(3);
       const queryModels = Array.from(new Set(strategy.modelsToQuery || ['icon_eu', 'ecmwf_ifs025', 'gfs_seamless'])).join(',');
-      let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,precipitation,wind_speed_10m&models=${queryModels}&forecast_days=10`;
+      let url = `https://api.open-meteo.com/v1/forecast?latitude=${qLat}&longitude=${qLon}&hourly=temperature_2m,precipitation,wind_speed_10m&models=${queryModels}&forecast_days=7`;
 
-      let data = await resilientFetch(url, {
-        cancelCategory: 'multi-model-forecast',
-        ttlMs: 5 * 60 * 1000
-      });
-
-      // Robuster Fallback auf Standard ECMWF + GFS falls regionale Modelle an Randgrenzen fehlschlagen
-      if (!data || !data.hourly) {
-        url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=temperature_2m,precipitation,wind_speed_10m&models=ecmwf_ifs025,gfs_seamless&forecast_days=10`;
+      let data = null;
+      const forceRefresh = Boolean(options?.forceRefresh);
+      try {
         data = await resilientFetch(url, {
-          cancelCategory: 'multi-model-forecast-fallback',
-          ttlMs: 5 * 60 * 1000
+          ttlMs: 45 * 60 * 1000, // 45 Min persistenter L2-Cache (spart ~80% Multi-Modell-Calls)
+          persist: true,
+          signal: options?.signal,
+          forceRefresh
+        });
+      } catch (primaryErr) {
+        if (primaryErr?.status === 429 || primaryErr?.isCircuitOpen || primaryErr?.name === 'AbortError') {
+          throw primaryErr;
+        }
+      }
+
+      // Robuster Fallback auf Standard ECMWF + GFS NUR bei leerem Regionalmodell (NIEMALS bei 429 oder Circuit Breaker!)
+      if ((!data || !data.hourly) && !isApiCoolingDown('https://api.open-meteo.com')) {
+        url = `https://api.open-meteo.com/v1/forecast?latitude=${qLat}&longitude=${qLon}&hourly=temperature_2m,precipitation,wind_speed_10m&models=ecmwf_ifs025,gfs_seamless&forecast_days=7`;
+        data = await resilientFetch(url, {
+          ttlMs: 45 * 60 * 1000,
+          persist: true,
+          signal: options?.signal,
+          forceRefresh
         });
       }
 
@@ -2356,7 +2385,7 @@ export const MicroEngine = {
       const nowMs = Date.now();
       let idx = 0;
       let minDiff = Infinity;
-      for (let i = 0; i < Math.min(36, h.time.length); i++) {
+      for (let i = 0; i < h.time.length; i++) {
         const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
         if (diff < minDiff) {
           minDiff = diff;
@@ -2562,12 +2591,14 @@ export const MicroEngine = {
   /**
    * STUFE 6: Alpine Luftqualität & UV-Exposition (CAMS / Open-Meteo Air Quality)
    */
-  async fetchAirQualityAndUV(lat, lon, elevation = 500) {
+  async fetchAirQualityAndUV(lat, lon, elevation = 500, options = {}) {
     try {
-      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=uv_index,uv_index_clear_sky,pm10,pm2_5,ozone`;
+      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${Number(lat).toFixed(2)}&longitude=${Number(lon).toFixed(2)}&hourly=uv_index,uv_index_clear_sky,pm10,pm2_5,ozone`;
       const data = await resilientFetch(url, {
-        cancelCategory: 'air-quality',
-        ttlMs: 10 * 60 * 1000
+        ttlMs: 45 * 60 * 1000,
+        persist: true,
+        signal: options?.signal,
+        forceRefresh: Boolean(options?.forceRefresh)
       });
       const h = data ? data.hourly : null;
       if (!h || !h.time) return null;
@@ -2575,7 +2606,7 @@ export const MicroEngine = {
       const nowMs = Date.now();
       let idx = 0;
       let minDiff = Infinity;
-      for (let i = 0; i < Math.min(36, h.time.length); i++) {
+      for (let i = 0; i < h.time.length; i++) {
         const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
         if (diff < minDiff) {
           minDiff = diff;
@@ -4421,134 +4452,362 @@ export const MicroEngine = {
   },
 
   /**
+   * Stull (2011) Feuchtkugeltemperatur T_w (°C) — präzise für alpine Phasengrenzen
+   */
+  computeWetBulbTemp(tempC, rhPct = 85) {
+    const T = Number.isFinite(tempC) ? tempC : 5;
+    const RH = Math.max(5, Math.min(100, Number.isFinite(rhPct) ? rhPct : 85));
+    const tw = T * Math.atan(0.151977 * Math.sqrt(RH + 8.313659))
+      + Math.atan(T + RH)
+      - Math.atan(RH - 1.676331)
+      + 0.00391838 * Math.pow(RH, 1.5) * Math.atan(0.023101 * RH)
+      - 4.686035;
+    return Math.round(tw * 10) / 10;
+  },
+
+  /**
+   * Thermodynamische Niederschlagsphasen-Klassifikation (Regen / Schneeregen / Schnee)
+   * Kombiniert Feuchtkugeltemperatur T_w, Modell-Nullgradgrenze (freezing_level_height),
+   * NWP-Schneewasseräquivalent und WMO-Codes inkl. Subgrid-Gipfelkorrektur.
+   */
+  classifyPrecipPhase({
+    tempC = 5,
+    rhPct = 88,
+    precipMm = 0,
+    rainMm = 0,
+    snowCm = 0,
+    elevation = 500,
+    freezingLevelM = null,
+    wCode = 0
+  }) {
+    const wetBulbC = this.computeWetBulbTemp(tempC, rhPct);
+    const smooth01 = (v) => {
+      const c = Math.max(0, Math.min(1, v));
+      return c * c * (3 - 2 * c);
+    };
+
+    // 1. Feuchtkugel-Kurve: T_w <= -0.4°C -> 100% Schnee, T_w >= +1.8°C -> 100% Regen
+    const thermoRatio = smooth01((1.8 - wetBulbC) / 2.2);
+
+    // 2. Nullgradgrenzen-Kurve (Bright-Band / Schmelzschicht liegt ~100..450m unterhalb 0°C-Niveau)
+    let altRatio = null;
+    if (freezingLevelM !== null && freezingLevelM !== undefined && Number.isFinite(freezingLevelM)) {
+      altRatio = smooth01((elevation - (freezingLevelM - 450)) / 380);
+    }
+
+    // 3. Explizite NWP-Aufteilung (Schnee in cm ~ 0.7..1.0 mm SWE)
+    let modelRatio = null;
+    const totalSweSnow = Math.max(0, snowCm || 0) / 0.72;
+    const liquidRain = Math.max(0, rainMm || 0);
+    if (totalSweSnow > 0.02 && liquidRain <= 0.02) {
+      modelRatio = 1.0;
+    } else if (totalSweSnow > 0.02 || liquidRain > 0.02) {
+      modelRatio = Math.max(0, Math.min(1, totalSweSnow / (totalSweSnow + liquidRain)));
+    }
+
+    let snowRatio = thermoRatio;
+    if (altRatio !== null && modelRatio !== null) {
+      // Subgrid-Gipfelschutz: Falls Modell trotz Höhe >= Nullgradgrenze-150m & T_w <= 0.6 Regen meldet, korrigiere auf Physik
+      if (elevation >= freezingLevelM - 150 && wetBulbC <= 0.6 && modelRatio < 0.5) {
+        snowRatio = Math.max(thermoRatio, altRatio);
+      } else {
+        snowRatio = 0.52 * thermoRatio + 0.30 * altRatio + 0.18 * modelRatio;
+      }
+    } else if (altRatio !== null) {
+      snowRatio = 0.62 * thermoRatio + 0.38 * altRatio;
+    } else if (modelRatio !== null) {
+      snowRatio = 0.60 * thermoRatio + 0.40 * modelRatio;
+    }
+
+    // WMO-Code Plausibilisierung (Schneeschauer / gefrierender Niederschlag)
+    if ((wCode >= 71 && wCode <= 77) || wCode === 85 || wCode === 86) {
+      snowRatio = Math.max(snowRatio, wetBulbC <= 1.2 ? 0.85 : 0.55);
+    } else if (wCode === 56 || wCode === 57 || wCode === 66 || wCode === 67 || wCode === 68 || wCode === 69) {
+      snowRatio = Math.max(snowRatio, 0.45);
+    }
+
+    snowRatio = Math.max(0, Math.min(1, snowRatio));
+
+    let phase = 'dry';
+    if (precipMm >= 0.08 || snowCm >= 0.05) {
+      if (snowRatio >= 0.68) phase = 'snow';
+      else if (snowRatio >= 0.22) phase = 'sleet';
+      else phase = 'rain';
+    } else {
+      if (snowRatio >= 0.68) phase = 'snow';
+      else if (snowRatio >= 0.22) phase = 'sleet';
+      else phase = 'rain';
+    }
+
+    return {
+      wetBulbC,
+      snowRatio: Math.round(snowRatio * 100) / 100,
+      phase
+    };
+  },
+
+  /**
+   * Kompaktiert die 36-Stationen Open-Meteo Batch-Antwort in eine spaltenorientierte Struktur (~90 KB statt ~300+ KB),
+   * sodass sie problemlos im L2 localStorage-Cache + als 24h Stale-on-429-Fallback gespeichert werden kann.
+   */
+  _compactRadarBatchResponse(rawData) {
+    if (rawData && rawData.format === 'bw_radar_col_v1' && Array.isArray(rawData.times) && Array.isArray(rawData.cols)) {
+      return rawData;
+    }
+
+    const stationResults = Array.isArray(rawData) ? rawData : [rawData];
+    if (!stationResults[0] || !stationResults[0].hourly || !Array.isArray(stationResults[0].hourly.time) || stationResults[0].hourly.time.length === 0) {
+      throw new Error('Ungültiges Open-Meteo Antwortformat');
+    }
+
+    const times = stationResults[0].hourly.time;
+    const parseUtcIso = (s) => new Date(String(s).endsWith('Z') ? s : `${s}Z`).getTime();
+    const nowMs = Date.now();
+
+    let curIdx = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < Math.min(48, times.length); i++) {
+      const diff = Math.abs(parseUtcIso(times[i]) - nowMs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        curIdx = i;
+      }
+    }
+
+    // Ab 1h vor Jetzt alle verbleibenden Stunden behalten (erlaubt L2-Wiederverwendung & Stale-Fallback über mehrere Stunden)
+    const fromIdx = Math.max(0, curIdx - 1);
+    const len = times.length - fromIdx;
+    const timesSlice = times.slice(fromIdx);
+
+    const cols = stationResults.map((resObj) => {
+      const h = resObj ? resObj.hourly : null;
+      if (!h) return null;
+
+      const e = (resObj && Number.isFinite(resObj.elevation)) ? Math.round(resObj.elevation) : null;
+      const p = new Array(len);
+      const rs = new Array(len);
+      const sn = new Array(len);
+      const t = new Array(len);
+      const rh = new Array(len);
+      const fl = new Array(len);
+      const wc = new Array(len);
+      const cc = new Array(len);
+      const pr = new Array(len);
+      const ws = new Array(len);
+      const wd = new Array(len);
+      const wg = new Array(len);
+
+      for (let k = 0; k < len; k++) {
+        const idx = fromIdx + k;
+        const pVal = h.precipitation ? (h.precipitation[idx] || 0) : 0;
+        const rVal = h.rain ? (h.rain[idx] || 0) : 0;
+        const shVal = h.showers ? (h.showers[idx] || 0) : 0;
+        const snVal = h.snowfall ? (h.snowfall[idx] || 0) : 0;
+        const tVal = h.temperature_2m && h.temperature_2m[idx] !== undefined ? h.temperature_2m[idx] : 10;
+        const rhVal = h.relative_humidity_2m && h.relative_humidity_2m[idx] !== undefined ? h.relative_humidity_2m[idx] : 85;
+        const flVal = (h.freezing_level_height && h.freezing_level_height[idx] !== undefined && h.freezing_level_height[idx] !== null)
+          ? Math.round(h.freezing_level_height[idx])
+          : null;
+        const wcVal = h.weather_code ? (h.weather_code[idx] || 0) : 0;
+        const ccVal = h.cloud_cover && h.cloud_cover[idx] !== undefined ? h.cloud_cover[idx] : 50;
+        const prVal = h.pressure_msl ? (h.pressure_msl[idx] || 1013) : 1013;
+        const wsVal = h.wind_speed_10m ? (h.wind_speed_10m[idx] || 0) : 15;
+        const wdVal = h.wind_direction_10m ? (h.wind_direction_10m[idx] || 0) : 240;
+        const wgVal = h.wind_gusts_10m ? (h.wind_gusts_10m[idx] || Math.round(wsVal * 1.35)) : Math.round(wsVal * 1.35);
+
+        p[k] = Math.round(pVal * 100) / 100;
+        rs[k] = Math.round((rVal + shVal) * 100) / 100;
+        sn[k] = Math.round(snVal * 100) / 100;
+        t[k] = Math.round(tVal * 10) / 10;
+        rh[k] = Math.round(rhVal);
+        fl[k] = flVal;
+        wc[k] = Math.round(wcVal);
+        cc[k] = Math.round(ccVal);
+        pr[k] = Math.round(prVal * 10) / 10;
+        ws[k] = Math.round(wsVal * 10) / 10;
+        wd[k] = Math.round(wdVal);
+        wg[k] = Math.round(wgVal * 10) / 10;
+      }
+
+      return { e, p, rs, sn, t, rh, fl, wc, cc, pr, ws, wd, wg };
+    });
+
+    return {
+      format: 'bw_radar_col_v1',
+      times: timesSlice,
+      cols
+    };
+  },
+
+  /**
+   * Baut aus kompakten Spalten-Daten (oder Rohdaten) bis zu 49 stündliche Radar-Frames ab aktueller Uhrzeit.
+   */
+  _buildRadarFramesFromCompact(stations, payload) {
+    const compact = this._compactRadarBatchResponse(payload);
+    const times = compact.times;
+    const parseUtcIso = (s) => new Date(String(s).endsWith('Z') ? s : `${s}Z`).getTime();
+    const nowMs = Date.now();
+
+    let curIdx = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < times.length; i++) {
+      const diff = Math.abs(parseUtcIso(times[i]) - nowMs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        curIdx = i;
+      }
+    }
+
+    const hoursCount = Math.min(49, times.length - curIdx);
+    // Verhindert stark verkürzten Radar-Zeitraum bei sehr altem Stale-Eintrag
+    if (hoursCount < 12) return null;
+
+    const forecastFrames = [];
+    for (let h = 0; h < hoursCount; h++) {
+      const idx = curIdx + h;
+      const timeStr = times[idx];
+      const timestampMs = parseUtcIso(timeStr);
+
+      const cells = [];
+      const stationsData = [];
+      let maxPrecipMm = 0;
+
+      for (let s = 0; s < stations.length; s++) {
+        const st = stations[s];
+        const col = compact.cols[s];
+        if (!col) continue;
+
+        const modelElev = (col.e !== null && col.e !== undefined) ? col.e : st.elevation;
+        const stElev = st.elevation !== undefined ? st.elevation : modelElev;
+
+        const precipRaw = col.p[idx] || 0;
+        const liquidRainShowers = col.rs[idx] || 0;
+        const snow = col.sn[idx] || 0;
+        const liquidPrecip = Math.max(precipRaw, liquidRainShowers);
+
+        const rawTemp = col.t[idx] !== undefined ? col.t[idx] : 10;
+        // Subgrid-Gipfelkorrektur falls Open-Meteo DEM niedriger liegt als echter Gipfel
+        const elevGap = stElev - modelElev;
+        const temp = (st.isMountain && elevGap > 80)
+          ? rawTemp - (elevGap / 100) * 0.62
+          : rawTemp;
+
+        const rh = col.rh[idx] !== undefined ? col.rh[idx] : 85;
+        const freezingLevelHeight = (col.fl[idx] !== null && col.fl[idx] !== undefined)
+          ? col.fl[idx]
+          : Math.round(stElev + (temp / 0.65) * 100);
+
+        const wCode = col.wc[idx] || 0;
+        const cloud = col.cc[idx] !== undefined ? col.cc[idx] : 50;
+        const pressure = col.pr[idx] || 1013;
+        const windSpd = col.ws[idx] !== undefined ? col.ws[idx] : 15;
+        const windDir = col.wd[idx] !== undefined ? col.wd[idx] : 240;
+        const windGusts = col.wg[idx] !== undefined ? col.wg[idx] : Math.round(windSpd * 1.35);
+
+        const phaseInfo = this.classifyPrecipPhase({
+          tempC: temp,
+          rhPct: rh,
+          precipMm: liquidPrecip,
+          rainMm: liquidRainShowers,
+          snowCm: snow,
+          elevation: stElev,
+          freezingLevelM: freezingLevelHeight,
+          wCode
+        });
+
+        const isSnow = phaseInfo.snowRatio >= 0.55;
+
+        stationsData.push({
+          name: st.name,
+          lat: st.lat,
+          lon: st.lon,
+          elevation: stElev,
+          modelElevation: modelElev,
+          isMountain: !!st.isMountain,
+          precip: Math.round(liquidPrecip * 100) / 100,
+          rain: Math.round(liquidRainShowers * 100) / 100,
+          snow: Math.round(snow * 100) / 100,
+          temperature: Math.round(temp * 10) / 10,
+          relativeHumidity: Math.round(rh),
+          wetBulbC: phaseInfo.wetBulbC,
+          freezingLevelHeight,
+          snowRatio: phaseInfo.snowRatio,
+          phase: phaseInfo.phase,
+          weatherCode: wCode,
+          cloudCover: Math.round(cloud),
+          pressureMsl: Math.round(pressure * 10) / 10,
+          windSpeed: Math.round(windSpd),
+          windDirection: Math.round(windDir),
+          windGusts: Math.round(windGusts),
+          isSnow
+        });
+
+        if (liquidPrecip > 0.08 || snow > 0.05 || (wCode >= 51 && wCode <= 99)) {
+          if (liquidPrecip > maxPrecipMm) maxPrecipMm = liquidPrecip;
+
+          cells.push({
+            name: st.name,
+            lat: st.lat,
+            lon: st.lon,
+            elevation: stElev,
+            precipMm: Math.round(liquidPrecip * 100) / 100,
+            snowCm: Math.round(snow * 100) / 100,
+            temperature: Math.round(temp * 10) / 10,
+            wetBulbC: phaseInfo.wetBulbC,
+            freezingLevelHeight,
+            snowRatio: phaseInfo.snowRatio,
+            phase: phaseInfo.phase,
+            isSnow,
+            wCode,
+            intensity: liquidPrecip >= 6.0 ? 'heavy' : liquidPrecip >= 2.0 ? 'moderate' : 'light'
+          });
+        }
+      }
+
+      forecastFrames.push({
+        hourOffset: h,
+        time: String(timeStr).endsWith('Z') ? timeStr : `${timeStr}Z`,
+        timestampMs,
+        hoursFromNow: h,
+        label: h === 0 ? 'Jetzt' : `+${h} Std.`,
+        hasPrecipitation: cells.length > 0,
+        maxPrecipMm: Math.round(maxPrecipMm * 10) / 10,
+        cells,
+        stations: stationsData
+      });
+    }
+
+    return forecastFrames;
+  },
+
+  /**
    * STUFE 11: 48-Stunden-Zukunfts-Radar & Niederschlags-Prognose (DWD ICON & ECMWF)
-   * Lädt stündliche hochauflösende Niederschlags- und Schneefelder für die gesamte Region (bis zu +48h)
+   * Lädt stündliche hochauflösende Niederschlags-, Phasen-, Feuchtkugel- und Nullgrad-Felder (bis zu +48h)
    */
   async fetch48hRadarForecast(stations, fallbackWeather = null) {
     if (!stations || stations.length === 0) return null;
 
-    const CACHE_KEY = 'micro_48h_radar_forecast_cache_v3';
-    const CACHE_TTL = 15 * 60 * 1000; // 15 Minuten TTL
-
-    try {
-      const cached = sessionStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Date.now() - parsed.timestamp < CACHE_TTL && Array.isArray(parsed.frames) && parsed.frames.length > 0) {
-          return parsed.frames;
-        }
-      }
-    } catch (_) {}
+    const CACHE_TTL = 45 * 60 * 1000; // 45 Minuten TTL in L1 + kompaktem L2 localStorage
 
     try {
       const lats = stations.map(s => s.lat.toFixed(3)).join(',');
       const lons = stations.map(s => s.lon.toFixed(3)).join(',');
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=precipitation,snowfall,rain,temperature_2m,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m&forecast_days=4`;
-      
-      const rawData = await resilientFetch(url, {
-        cancelCategory: 'radar-forecast',
-        ttlMs: 5 * 60 * 1000
+      // forecast_days=3 deckt bis zu 72h ab (+48h inkl. UTC-Mitternachtsversatz) -> 25% weniger API-Gewicht als 4 Tage!
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=precipitation,snowfall,rain,showers,temperature_2m,relative_humidity_2m,freezing_level_height,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m&forecast_days=3&timezone=GMT`;
+
+      const compacted = await resilientFetch(url, {
+        ttlMs: CACHE_TTL,
+        persist: true,
+        staleTtlMs: 24 * 60 * 60 * 1000,
+        allowStaleOnError: true,
+        timeoutMs: 12000,
+        transformResponse: (rawData) => this._compactRadarBatchResponse(rawData)
       });
-      const stationResults = Array.isArray(rawData) ? rawData : [rawData];
 
-      if (!stationResults[0] || !stationResults[0].hourly || !stationResults[0].hourly.time) {
-        throw new Error('Ungültiges Open-Meteo Antwortformat');
+      const forecastFrames = this._buildRadarFramesFromCompact(stations, compacted);
+      if (!forecastFrames || forecastFrames.length === 0) {
+        throw new Error('Keine ausreichenden Zukunfts-Radar-Frames verfügbar');
       }
-
-      const times = stationResults[0].hourly.time;
-      const nowMs = Date.now();
-
-      let curIdx = 0;
-      let minDiff = Infinity;
-      for (let i = 0; i < Math.min(48, times.length); i++) {
-        const diff = Math.abs(new Date(times[i]).getTime() - nowMs);
-        if (diff < minDiff) {
-          minDiff = diff;
-          curIdx = i;
-        }
-      }
-
-      const forecastFrames = [];
-      const hoursCount = Math.min(49, times.length - curIdx);
-
-      for (let h = 0; h < hoursCount; h++) {
-        const idx = curIdx + h;
-        const timeStr = times[idx];
-        const timeObj = new Date(timeStr);
-
-        const cells = [];
-        const stationsData = [];
-        let maxPrecipMm = 0;
-
-        for (let s = 0; s < stations.length; s++) {
-          const st = stations[s];
-          const stHourly = stationResults[s] ? stationResults[s].hourly : null;
-          if (!stHourly) continue;
-
-          const precip = stHourly.precipitation ? (stHourly.precipitation[idx] || 0) : 0;
-          const snow = stHourly.snowfall ? (stHourly.snowfall[idx] || 0) : 0;
-          const temp = stHourly.temperature_2m ? (stHourly.temperature_2m[idx] !== undefined ? stHourly.temperature_2m[idx] : 10) : 10;
-          const wCode = stHourly.weather_code ? (stHourly.weather_code[idx] || 0) : 0;
-          const cloud = stHourly.cloud_cover ? (stHourly.cloud_cover[idx] !== undefined ? stHourly.cloud_cover[idx] : 50) : 50;
-          const pressure = stHourly.pressure_msl ? (stHourly.pressure_msl[idx] || 1013) : 1013;
-          const windSpd = stHourly.wind_speed_10m ? (stHourly.wind_speed_10m[idx] || 0) : 15;
-          const windDir = stHourly.wind_direction_10m ? (stHourly.wind_direction_10m[idx] || 0) : 240;
-          const windGusts = stHourly.wind_gusts_10m ? (stHourly.wind_gusts_10m[idx] || Math.round(windSpd * 1.35)) : Math.round(windSpd * 1.35);
-
-          const isSnow = temp <= 1.5 || snow > 0 || (wCode >= 71 && wCode <= 86);
-
-          stationsData.push({
-            name: st.name,
-            lat: st.lat,
-            lon: st.lon,
-            elevation: st.elevation,
-            isMountain: !!st.isMountain,
-            precip: Math.round(precip * 10) / 10,
-            snow: Math.round(snow * 10) / 10,
-            temperature: Math.round(temp * 10) / 10,
-            weatherCode: wCode,
-            cloudCover: Math.round(cloud),
-            pressureMsl: Math.round(pressure * 10) / 10,
-            windSpeed: Math.round(windSpd),
-            windDirection: Math.round(windDir),
-            windGusts: Math.round(windGusts),
-            isSnow: isSnow
-          });
-
-          if (precip > 0.05 || snow > 0 || (wCode >= 51 && wCode <= 99)) {
-            if (precip > maxPrecipMm) maxPrecipMm = precip;
-
-            cells.push({
-              name: st.name,
-              lat: st.lat,
-              lon: st.lon,
-              elevation: st.elevation,
-              precipMm: Math.round(precip * 10) / 10,
-              snowCm: Math.round(snow * 10) / 10,
-              temperature: Math.round(temp * 10) / 10,
-              isSnow: isSnow,
-              wCode: wCode,
-              intensity: precip >= 6.0 ? 'heavy' : precip >= 2.0 ? 'moderate' : 'light'
-            });
-          }
-        }
-
-        forecastFrames.push({
-          hourOffset: h,
-          time: timeStr,
-          timestampMs: timeObj.getTime(),
-          hoursFromNow: h,
-          label: h === 0 ? 'Jetzt' : `+${h} Std.`,
-          hasPrecipitation: cells.length > 0,
-          maxPrecipMm: Math.round(maxPrecipMm * 10) / 10,
-          cells: cells,
-          stations: stationsData
-        });
-      }
-
-      try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), frames: forecastFrames }));
-      } catch (_) {}
 
       return forecastFrames;
     } catch (err) {
@@ -4558,8 +4817,8 @@ export const MicroEngine = {
   },
 
   /**
-   * Physikalisch exakte meteorologische Synthese über Höhengradienten und barometrische Formeln,
-   * falls Open-Meteo Rate-Limits (HTTP 429) oder Netzwerkfehler auftreten.
+   * Physikalisch exakte meteorologische Synthese über Höhengradienten, Feuchtkugeltemperatur
+   * und barometrische Formeln, falls Open-Meteo Rate-Limits (HTTP 429) oder Netzwerkfehler auftreten.
    */
   buildFallback48hForecast(stations, baseWeather = null) {
     const hoursCount = 49;
@@ -4569,11 +4828,12 @@ export const MicroEngine = {
     const hourly = (baseWeather && baseWeather.hourly) ? baseWeather.hourly : null;
     const cur = (baseWeather && baseWeather.current) ? baseWeather.current : null;
 
-    const baseT = (cur && cur.temperature_2m !== undefined) ? cur.temperature_2m : 12.0;
+    const baseT = (cur && cur.temperature_2m !== undefined) ? cur.temperature_2m : 10.0;
     const baseP = (cur && cur.surface_pressure !== undefined) ? cur.surface_pressure : 1014.2;
     const baseWind = (cur && cur.wind_speed_10m !== undefined) ? cur.wind_speed_10m : 16.0;
     const baseDir = (cur && cur.wind_direction_10m !== undefined) ? cur.wind_direction_10m : 240;
     const baseCloud = (cur && cur.cloud_cover !== undefined) ? cur.cloud_cover : 55;
+    const baseRh = (cur && cur.relative_humidity_2m !== undefined) ? cur.relative_humidity_2m : 82;
 
     for (let h = 0; h < hoursCount; h++) {
       const timeMs = now + h * 3600000;
@@ -4587,6 +4847,9 @@ export const MicroEngine = {
       const hourlyT = (hourly && hourly.temperature_2m && hourly.temperature_2m[h] !== undefined)
         ? hourly.temperature_2m[h]
         : (baseT + diurnalOffset);
+      const hourlyRh = (hourly && hourly.relative_humidity_2m && hourly.relative_humidity_2m[h] !== undefined)
+        ? hourly.relative_humidity_2m[h]
+        : baseRh;
       const hourlyCloud = (hourly && hourly.cloud_cover && hourly.cloud_cover[h] !== undefined)
         ? hourly.cloud_cover[h]
         : Math.max(10, Math.min(95, baseCloud + Math.sin(h * 0.4) * 25));
@@ -4598,15 +4861,17 @@ export const MicroEngine = {
         : ((baseDir + h * 3) % 360);
       const hourlyPrecip = (hourly && hourly.precipitation && hourly.precipitation[h] !== undefined)
         ? hourly.precipitation[h]
-        : (h % 14 === 4 ? 2.4 : (h % 14 === 5 ? 1.2 : 0));
+        : 0;
+      const freezingLevelBase = (hourly && hourly.freezing_level_height && hourly.freezing_level_height[h] !== undefined)
+        ? Math.round(hourly.freezing_level_height[h])
+        : Math.round(520 + (hourlyT / 0.65) * 100);
 
       stations.forEach(st => {
-        const deltaElev = (st.elevation || 500) - 520;
+        const stElev = st.elevation || 500;
+        const deltaElev = stElev - 520;
         // Meteorologischer Höhengradient: -0.65°C pro 100m
         const stTemp = Math.round((hourlyT - (deltaElev / 100) * 0.65) * 10) / 10;
-        // Barometrische Höhenformel für QNH / Bodenluftdruck
         const stPressure = Math.round((baseP - (deltaElev / 8.3)) * 10) / 10;
-        // Windzunahme in exponierten Berglagen
         const windMult = st.isMountain ? 1.85 : 1.0;
         const stWind = Math.round(hourlyWind * windMult);
         const stGusts = Math.round(stWind * (st.isMountain ? 1.6 : 1.35));
@@ -4614,40 +4879,62 @@ export const MicroEngine = {
         const stDir = (hourlyDir + dirOffset + 360) % 360;
 
         const cloudMod = st.isMountain ? Math.min(100, hourlyCloud + 15) : hourlyCloud;
-        const isSnow = stTemp <= 1.0;
-        const stPrecip = hourlyPrecip;
-        const stSnow = isSnow ? Math.round(stPrecip * 1.2 * 10) / 10 : 0;
+        const stPrecip = Math.round(hourlyPrecip * (st.isMountain ? 1.25 : 1.0) * 100) / 100;
+        const stRh = Math.min(99, hourlyRh + (stPrecip > 0.1 ? 8 : 0));
+
+        const phaseInfo = this.classifyPrecipPhase({
+          tempC: stTemp,
+          rhPct: stRh,
+          precipMm: stPrecip,
+          rainMm: stTemp > 1.5 ? stPrecip : 0,
+          snowCm: stTemp <= 0.5 ? stPrecip : 0,
+          elevation: stElev,
+          freezingLevelM: freezingLevelBase,
+          wCode: stPrecip > 0 ? 61 : 2
+        });
+        const isSnow = phaseInfo.snowRatio >= 0.55;
+        const stSnow = (isSnow && stPrecip > 0) ? Math.round(stPrecip * phaseInfo.snowRatio * 10) / 10 : 0;
 
         const sObj = {
           name: st.name,
           lat: st.lat,
           lon: st.lon,
-          elevation: st.elevation,
+          elevation: stElev,
           isMountain: !!st.isMountain,
           precip: stPrecip,
+          rain: Math.round(stPrecip * (1 - phaseInfo.snowRatio) * 100) / 100,
           snow: stSnow,
           temperature: stTemp,
+          relativeHumidity: Math.round(stRh),
+          wetBulbC: phaseInfo.wetBulbC,
+          freezingLevelHeight: freezingLevelBase,
+          snowRatio: phaseInfo.snowRatio,
+          phase: phaseInfo.phase,
           weatherCode: isSnow && stPrecip > 0 ? 71 : (stPrecip > 0 ? 61 : (cloudMod > 70 ? 3 : 1)),
           cloudCover: Math.round(cloudMod),
           pressureMsl: Math.round(baseP * 10) / 10,
           windSpeed: stWind,
           windDirection: stDir,
           windGusts: stGusts,
-          isSnow: isSnow
+          isSnow
         };
         stationsData.push(sObj);
 
-        if (stPrecip > 0.05 || stSnow > 0) {
+        if (stPrecip > 0.08 || stSnow > 0.05) {
           if (stPrecip > maxPrecip) maxPrecip = stPrecip;
           cells.push({
             name: st.name,
             lat: st.lat,
             lon: st.lon,
-            elevation: st.elevation,
+            elevation: stElev,
             precipMm: stPrecip,
             snowCm: stSnow,
             temperature: stTemp,
-            isSnow: isSnow,
+            wetBulbC: phaseInfo.wetBulbC,
+            freezingLevelHeight: freezingLevelBase,
+            snowRatio: phaseInfo.snowRatio,
+            phase: phaseInfo.phase,
+            isSnow,
             wCode: sObj.weatherCode,
             intensity: stPrecip >= 6.0 ? 'heavy' : stPrecip >= 2.0 ? 'moderate' : 'light'
           });
@@ -4661,8 +4948,8 @@ export const MicroEngine = {
         hoursFromNow: h,
         label: h === 0 ? 'Jetzt' : `+${h} Std.`,
         hasPrecipitation: cells.length > 0,
-        maxPrecipMm: maxPrecip,
-        cells: cells,
+        maxPrecipMm: Math.round(maxPrecip * 10) / 10,
+        cells,
         stations: stationsData
       });
     }
@@ -4687,7 +4974,15 @@ export const MicroEngine = {
       return { icon: '🌤️', label: 'Heiter', synopNote: 'Ruhige Wetterlage', theme: 'clear-day' };
     }
 
-    const startH = dayIndex * 24;
+    const dateKey = String(daily.time[dayIndex]).slice(0, 10);
+    let startH = dayIndex * 24;
+    if (hourly && Array.isArray(hourly.time)) {
+      const atOffset = hourly.time[startH] ? String(hourly.time[startH]).slice(0, 10) : '';
+      if (atOffset !== dateKey) {
+        const matched = hourly.time.findIndex(t => String(t).slice(0, 10) === dateKey);
+        if (matched >= 0) startH = matched;
+      }
+    }
     const endH = Math.min(startH + 24, (hourly && hourly.time) ? hourly.time.length : startH);
 
     // Tagesstunden filtern (Tageslichtzeit ca. 07:00 bis 19:00 Uhr)
@@ -4841,11 +5136,9 @@ export const MicroEngine = {
           source: stationRes.source
         };
       }
-      const url = `https://api.brightsky.dev/current_weather?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`;
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data.weather || null;
+      const url = `https://api.brightsky.dev/current_weather?lat=${Number(lat).toFixed(3)}&lon=${Number(lon).toFixed(3)}`;
+      const data = await resilientFetch(url, { ttlMs: 10 * 60 * 1000, persist: true });
+      return data?.weather || null;
     } catch (e) {
       console.warn("Stationsabruf nicht erreichbar:", e.message);
       return null;
