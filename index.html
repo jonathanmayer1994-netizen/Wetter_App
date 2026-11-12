@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.9.2">
+  <link rel="stylesheet" href="style.css?v=2.9.3">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -1548,45 +1548,6 @@
                   </button>
                 </div>
               </div>
-
-              <!-- 4-Tab Segmented Mode Switcher (MeteoSwiss Style) -->
-              <div class="ms-segmented-wrap" id="ms-segmented-wrap">
-                <div class="ms-segmented-bar" role="tablist" aria-label="Wetterebenen Schnellwahl">
-                  <button class="ms-seg-btn active" data-overlay="precip" type="button" role="tab" aria-selected="true" title="Niederschlag &amp; Niederschlagstyp">
-                    <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true">
-                      <path d="M12.5 3.2c0 0-4.2 5.1-4.2 8.1a4.2 4.2 0 0 0 8.4 0c0-3-4.2-8.1-4.2-8.1zm-5.8 9.2c0 0-2.6 3.2-2.6 5.1a2.6 2.6 0 0 0 5.2 0c0-1.9-2.6-5.1-2.6-5.1zm11.2 1.8c0 0-2.2 2.7-2.2 4.3a2.2 2.2 0 0 0 4.4 0c0-1.6-2.2-4.3-2.2-4.3z"/>
-                    </svg>
-                  </button>
-                  <button class="ms-seg-btn" data-overlay="wind" type="button" role="tab" aria-selected="false" title="Wind &amp; Böen">
-                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M17.5 14a3.5 3.5 0 0 0 0-7 4.8 4.8 0 0 0-9.3-1.1A3.6 3.6 0 0 0 4 9.5a3.5 3.5 0 0 0 3.5 3.5H17.5z"/>
-                      <path d="M4 16.5h9.5a2 2 0 1 0-2-2"/>
-                      <path d="M6 19.5h7.5"/>
-                    </svg>
-                  </button>
-                  <button class="ms-seg-btn" data-overlay="clouds" type="button" role="tab" aria-selected="false" title="Bewölkung &amp; Hochnebel">
-                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M17.5 14.5H7.2a3.7 3.7 0 0 1-.4-7.4 4.9 4.9 0 0 1 9.5-1.2 3.8 3.8 0 0 1 1.2 8.6z" fill="currentColor" fill-opacity="0.22"/>
-                      <line x1="8" y1="17.5" x2="7.3" y2="19.5"/>
-                      <line x1="12" y1="17.5" x2="11.3" y2="19.5"/>
-                      <line x1="16" y1="17.5" x2="15.3" y2="19.5"/>
-                    </svg>
-                  </button>
-                  <button class="ms-seg-btn" data-overlay="temp" type="button" role="tab" aria-selected="false" title="Temperatur &amp; 0°C-Grenze">
-                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z"/>
-                      <circle cx="12" cy="17.5" r="1.4" fill="currentColor"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Collapse / Expand Chevron Notch -->
-              <button class="ms-header-collapse-tab" id="ms-header-collapse-btn" type="button" title="Kopfleiste ein-/ausklappen" aria-label="Kopfleiste ein-/ausklappen">
-                <svg viewBox="0 0 20 12" width="16" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="4 3 10 9 16 3"></polyline>
-                </svg>
-              </button>
             </div>
 
             <!-- Subtle Top-Left & Top-Right Radar Attribution / Watermark -->
@@ -1932,7 +1893,7 @@
                       <span class="ms-bar-forecast" id="ms-bar-forecast"></span>
                     </div>
                     <div class="ms-scrubber-needle" id="ms-scrubber-needle" aria-hidden="true"></div>
-                    <input type="range" id="radar-time-slider" min="0" max="60" value="4" step="1" aria-label="Zeitleiste 48h Radar">
+                    <input type="range" id="radar-time-slider" min="0" max="60" value="4" step="any" aria-label="Zeitleiste 48h Radar">
                   </div>
                   <div class="radar-timeline-markers ms-axis-subline">
                     <span class="ms-sub-left"><span class="ms-line-sample measured"></span>Messung</span>
@@ -3069,11 +3030,11 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.9.2"></script>
+  <script type="module" src="app.js?v=2.9.3"></script>
 
   <!-- Autonome iOS-PWA & Service-Worker Update-Engine -->
   <script type="module">
-    import { initAppUpdater } from './core/appUpdater.js?v=2.9.2';
+    import { initAppUpdater } from './core/appUpdater.js?v=2.9.3';
     initAppUpdater();
   </script>
 </body>

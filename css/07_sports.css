@@ -4,7 +4,7 @@
 @media (max-width: 768px) {
   .app-layout {
     --app-layout-gap: 14px;
-    padding-top: max(24px, calc(env(safe-area-inset-top, 0px) + 20px)) !important;
+    padding-top: 12px !important;
     padding-bottom: calc(108px + env(safe-area-inset-bottom, 12px)) !important;
     padding-left: max(14px, env(safe-area-inset-left, 14px)) !important;
     padding-right: max(14px, env(safe-area-inset-right, 14px)) !important;
@@ -112,8 +112,8 @@
   }
 
   .header-gps-pill {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     padding: 0;
     display: inline-flex;
     align-items: center;
@@ -121,16 +121,16 @@
     border-radius: 50%;
     isolation: isolate;
     transform: translateZ(0);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 
   .nav-icon-btn {
-    width: 40px;
-    height: 40px;
-    font-size: 15px;
+    width: 42px;
+    height: 42px;
+    font-size: 16px;
     isolation: isolate;
     transform: translateZ(0);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 
   .search-dropdown {
@@ -636,56 +636,52 @@
     left: 0 !important;
     right: 0 !important;
     z-index: 100002 !important;
-    padding: calc(env(safe-area-inset-top, 10px) + 6px) 10px 8px 10px !important;
-    gap: 6px !important;
+    background: #12161d !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16) !important;
+    padding: calc(env(safe-area-inset-top, 12px) + 10px) 12px 12px 12px !important;
+    gap: 0 !important;
   }
 
   .ms-header-top-row {
-    grid-template-columns: minmax(0, auto) 1fr auto;
-    gap: 6px;
-    min-height: 40px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    min-height: 44px;
+  }
+
+  .ms-title-stack {
+    width: 100%;
+    padding: 0 2px;
+    line-height: 1.24;
   }
 
   .ms-title-main {
-    font-size: 15px;
+    font-size: 15.5px;
+    line-height: 1.2;
   }
 
   .ms-title-sub {
-    font-size: 10px;
-    max-width: 165px;
+    font-size: 10.5px;
+    line-height: 1.25;
+    width: 100%;
+    max-width: 100%;
+    color: rgba(255, 255, 255, 0.84);
   }
 
   .ms-info-btn {
-    width: 34px;
-    height: 34px;
-  }
-
-  .ms-segmented-bar {
-    max-width: none;
-    padding: 2.5px;
-    gap: 2px;
-  }
-
-  .ms-seg-btn {
-    height: 28px;
-  }
-
-  .ms-header-collapse-tab {
-    bottom: -16px;
-    width: 44px;
-    height: 16px;
+    width: 38px;
+    height: 38px;
+    background: #1d2432;
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    color: #ffffff;
   }
 
   .ms-map-attribution,
   .ms-radar-watermark {
     position: absolute !important;
-    top: calc(env(safe-area-inset-top, 10px) + 104px) !important;
+    top: calc(env(safe-area-inset-top, 12px) + 68px) !important;
     z-index: 100000 !important;
-  }
-
-  #fullscreen-map-wrapper:has(.ms-map-header-bar.is-collapsed) .ms-map-attribution,
-  #fullscreen-map-wrapper:has(.ms-map-header-bar.is-collapsed) .ms-radar-watermark {
-    top: calc(env(safe-area-inset-top, 10px) + 62px) !important;
   }
 
   .ms-right-fab-stack {
@@ -715,15 +711,15 @@
     top: auto;
     right: auto;
     z-index: 100005;
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.10);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: #1d2432;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.28);
     color: #ffffff;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
     cursor: pointer;
     font-size: 17px;
     font-weight: 700;
@@ -766,13 +762,16 @@
   }
 
   .map-layer-pill {
-    padding: 5px 9px;
-    font-size: 11px;
-    gap: 5px;
+    padding: 7px 12px;
+    min-height: 38px;
+    font-size: 12px;
+    gap: 6px;
     border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.10);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    background: #1d2432;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   }
 
   .map-layer-pill .mlp-tag {
@@ -818,7 +817,7 @@
   /* Windkompass — 100% Kollisionsfrei auf Mobile */
   .map-wind-compass-widget {
     position: absolute !important;
-    top: calc(env(safe-area-inset-top, 10px) + 124px) !important;
+    top: calc(env(safe-area-inset-top, 12px) + 86px) !important;
     left: 10px !important;
     z-index: 100001 !important;
     width: fit-content !important;
@@ -826,10 +825,10 @@
     max-width: 240px !important;
     padding: 5px 10px !important;
     gap: 10px !important;
-    background: rgba(23, 25, 29, 0.94) !important;
-    backdrop-filter: blur(24px) !important;
-    -webkit-backdrop-filter: blur(24px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    background: rgba(18, 22, 29, 0.96) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
     border-radius: 14px !important;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
     cursor: pointer !important;
@@ -837,10 +836,6 @@
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
     isolation: isolate !important;
     transform: translateZ(0) !important;
-  }
-
-  #fullscreen-map-wrapper:has(.ms-map-header-bar.is-collapsed) .map-wind-compass-widget {
-    top: calc(env(safe-area-inset-top, 10px) + 82px) !important;
   }
 
   .mwc-compass-dial {
@@ -1061,7 +1056,7 @@
   .map-legend-card.ms-legend-force-open {
     display: flex !important;
     position: absolute !important;
-    top: calc(env(safe-area-inset-top, 10px) + 122px) !important;
+    top: calc(env(safe-area-inset-top, 12px) + 86px) !important;
     left: 10px !important;
     right: 10px !important;
     min-width: unset !important;
@@ -1095,12 +1090,14 @@
   }
 
   .radar-time-banner {
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 700;
     color: #ffffff;
     white-space: nowrap;
-    overflow: visible;
-    text-overflow: clip;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
   }
 }
 
@@ -5328,8 +5325,8 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: linear-gradient(135deg, rgba(10, 132, 255, 0.25), rgba(0, 122, 255, 0.4));
-  border: 1px solid rgba(100, 210, 255, 0.55);
+  background: linear-gradient(135deg, rgba(14, 116, 224, 0.92), rgba(2, 132, 199, 0.94));
+  border: 1px solid rgba(125, 211, 252, 0.72);
   border-radius: var(--radius-pill);
   padding: 8px 14px;
   color: #fff;
@@ -5565,7 +5562,8 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     left: 0;
     right: 0;
     height: env(safe-area-inset-top, 0px);
-    background: linear-gradient(180deg, rgba(11, 19, 30, 0.45) 0%, rgba(11, 19, 30, 0.14) 70%, transparent 100%);
+    background: var(--bg-gradient-top, #153243);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     pointer-events: none;
     z-index: 9999;
   }
@@ -5625,8 +5623,9 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 
   .app-layout {
     position: relative;
+    top: env(safe-area-inset-top, 0px);
     width: 100%;
-    height: 100%;
+    height: calc(var(--app-height, 100%) - env(safe-area-inset-top, 0px));
     min-height: 0;
     overflow-y: auto !important;
     overflow-x: hidden !important;
@@ -5636,6 +5635,9 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 
   body.mobile-map-fullscreen-active .app-layout,
   body.sports-map-fullscreen-active .app-layout {
+    top: 0 !important;
+    height: var(--app-height, 100%) !important;
+    padding-top: 0 !important;
     overflow: hidden !important;
   }
 }
@@ -5650,7 +5652,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   }
 
   .app-layout {
-    padding-top: max(24px, calc(env(safe-area-inset-top, 0px) + 20px)) !important;
+    padding-top: 12px !important;
     padding-bottom: calc(108px + env(safe-area-inset-bottom, 12px)) !important;
   }
 

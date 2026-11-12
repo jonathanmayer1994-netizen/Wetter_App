@@ -49,6 +49,7 @@ export const state = {
     radarFrames: [],
     unifiedRadarFrames: [],
     radarIndex: 0,
+    radarFloatIndex: 0,
     liveRadarIndex: 0,
     radarInterval: null,
     radarRafId: null,

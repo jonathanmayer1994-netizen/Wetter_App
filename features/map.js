@@ -50,13 +50,6 @@ export function createUserLocationBeaconIcon(loc) {
 
 export function syncMeteoSwissHudControls() {
   const activeOverlay = (state.map && state.map.activeOverlay) || 'precip';
-  const segOverlay = ['precip', 'wind', 'clouds', 'temp'].includes(activeOverlay) ? activeOverlay : '';
-
-  document.querySelectorAll('.ms-seg-btn').forEach(btn => {
-    const isAct = btn.dataset.overlay === segOverlay;
-    btn.classList.toggle('active', isAct);
-    btn.setAttribute('aria-selected', isAct ? 'true' : 'false');
-  });
 
   const subMap = {
     'precip': state.map && state.map.precipPhaseEnabled === false ? 'Niederschlag (Intensität)' : 'Niederschlag & Niederschlagstyp',
@@ -331,17 +324,28 @@ export function initLeafletMap() {
     if (panRenderRaf) return;
     panRenderRaf = requestAnimationFrame(() => {
       panRenderRaf = null;
-      if (state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length) {
-        const f = state.map.unifiedRadarFrames[state.map.radarIndex] || {};
-        WeatherCanvasEngine.render(f, state.map.activeOverlay, { fastPan: true });
+      const spec = getActiveInterpolatedRadarSpec();
+      if (spec) {
+        WeatherCanvasEngine.render(spec.frame, state.map.activeOverlay, {
+          fastPan: true,
+          rvFrameA: spec.frameA,
+          rvFrameB: spec.frameB,
+          morphAlpha: spec.morphAlpha,
+          stationsPreInterpolated: spec.morphAlpha > 0
+        });
       }
     });
   });
 
   state.map.instance.on('moveend zoomend', () => {
-    if (state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length) {
-      const f = state.map.unifiedRadarFrames[state.map.radarIndex] || {};
-      WeatherCanvasEngine.render(f, state.map.activeOverlay);
+    const spec = getActiveInterpolatedRadarSpec();
+    if (spec) {
+      WeatherCanvasEngine.render(spec.frame, state.map.activeOverlay, {
+        rvFrameA: spec.frameA,
+        rvFrameB: spec.frameB,
+        morphAlpha: spec.morphAlpha,
+        stationsPreInterpolated: spec.morphAlpha > 0
+      });
     }
     if (state.map.activeOverlay === 'precip' || state.map.activeOverlay === 'rainviewer-radar') {
       ViewportDemStore.scheduleFetchForMap(state.map.instance);
@@ -352,17 +356,27 @@ export function initLeafletMap() {
   // Fenster-Resize-Handling für responsive Anpassung (Canvas, Map, 3D-Mountain)
   let resizeDebounce = null;
   window.addEventListener('resize', () => {
-    if (state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length) {
-      const f = state.map.unifiedRadarFrames[state.map.radarIndex] || {};
-      WeatherCanvasEngine.render(f, state.map.activeOverlay);
+    const spec = getActiveInterpolatedRadarSpec();
+    if (spec) {
+      WeatherCanvasEngine.render(spec.frame, state.map.activeOverlay, {
+        rvFrameA: spec.frameA,
+        rvFrameB: spec.frameB,
+        morphAlpha: spec.morphAlpha,
+        stationsPreInterpolated: spec.morphAlpha > 0
+      });
     }
     if (resizeDebounce) clearTimeout(resizeDebounce);
     resizeDebounce = setTimeout(() => {
       if (state.activeTab === 'tab-map' && state.map.instance) {
         state.map.instance.invalidateSize();
-        if (state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length) {
-          const f = state.map.unifiedRadarFrames[state.map.radarIndex] || {};
-          WeatherCanvasEngine.render(f, state.map.activeOverlay);
+        const debSpec = getActiveInterpolatedRadarSpec();
+        if (debSpec) {
+          WeatherCanvasEngine.render(debSpec.frame, state.map.activeOverlay, {
+            rvFrameA: debSpec.frameA,
+            rvFrameB: debSpec.frameB,
+            morphAlpha: debSpec.morphAlpha,
+            stationsPreInterpolated: debSpec.morphAlpha > 0
+          });
         }
       }
     }, 100);
@@ -371,28 +385,7 @@ export function initLeafletMap() {
   // 12. Mobile Vollbild-Karte und Ergonomie Setup (Schließen-Button, Point-Weather & MeteoSwiss FABs)
   setupMobileMapFullscreen();
 
-  // 13. MeteoSwiss Segmented Bar, Header Collapse, Info Legend & Right FAB Stack
-  document.querySelectorAll('.ms-seg-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const overlay = btn.dataset.overlay;
-      if (!overlay) return;
-      document.querySelectorAll('.map-overlay-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.overlay === overlay);
-      });
-      setMapOverlay(overlay);
-    });
-  });
-
-  const headerCollapseBtn = document.getElementById('ms-header-collapse-btn');
-  const headerBar = document.getElementById('ms-map-header-bar');
-  if (headerCollapseBtn && headerBar) {
-    headerCollapseBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      headerBar.classList.toggle('is-collapsed');
-    });
-  }
-
+  // 13. Info Legend & Right FAB Stack
   const legendToggleBtn = document.getElementById('map-legend-toggle-btn');
   if (legendToggleBtn) {
     legendToggleBtn.addEventListener('click', (e) => {
@@ -704,14 +697,20 @@ export function setMapBaseLayer(baseKey) {
       const ctx = canvas.getContext('2d');
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-    if (state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length) {
-      showUnifiedRadarFrame(state.map.radarIndex);
+    const spec = getActiveInterpolatedRadarSpec();
+    if (spec) {
+      showUnifiedRadarFrame(spec.floatIdx);
     }
   } else if (state.map.activeOverlay) {
     updateMapLegend(state.map.activeOverlay);
-    if (state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length) {
-      const f = state.map.unifiedRadarFrames[state.map.radarIndex] || {};
-      WeatherCanvasEngine.render(f, state.map.activeOverlay);
+    const spec = getActiveInterpolatedRadarSpec();
+    if (spec) {
+      WeatherCanvasEngine.render(spec.frame, state.map.activeOverlay, {
+        rvFrameA: spec.frameA,
+        rvFrameB: spec.frameB,
+        morphAlpha: spec.morphAlpha,
+        stationsPreInterpolated: spec.morphAlpha > 0
+      });
     }
   }
 
@@ -983,7 +982,15 @@ export function updateWindCompassWidget(frame) {
 
   const needleWrap = document.getElementById('mwc-needle-wrap');
   if (needleWrap) {
-    needleWrap.style.transform = `rotate(${dir + 180}deg)`;
+    const rawTarget = dir + 180;
+    const prev = state.map._compassNeedleAngle;
+    if (typeof prev === 'number' && Number.isFinite(prev)) {
+      let delta = ((rawTarget - prev) % 360 + 540) % 360 - 180;
+      state.map._compassNeedleAngle = prev + delta;
+    } else {
+      state.map._compassNeedleAngle = rawTarget;
+    }
+    needleWrap.style.transform = `rotate(${state.map._compassNeedleAngle}deg)`;
   }
 }
 
@@ -995,8 +1002,9 @@ export function updatePointWeatherCard(frame) {
   const card = document.getElementById('map-point-weather-card');
   if (!card) return;
 
-  if (!frame && state.map && state.map.unifiedRadarFrames && state.map.radarIndex !== undefined) {
-    frame = state.map.unifiedRadarFrames[state.map.radarIndex];
+  if (!frame) {
+    const activeSpec = getActiveInterpolatedRadarSpec();
+    if (activeSpec) frame = activeSpec.frame;
   }
 
   const loc = state.currentLocation || { name: 'München', elevation: 520 };
@@ -1042,22 +1050,24 @@ export function updatePointWeatherCard(frame) {
 
   const timeBadge = document.getElementById('mpw-time-badge');
   if (timeBadge) {
-    if (frame && !frame.isLive && frame.minuteOffset !== undefined && frame.minuteOffset !== 0) {
-      const mo = frame.minuteOffset;
+    const rawMo = frame && frame.minuteOffset !== undefined ? Number(frame.minuteOffset) : undefined;
+    const dispMo = (rawMo !== undefined && Number.isFinite(rawMo)) ? Math.round(rawMo) : undefined;
+    if (frame && !frame.isLive && dispMo !== undefined && dispMo !== 0) {
       let text = '';
-      if (Math.abs(mo) < 60) {
-        text = mo > 0 ? `+${mo}m` : `${mo}m`;
-      } else if (mo % 60 === 0) {
-        text = mo > 0 ? `+${mo / 60}h` : `${mo / 60}h`;
+      if (Math.abs(dispMo) < 60) {
+        text = dispMo > 0 ? `+${dispMo}m` : `${dispMo}m`;
+      } else if (dispMo % 60 === 0) {
+        text = dispMo > 0 ? `+${dispMo / 60}h` : `${dispMo / 60}h`;
       } else {
-        const h = Math.floor(Math.abs(mo) / 60);
-        const m = Math.abs(mo) % 60;
-        text = mo > 0 ? `+${h}h ${m}m` : `-${h}h ${m}m`;
+        const h = Math.floor(Math.abs(dispMo) / 60);
+        const m = Math.abs(dispMo) % 60;
+        text = dispMo > 0 ? `+${h}h ${m}m` : `-${h}h ${m}m`;
       }
       timeBadge.innerText = text;
       timeBadge.className = 'mpw-time-badge forecast';
-    } else if (frame && !frame.isLive && frame.hoursFromNow !== undefined && frame.hoursFromNow !== 0) {
-      const sign = frame.hoursFromNow > 0 ? `+${frame.hoursFromNow}h` : `${frame.hoursFromNow}h`;
+    } else if (frame && !frame.isLive && frame.hoursFromNow !== undefined && Math.abs(frame.hoursFromNow) >= 0.05) {
+      const hRound = Math.round(frame.hoursFromNow * 10) / 10;
+      const sign = hRound > 0 ? `+${hRound}h` : `${hRound}h`;
       timeBadge.innerText = sign;
       timeBadge.className = 'mpw-time-badge forecast';
     } else {
@@ -1723,11 +1733,15 @@ const RainViewerRadarStore = {
     this._rerenderRaf = requestAnimationFrame(() => {
       this._rerenderRaf = null;
       if (state.map && state.map.activeOverlay && (state.map.activeOverlay === 'precip' || state.map.activeOverlay === 'rainviewer-radar')) {
-        const frames = state.map.unifiedRadarFrames;
-        if (frames && frames.length) {
-          const curFrame = frames[state.map.radarIndex] || {};
-          WeatherCanvasEngine.render(curFrame, state.map.activeOverlay);
-          updatePointWeatherCard(curFrame);
+        const spec = getActiveInterpolatedRadarSpec();
+        if (spec) {
+          WeatherCanvasEngine.render(spec.frame, state.map.activeOverlay, {
+            rvFrameA: spec.frameA,
+            rvFrameB: spec.frameB,
+            morphAlpha: spec.morphAlpha,
+            stationsPreInterpolated: spec.morphAlpha > 0
+          });
+          updatePointWeatherCard(spec.frame);
         }
       }
     });
@@ -2067,9 +2081,14 @@ const ViewportDemStore = {
         });
         this.persistToStorage();
         if (state.map && state.map.activeOverlay && (state.map.activeOverlay === 'precip' || state.map.activeOverlay === 'rainviewer-radar')) {
-          const frames = state.map.unifiedRadarFrames;
-          if (frames && frames.length) {
-            WeatherCanvasEngine.render(frames[state.map.radarIndex] || {}, state.map.activeOverlay);
+          const spec = getActiveInterpolatedRadarSpec();
+          if (spec) {
+            WeatherCanvasEngine.render(spec.frame, state.map.activeOverlay, {
+              rvFrameA: spec.frameA,
+              rvFrameB: spec.frameB,
+              morphAlpha: spec.morphAlpha,
+              stationsPreInterpolated: spec.morphAlpha > 0
+            });
           }
         }
       }
@@ -2405,10 +2424,14 @@ const ViewportForecastGridStore = {
 
       // Sofort neu rendern (auch bei Live / +5m, sobald Hochnebel & Alpen-NWP-Gitter geladen ist)
       if (state.activeTab === 'tab-map' && state.map && (state.map.activeOverlay === 'precip' || state.map.activeOverlay === 'rainviewer-radar')) {
-        const frames = state.map.unifiedRadarFrames;
-        const curFrame = (frames && frames.length) ? frames[state.map.radarIndex] : null;
-        if (curFrame) {
-          WeatherCanvasEngine.render(curFrame, state.map.activeOverlay);
+        const spec = getActiveInterpolatedRadarSpec();
+        if (spec) {
+          WeatherCanvasEngine.render(spec.frame, state.map.activeOverlay, {
+            rvFrameA: spec.frameA,
+            rvFrameB: spec.frameB,
+            morphAlpha: spec.morphAlpha,
+            stationsPreInterpolated: spec.morphAlpha > 0
+          });
         }
       }
     } catch (_) {
@@ -2656,6 +2679,19 @@ const WeatherCanvasEngine = {
   },
 
   render(frame, overlay, options = {}) {
+    const stations = (frame && frame.stations && frame.stations.length > 0)
+      ? frame.stations
+      : ((state.map.regionalStationsData && state.map.regionalStationsData.length > 0)
+          ? state.map.regionalStationsData
+          : getSynthesizedBaselineStations());
+
+    // Bei kontinuierlichem Scrubbing/Playback bestehende Wind-Partikel nahtlos weitersteuern ohne Flackern
+    if (overlay === 'wind' && this.activeOverlay === 'wind' && this.animId && !options.forceRestart) {
+      this.currentFrame = frame;
+      this._windStations = stations;
+      return;
+    }
+
     this.currentFrame = frame;
     this.activeOverlay = overlay;
     this.stopAnimation();
@@ -2663,12 +2699,6 @@ const WeatherCanvasEngine = {
     const cData = this.ensureCanvas();
     if (!cData || !state.map || !state.map.instance) return;
     const { ctx, width, height } = cData;
-
-    const stations = (frame && frame.stations && frame.stations.length > 0)
-      ? frame.stations
-      : ((state.map.regionalStationsData && state.map.regionalStationsData.length > 0)
-          ? state.map.regionalStationsData
-          : getSynthesizedBaselineStations());
 
     if (overlay === 'temp') {
       this.renderThermalHeatmap(ctx, width, height, stations);
@@ -2818,6 +2848,7 @@ const WeatherCanvasEngine = {
   // 2. KONTINUIERLICHES 420-PARTIKEL WINDSTRÖMUNGSFELD
   startWindParticleSimulation(ctx, width, height, stations) {
     if (!stations.length || !state.map.instance) return;
+    this._windStations = stations;
 
     if (!this.particles || this.particles.length === 0 || this.particles.length !== this.maxParticles) {
       this.particles = [];
@@ -2835,6 +2866,7 @@ const WeatherCanvasEngine = {
     const self = this;
     function animLoop() {
       if (self.activeOverlay !== 'wind') return;
+      const liveStations = (self._windStations && self._windStations.length) ? self._windStations : stations;
 
       // Erhalte die darunterliegende OSM-Karte 100% transparent sichtbar!
       // Faded bestehende Partikelspuren sauber mit destination-out ab, ohne eine deckende Farbschicht aufzubauen.
@@ -2853,7 +2885,7 @@ const WeatherCanvasEngine = {
       for (let i = 0; i < self.particles.length; i++) {
         const p = self.particles[i];
         const latLng = state.map.instance.containerPointToLatLng([p.x, p.y]);
-        const vec = self.interpolateWindVector(latLng.lat, latLng.lng, stations);
+        const vec = self.interpolateWindVector(latLng.lat, latLng.lng, liveStations);
         p.speed = vec.speed;
 
         const dt = 0.28;
@@ -3785,8 +3817,11 @@ const WeatherCanvasEngine = {
     const mapInst = state.map.instance;
     const isFastPan = !!options.fastPan;
     const isDark = this.isDarkBasemap();
-    const morphNext = options.nextFrame || null;
-    const morphAlpha = (morphNext && options.morphAlpha > 0 && options.morphAlpha < 1) ? options.morphAlpha : 0;
+    const stationsPreInterpolated = !!options.stationsPreInterpolated;
+    const morphNext = options.rvFrameB || options.nextFrame || null;
+    const rawMorphAlpha = (morphNext && options.morphAlpha > 0 && options.morphAlpha < 1) ? options.morphAlpha : 0;
+    const morphAlpha = stationsPreInterpolated ? 0 : rawMorphAlpha;
+    const rvBlendAlpha = rawMorphAlpha;
     const step = isFastPan ? 5 : 2;
     const sCols = Math.ceil(width / step) + 1;
     const sRows = Math.ceil(height / step) + 1;
@@ -3861,8 +3896,12 @@ const WeatherCanvasEngine = {
         };
       }
 
-      const fieldCtx = this.preparePrecipFieldContext(activeStations, activeFrame);
-      const fieldCtxB = (morphAlpha > 0 && morphNext) ? this.preparePrecipFieldContext(morphNext.stations || activeStations, morphNext) : null;
+      const frameForCtxA = (stationsPreInterpolated && options.rvFrameA)
+        ? { ...activeFrame, rvPath: options.rvFrameA.rvPath || options.rvFrameA.path || '', path: options.rvFrameA.path || options.rvFrameA.rvPath || '' }
+        : activeFrame;
+      const fieldCtx = this.preparePrecipFieldContext(activeStations, frameForCtxA);
+      const needsRvBlend = rvBlendAlpha > 0 && morphNext && (morphAlpha > 0 || (stationsPreInterpolated && (frameForCtxA.rvPath || morphNext.rvPath || morphNext.path)));
+      const fieldCtxB = needsRvBlend ? this.preparePrecipFieldContext(morphNext.stations || activeStations, morphNext) : null;
 
       const cStep = isFastPan ? 2 : 4;
       const cCols = Math.ceil((sCols - 1) / cStep) + 1;
@@ -3889,7 +3928,7 @@ const WeatherCanvasEngine = {
       let rvColNxA = null, rvRowNyA = null;
       let rvColNxB = null, rvRowNyB = null;
       const useRvA = fieldCtx.radarWeight > 0 && !!fieldCtx.rvPath;
-      const useRvB = !!(fieldCtxB && fieldCtxB.radarWeight > 0 && fieldCtxB.rvPath && morphAlpha > 0);
+      const useRvB = !!(fieldCtxB && fieldCtxB.radarWeight > 0 && fieldCtxB.rvPath && rvBlendAlpha > 0);
 
       if (useRvA) {
         rvColNxA = new Float64Array(sCols);
@@ -3950,7 +3989,7 @@ const WeatherCanvasEngine = {
 
           if (useRvA || useRvB) {
             const rvA = useRvA ? RainViewerRadarStore.sampleAtNormXY(fieldCtx.rvPath, fieldCtx.rvZoom, rvColNxA[c], nyA) : { hasTile: false, rateMmH: 0, rvSnowMask: 0 };
-            if (useRvB && morphAlpha > 0) {
+            if (useRvB && rvBlendAlpha > 0) {
               const rvB = RainViewerRadarStore.sampleAtNormXY(fieldCtxB.rvPath, fieldCtxB.rvZoom, rvColNxB[c], nyB);
               if (rvA.hasTile || rvB.hasTile) {
                 hasRvAtPt = true;
@@ -3981,11 +4020,11 @@ const WeatherCanvasEngine = {
                     rB = 0;
                   }
                 }
-                rate = rA * (1 - morphAlpha) + rB * morphAlpha;
+                rate = rA * (1 - rvBlendAlpha) + rB * rvBlendAlpha;
                 const sA = rvA.hasTile ? rvA.rvSnowMask * fieldCtx.radarWeight : 0;
                 const sB = rvB.hasTile ? rvB.rvSnowMask * fieldCtxB.radarWeight : 0;
-                const totR = rA * (1 - morphAlpha) + rB * morphAlpha;
-                rvSnowMask = totR > 0.005 ? (rA * (1 - morphAlpha) * sA + rB * morphAlpha * sB) / totR : 0;
+                const totR = rA * (1 - rvBlendAlpha) + rB * rvBlendAlpha;
+                rvSnowMask = totR > 0.005 ? (rA * (1 - rvBlendAlpha) * sA + rB * rvBlendAlpha * sB) / totR : 0;
               }
             } else if (rvA.hasTile) {
               hasRvAtPt = true;
@@ -4430,7 +4469,7 @@ const WeatherCanvasEngine = {
  * Rendert das aktuell aktive Wetter-Overlay (48h Radar, Wind, Blitze, Wolken, Temp, Druck)
  * präzise und unendlich trennscharf über der gesamten Kartenoberfläche.
  */
-export function renderActiveWeatherOverlayForFrame(frame, overlay) {
+export function renderActiveWeatherOverlayForFrame(frame, overlay, renderOpts = {}) {
   if (!state.map.instance || !state.map.weatherLayerGroup) return;
 
   const stations = (frame && frame.stations && frame.stations.length > 0)
@@ -4446,31 +4485,34 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
   const isTomorrow = t.toDateString() === tmrw.toDateString();
   const dayStr = isToday ? 'Heute' : (isTomorrow ? 'Morgen' : t.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }));
   const timeStr = t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  
+
+  const rawMo = (frame && frame.minuteOffset !== undefined) ? Number(frame.minuteOffset) : undefined;
+  const dispMin = rawMo !== undefined ? Math.round(rawMo) : undefined;
+  const isLiveNow = !!(frame && (frame.isLive || dispMin === 0));
+
   let relStr = 'Live';
   if (frame) {
-    if (frame.isLive || frame.minuteOffset === 0) {
+    if (isLiveNow) {
       relStr = 'Live';
-    } else if (frame.minuteOffset !== undefined) {
-      const mo = frame.minuteOffset;
-      if (mo < 0) {
-        relStr = `vor ${Math.abs(mo)} Min.`;
-      } else if (mo < 60) {
-        relStr = `+${mo}m`;
-      } else if (mo % 60 === 0) {
-        relStr = `+${mo / 60}h`;
+    } else if (dispMin !== undefined) {
+      if (dispMin < 0) {
+        relStr = `vor ${Math.abs(dispMin)} Min.`;
+      } else if (dispMin < 60) {
+        relStr = `+${dispMin}m`;
+      } else if (dispMin % 60 === 0) {
+        relStr = `+${dispMin / 60}h`;
       } else {
-        relStr = `+${Math.floor(mo / 60)}h ${mo % 60}m`;
+        relStr = `+${Math.floor(dispMin / 60)}h ${dispMin % 60}m`;
       }
     } else if (frame.type === 'past') {
       const diffM = Math.round((Date.now() - t.getTime()) / 60000);
       relStr = `vor ${diffM} Min.`;
     } else if (frame.hoursFromNow) {
-      relStr = `+${frame.hoursFromNow}h`;
+      relStr = `+${Math.round(frame.hoursFromNow)}h`;
     }
   }
 
-  const fullDateTimeText = relStr ? `${dayStr}, ${timeStr} Uhr (${relStr})` : `${dayStr}, ${timeStr} Uhr`;
+  const fullDateTimeText = relStr ? `${dayStr}, ${timeStr} (${relStr})` : `${dayStr}, ${timeStr} Uhr`;
 
   const modeChip = document.getElementById('radar-mode-chip');
   const timeDisplay = document.getElementById('radar-time-display');
@@ -4481,30 +4523,47 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
     radarControls.style.display = 'flex';
   }
 
-  // Berechne exakte Wetterdaten für den aktuell betrachteten Standort/Berg für diesen Zeitschritt
-  const locWeather = getLocationWeatherForFrame(frame);
-
   // Aktualisiere Live-Windkompass-Widget (wird automatisch angezeigt, wenn overlay === 'wind')
   updateWindCompassWidget(frame);
 
   // Aktualisiere Live-Point-Wetter-Kachel für den aktuellen Zeitpunkt/Frame
   updatePointWeatherCard(frame);
 
+  const canvasOpts = {
+    rvFrameA: renderOpts.rvFrameA,
+    rvFrameB: renderOpts.rvFrameB,
+    morphAlpha: renderOpts.morphAlpha,
+    stationsPreInterpolated: renderOpts.stationsPreInterpolated,
+    fastPan: renderOpts.fastPan
+  };
+
+  // Vermeide 30-FPS-DOM-Neuerzeugung der 36 Stations-Badges während flüssigem Ziehen/Playback
+  const shouldThrottleDomMarkers = (targetOverlay) => {
+    if (!renderOpts.isScrubOrPlay) return false;
+    if (state.map._stationLayerOverlay !== targetOverlay) return false;
+    if (!state.map.weatherLayerGroup || state.map.weatherLayerGroup.getLayers().length === 0) return false;
+    return (performance.now() - (state.map._lastStationMarkerAt || 0)) < 140;
+  };
+  const markDomMarkersFresh = (targetOverlay) => {
+    state.map._stationLayerOverlay = targetOverlay;
+    state.map._lastStationMarkerAt = performance.now();
+  };
+
   // =========================================================================
   // 1. NIEDERSCHLAG & RADAR (48h RADAR)
   // =========================================================================
   if (overlay === 'precip' || overlay === 'rainviewer-radar') {
-    if (frame && frame.type === 'past') {
+    if (frame && (frame.type === 'past' || isLiveNow)) {
       if (state.map.futureRadarLayerGroup) state.map.futureRadarLayerGroup.clearLayers();
       cleanupRadarTiles();
 
       if (modeChip) {
-        if (frame.isLive) {
+        if (isLiveNow) {
           modeChip.innerText = '🔴 Live';
           modeChip.style.background = 'rgba(239, 68, 68, 0.25)';
           modeChip.style.borderColor = '#ef4444';
-        } else if (frame.minuteOffset !== undefined && frame.minuteOffset < 0) {
-          modeChip.innerText = `⏪ -${Math.abs(frame.minuteOffset)}m`;
+        } else if (dispMin !== undefined && dispMin < 0) {
+          modeChip.innerText = `⏪ -${Math.abs(dispMin)}m`;
           modeChip.style.background = 'rgba(56, 189, 248, 0.2)';
           modeChip.style.borderColor = '#38bdf8';
         } else {
@@ -4516,27 +4575,27 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
       if (timeDisplay) {
         timeDisplay.innerText = fullDateTimeText;
       }
-      WeatherCanvasEngine.render(frame, 'precip');
+      WeatherCanvasEngine.render(frame, 'precip', canvasOpts);
     } else if (frame) {
       if (state.map.radarTileLayer && state.map.instance.hasLayer(state.map.radarTileLayer)) {
         state.map.instance.removeLayer(state.map.radarTileLayer);
         state.map.radarTileLayer = null;
       }
       renderFutureRadarCells(frame);
-      WeatherCanvasEngine.render(frame, 'precip');
+      WeatherCanvasEngine.render(frame, 'precip', canvasOpts);
 
       if (modeChip) {
-        if (frame.minuteOffset !== undefined && frame.minuteOffset <= 60 && frame.minuteOffset > 0) {
-          modeChip.innerText = `⚡ Nowcast (+${frame.minuteOffset}m)`;
+        if (dispMin !== undefined && dispMin <= 60 && dispMin > 0) {
+          modeChip.innerText = `⚡ Nowcast (+${dispMin}m)`;
           modeChip.style.background = 'rgba(245, 158, 11, 0.25)';
           modeChip.style.borderColor = '#f59e0b';
-        } else if (frame.minuteOffset !== undefined && frame.minuteOffset <= 180) {
-          const hStr = frame.minuteOffset % 60 === 0 ? `+${frame.minuteOffset / 60}h` : `+${Math.floor(frame.minuteOffset / 60)}h ${frame.minuteOffset % 60}m`;
+        } else if (dispMin !== undefined && dispMin <= 180) {
+          const hStr = dispMin % 60 === 0 ? `+${dispMin / 60}h` : `+${Math.floor(dispMin / 60)}h ${dispMin % 60}m`;
           modeChip.innerText = `🔮 Detail (${hStr})`;
           modeChip.style.background = 'rgba(168, 85, 247, 0.25)';
           modeChip.style.borderColor = '#c084fc';
         } else {
-          const h = frame.hoursFromNow || Math.round((frame.minuteOffset || 0) / 60);
+          const h = dispMin !== undefined ? Math.round(dispMin / 60) : (frame.hoursFromNow || 0);
           modeChip.innerText = `🔮 48h Radar (+${h}h)`;
           modeChip.style.background = 'rgba(168, 85, 247, 0.25)';
           modeChip.style.borderColor = '#c084fc';
@@ -4547,24 +4606,27 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
       }
     }
 
-    state.map.weatherLayerGroup.clearLayers();
-    if (state.map.showLightningOverlay) {
-      const storm = MicroEngine.computeLightningActivity(
-        state.currentLocation.lat,
-        state.currentLocation.lon,
-        state.weatherData
-      );
-      if (storm && Array.isArray(storm.strikes)) {
-        storm.strikes.slice(0, 10).forEach(s => {
-          const color = s.ageMinutes < 10 ? '#ff3b30' : '#ffd166';
-          const icon = L.divIcon({
-            className: 'custom-lightning-icon',
-            html: `<div class="lightning-marker" style="background:${color}; box-shadow:0 0 12px ${color};">⚡</div>`,
-            iconAnchor: [12, 12]
+    if (!shouldThrottleDomMarkers('precip')) {
+      state.map.weatherLayerGroup.clearLayers();
+      if (state.map.showLightningOverlay) {
+        const storm = MicroEngine.computeLightningActivity(
+          state.currentLocation.lat,
+          state.currentLocation.lon,
+          state.weatherData
+        );
+        if (storm && Array.isArray(storm.strikes)) {
+          storm.strikes.slice(0, 10).forEach(s => {
+            const color = s.ageMinutes < 10 ? '#ff3b30' : '#ffd166';
+            const icon = L.divIcon({
+              className: 'custom-lightning-icon',
+              html: `<div class="lightning-marker" style="background:${color}; box-shadow:0 0 12px ${color};">⚡</div>`,
+              iconAnchor: [12, 12]
+            });
+            L.marker([s.lat, s.lon], { icon }).addTo(state.map.weatherLayerGroup);
           });
-          L.marker([s.lat, s.lon], { icon }).addTo(state.map.weatherLayerGroup);
-        });
+        }
       }
+      markDomMarkersFresh('precip');
     }
   }
 
@@ -4574,18 +4636,10 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
   else if (overlay === 'wind') {
     cleanupRadarTiles();
 
-    let sumSpd = 0, sumDir = 0, count = 0;
-    stations.forEach(st => {
-      sumSpd += (st.windSpeed || 15);
-      sumDir += (st.windDirection || 240);
-      count++;
-    });
-    const avgSpd = count ? Math.round(sumSpd / count) : 20;
-
-    WeatherCanvasEngine.render(frame, 'wind');
+    WeatherCanvasEngine.render(frame, 'wind', canvasOpts);
 
     if (modeChip) {
-      modeChip.innerText = (frame && frame.isLive) ? '💨 Live-Wind' : '💨 Windfeld';
+      modeChip.innerText = isLiveNow ? '💨 Live-Wind' : '💨 Windfeld';
       modeChip.style.background = 'rgba(56, 189, 248, 0.25)';
       modeChip.style.borderColor = '#38bdf8';
     }
@@ -4593,57 +4647,60 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
       timeDisplay.innerText = fullDateTimeText;
     }
 
-    state.map.weatherLayerGroup.clearLayers();
-    const curLoc = state.currentLocation;
-    stations.forEach(st => {
-      if (curLoc && curLoc.lat !== undefined && Math.hypot(st.lat - curLoc.lat, st.lon - curLoc.lon) < 0.04) return;
-      const spd = st.windSpeed !== undefined ? st.windSpeed : 15;
-      const gust = st.windGusts !== undefined ? st.windGusts : Math.round(spd * 1.35);
-      const dir = st.windDirection !== undefined ? st.windDirection : 240;
-      const isDarkMap = (state.map && state.map.activeBase === 'osm-dark');
-      let color = isDarkMap ? '#22c55e' : '#002855';
-      let bftClass = 'Schwache Brise';
-      if (isDarkMap) {
-        if (gust >= 80) { color = '#c084fc'; bftClass = 'Orkanartig'; }
-        else if (gust >= 60) { color = '#ef4444'; bftClass = 'Sturm'; }
-        else if (gust >= 40) { color = '#f59e0b'; bftClass = 'Starker Wind'; }
-        else if (spd >= 25) { color = '#38bdf8'; bftClass = 'Frische Brise'; }
-      } else {
-        if (gust >= 80) { color = '#312e81'; bftClass = 'Orkanartig'; }
-        else if (gust >= 60) { color = '#991b1b'; bftClass = 'Sturm'; }
-        else if (gust >= 40) { color = '#b45309'; bftClass = 'Starker Wind'; }
-        else if (spd >= 25) { color = '#0d47a1'; bftClass = 'Frische Brise'; }
-      }
+    if (!shouldThrottleDomMarkers('wind')) {
+      state.map.weatherLayerGroup.clearLayers();
+      const curLoc = state.currentLocation;
+      stations.forEach(st => {
+        if (curLoc && curLoc.lat !== undefined && Math.hypot(st.lat - curLoc.lat, st.lon - curLoc.lon) < 0.04) return;
+        const spd = st.windSpeed !== undefined ? st.windSpeed : 15;
+        const gust = st.windGusts !== undefined ? st.windGusts : Math.round(spd * 1.35);
+        const dir = st.windDirection !== undefined ? st.windDirection : 240;
+        const isDarkMap = (state.map && state.map.activeBase === 'osm-dark');
+        let color = isDarkMap ? '#22c55e' : '#002855';
+        let bftClass = 'Schwache Brise';
+        if (isDarkMap) {
+          if (gust >= 80) { color = '#c084fc'; bftClass = 'Orkanartig'; }
+          else if (gust >= 60) { color = '#ef4444'; bftClass = 'Sturm'; }
+          else if (gust >= 40) { color = '#f59e0b'; bftClass = 'Starker Wind'; }
+          else if (spd >= 25) { color = '#38bdf8'; bftClass = 'Frische Brise'; }
+        } else {
+          if (gust >= 80) { color = '#312e81'; bftClass = 'Orkanartig'; }
+          else if (gust >= 60) { color = '#991b1b'; bftClass = 'Sturm'; }
+          else if (gust >= 40) { color = '#b45309'; bftClass = 'Starker Wind'; }
+          else if (spd >= 25) { color = '#0d47a1'; bftClass = 'Frische Brise'; }
+        }
 
-      const chipBg = isDarkMap ? 'background: rgba(15, 23, 42, 0.88);' : 'background: rgba(255, 255, 255, 0.94); box-shadow: 0 4px 12px rgba(0, 40, 85, 0.28);';
-      const nameCol = isDarkMap ? '#ffffff' : '#0f172a';
+        const chipBg = isDarkMap ? 'background: rgba(15, 23, 42, 0.88);' : 'background: rgba(255, 255, 255, 0.94); box-shadow: 0 4px 12px rgba(0, 40, 85, 0.28);';
+        const nameCol = isDarkMap ? '#ffffff' : '#0f172a';
 
-      const badgeHtml = `
-        <div class="station-mini-chip wind-chip" style="border-color:${color}; ${chipBg}">
-          <span style="display:inline-block; transform:rotate(${dir}deg); font-weight:900; color:${color}; font-size:14px; line-height:1;">↑</span>
-          <span class="smc-name" style="color:${nameCol};">${st.name}</span>
-          <span class="smc-val" style="color:${color}; font-weight:800;">${spd} <small style="opacity:0.8;">(${gust})</small></span>
-        </div>
-      `;
+        const badgeHtml = `
+          <div class="station-mini-chip wind-chip" style="border-color:${color}; ${chipBg}">
+            <span style="display:inline-block; transform:rotate(${dir}deg); font-weight:900; color:${color}; font-size:14px; line-height:1;">↑</span>
+            <span class="smc-name" style="color:${nameCol};">${st.name}</span>
+            <span class="smc-val" style="color:${color}; font-weight:800;">${spd} <small style="opacity:0.8;">(${gust})</small></span>
+          </div>
+        `;
 
-      let gustTooltipColor = color;
-      if (gust >= 80) gustTooltipColor = '#6b21a8';
-      else if (gust >= 60) gustTooltipColor = '#b91c1c';
-      else if (gust >= 40) gustTooltipColor = '#c2410c';
-      else if (spd >= 25) gustTooltipColor = '#0369a1';
-      else gustTooltipColor = '#047857';
+        let gustTooltipColor = color;
+        if (gust >= 80) gustTooltipColor = '#6b21a8';
+        else if (gust >= 60) gustTooltipColor = '#b91c1c';
+        else if (gust >= 40) gustTooltipColor = '#c2410c';
+        else if (spd >= 25) gustTooltipColor = '#0369a1';
+        else gustTooltipColor = '#047857';
 
-      const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [48, 12] });
-      const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
-      m.bindTooltip(`
-        <div style="color:#0f172a; padding:2px; line-height:1.45;">
-          <strong style="color:#000000; font-size:12.5px;">${st.name} • ${st.isMountain ? '🏔️ Gipfel' : '🏡 Tal'} (${st.elevation} m)</strong><br>
-          Wind: <b>${spd} km/h</b> • Spitzenböen: <b style="color:${gustTooltipColor}; font-weight:800;">${gust} km/h</b><br>
-          Richtung: <b>${dir}°</b> • <span>${bftClass}</span>
-        </div>
-      `, { direction: 'top', offset: [0, -10] });
-      m.on('click', () => selectExactLocation(st));
-    });
+        const icon = L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [48, 12] });
+        const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
+        m.bindTooltip(`
+          <div style="color:#0f172a; padding:2px; line-height:1.45;">
+            <strong style="color:#000000; font-size:12.5px;">${st.name} • ${st.isMountain ? '🏔️ Gipfel' : '🏡 Tal'} (${st.elevation} m)</strong><br>
+            Wind: <b>${spd} km/h</b> • Spitzenböen: <b style="color:${gustTooltipColor}; font-weight:800;">${gust} km/h</b><br>
+            Richtung: <b>${dir}°</b> • <span>${bftClass}</span>
+          </div>
+        `, { direction: 'top', offset: [0, -10] });
+        m.on('click', () => selectExactLocation(st));
+      });
+      markDomMarkersFresh('wind');
+    }
   }
 
   // =========================================================================
@@ -4651,83 +4708,80 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
   // =========================================================================
   else if (overlay === 'lightning') {
     cleanupRadarTiles();
-    WeatherCanvasEngine.render(frame, 'lightning');
+    WeatherCanvasEngine.render(frame, 'lightning', canvasOpts);
 
     if (modeChip) {
-      modeChip.innerText = (frame && frame.isLive) ? '⚡ Live-Blitze' : '⚡ Blitze';
+      modeChip.innerText = isLiveNow ? '⚡ Live-Blitze' : '⚡ Blitze';
       modeChip.style.background = 'rgba(239, 68, 68, 0.25)';
       modeChip.style.borderColor = '#ef4444';
     }
 
-    state.map.weatherLayerGroup.clearLayers();
+    if (timeDisplay) {
+      timeDisplay.innerText = fullDateTimeText;
+    }
 
-    if (!frame || frame.isLive || frame.type === 'past') {
-      const storm = MicroEngine.computeLightningActivity(
-        state.currentLocation.lat,
-        state.currentLocation.lon,
-        state.weatherData
-      );
+    if (!shouldThrottleDomMarkers('lightning')) {
+      state.map.weatherLayerGroup.clearLayers();
 
-      if (timeDisplay) {
-        timeDisplay.innerText = fullDateTimeText;
-      }
+      if (!frame || isLiveNow || frame.type === 'past') {
+        const storm = MicroEngine.computeLightningActivity(
+          state.currentLocation.lat,
+          state.currentLocation.lon,
+          state.weatherData
+        );
 
-      L.circle([state.currentLocation.lat, state.currentLocation.lon], {
-        radius: 14000,
-        color: '#ff453a',
-        fillColor: '#ff453a',
-        fillOpacity: 0.08,
-        weight: 1.5,
-        dashArray: '4, 4'
-      }).addTo(state.map.weatherLayerGroup);
+        L.circle([state.currentLocation.lat, state.currentLocation.lon], {
+          radius: 14000,
+          color: '#ff453a',
+          fillColor: '#ff453a',
+          fillOpacity: 0.08,
+          weight: 1.5,
+          dashArray: '4, 4'
+        }).addTo(state.map.weatherLayerGroup);
 
-      storm.strikes.forEach(s => {
-        let color = '#64d2ff';
-        if (s.ageMinutes < 5) color = '#ff3b30';
-        else if (s.ageMinutes < 15) color = '#ff9500';
-        else if (s.ageMinutes < 30) color = '#ffd166';
+        storm.strikes.forEach(s => {
+          let color = '#64d2ff';
+          if (s.ageMinutes < 5) color = '#ff3b30';
+          else if (s.ageMinutes < 15) color = '#ff9500';
+          else if (s.ageMinutes < 30) color = '#ffd166';
 
-        const icon = L.divIcon({
-          className: 'custom-lightning-icon',
-          html: `<div class="lightning-marker" style="background:${color}; box-shadow:0 0 14px ${color};">⚡</div>`,
-          iconAnchor: [12, 12]
-        });
-
-        const m = L.marker([s.lat, s.lon], { icon }).addTo(state.map.weatherLayerGroup);
-        m.bindPopup(`
-          <div style="font-family:sans-serif; color:#0f172a; padding:4px;">
-            <strong style="color:${color}; font-size:13px;">⚡ Blitzentladung</strong><br>
-            <b>Typ:</b> ${s.type}<br>
-            <b>Stromstärke:</b> ${s.intensityKa} kA<br>
-            <b>Alter:</b> vor ${s.ageMinutes} Min.<br>
-            <b>Distanz:</b> ${s.distKm} km
-          </div>
-        `);
-      });
-    } else {
-      let stormCount = 0;
-      stations.forEach(st => {
-        const isThunderstorm = (st.weatherCode >= 95 && st.weatherCode <= 99) || (st.precip >= 3.0 && st.temperature >= 15);
-        if (isThunderstorm) {
-          stormCount++;
           const icon = L.divIcon({
             className: 'custom-lightning-icon',
-            html: `<div class="lightning-marker" style="background:#ef4444; box-shadow:0 0 16px #ff3b30;">⚡</div>`,
+            html: `<div class="lightning-marker" style="background:${color}; box-shadow:0 0 14px ${color};">⚡</div>`,
             iconAnchor: [12, 12]
           });
-          const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
-          m.bindTooltip(`
-            <div style="color:#0f172a; padding:2px; line-height:1.45;">
-              ⚠️ <strong style="color:#b91c1c; font-size:12.5px;">${st.name} (+${frame.hoursFromNow}h)</strong><br>
-              Konvektives Gewitterrisiko • Niederschlag: <b>${st.precip} mm/h</b>
-            </div>
-          `, { direction: 'top', offset: [0, -10] });
-        }
-      });
 
-      if (timeDisplay) {
-        timeDisplay.innerText = fullDateTimeText;
+          const m = L.marker([s.lat, s.lon], { icon }).addTo(state.map.weatherLayerGroup);
+          m.bindPopup(`
+            <div style="font-family:sans-serif; color:#0f172a; padding:4px;">
+              <strong style="color:${color}; font-size:13px;">⚡ Blitzentladung</strong><br>
+              <b>Typ:</b> ${s.type}<br>
+              <b>Stromstärke:</b> ${s.intensityKa} kA<br>
+              <b>Alter:</b> vor ${s.ageMinutes} Min.<br>
+              <b>Distanz:</b> ${s.distKm} km
+            </div>
+          `);
+        });
+      } else {
+        stations.forEach(st => {
+          const isThunderstorm = (st.weatherCode >= 95 && st.weatherCode <= 99) || (st.precip >= 3.0 && st.temperature >= 15);
+          if (isThunderstorm) {
+            const icon = L.divIcon({
+              className: 'custom-lightning-icon',
+              html: `<div class="lightning-marker" style="background:#ef4444; box-shadow:0 0 16px #ff3b30;">⚡</div>`,
+              iconAnchor: [12, 12]
+            });
+            const m = L.marker([st.lat, st.lon], { icon }).addTo(state.map.weatherLayerGroup);
+            m.bindTooltip(`
+              <div style="color:#0f172a; padding:2px; line-height:1.45;">
+                ⚠️ <strong style="color:#b91c1c; font-size:12.5px;">${st.name} (${relStr})</strong><br>
+                Konvektives Gewitterrisiko • Niederschlag: <b>${st.precip} mm/h</b>
+              </div>
+            `, { direction: 'top', offset: [0, -10] });
+          }
+        });
       }
+      markDomMarkersFresh('lightning');
     }
   }
 
@@ -4736,48 +4790,51 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
   // =========================================================================
   else if (overlay === 'clouds') {
     cleanupRadarTiles();
-    WeatherCanvasEngine.render(frame, 'clouds');
+    WeatherCanvasEngine.render(frame, 'clouds', canvasOpts);
 
     if (modeChip) {
-      modeChip.innerText = (frame && frame.isLive) ? '☁️ Live-Bewölkung' : `☁️ ${relStr} Wolken`;
+      modeChip.innerText = isLiveNow ? '☁️ Live-Bewölkung' : `☁️ ${relStr} Wolken`;
       modeChip.style.background = 'rgba(148, 163, 184, 0.25)';
       modeChip.style.borderColor = '#cbd5e1';
     }
 
-    state.map.weatherLayerGroup.clearLayers();
-
-    stations.forEach(st => {
-      const c = st.cloudCover !== undefined ? st.cloudCover : 50;
-
-      let icon = '☀️';
-      let desc = 'Sonnig';
-      if (c >= 80) { icon = '☁️'; desc = 'Bedeckt'; }
-      else if (c >= 50) { icon = '⛅'; desc = 'Wolkig'; }
-      else if (c >= 20) { icon = '🌤️'; desc = 'Heiter'; }
-
-      const badgeHtml = `
-        <div class="station-mini-chip cloud-chip">
-          <span>${icon}</span>
-          <span class="smc-name">${st.name}</span>
-          <span class="smc-val">${c}%</span>
-        </div>
-      `;
-
-      const m = L.marker([st.lat, st.lon], {
-        icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [38, 12] })
-      }).addTo(state.map.weatherLayerGroup);
-
-      m.bindTooltip(`
-        <div style="color:#0f172a; padding:2px; line-height:1.45;">
-          <strong style="color:#000000; font-size:12.5px;">${st.name} (${st.elevation} m)</strong><br>
-          ${desc} (<b>${c}%</b> Wolkenbedeckung)
-        </div>
-      `, { direction: 'top', offset: [0, -10] });
-      m.on('click', () => selectExactLocation(st));
-    });
-
     if (timeDisplay) {
       timeDisplay.innerText = fullDateTimeText;
+    }
+
+    if (!shouldThrottleDomMarkers('clouds')) {
+      state.map.weatherLayerGroup.clearLayers();
+
+      stations.forEach(st => {
+        const c = st.cloudCover !== undefined ? st.cloudCover : 50;
+
+        let icon = '☀️';
+        let desc = 'Sonnig';
+        if (c >= 80) { icon = '☁️'; desc = 'Bedeckt'; }
+        else if (c >= 50) { icon = '⛅'; desc = 'Wolkig'; }
+        else if (c >= 20) { icon = '🌤️'; desc = 'Heiter'; }
+
+        const badgeHtml = `
+          <div class="station-mini-chip cloud-chip">
+            <span>${icon}</span>
+            <span class="smc-name">${st.name}</span>
+            <span class="smc-val">${c}%</span>
+          </div>
+        `;
+
+        const m = L.marker([st.lat, st.lon], {
+          icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [38, 12] })
+        }).addTo(state.map.weatherLayerGroup);
+
+        m.bindTooltip(`
+          <div style="color:#0f172a; padding:2px; line-height:1.45;">
+            <strong style="color:#000000; font-size:12.5px;">${st.name} (${st.elevation} m)</strong><br>
+            ${desc} (<b>${c}%</b> Wolkenbedeckung)
+          </div>
+        `, { direction: 'top', offset: [0, -10] });
+        m.on('click', () => selectExactLocation(st));
+      });
+      markDomMarkersFresh('clouds');
     }
   }
 
@@ -4786,59 +4843,62 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
   // =========================================================================
   else if (overlay === 'temp') {
     cleanupRadarTiles();
-    WeatherCanvasEngine.render(frame, 'temp');
+    WeatherCanvasEngine.render(frame, 'temp', canvasOpts);
 
     if (modeChip) {
-      modeChip.innerText = (frame && frame.isLive) ? '🌡️ Live-Temperatur' : `🌡️ ${relStr} Temperatur`;
+      modeChip.innerText = isLiveNow ? '🌡️ Live-Temperatur' : `🌡️ ${relStr} Temperatur`;
       modeChip.style.background = 'rgba(234, 179, 8, 0.25)';
       modeChip.style.borderColor = '#eab308';
     }
 
-    state.map.weatherLayerGroup.clearLayers();
-
-    stations.forEach(st => {
-      const tVal = (st.temperature !== undefined && st.temperature !== null) ? Number(st.temperature) : 10;
-      let color = '#22c55e';
-      if (tVal < -5) color = '#1e40af';
-      else if (tVal <= 0) color = '#06b6d4';
-      else if (tVal >= 25) color = '#ef4444';
-      else if (tVal >= 18) color = '#f97316';
-      else if (tVal >= 10) color = '#eab308';
-
-      const isFrost = tVal <= 0;
-      const tIcon = isFrost ? '❄️' : '🌡️';
-
-      const badgeHtml = `
-        <div class="station-mini-chip temp-chip" style="border-color:${color};">
-          <span>${tIcon}</span>
-          <span class="smc-name">${st.name}</span>
-          <span class="smc-val" style="color:${color}; font-weight:800;">${tVal.toFixed(1)}°C</span>
-        </div>
-      `;
-
-      const m = L.marker([st.lat, st.lon], {
-        icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [42, 12] })
-      }).addTo(state.map.weatherLayerGroup);
-
-      let tempTooltipColor = color;
-      if (tVal < -5) tempTooltipColor = '#1d4ed8';
-      else if (tVal <= 0) tempTooltipColor = '#0284c7';
-      else if (tVal >= 25) tempTooltipColor = '#b91c1c';
-      else if (tVal >= 18) tempTooltipColor = '#c2410c';
-      else if (tVal >= 10) tempTooltipColor = '#b45309';
-      else tempTooltipColor = '#15803d';
-
-      m.bindTooltip(`
-        <div style="color:#0f172a; padding:2px; line-height:1.45;">
-          <strong style="color:#000000; font-size:12.5px;">${st.name} (${st.elevation} m)</strong><br>
-          Temperatur: <b style="color:${tempTooltipColor}; font-weight:800;">${tVal.toFixed(1)}°C</b> • ${isFrost ? '❄️ Frostgrenze (< 0°C)' : '💧 Tauwetter (> 0°C)'}
-        </div>
-      `, { direction: 'top', offset: [0, -10] });
-      m.on('click', () => selectExactLocation(st));
-    });
-
     if (timeDisplay) {
       timeDisplay.innerText = fullDateTimeText;
+    }
+
+    if (!shouldThrottleDomMarkers('temp')) {
+      state.map.weatherLayerGroup.clearLayers();
+
+      stations.forEach(st => {
+        const tVal = (st.temperature !== undefined && st.temperature !== null) ? Number(st.temperature) : 10;
+        let color = '#22c55e';
+        if (tVal < -5) color = '#1e40af';
+        else if (tVal <= 0) color = '#06b6d4';
+        else if (tVal >= 25) color = '#ef4444';
+        else if (tVal >= 18) color = '#f97316';
+        else if (tVal >= 10) color = '#eab308';
+
+        const isFrost = tVal <= 0;
+        const tIcon = isFrost ? '❄️' : '🌡️';
+
+        const badgeHtml = `
+          <div class="station-mini-chip temp-chip" style="border-color:${color};">
+            <span>${tIcon}</span>
+            <span class="smc-name">${st.name}</span>
+            <span class="smc-val" style="color:${color}; font-weight:800;">${tVal.toFixed(1)}°C</span>
+          </div>
+        `;
+
+        const m = L.marker([st.lat, st.lon], {
+          icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [42, 12] })
+        }).addTo(state.map.weatherLayerGroup);
+
+        let tempTooltipColor = color;
+        if (tVal < -5) tempTooltipColor = '#1d4ed8';
+        else if (tVal <= 0) tempTooltipColor = '#0284c7';
+        else if (tVal >= 25) tempTooltipColor = '#b91c1c';
+        else if (tVal >= 18) tempTooltipColor = '#c2410c';
+        else if (tVal >= 10) tempTooltipColor = '#b45309';
+        else tempTooltipColor = '#15803d';
+
+        m.bindTooltip(`
+          <div style="color:#0f172a; padding:2px; line-height:1.45;">
+            <strong style="color:#000000; font-size:12.5px;">${st.name} (${st.elevation} m)</strong><br>
+            Temperatur: <b style="color:${tempTooltipColor}; font-weight:800;">${tVal.toFixed(1)}°C</b> • ${isFrost ? '❄️ Frostgrenze (< 0°C)' : '💧 Tauwetter (> 0°C)'}
+          </div>
+        `, { direction: 'top', offset: [0, -10] });
+        m.on('click', () => selectExactLocation(st));
+      });
+      markDomMarkersFresh('temp');
     }
   }
 
@@ -4847,45 +4907,48 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
   // =========================================================================
   else if (overlay === 'pressure') {
     cleanupRadarTiles();
-    WeatherCanvasEngine.render(frame, 'pressure');
+    WeatherCanvasEngine.render(frame, 'pressure', canvasOpts);
 
     if (modeChip) {
-      modeChip.innerText = (frame && frame.isLive) ? '⏱️ Live-Bodendruck QNH' : `⏱️ ${relStr} Druck`;
+      modeChip.innerText = isLiveNow ? '⏱️ Live-Bodendruck QNH' : `⏱️ ${relStr} Druck`;
       modeChip.style.background = 'rgba(99, 102, 241, 0.25)';
       modeChip.style.borderColor = '#818cf8';
     }
 
-    state.map.weatherLayerGroup.clearLayers();
-
-    stations.forEach(st => {
-      const p = (st.pressureMsl !== undefined && st.pressureMsl !== null) ? Number(st.pressureMsl) : ((st.weather && st.weather.pressure_msl != null) ? Number(st.weather.pressure_msl) : 1013.2);
-      let color = '#38bdf8';
-      let tag = 'Normal';
-      if (p >= 1022) { color = '#3b82f6'; tag = '🔵 Hoch H'; }
-      else if (p <= 1008) { color = '#ef4444'; tag = '🔴 Tief T'; }
-
-      const badgeHtml = `
-        <div class="station-mini-chip pressure-chip" style="border-color:${color};">
-          <span>⏲️</span>
-          <span class="smc-name">${st.name}</span>
-          <span class="smc-val" style="color:${color}; font-weight:800;">${Math.round(p)} <small>hPa</small></span>
-        </div>
-      `;
-
-      const m = L.marker([st.lat, st.lon], {
-        icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [44, 12] })
-      }).addTo(state.map.weatherLayerGroup);
-
-      m.bindTooltip(`
-        <div style="color:#0f172a; padding:2px; line-height:1.45;">
-          <strong style="color:#000000; font-size:12.5px;">${st.name}</strong>: <b>${p.toFixed(1)} hPa QNH</b> (${tag})
-        </div>
-      `, { direction: 'top', offset: [0, -10] });
-      m.on('click', () => selectExactLocation(st));
-    });
-
     if (timeDisplay) {
       timeDisplay.innerText = fullDateTimeText;
+    }
+
+    if (!shouldThrottleDomMarkers('pressure')) {
+      state.map.weatherLayerGroup.clearLayers();
+
+      stations.forEach(st => {
+        const p = (st.pressureMsl !== undefined && st.pressureMsl !== null) ? Number(st.pressureMsl) : ((st.weather && st.weather.pressure_msl != null) ? Number(st.weather.pressure_msl) : 1013.2);
+        let color = '#38bdf8';
+        let tag = 'Normal';
+        if (p >= 1022) { color = '#3b82f6'; tag = '🔵 Hoch H'; }
+        else if (p <= 1008) { color = '#ef4444'; tag = '🔴 Tief T'; }
+
+        const badgeHtml = `
+          <div class="station-mini-chip pressure-chip" style="border-color:${color};">
+            <span>⏲️</span>
+            <span class="smc-name">${st.name}</span>
+            <span class="smc-val" style="color:${color}; font-weight:800;">${Math.round(p)} <small>hPa</small></span>
+          </div>
+        `;
+
+        const m = L.marker([st.lat, st.lon], {
+          icon: L.divIcon({ className: 'custom-weather-icon', html: badgeHtml, iconAnchor: [44, 12] })
+        }).addTo(state.map.weatherLayerGroup);
+
+        m.bindTooltip(`
+          <div style="color:#0f172a; padding:2px; line-height:1.45;">
+            <strong style="color:#000000; font-size:12.5px;">${st.name}</strong>: <b>${p.toFixed(1)} hPa QNH</b> (${tag})
+          </div>
+        `, { direction: 'top', offset: [0, -10] });
+        m.on('click', () => selectExactLocation(st));
+      });
+      markDomMarkersFresh('pressure');
     }
   }
 }
@@ -4894,10 +4957,18 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay) {
  * Animiertes Windströmungs-Canvas für die Leaflet-Karte (Kompatibilitäts-Wrapper)
  */
 export function startWindCanvas(windDirDeg, windSpeedKm) {
-  const currentFrame = (state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length)
-    ? state.map.unifiedRadarFrames[state.map.radarIndex]
-    : null;
-  WeatherCanvasEngine.render(currentFrame, 'wind');
+  const spec = getActiveInterpolatedRadarSpec();
+  const currentFrame = spec
+    ? spec.frame
+    : ((state.map.unifiedRadarFrames && state.map.unifiedRadarFrames.length)
+        ? state.map.unifiedRadarFrames[state.map.radarIndex || 0]
+        : null);
+  WeatherCanvasEngine.render(currentFrame, 'wind', spec ? {
+    rvFrameA: spec.frameA,
+    rvFrameB: spec.frameB,
+    morphAlpha: spec.morphAlpha,
+    stationsPreInterpolated: spec.morphAlpha > 0
+  } : {});
 }
 
 export function stopWindCanvas() {
@@ -5032,10 +5103,12 @@ export async function loadUnifiedRadarEngine() {
         const livePos = 4;
         state.map.unifiedRadarFrames = quickFrames;
         state.map.liveRadarIndex = livePos;
+        state.map.radarFloatIndex = livePos;
         const quickSlider = document.getElementById('radar-time-slider');
         if (quickSlider) {
           quickSlider.min = 0;
           quickSlider.max = quickFrames.length - 1;
+          quickSlider.step = 'any';
           quickSlider.value = livePos;
         }
         showUnifiedRadarFrame(livePos);
@@ -5197,13 +5270,15 @@ export async function loadUnifiedRadarEngine() {
 
       state.map.unifiedRadarFrames = unifiedFrames;
       state.map.liveRadarIndex = liveIdx;
+      state.map.radarFloatIndex = liveIdx;
       state.map._radarLoaded = true;
 
-      // Konfiguriere Timeline-Slider
+      // Konfiguriere Timeline-Slider (stufenlos!)
       const slider = document.getElementById('radar-time-slider');
       if (slider) {
         slider.min = 0;
         slider.max = Math.max(0, unifiedFrames.length - 1);
+        slider.step = 'any';
         slider.value = liveIdx;
       }
 
@@ -5253,6 +5328,145 @@ export function renderFutureRadarCells(frame) {
   }
 }
 
+export function interpolateStationLists(stListA, stListB, alpha) {
+  if (!stListA || !stListA.length) return stListB || [];
+  if (!stListB || !stListB.length || alpha <= 0.001) return stListA;
+  if (alpha >= 0.999) return stListB;
+
+  const inv = 1 - alpha;
+  const byNameB = new Map();
+  for (let i = 0; i < stListB.length; i++) {
+    if (stListB[i] && stListB[i].name) byNameB.set(stListB[i].name, stListB[i]);
+  }
+
+  return stListA.map((s0, idx) => {
+    const s1 = (stListB[idx] && stListB[idx].name === s0.name)
+      ? stListB[idx]
+      : (byNameB.get(s0.name) || s0);
+
+    const temp = Math.round(((s0.temperature || 0) * inv + (s1.temperature || 0) * alpha) * 10) / 10;
+    const precip = Math.max(0, Math.round(((s0.precip || 0) * inv + (s1.precip || 0) * alpha) * 100) / 100);
+    const rain = Math.max(0, Math.round(((s0.rain || 0) * inv + (s1.rain || 0) * alpha) * 100) / 100);
+    const snow = Math.max(0, Math.round(((s0.snow || 0) * inv + (s1.snow || 0) * alpha) * 100) / 100);
+    const rh = Math.round((s0.relativeHumidity || 84) * inv + (s1.relativeHumidity || 84) * alpha);
+    const fz0 = s0.freezingLevelHeight !== undefined ? s0.freezingLevelHeight : 1400;
+    const fz1 = s1.freezingLevelHeight !== undefined ? s1.freezingLevelHeight : fz0;
+    const freezingLevelHeight = Math.round(fz0 * inv + fz1 * alpha);
+    const cloudCover = Math.round((s0.cloudCover !== undefined ? s0.cloudCover : 50) * inv + (s1.cloudCover !== undefined ? s1.cloudCover : 50) * alpha);
+    const p0 = s0.pressureMsl !== undefined ? s0.pressureMsl : 1013.2;
+    const p1 = s1.pressureMsl !== undefined ? s1.pressureMsl : p0;
+    const pressureMsl = Math.round((p0 * inv + p1 * alpha) * 10) / 10;
+    const windSpeed = Math.round((s0.windSpeed || 0) * inv + (s1.windSpeed || 0) * alpha);
+    const windGusts = Math.round((s0.windGusts || (s0.windSpeed || 0) * 1.35) * inv + (s1.windGusts || (s1.windSpeed || 0) * 1.35) * alpha);
+
+    const a0 = s0.windDirection !== undefined ? s0.windDirection : 240;
+    const a1 = s1.windDirection !== undefined ? s1.windDirection : a0;
+    let diff = (a1 - a0) % 360;
+    if (diff < -180) diff += 360;
+    if (diff > 180) diff -= 360;
+    const windDirection = Math.round(((a0 + diff * alpha) % 360 + 360) % 360);
+
+    const weatherCode = alpha < 0.5 ? s0.weatherCode : s1.weatherCode;
+    const phaseInfo = (MicroEngine && MicroEngine.classifyPrecipPhase)
+      ? MicroEngine.classifyPrecipPhase({
+          tempC: temp,
+          rhPct: rh,
+          precipMm: precip,
+          rainMm: rain,
+          snowCm: snow,
+          elevation: s0.elevation || 500,
+          freezingLevelM: freezingLevelHeight,
+          wCode: weatherCode
+        })
+      : {
+          wetBulbC: temp,
+          snowRatio: (s0.snowRatio !== undefined && s1.snowRatio !== undefined) ? (s0.snowRatio * inv + s1.snowRatio * alpha) : (s0.snowRatio || 0),
+          phase: s0.phase || 'dry'
+        };
+
+    return {
+      ...s0,
+      temperature: temp,
+      relativeHumidity: rh,
+      freezingLevelHeight,
+      wetBulbC: phaseInfo.wetBulbC,
+      snowRatio: phaseInfo.snowRatio,
+      phase: phaseInfo.phase,
+      precip,
+      rain,
+      snow,
+      cloudCover,
+      pressureMsl,
+      windSpeed,
+      windGusts,
+      windDirection,
+      weatherCode,
+      isSnow: phaseInfo.snowRatio >= 0.55
+    };
+  });
+}
+
+export function getInterpolatedRadarSpec(floatIdx) {
+  const frames = state.map && state.map.unifiedRadarFrames;
+  if (!frames || !frames.length) return null;
+
+  const maxIdx = frames.length - 1;
+  const numIdx = Number(floatIdx);
+  const clamped = Math.max(0, Math.min(maxIdx, Number.isFinite(numIdx) ? numIdx : 0));
+  const i0 = Math.floor(clamped);
+  const i1 = Math.min(maxIdx, Math.ceil(clamped));
+  const alpha = clamped - i0;
+  const f0 = frames[i0];
+  const f1 = frames[i1];
+  const nearestIdx = Math.round(clamped);
+
+  if (i0 === i1 || alpha <= 0.001) {
+    return { floatIdx: clamped, nearestIdx, frame: f0, frameA: f0, frameB: null, morphAlpha: 0 };
+  }
+  if (alpha >= 0.999) {
+    return { floatIdx: clamped, nearestIdx, frame: f1, frameA: f1, frameB: null, morphAlpha: 0 };
+  }
+
+  const mo0 = f0 && f0.minuteOffset !== undefined ? f0.minuteOffset : 0;
+  const mo1 = f1 && f1.minuteOffset !== undefined ? f1.minuteOffset : mo0;
+  const mo = mo0 + (mo1 - mo0) * alpha;
+  const ts0 = (f0 && f0.timestampMs) || Date.now();
+  const ts1 = (f1 && f1.timestampMs) || ts0;
+  const ts = Math.round(ts0 + (ts1 - ts0) * alpha);
+  const timeStr = new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const isLive = Math.abs(mo) < 0.5;
+  const type = mo <= 0 ? 'past' : 'future';
+
+  const frame = {
+    ...f0,
+    type,
+    isLive,
+    minuteOffset: mo,
+    hoursFromNow: mo / 60,
+    timestampMs: ts,
+    timeStr,
+    rvPath: alpha < 0.5 ? (f0.rvPath || f0.path || '') : (f1.rvPath || f1.path || ''),
+    path: alpha < 0.5 ? (f0.path || f0.rvPath || '') : (f1.path || f1.rvPath || ''),
+    stations: interpolateStationLists(f0.stations, f1.stations, alpha)
+  };
+
+  return {
+    floatIdx: clamped,
+    nearestIdx,
+    frame,
+    frameA: f0,
+    frameB: f1,
+    morphAlpha: alpha
+  };
+}
+
+export function getActiveInterpolatedRadarSpec() {
+  const floatIdx = (state.map && state.map.radarFloatIndex !== undefined)
+    ? state.map.radarFloatIndex
+    : ((state.map && state.map.radarIndex) || 0);
+  return getInterpolatedRadarSpec(floatIdx);
+}
+
 export function updateMeteoSwissTimelineUI(frame, idx, total) {
   const frames = state.map && state.map.unifiedRadarFrames ? state.map.unifiedRadarFrames : [];
   const count = total || frames.length || 1;
@@ -5289,7 +5503,7 @@ export function updateMeteoSwissTimelineUI(frame, idx, total) {
     cDay.innerText = isToday ? 'Heute' : (isTomorrow ? 'Morgen' : weekdays[d.getDay()]);
   }
 
-  const isMeasured = !!(frame && (frame.isLive || frame.type === 'past' || (frame.minuteOffset !== undefined && frame.minuteOffset <= 0)));
+  const isMeasured = !!(frame && (frame.isLive || frame.type === 'past' || (frame.minuteOffset !== undefined && frame.minuteOffset <= 0.4)));
   const cKind = document.getElementById('mscb-kind');
   if (cKind) {
     cKind.innerText = isMeasured ? 'Messung' : 'Prognose';
@@ -5313,31 +5527,40 @@ export function updateMeteoSwissTimelineUI(frame, idx, total) {
 }
 
 /**
- * Zeigt einen bestimmten Frame aus der kombinierten Timeline an
+ * Zeigt einen bestimmten Frame (oder stufenlosen Zwischenzustand) aus der kombinierten Timeline an
  * und aktualisiert das aktive Wetter-Overlay (Radar, Wind, Blitze, Wolken, Temp, Druck)
  */
-export function showUnifiedRadarFrame(idx) {
+export function showUnifiedRadarFrame(idx, renderOpts = {}) {
   const frames = state.map.unifiedRadarFrames;
   if (!frames || frames.length === 0) return;
 
-  // Clamping
-  if (idx < 0) idx = 0;
-  if (idx >= frames.length) idx = frames.length - 1;
-  state.map.radarIndex = idx;
+  const spec = getInterpolatedRadarSpec(idx);
+  if (!spec) return;
 
-  const frame = frames[idx];
+  state.map.radarFloatIndex = spec.floatIdx;
+  state.map.radarIndex = spec.nearestIdx;
+
   const slider = document.getElementById('radar-time-slider');
-  if (slider) slider.value = idx;
+  if (slider) {
+    if (slider.step !== 'any') slider.step = 'any';
+    slider.value = spec.floatIdx;
+  }
 
-  updateJumpButtonsActive(idx);
-  updateMeteoSwissTimelineUI(frame, idx, frames.length);
+  updateJumpButtonsActive(spec.nearestIdx);
+  updateMeteoSwissTimelineUI(spec.frame, spec.floatIdx, frames.length);
 
-  // Rendere das aktuell gewählte Wetter-Overlay exakt für diesen Zeitschritt
+  // Rendere das aktuell gewählte Wetter-Overlay exakt für diesen stufenlosen Zeitschritt
   const activeOverlay = state.map.activeOverlay || 'precip';
   if ((activeOverlay === 'precip' || activeOverlay === 'rainviewer-radar') && state.map.instance) {
     ViewportForecastGridStore.scheduleFetchForMap(state.map.instance, 120);
   }
-  renderActiveWeatherOverlayForFrame(frame, activeOverlay);
+  renderActiveWeatherOverlayForFrame(spec.frame, activeOverlay, {
+    rvFrameA: spec.frameA,
+    rvFrameB: spec.frameB,
+    morphAlpha: spec.morphAlpha,
+    stationsPreInterpolated: spec.morphAlpha > 0,
+    ...renderOpts
+  });
 }
 
 /**
@@ -5346,9 +5569,19 @@ export function showUnifiedRadarFrame(idx) {
 export function setupUnifiedRadarControls() {
   const slider = document.getElementById('radar-time-slider');
   if (slider) {
+    slider.step = 'any';
     slider.addEventListener('input', (e) => {
       stopRadarAnimation();
-      showUnifiedRadarFrame(parseInt(e.target.value, 10));
+      const val = parseFloat(e.target.value);
+      if (Number.isFinite(val)) {
+        showUnifiedRadarFrame(val, { isScrubOrPlay: true });
+      }
+    });
+    slider.addEventListener('change', (e) => {
+      const val = parseFloat(e.target.value);
+      if (Number.isFinite(val)) {
+        showUnifiedRadarFrame(val, { isScrubOrPlay: false });
+      }
     });
   }
 
@@ -5413,7 +5646,7 @@ export function setupUnifiedRadarControls() {
       stopRadarAnimation();
       const target = btn.dataset.target;
       const targetIdx = findFrameIndexForTarget(target);
-      showUnifiedRadarFrame(targetIdx);
+      showUnifiedRadarFrame(targetIdx, { isScrubOrPlay: false });
     });
   });
 }
@@ -5528,33 +5761,47 @@ export function startRadarAnimation() {
 
   const delays = { 1: 820, 2: 440, 3: 240 };
   const stepMs = delays[state.map.radarPlaybackSpeed || 1] || 820;
-  let stepStart = performance.now();
-  let lastMorphRender = 0;
+  let lastTickTime = performance.now();
+  let lastCanvasDraw = 0;
 
   function radarLoop(currentTime) {
     if (!state.map.radarPlaying) return;
     const frames = state.map.unifiedRadarFrames;
     if (frames && frames.length > 0) {
-      const elapsed = currentTime - stepStart;
-      if (elapsed >= stepMs) {
-        stepStart = currentTime - (elapsed % stepMs);
-        lastMorphRender = currentTime;
-        let next = state.map.radarIndex + 1;
-        if (next >= frames.length) next = 0;
-        showUnifiedRadarFrame(next);
-      } else {
+      const dt = Math.min(80, Math.max(0, currentTime - lastTickTime));
+      lastTickTime = currentTime;
+
+      const maxIdx = Math.max(1, frames.length - 1);
+      const curFloat = (state.map.radarFloatIndex !== undefined)
+        ? state.map.radarFloatIndex
+        : (state.map.radarIndex || 0);
+      let nextFloat = curFloat + (dt / stepMs);
+      if (nextFloat > maxIdx) nextFloat = 0;
+
+      const spec = getInterpolatedRadarSpec(nextFloat);
+      if (spec) {
+        state.map.radarFloatIndex = spec.floatIdx;
+        state.map.radarIndex = spec.nearestIdx;
+
+        const slider = document.getElementById('radar-time-slider');
+        if (slider) {
+          if (slider.step !== 'any') slider.step = 'any';
+          slider.value = spec.floatIdx;
+        }
+
+        updateJumpButtonsActive(spec.nearestIdx);
+        updateMeteoSwissTimelineUI(spec.frame, spec.floatIdx, frames.length);
+
         const activeOverlay = state.map.activeOverlay || 'precip';
-        if ((activeOverlay === 'precip' || activeOverlay === 'rainviewer-radar') && currentTime - lastMorphRender >= 80) {
-          lastMorphRender = currentTime;
-          const idx = state.map.radarIndex || 0;
-          const nextIdx = idx + 1 >= frames.length ? 0 : idx + 1;
-          const alpha = elapsed / stepMs;
-          if (alpha > 0.04 && alpha < 0.96 && frames[idx] && frames[nextIdx]) {
-            WeatherCanvasEngine.render(frames[idx], 'precip', {
-              nextFrame: frames[nextIdx],
-              morphAlpha: alpha
-            });
-          }
+        if (lastCanvasDraw === 0 || (currentTime - lastCanvasDraw >= 32)) {
+          lastCanvasDraw = currentTime;
+          renderActiveWeatherOverlayForFrame(spec.frame, activeOverlay, {
+            rvFrameA: spec.frameA,
+            rvFrameB: spec.frameB,
+            morphAlpha: spec.morphAlpha,
+            stationsPreInterpolated: spec.morphAlpha > 0,
+            isScrubOrPlay: true
+          });
         }
       }
     }
@@ -5581,6 +5828,10 @@ export function stopRadarAnimation() {
 export function toggleRadarPlay() {
   if (state.map.radarPlaying) {
     stopRadarAnimation();
+    const settledIdx = (state.map.radarFloatIndex !== undefined)
+      ? state.map.radarFloatIndex
+      : (state.map.radarIndex || 0);
+    showUnifiedRadarFrame(settledIdx, { isScrubOrPlay: false });
   } else {
     startRadarAnimation();
   }
@@ -5588,10 +5839,11 @@ export function toggleRadarPlay() {
 
 export function stepRadar(delta) {
   if (!state.map.unifiedRadarFrames || state.map.unifiedRadarFrames.length === 0) return;
-  let next = state.map.radarIndex + delta;
+  const baseIdx = Math.round((state.map.radarFloatIndex !== undefined) ? state.map.radarFloatIndex : (state.map.radarIndex || 0));
+  let next = baseIdx + delta;
   if (next < 0) next = state.map.unifiedRadarFrames.length - 1;
   if (next >= state.map.unifiedRadarFrames.length) next = 0;
-  showUnifiedRadarFrame(next);
+  showUnifiedRadarFrame(next, { isScrubOrPlay: false });
 }
 
 export function updateMapLocation() {
@@ -5616,5 +5868,6 @@ if (typeof window !== 'undefined') {
   window.ViewportDemStore = ViewportDemStore;
   window.ViewportForecastGridStore = ViewportForecastGridStore;
   window.showUnifiedRadarFrame = showUnifiedRadarFrame;
+  window.getInterpolatedRadarSpec = getInterpolatedRadarSpec;
   window.setMapBaseLayer = setMapBaseLayer;
 }

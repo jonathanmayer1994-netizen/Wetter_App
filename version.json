@@ -1,5 +1,5 @@
 {
-  "version": "2.25.2",
-  "build": "20261112-2110",
-  "notes": "Adaptive iOS standalone PWA full-height viewport fix + html/body theme sync"
+  "version": "2.25.3",
+  "build": "20261112-2140",
+  "notes": "Remove map black shortcut bar, crisp blur-free top headers across all tabs, stepless smooth radar timeline & transitions"
 }

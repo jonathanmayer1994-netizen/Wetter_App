@@ -38,14 +38,15 @@ body {
 
 .ambient-glow {
   position: fixed;
-  top: -15vw;
+  top: 10vh;
   left: 50%;
   transform: translateX(-50%);
-  width: 100vw;
-  height: 60vh;
+  width: 90vw;
+  height: 50vh;
   border-radius: 50%;
   background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
   filter: blur(80px);
+  opacity: 0.42;
   pointer-events: none;
   z-index: 1;
 }
@@ -152,13 +153,14 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
+  background: rgba(11, 18, 32, 0.92);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: var(--radius-pill);
   padding: 0 16px;
   height: 46px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
   transition: var(--transition-smooth);
 }
 
@@ -170,9 +172,9 @@ body {
 }
 
 .search-input-box:focus-within {
-  background: rgba(0, 0, 0, 0.55);
-  border-color: rgba(100, 210, 255, 0.6);
-  box-shadow: 0 0 0 3px rgba(100, 210, 255, 0.25);
+  background: rgba(11, 18, 32, 0.98);
+  border-color: rgba(100, 210, 255, 0.78);
+  box-shadow: 0 0 0 3px rgba(100, 210, 255, 0.28);
 }
 
 .search-icon {
@@ -214,8 +216,8 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(16, 25, 44, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   color: #fff;
   font-size: 16px;
   display: flex;
@@ -227,12 +229,12 @@ body {
   -webkit-font-smoothing: antialiased;
   isolation: isolate;
   transform: translateZ(0);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.38);
 }
 
 .nav-icon-btn:hover {
-  background: rgba(30, 41, 59, 0.95);
-  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(30, 41, 59, 0.98);
+  border-color: rgba(255, 255, 255, 0.45);
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
 }
@@ -255,9 +257,9 @@ body {
   right: 0;
   width: 100%;
   box-sizing: border-box;
-  background: rgba(16, 24, 40, 0.95);
-  backdrop-filter: blur(35px);
-  -webkit-backdrop-filter: blur(35px);
+  background: rgba(11, 17, 30, 0.98);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 18px;
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.1);
