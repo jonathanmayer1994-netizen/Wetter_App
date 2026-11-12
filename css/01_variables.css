@@ -41,6 +41,7 @@
 }
 
 /* Atmospheric Weather Class Themes */
+:root.weather-clear-day,
 body.weather-clear-day {
   --bg-gradient-top: #1a4d80;
   --bg-gradient-mid: #2b7bbd;
@@ -48,6 +49,7 @@ body.weather-clear-day {
   --accent-glow: rgba(255, 214, 10, 0.22);
 }
 
+:root.weather-clear-night,
 body.weather-clear-night {
   --bg-gradient-top: #060b19;
   --bg-gradient-mid: #0b1736;
@@ -55,6 +57,7 @@ body.weather-clear-night {
   --accent-glow: rgba(100, 210, 255, 0.15);
 }
 
+:root.weather-cloudy,
 body.weather-cloudy {
   --bg-gradient-top: #2c3e50;
   --bg-gradient-mid: #415a77;
@@ -62,6 +65,7 @@ body.weather-cloudy {
   --accent-glow: rgba(186, 218, 245, 0.15);
 }
 
+:root.weather-rain,
 body.weather-rain {
   --bg-gradient-top: #141f2d;
   --bg-gradient-mid: #1d334a;
@@ -69,6 +73,7 @@ body.weather-rain {
   --accent-glow: rgba(100, 210, 255, 0.22);
 }
 
+:root.weather-snow,
 body.weather-snow {
   --bg-gradient-top: #2b3a4a;
   --bg-gradient-mid: #4a637d;
@@ -76,6 +81,7 @@ body.weather-snow {
   --accent-glow: rgba(255, 255, 255, 0.28);
 }
 
+:root.weather-thunder,
 body.weather-thunder {
   --bg-gradient-top: #120c22;
   --bg-gradient-mid: #1f143a;
@@ -83,6 +89,7 @@ body.weather-thunder {
   --accent-glow: rgba(191, 90, 242, 0.35);
 }
 
+:root.weather-fog,
 body.weather-fog {
   --bg-gradient-top: #36393e;
   --bg-gradient-mid: #4e535a;

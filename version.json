@@ -1,5 +1,5 @@
 {
-  "version": "2.25.1",
-  "build": "20261112-2045",
-  "notes": "Fix iOS bottom viewport cutoff bar + sunny/rainy daily condition consistency"
+  "version": "2.25.2",
+  "build": "20261112-2110",
+  "notes": "Adaptive iOS standalone PWA full-height viewport fix + html/body theme sync"
 }

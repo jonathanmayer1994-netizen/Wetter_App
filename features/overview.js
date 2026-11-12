@@ -220,6 +220,10 @@ export function renderOverviewTab() {
 
   const isMapFullscreen = document.body.classList.contains('mobile-map-fullscreen-active');
   const isModalOpen = document.body.classList.contains('modal-open');
+  const rootClasses = Array.from(document.documentElement.classList).filter(c => c.startsWith('weather-'));
+  rootClasses.forEach(c => document.documentElement.classList.remove(c));
+  document.documentElement.classList.add(`weather-${theme}`);
+
   const weatherClasses = Array.from(document.body.classList).filter(c => c.startsWith('weather-'));
   weatherClasses.forEach(c => document.body.classList.remove(c));
   document.body.classList.add(`weather-${theme}`);

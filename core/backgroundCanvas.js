@@ -61,8 +61,15 @@ export class BackgroundCanvasEngine {
       }
     }
 
-    // Handle Window Resize
+    // Handle Window, Orientation & VisualViewport Resize (Adaptive full-screen canvas on iOS PWA)
     window.addEventListener('resize', () => this.handleResize());
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => this.handleResize(), 80);
+      setTimeout(() => this.handleResize(), 260);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => this.handleResize(), { passive: true });
+    }
 
     // IntersectionObserver to auto-pause when scrolled out of view
     if (typeof IntersectionObserver !== 'undefined') {
@@ -80,8 +87,8 @@ export class BackgroundCanvasEngine {
   }
 
   updateDimensions() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
+    this.width = Math.max(window.innerWidth || 0, this.canvas ? this.canvas.clientWidth || 0 : 0);
+    this.height = Math.max(window.innerHeight || 0, this.canvas ? this.canvas.clientHeight || 0 : 0);
     if (!this.useWorker && this.canvas) {
       this.canvas.width = this.width;
       this.canvas.height = this.height;

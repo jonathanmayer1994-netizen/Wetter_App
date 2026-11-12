@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" class="weather-clear-day">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -26,7 +26,78 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.9.1">
+  <link rel="stylesheet" href="style.css?v=2.9.2">
+
+  <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
+  <script>
+    (function () {
+      var lastFullHeight = 0;
+      function syncAppViewportMetrics() {
+        var root = document.documentElement;
+        if (!root) return;
+        var ua = navigator.userAgent || '';
+        var isAppleTouch = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+        var isStandalone = (window.navigator && window.navigator.standalone === true) ||
+          (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
+
+        var innerW = window.innerWidth || root.clientWidth || 0;
+        var innerH = window.innerHeight || root.clientHeight || 0;
+        var vv = window.visualViewport;
+        var vvH = vv ? Math.round(vv.height) : innerH;
+
+        var activeTag = document.activeElement && document.activeElement.tagName;
+        var isInputFocused = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || Boolean(document.activeElement && document.activeElement.isContentEditable);
+
+        var isLandscape = innerW > innerH;
+        var sw = window.screen ? (isLandscape ? Math.max(window.screen.width, window.screen.height) : Math.min(window.screen.width, window.screen.height)) : innerW;
+        var sh = window.screen ? (isLandscape ? Math.min(window.screen.width, window.screen.height) : Math.max(window.screen.width, window.screen.height)) : innerH;
+
+        var targetH = innerH;
+        if (isAppleTouch && isStandalone && sh > 0 && Math.abs(innerW - sw) <= 6) {
+          if (sh > innerH && (sh - innerH) <= 130) {
+            targetH = sh;
+          } else if (!isInputFocused) {
+            targetH = Math.max(innerH, sh);
+          } else if (lastFullHeight >= sh - 2) {
+            targetH = lastFullHeight;
+          }
+        } else if (!isInputFocused) {
+          targetH = Math.max(innerH, vvH);
+        } else if (lastFullHeight > 0) {
+          targetH = lastFullHeight;
+        }
+
+        if (!isInputFocused && targetH > 0) {
+          lastFullHeight = targetH;
+        }
+        if (targetH > 0) {
+          root.style.setProperty('--app-height', targetH + 'px');
+        }
+      }
+
+      window.__syncAppViewportMetrics = syncAppViewportMetrics;
+      syncAppViewportMetrics();
+
+      window.addEventListener('resize', syncAppViewportMetrics, { passive: true });
+      window.addEventListener('orientationchange', function () {
+        setTimeout(syncAppViewportMetrics, 60);
+        setTimeout(syncAppViewportMetrics, 260);
+      }, { passive: true });
+      window.addEventListener('pageshow', syncAppViewportMetrics, { passive: true });
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) setTimeout(syncAppViewportMetrics, 40);
+      });
+      document.addEventListener('focusout', function () {
+        setTimeout(function () {
+          if (window.scrollY !== 0) window.scrollTo(0, 0);
+          syncAppViewportMetrics();
+        }, 80);
+      });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', syncAppViewportMetrics, { passive: true });
+      }
+    })();
+  </script>
 </head>
 <body class="weather-clear-day">
   <!-- Dynamic Atmospheric Background Canvas -->
@@ -2998,11 +3069,11 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.9.1"></script>
+  <script type="module" src="app.js?v=2.9.2"></script>
 
   <!-- Autonome iOS-PWA & Service-Worker Update-Engine -->
   <script type="module">
-    import { initAppUpdater } from './core/appUpdater.js?v=2.9.1';
+    import { initAppUpdater } from './core/appUpdater.js?v=2.9.2';
     initAppUpdater();
   </script>
 </body>

@@ -54,6 +54,7 @@
 }
 
 /* Atmospheric Weather Class Themes */
+:root.weather-clear-day,
 body.weather-clear-day {
   --bg-gradient-top: #1a4d80;
   --bg-gradient-mid: #2b7bbd;
@@ -61,6 +62,7 @@ body.weather-clear-day {
   --accent-glow: rgba(255, 214, 10, 0.22);
 }
 
+:root.weather-clear-night,
 body.weather-clear-night {
   --bg-gradient-top: #060b19;
   --bg-gradient-mid: #0b1736;
@@ -68,6 +70,7 @@ body.weather-clear-night {
   --accent-glow: rgba(100, 210, 255, 0.15);
 }
 
+:root.weather-cloudy,
 body.weather-cloudy {
   --bg-gradient-top: #2c3e50;
   --bg-gradient-mid: #415a77;
@@ -75,6 +78,7 @@ body.weather-cloudy {
   --accent-glow: rgba(186, 218, 245, 0.15);
 }
 
+:root.weather-rain,
 body.weather-rain {
   --bg-gradient-top: #141f2d;
   --bg-gradient-mid: #1d334a;
@@ -82,6 +86,7 @@ body.weather-rain {
   --accent-glow: rgba(100, 210, 255, 0.22);
 }
 
+:root.weather-snow,
 body.weather-snow {
   --bg-gradient-top: #2b3a4a;
   --bg-gradient-mid: #4a637d;
@@ -89,6 +94,7 @@ body.weather-snow {
   --accent-glow: rgba(255, 255, 255, 0.28);
 }
 
+:root.weather-thunder,
 body.weather-thunder {
   --bg-gradient-top: #120c22;
   --bg-gradient-mid: #1f143a;
@@ -96,6 +102,7 @@ body.weather-thunder {
   --accent-glow: rgba(191, 90, 242, 0.35);
 }
 
+:root.weather-fog,
 body.weather-fog {
   --bg-gradient-top: #36393e;
   --bg-gradient-mid: #4e535a;
@@ -121,7 +128,7 @@ body {
   min-height: 100%;
   font-family: var(--font-main);
   color: var(--text-primary);
-  background-color: var(--bg-gradient-top, #0d1b2a);
+  background-color: var(--bg-gradient-bottom, #0f1c2e);
   background-image: linear-gradient(180deg, var(--bg-gradient-top) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-bottom) 100%);
   background-repeat: no-repeat;
   background-size: cover;
@@ -8911,9 +8918,10 @@ body {
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    bottom: 0 !important;
+    bottom: auto !important;
     width: 100% !important;
-    height: auto !important;
+    height: var(--app-height, 100vh) !important;
+    height: var(--app-height, 100dvh) !important;
     z-index: 99990 !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -8922,13 +8930,13 @@ body {
   }
 
   body.mobile-map-fullscreen-active .map-view-card {
-    position: fixed !important;
+    position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
@@ -8943,13 +8951,13 @@ body {
   }
 
   body.mobile-map-fullscreen-active .fullscreen-map-wrapper {
-    position: fixed !important;
+    position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
@@ -8964,7 +8972,7 @@ body {
 
   /* MeteoSwiss Animationen Header Bar on Mobile Fullscreen */
   .ms-map-header-bar {
-    position: fixed !important;
+    position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
@@ -9011,7 +9019,7 @@ body {
 
   .ms-map-attribution,
   .ms-radar-watermark {
-    position: fixed !important;
+    position: absolute !important;
     top: calc(env(safe-area-inset-top, 10px) + 104px) !important;
     z-index: 100000 !important;
   }
@@ -9022,7 +9030,7 @@ body {
   }
 
   .ms-right-fab-stack {
-    position: fixed !important;
+    position: absolute !important;
     right: 10px !important;
     bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 116px) !important;
     z-index: 100001 !important;
@@ -9114,7 +9122,7 @@ body {
 
   /* Mobile Bottom Sheet for Ebenen & Kartenstil */
   .map-layer-drawer {
-    position: fixed !important;
+    position: absolute !important;
     top: auto !important;
     bottom: calc(env(safe-area-inset-bottom, 16px) + 10px) !important;
     left: 10px !important;
@@ -9139,7 +9147,7 @@ body {
   }
 
   .map-layer-backdrop {
-    position: fixed !important;
+    position: absolute !important;
     z-index: 100008 !important;
   }
 
@@ -9150,7 +9158,7 @@ body {
 
   /* Windkompass — 100% Kollisionsfrei auf Mobile */
   .map-wind-compass-widget {
-    position: fixed !important;
+    position: absolute !important;
     top: calc(env(safe-area-inset-top, 10px) + 124px) !important;
     left: 10px !important;
     z-index: 100001 !important;
@@ -9270,7 +9278,7 @@ body {
 
   /* Point Weather Card on Mobile — Sitzt ergonomisch unten links über Timeline, links neben FABs */
   .map-point-weather-card {
-    position: fixed !important;
+    position: absolute !important;
     top: auto !important;
     bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 116px) !important;
     left: 10px !important;
@@ -9393,7 +9401,7 @@ body {
 
   .map-legend-card.ms-legend-force-open {
     display: flex !important;
-    position: fixed !important;
+    position: absolute !important;
     top: calc(env(safe-area-inset-top, 10px) + 122px) !important;
     left: 10px !important;
     right: 10px !important;
@@ -9411,7 +9419,7 @@ body {
   .modern-radar-player,
   #radar-floating-controls,
   .ms-timeline-dock {
-    position: fixed !important;
+    position: absolute !important;
     top: auto !important;
     bottom: max(10px, env(safe-area-inset-bottom, 10px)) !important;
     left: 10px !important;
@@ -12756,9 +12764,10 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 0 !important;
+  bottom: auto !important;
   width: 100% !important;
-  height: auto !important;
+  height: var(--app-height, 100vh) !important;
+  height: var(--app-height, 100dvh) !important;
   z-index: 100000 !important;
   border-radius: 0 !important;
   border: none !important;
@@ -13908,28 +13917,51 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 }
 
 /* Lock outer document on mobile/touch iOS so Safari/PWA UIScrollView NEVER rubber-bands
-   past the top edge AND stretches edge-to-edge behind the bottom home indicator (no 100dvh cutoff bar). */
+   past the top edge AND stretches edge-to-edge across the true adaptive screen height
+   (bypasses the iOS Standalone black-translucent Initial Containing Block ~59px cutoff bug). */
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   html {
     width: 100%;
-    height: 100%;
-    min-height: 100%;
+    height: var(--app-height, 100vh);
+    height: var(--app-height, 100dvh);
+    min-height: var(--app-height, 100%);
     overflow: hidden !important;
     overscroll-behavior: none !important;
   }
 
   body {
-    position: fixed;
+    position: relative;
+    width: 100%;
+    height: var(--app-height, 100%);
+    min-height: var(--app-height, 100%);
+    margin: 0;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+
+  #weather-canvas {
+    position: absolute;
     top: 0;
     right: 0;
     bottom: 0;
     left: 0;
-    width: auto;
-    height: auto;
-    min-height: 0;
-    margin: 0;
-    overflow: hidden !important;
-    overscroll-behavior: none !important;
+    width: 100%;
+    height: 100%;
+  }
+
+  .ambient-glow {
+    position: absolute;
+  }
+
+  .bento-modal-overlay,
+  .modal-overlay,
+  .spotlight-overlay,
+  .cloud-sync-modal-overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
   }
 
   .app-layout {
@@ -13966,8 +13998,8 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   /* Floating Liquid Glass Dock for iPhone (fliegt über dem Content am unteren Rand) */
   .mobile-bottom-nav {
     display: flex;
-    position: fixed;
-    bottom: calc(14px + env(safe-area-inset-bottom, 8px));
+    position: absolute;
+    bottom: calc(10px + env(safe-area-inset-bottom, 8px));
     left: 14px;
     right: 14px;
     max-width: 420px;
