@@ -5,6 +5,7 @@
  */
 
 import { GoogleSheetsSync } from '../core/googleSheetsSync.js';
+import { checkForAppUpdate } from '../core/appUpdater.js?v=2.9.0';
 
 let startX = 0;
 let startY = 0;
@@ -210,6 +211,8 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
 
     let weatherResult = null;
     try {
+      const updatePromise = checkForAppUpdate({ reason: 'ptr' }).catch(() => null);
+
       let weatherPromise = Promise.resolve(null);
       if (onRefreshWeather && window.state?.currentLocation) {
         weatherPromise = Promise.race([
@@ -221,6 +224,12 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
       const syncPromise = Promise.resolve(
         onRefreshSync ? onRefreshSync() : GoogleSheetsSync.pullAll()
       ).catch(() => null);
+
+      const updateRes = await Promise.race([updatePromise, new Promise(resolve => setTimeout(() => resolve(null), 1200))]);
+      if (updateRes && updateRes.updated) {
+        if (text) text.innerText = '🔄 Neue Version gefunden — aktualisiere App...';
+        return;
+      }
 
       weatherResult = await weatherPromise;
       await Promise.race([syncPromise, new Promise(resolve => setTimeout(resolve, 350))]);

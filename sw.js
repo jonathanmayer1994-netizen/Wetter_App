@@ -1,17 +1,24 @@
 /**
- * BEST WEATHER — Service Worker v2.0 (Task 5a)
+ * BEST WEATHER — Service Worker v2.25.0
  * Enterprise-Grade Alpine Offline PWA Cache Engine
- * Features: Leaflet precaching, Worker precaching, Stale-While-Revalidate,
- * and high-altitude offline fallbacks when off-grid in the Alps.
+ * Features:
+ * - CDN Edge & iOS NSURLCache bypass on deploy token change (GitHub Pages max-age=600 fix)
+ * - Network-First for code/markup with instant offline CacheStorage fallback
+ * - Bounded 600-tile map cache
  */
 
-const CACHE_NAME = 'best-weather-v2.24.0-ptr-ios-fix';
+const SW_URL = new URL(self.location.href);
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.25.0';
+const CACHE_NAME = `best-weather-v2.25.0-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
 const MAX_TILES = 600;
+
+let activeBustToken = DEPLOY_TOKEN;
 
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './version.json',
   './style.css',
   './css/01_variables.css',
   './css/02_base.css',
@@ -28,6 +35,7 @@ const STATIC_ASSETS = [
   './gpx.worker.js',
   './background.worker.js',
   './physics.worker.js',
+  './core/appUpdater.js',
   './core/dispatcher.js',
   './core/state.js',
   './core/constants.js',
@@ -60,6 +68,28 @@ const STATIC_ASSETS = [
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
 ];
 
+const CORE_PRECACHE_ASSETS = [
+  './',
+  './index.html',
+  './version.json',
+  './style.css',
+  './app.js',
+  './core/appUpdater.js',
+  './manifest.json',
+  './logo.png'
+];
+
+function appendBustParam(rawUrl, key, value) {
+  try {
+    const u = new URL(rawUrl, self.location.href);
+    if (u.origin !== self.location.origin) return rawUrl;
+    u.searchParams.set(key, value);
+    return u.toString();
+  } catch (_) {
+    return rawUrl;
+  }
+}
+
 async function putTileCacheWithQuota(req, res) {
   try {
     const cache = await caches.open(TILE_CACHE_NAME);
@@ -74,18 +104,69 @@ async function putTileCacheWithQuota(req, res) {
   } catch (_) { }
 }
 
-// 1. Install Event: Precache All Essential Alpine Assets
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 4500) {
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+  try {
+    return await fetch(url, ctrl ? { ...opts, signal: ctrl.signal } : opts);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function precacheAssetList(urls) {
+  const cache = await caches.open(CACHE_NAME);
+  for (let i = 0; i < urls.length; i += 2) {
+    const chunk = urls.slice(i, i + 2);
+    await Promise.allSettled(
+      chunk.map(async (asset) => {
+        try {
+          const isLocal = !asset.startsWith('http');
+          const fetchUrl = isLocal ? appendBustParam(asset, '_sw', activeBustToken) : asset;
+          const reqInit = isLocal ? { cache: 'no-store' } : {};
+          const res = await fetchWithTimeout(fetchUrl, reqInit, 4500);
+          if (res && res.status === 200) {
+            await cache.put(asset, res);
+          }
+        } catch (err) {
+          console.warn('[ServiceWorker] Precache Notice:', asset, err);
+        }
+      })
+    );
+  }
+}
+
+async function precacheFreshAssets() {
+  await precacheAssetList(CORE_PRECACHE_ASSETS);
+}
+
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.token) {
+    activeBustToken = String(data.token);
+  }
+  if (data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (data.type === 'FORCE_REVALIDATE') {
+    event.waitUntil(
+      caches.keys().then((keys) => Promise.all(
+        keys
+          .filter((k) => k !== TILE_CACHE_NAME)
+          .map((k) => caches.delete(k))
+      ))
+    );
+  }
+});
+
+// 1. Install Event: Precache All Essential Assets bypassing CDN max-age=600
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[ServiceWorker] Partial Precache Notice:', err);
-      });
-    }).then(() => self.skipWaiting())
+    precacheFreshAssets().then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate Event: Clean Out Deprecated Caches
+// 2. Activate Event: Clean Out Deprecated Caches, Claim Clients & Warm Remaining Cache
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -96,14 +177,30 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()).then(() => {
+      // Warm remaining offline assets in background without delaying SW activation or saturating sockets
+      const remaining = STATIC_ASSETS.filter((a) => !CORE_PRECACHE_ASSETS.includes(a));
+      setTimeout(() => {
+        precacheAssetList(remaining).catch(() => {});
+      }, 600);
+    })
   );
 });
 
-// 3. Fetch Event: Stale-While-Revalidate & Resilient Offline Fallbacks
+// 3. Fetch Event: Direct Origin Bypass on Cache-Busted Probes + Network-First Code/Markup
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') return;
+
+  const isSameOrigin = url.origin === self.location.origin;
+
+  // Explicit update-checker probes (_bw_cb=...) always bypass CacheStorage cleanly
+  if (isSameOrigin && url.searchParams.has('_bw_cb')) {
+    event.respondWith(fetch(new Request(req, { cache: 'no-store' })));
+    return;
+  }
 
   if (req.method !== 'GET') return;
 
@@ -131,7 +228,6 @@ self.addEventListener('fetch', (event) => {
         .catch(async () => {
           const cached = await caches.match(req, { ignoreSearch: true });
           if (cached) return cached;
-          // Liefert bei fehlender Kachel kein JSON (verhindert Bild-Dekodierungsfehler)
           return new Response(null, { status: 504, statusText: 'Offline Tile Not Cached' });
         })
     );
@@ -162,8 +258,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // B. Same-Origin App Shell, HTML, JS & CSS: Network-First (immer aktuelle Version bei Online-Nutzung, Offline-Fallback aus Cache)
-  const isSameOrigin = url.origin === self.location.origin;
+  // B. Same-Origin App Shell, HTML, JS & CSS: Network-First mit CDN-Token-Bypass & Offline-Fallback
   const isCodeOrMarkup = isSameOrigin && (
     req.mode === 'navigate' ||
     url.pathname === '/' ||
@@ -175,8 +270,9 @@ self.addEventListener('fetch', (event) => {
   );
 
   if (isCodeOrMarkup) {
+    const bustUrl = appendBustParam(req.url, '_sw', activeBustToken);
     event.respondWith(
-      fetch(new Request(req, { cache: 'no-cache' }))
+      fetch(bustUrl, { cache: 'no-store' })
         .then((networkRes) => {
           if (networkRes && networkRes.status === 200) {
             const clone = networkRes.clone();

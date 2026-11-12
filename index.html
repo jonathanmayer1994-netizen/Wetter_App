@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.8.0">
+  <link rel="stylesheet" href="style.css?v=2.9.0">
 </head>
 <body class="weather-clear-day">
   <!-- Dynamic Atmospheric Background Canvas -->
@@ -2998,39 +2998,12 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.8.0"></script>
+  <script type="module" src="app.js?v=2.9.0"></script>
 
-  <!-- Service Worker Registration für Alpine Offline PWA -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      let swRefreshing = false;
-      const hadController = Boolean(navigator.serviceWorker.controller);
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!hadController || swRefreshing) return;
-        try {
-          if (sessionStorage.getItem('bw_sw_reloaded_v224')) return;
-          sessionStorage.setItem('bw_sw_reloaded_v224', '1');
-        } catch (_) {}
-        swRefreshing = true;
-        window.location.reload();
-      });
-
-      let activeSwReg = null;
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
-          activeSwReg = reg;
-          if (reg) reg.update();
-        }).catch((err) => {
-          console.warn('Service Worker Registrierung:', err);
-        });
-      });
-
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && activeSwReg) {
-          try { activeSwReg.update(); } catch (_) {}
-        }
-      });
-    }
+  <!-- Autonome iOS-PWA & Service-Worker Update-Engine -->
+  <script type="module">
+    import { initAppUpdater } from './core/appUpdater.js?v=2.9.0';
+    initAppUpdater();
   </script>
 </body>
 </html>
