@@ -5442,15 +5442,31 @@ export const MicroEngine = {
     }
     const endH = Math.min(startH + 24, (hourly && hourly.time) ? hourly.time.length : startH);
 
-    // Tagesstunden filtern (Tageslichtzeit ca. 07:00 bis 19:00 Uhr)
+    // Exaktes astronomisches Tageslicht-Fenster bestimmen (verhindert, dass November-Nachtstunden
+    // wie 17–19 Uhr als "Regen-Tagesstunden" einen sonnigen Tag verzerren)
+    let sunriseDec = 7.0;
+    let sunsetDec = 19.0;
+    if (daily.sunrise && daily.sunrise[dayIndex]) {
+      const sr = new Date(daily.sunrise[dayIndex]);
+      if (!isNaN(sr.getTime())) sunriseDec = sr.getHours() + sr.getMinutes() / 60;
+    }
+    if (daily.sunset && daily.sunset[dayIndex]) {
+      const ss = new Date(daily.sunset[dayIndex]);
+      if (!isNaN(ss.getTime())) sunsetDec = ss.getHours() + ss.getMinutes() / 60;
+    }
+
     let daytimeIndices = [];
+    let nightIndices = [];
     for (let h = startH; h < endH; h++) {
       const hourOfDay = (h - startH);
+      const isWithinAstroDay = (hourOfDay + 0.5) >= sunriseDec && (hourOfDay + 0.5) <= sunsetDec;
       const isDayFlag = (hourly && hourly.is_day && hourly.is_day[h] !== undefined)
         ? hourly.is_day[h] === 1
-        : (hourOfDay >= 7 && hourOfDay <= 19);
-      if (isDayFlag || (hourOfDay >= 7 && hourOfDay <= 19)) {
+        : isWithinAstroDay;
+      if (isWithinAstroDay || isDayFlag) {
         daytimeIndices.push(h);
+      } else {
+        nightIndices.push(h);
       }
     }
     if (daytimeIndices.length === 0) {
@@ -5461,7 +5477,7 @@ export const MicroEngine = {
     let activeIndices = daytimeIndices;
     if (isToday) {
       const nowHour = new Date().getHours();
-      if (nowHour >= 10 && nowHour <= 19) {
+      if (nowHour >= Math.ceil(sunriseDec) && nowHour <= Math.ceil(sunsetDec)) {
         const remaining = daytimeIndices.filter(h => (h - startH) >= nowHour);
         if (remaining.length > 0) {
           activeIndices = remaining;
@@ -5469,17 +5485,41 @@ export const MicroEngine = {
       }
     }
 
-    // Kennzahlen extrahieren
+    // Kennzahlen extrahieren (synchronisiert mit render10DayForecast)
     const codes = activeIndices.map(h => (hourly && hourly.weather_code) ? hourly.weather_code[h] : 0);
-    const precips = activeIndices.map(h => (hourly && hourly.precipitation) ? hourly.precipitation[h] : 0);
-    const snows = activeIndices.map(h => (hourly && hourly.snowfall) ? hourly.snowfall[h] : 0);
-    const clouds = activeIndices.map(h => (hourly && hourly.cloud_cover) ? hourly.cloud_cover[h] : 50);
+    const precips = activeIndices.map(h => (hourly && hourly.precipitation) ? (hourly.precipitation[h] || 0) : 0);
+    const snows = activeIndices.map(h => (hourly && hourly.snowfall) ? (hourly.snowfall[h] || 0) : 0);
+    const clouds = activeIndices.map(h => (hourly && hourly.cloud_cover) ? (hourly.cloud_cover[h] ?? 50) : 50);
 
-    const precipSum = daily.precipitation_sum ? (daily.precipitation_sum[dayIndex] || 0) : 0;
+    let hourlySunSumSec = 0;
+    let hourly24hPrecip = 0;
+    let morningRainMm = 0;
+    let eveningRainMm = 0;
+    for (let h = startH; h < endH; h++) {
+      const hod = h - startH;
+      const hSun = (hourly && hourly.sunshine_duration && hourly.sunshine_duration[h] != null && !isNaN(hourly.sunshine_duration[h]))
+        ? hourly.sunshine_duration[h]
+        : ((hourly && hourly.cloud_cover && hourly.cloud_cover[h] != null && (hourly.is_day ? hourly.is_day[h] === 1 : (hod + 0.5 >= sunriseDec && hod + 0.5 <= sunsetDec)))
+          ? Math.max(0, (100 - (hourly.cloud_cover[h] || 0)) / 100 * 3600)
+          : 0);
+      hourlySunSumSec += hSun;
+
+      const hp = (hourly && hourly.precipitation && hourly.precipitation[h] != null && !isNaN(hourly.precipitation[h]))
+        ? hourly.precipitation[h]
+        : 0;
+      hourly24hPrecip += hp;
+      if (hod < Math.max(sunriseDec + 1.5, 10)) morningRainMm += hp;
+      if (hod >= Math.min(sunsetDec - 1.0, 15)) eveningRainMm += hp;
+    }
+
+    const daylightPrecipSum = precips.reduce((a, b) => a + b, 0);
+    const precipSum = Math.max(daily.precipitation_sum ? (daily.precipitation_sum[dayIndex] || 0) : 0, hourly24hPrecip);
     const snowSum = daily.snowfall_sum ? (daily.snowfall_sum[dayIndex] || 0) : 0;
-    const sunDur = daily.sunshine_duration ? (daily.sunshine_duration[dayIndex] || 0) : 0;
-    const daylight = daily.daylight_duration ? (daily.daylight_duration[dayIndex] || 1) : 1;
-    const sunRatio = daylight > 0 ? (sunDur / daylight) : 0;
+    const sunDur = Math.max(hourlySunSumSec, daily.sunshine_duration ? (daily.sunshine_duration[dayIndex] || 0) : 0);
+    const daylight = (daily.daylight_duration && daily.daylight_duration[dayIndex])
+      ? daily.daylight_duration[dayIndex]
+      : Math.max(1, (sunsetDec - sunriseDec) * 3600);
+    const sunRatio = daylight > 0 ? Math.min(1, sunDur / daylight) : 0;
     const avgCloud = clouds.length > 0 ? (clouds.reduce((a, b) => a + b, 0) / clouds.length) : 50;
 
     // 1. GEWITTER & UNWETTER
@@ -5497,7 +5537,10 @@ export const MicroEngine = {
     // 2. SCHNEE & WINTERNIEDERSCHLAG
     const snowHours = snows.filter(s => s > 0).length + codes.filter(c => (c >= 71 && c <= 77) || c === 85 || c === 86).length;
     if (snowSum >= 1.5 || snowHours >= 3) {
-      if (sunRatio >= 0.30) {
+      if (sunRatio >= 0.45) {
+        return { icon: '🌨️', label: 'Sonne & Schneeschauer', synopNote: 'Schneeschauer mit vielen sonnigen Phasen', theme: 'snow' };
+      }
+      if (sunRatio >= 0.25) {
         return { icon: '🌨️', label: 'Schneeschauer', synopNote: 'Schneeschauer mit sonnigen Phasen', theme: 'snow' };
       }
       return { icon: '❄️', label: snowSum >= 6.0 ? 'Kräftiger Schneefall' : 'Schneefall', synopNote: 'Schneefallgrenze & Glättegefahr beachten', theme: 'snow' };
@@ -5506,23 +5549,61 @@ export const MicroEngine = {
       return { icon: '🌨️', label: 'Leichte Schneeschauer', synopNote: 'Vereinzelte Schneeschauer', theme: 'snow' };
     }
 
-    // 3. REGEN & SCHAUER
-    const rainHours = precips.filter(p => p >= 0.25).length;
+    // 3. REGEN & SCHAUER (konsistent mit tatsächlicher Sonnenscheindauer & Tag/Nacht-Verteilung)
+    const daylightRainHours = precips.filter(p => p >= 0.25).length;
+    const allHoursRain = (hourly && hourly.precipitation)
+      ? Array.from({ length: Math.max(0, endH - startH) }, (_, idx) => hourly.precipitation[startH + idx] || 0).filter(p => p >= 0.25).length
+      : daylightRainHours;
+
     if (precipSum >= 2.0) {
-      if (rainHours <= 3 && sunRatio >= 0.30) {
-        return { icon: '🌦️', label: 'Sonne & Schauer', synopNote: 'Wechselhaft mit sonnigen Abschnitten', theme: 'rain' };
+      // Überwiegend sonniger Tag (z.B. >= 50–70% Sonne) trotz Regen in Rand-/Nachtstunden oder kurzen Schauern
+      if (sunRatio >= 0.50) {
+        const mostlyOutsideDaylight = (daylightPrecipSum < 1.5 || daylightRainHours <= 1) && (precipSum - daylightPrecipSum >= 1.0 || nightIndices.length > 0);
+        if (mostlyOutsideDaylight) {
+          if (eveningRainMm >= morningRainMm * 1.35 && eveningRainMm >= 1.0) {
+            return { icon: '🌦️', label: 'Sonne, Spätregen', synopNote: 'Tagsüber viel Sonne, Regen vor allem abends/nachts', theme: 'clear-day' };
+          }
+          if (morningRainMm > eveningRainMm * 1.35 && morningRainMm >= 1.0) {
+            return { icon: '🌦️', label: 'Frühregen, Sonne', synopNote: 'Nach morgendlichem Regen viel Sonnenschein', theme: 'clear-day' };
+          }
+          return { icon: '🌦️', label: 'Sonne & Schauer', synopNote: 'Viel Sonnenschein tagsüber, Regen meist in Randstunden', theme: 'clear-day' };
+        }
+        if (precipSum >= 10.0 && sunRatio < 0.60) {
+          return { icon: '🌦️', label: 'Sonne & Schauer', synopNote: 'Sonnige Phasen im Wechsel mit kräftigen Schauern', theme: 'rain' };
+        }
+        return { icon: '🌦️', label: 'Sonne & Schauer', synopNote: 'Viel Sonnenschein im Wechsel mit Schauern', theme: 'rain' };
       }
+
+      if (sunRatio >= 0.30) {
+        if (daylightRainHours <= 4) {
+          return { icon: '🌦️', label: 'Sonne & Schauer', synopNote: 'Wechselhaft mit sonnigen Abschnitten', theme: 'rain' };
+        }
+        if (precipSum >= 10.0) {
+          return { icon: '🌧️', label: 'Starke Schauer', synopNote: 'Ergiebige Schauer mit kurzen Aufhellungen', theme: 'rain' };
+        }
+        return { icon: '🌦️', label: 'Schauer & Sonne', synopNote: 'Wiederholte Regenschauer bei einzelnen Auflockerungen', theme: 'rain' };
+      }
+
       if (precipSum >= 10.0) {
         return { icon: '🌧️', label: 'Starkregen', synopNote: 'Ergiebiger Niederschlag', theme: 'rain' };
       }
-      if (rainHours >= 5) {
-        return { icon: '🌧️', label: 'Dauerregen', synopNote: 'Länger anhaltender Regen', theme: 'rain' };
+      if ((daylightRainHours >= 5 || allHoursRain >= 7) && sunRatio < 0.18) {
+        return { icon: '🌧️', label: 'Dauerregen', synopNote: 'Länger anhaltender Regen bei meist geschlossener Wolkendecke', theme: 'rain' };
+      }
+      if (sunRatio >= 0.18 && daylightRainHours <= 3) {
+        return { icon: '🌦️', label: 'Schauer & Wolken', synopNote: 'Überwiegend bewölkt mit einzelnen Schauern', theme: 'rain' };
       }
       return { icon: '🌧️', label: 'Regnerisch', synopNote: 'Wiederholte Regenfälle', theme: 'rain' };
     }
 
     if (precipSum >= 0.5) {
-      if (sunRatio >= 0.40) {
+      if (sunRatio >= 0.60) {
+        if (daylightPrecipSum < 0.4 && eveningRainMm >= morningRainMm * 1.35) {
+          return { icon: '🌦️', label: 'Sonnig, Schauer', synopNote: 'Tagsüber viel Sonne, erst abends leichte Schauer', theme: 'clear-day' };
+        }
+        return { icon: '🌦️', label: 'Sonnig, Schauer', synopNote: 'Überwiegend sonnig mit vereinzelten leichten Schauern', theme: 'clear-day' };
+      }
+      if (sunRatio >= 0.35) {
         return { icon: '🌦️', label: 'Heiter, Schauer', synopNote: 'Überwiegend trocken mit vereinzelten Schauern', theme: 'rain' };
       }
       return { icon: '🌧️', label: 'Leichter Regen', synopNote: 'Gelegentlicher Niesel- oder Schauerregen', theme: 'rain' };

@@ -5,7 +5,7 @@
  */
 
 import { GoogleSheetsSync } from '../core/googleSheetsSync.js';
-import { checkForAppUpdate } from '../core/appUpdater.js?v=2.9.0';
+import { checkForAppUpdate } from '../core/appUpdater.js?v=2.9.1';
 
 let startX = 0;
 let startY = 0;

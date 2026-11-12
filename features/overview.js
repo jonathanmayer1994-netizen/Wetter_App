@@ -2184,9 +2184,17 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
   document.getElementById('modal-wind-spd').innerText = `${windSpdMax} km/h`;
   document.getElementById('modal-wind-gusts').innerText = `Spitzenböen bis ${windGustMax} km/h`;
 
-  // Sonne & Tageslicht
-  if (daily.sunshine_duration && daily.sunshine_duration[dayIndex] !== undefined) {
-    const sunHours = (daily.sunshine_duration[dayIndex] / 3600).toFixed(1);
+  // Sonne & Tageslicht (synchronisiert mit 10-Tage-Trend)
+  let modalSunSumSec = 0;
+  for (let h = 0; h < 24; h++) {
+    const hIdx = dayStartHourIdx + h;
+    if (hourly && hourly.sunshine_duration && hourly.sunshine_duration[hIdx] != null && !isNaN(hourly.sunshine_duration[hIdx])) {
+      modalSunSumSec += hourly.sunshine_duration[hIdx];
+    }
+  }
+  if (modalSunSumSec > 0 || (daily.sunshine_duration && daily.sunshine_duration[dayIndex] !== undefined)) {
+    const sunDurSec = Math.max(modalSunSumSec, daily.sunshine_duration ? (daily.sunshine_duration[dayIndex] || 0) : 0);
+    const sunHours = (sunDurSec / 3600).toFixed(1).replace('.', ',');
     document.getElementById('modal-sunshine-dur').innerText = `${sunHours} h`;
   } else {
     const wCode = (daily.weather_code && daily.weather_code[dayIndex] !== undefined) ? daily.weather_code[dayIndex] : 0;
