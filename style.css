@@ -1013,6 +1013,9 @@ body {
   align-items: center;
   gap: 14px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 6px 2px 12px 2px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
@@ -7407,7 +7410,7 @@ body {
   z-index: 90;
   background: transparent;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   overflow: hidden;
   pointer-events: none;
@@ -7415,6 +7418,10 @@ body {
   transition: height 0.24s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.ptr-indicator.ptr-active {
+  padding-bottom: 6px;
 }
 
 .ptr-indicator.ptr-ready .ptr-arrow {
@@ -7431,11 +7438,12 @@ body {
   gap: 9px;
   padding: 8px 16px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.58);
+  background: rgba(15, 23, 42, 0.68);
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transform-origin: center bottom;
 }
 
 .ptr-arrow {
@@ -13933,7 +13941,6 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     overflow-x: hidden !important;
     overscroll-behavior-y: none !important;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
   }
 
   body.mobile-map-fullscreen-active .app-layout,

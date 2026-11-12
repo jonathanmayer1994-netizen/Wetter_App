@@ -1,20 +1,23 @@
 /**
  * BEST WEATHER — Native iOS-Grade & Cross-Platform Pull-Down-to-Refresh Module
  * Elastic pull-down gesture on Dashboard (#tab-overview) and Stadtklima / Bergklima (#tab-mountain)
- * Supports iOS Safari / Standalone PWA Touch, Android Chrome Touch, Desktop Pointer/Mouse Drag & Mac Trackpad.
+ * Supports iOS Safari / Standalone PWA Touch (120Hz Retina), Android Chrome Touch, Desktop Pointer Drag & Mac Trackpad.
  */
 
 import { GoogleSheetsSync } from '../core/googleSheetsSync.js';
 
 let startX = 0;
 let startY = 0;
+let activeTouchId = null;
 let gestureTarget = null;
 let gestureActive = false;
+let directionLocked = null; // null | 'pull' | 'native'
 let isPulling = false;
 let pointerDown = false;
 let mouseStartX = 0;
 let mouseStartY = 0;
 let suppressNextClick = false;
+let suppressClickTimer = null;
 let wheelPulling = false;
 let wheelAccum = 0;
 let wheelEndTimer = null;
@@ -25,7 +28,8 @@ let activePaneEl = null;
 let initialized = false;
 
 const THRESHOLD = 48;
-const MAX_PULL_PX = 76;
+const MAX_PULL_PX = 80;
+const REFRESH_TIMEOUT_MS = 12000;
 
 export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
   const indicator = document.getElementById('pull-to-refresh');
@@ -54,6 +58,7 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
 
   function getScrollY() {
     return Math.max(
+      0,
       appLayout ? appLayout.scrollTop : 0,
       window.scrollY || 0,
       document.scrollingElement ? document.scrollingElement.scrollTop : 0,
@@ -77,7 +82,12 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
     ];
     for (const id of overlayIds) {
       const el = document.getElementById(id);
-      if (el && getComputedStyle(el).display !== 'none') return true;
+      if (el) {
+        const st = getComputedStyle(el);
+        if (st.display !== 'none' && st.visibility !== 'hidden' && st.opacity !== '0') {
+          return true;
+        }
+      }
     }
     return false;
   }
@@ -93,13 +103,22 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
       if (el !== appLayout) {
         const style = getComputedStyle(el);
         const overflowY = style.overflowY;
-        if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 2) {
+        if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 4) {
           if (el.scrollTop > 3) return false;
         }
       }
       el = el.parentElement;
     }
     return true;
+  }
+
+  function resolveLiveTarget(candidate, fallbackTarget, x, y) {
+    if (candidate && candidate.isConnected) return candidate;
+    if (fallbackTarget && fallbackTarget.isConnected) return fallbackTarget;
+    if (typeof x === 'number' && typeof y === 'number' && document.elementFromPoint) {
+      return document.elementFromPoint(x, y);
+    }
+    return null;
   }
 
   function canPull(target = null) {
@@ -110,7 +129,7 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
 
     if (hasOpenModalOrOverlay()) return false;
 
-    if (target && target.closest(
+    if (target && target.nodeType === 1 && target.closest(
       '#map-container, .leaflet-container, .leaflet-control, #sports-map, ' +
       '.range-slider, .track-slider, #route-scrubber, ' +
       '.interactive-chart, .day-chart-svg-wrap, #ensemble-meteogram-svg, #ensemble-meteogram-canvas, ' +
@@ -120,6 +139,15 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
     }
 
     return isAtScrollTop(target);
+  }
+
+  function armSuppressClick() {
+    suppressNextClick = true;
+    if (suppressClickTimer) clearTimeout(suppressClickTimer);
+    suppressClickTimer = setTimeout(() => {
+      suppressNextClick = false;
+      suppressClickTimer = null;
+    }, 320);
   }
 
   function beginVisualPull() {
@@ -132,9 +160,9 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
   }
 
   function updatePullUI(rawDeltaY) {
-    const pullDist = Math.min(Math.pow(Math.max(rawDeltaY, 1), 0.78) * 1.35, MAX_PULL_PX);
+    const pullDist = Math.min(Math.pow(Math.max(rawDeltaY, 1), 0.78) * 1.38, MAX_PULL_PX);
     indicator.style.height = `${Math.round(pullDist)}px`;
-    indicator.style.opacity = `${Math.min(pullDist / 22, 1)}`;
+    indicator.style.opacity = `${Math.min(pullDist / 20, 1)}`;
     indicator.dataset.pullDist = String(Math.round(pullDist));
 
     const pane = activePaneEl || getActiveTabPane();
@@ -184,7 +212,10 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
     try {
       let weatherPromise = Promise.resolve(null);
       if (onRefreshWeather && window.state?.currentLocation) {
-        weatherPromise = Promise.resolve(onRefreshWeather(window.state.currentLocation)).catch(() => ({ ok: false }));
+        weatherPromise = Promise.race([
+          Promise.resolve(onRefreshWeather(window.state.currentLocation)).catch(() => ({ ok: false })),
+          new Promise(resolve => setTimeout(() => resolve({ ok: false, timedOut: true }), REFRESH_TIMEOUT_MS))
+        ]);
       }
 
       const syncPromise = Promise.resolve(
@@ -199,6 +230,8 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
         if (text) text.innerText = '⚠️ Offline — Cache aktiv';
       } else if (weatherResult && weatherResult.isRateLimit) {
         if (text) text.innerText = '⏳ API-Cooldown · Cache aktiv';
+      } else if (weatherResult && weatherResult.timedOut) {
+        if (text) text.innerText = '⚠️ Zeitüberschreitung — Cache aktiv';
       } else if (weatherResult && weatherResult.ok === false && !weatherResult.aborted) {
         if (text) text.innerText = '⚠️ Verbindung gestört — Cache aktiv';
       } else {
@@ -212,25 +245,48 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
     }
   }
 
+  function findActiveTouch(touches) {
+    if (!touches || touches.length === 0) return null;
+    if (activeTouchId !== null) {
+      for (let i = 0; i < touches.length; i++) {
+        if (touches[i].identifier === activeTouchId) return touches[i];
+      }
+    }
+    return touches[0];
+  }
+
   // ---------------------------------------------------------------------------
-  // 1. TOUCH HANDLER (iOS Safari / iOS PWA 120Hz / Android Chrome)
+  // 1. TOUCH HANDLER (iOS Safari / iOS PWA 120Hz Retina / Android Chrome)
   // ---------------------------------------------------------------------------
   function handleTouchStart(e) {
     if (!e.touches || e.touches.length !== 1) {
+      if (isPulling && parseFloat(indicator.dataset.pullDist || '0') < THRESHOLD) {
+        collapseIndicator();
+      }
       gestureActive = false;
       gestureTarget = null;
-      return;
-    }
-    if (!canPull(e.target)) {
-      gestureActive = false;
-      gestureTarget = null;
+      directionLocked = null;
+      activeTouchId = null;
       isPulling = false;
       return;
     }
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
+
+    const t = e.touches[0];
+    if (!canPull(e.target)) {
+      gestureActive = false;
+      gestureTarget = null;
+      directionLocked = null;
+      activeTouchId = null;
+      isPulling = false;
+      return;
+    }
+
+    startX = t.clientX;
+    startY = t.clientY;
+    activeTouchId = t.identifier;
     gestureTarget = e.target;
     gestureActive = true;
+    directionLocked = null;
     isPulling = false;
     activePaneEl = getActiveTabPane();
   }
@@ -238,50 +294,64 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
   function handleTouchMove(e) {
     if (!gestureActive || isRefreshing || !e.touches || e.touches.length !== 1) return;
 
-    const x = e.touches[0].clientX;
-    const y = e.touches[0].clientY;
+    const t = findActiveTouch(e.touches);
+    if (!t) return;
+
+    const x = t.clientX;
+    const y = t.clientY;
     const diffX = Math.abs(x - startX);
     const diffY = y - startY;
 
     if (!isPulling) {
-      // Nach oben oder horizontal wischen -> native Scroll sofort freigeben
-      if (diffY < -0.5 || (diffX > 4 && diffX >= Math.max(diffY, 0))) {
+      // Klares Wischen nach oben (Seiten-Scroll nach unten) oder Horizontal (24h Slider) -> nativ freigeben
+      if (diffY <= -6 || (diffX >= 9 && diffX > Math.max(diffY, 0) * 1.15)) {
+        directionLocked = 'native';
         gestureActive = false;
         gestureTarget = null;
         return;
       }
-      // Auf iOS WebKit (120Hz) sofort beim allerersten Abwärts-Tick preventDefault(),
-      // bevor UIScrollView ein natives Rubber-Banding übernimmt!
-      if (diffY > 0.15 && diffY > diffX * 1.05) {
-        if (!canPull(gestureTarget || e.target)) {
+
+      // Sofort beim ersten Abwärts-Mikro-Impuls preventDefault() aufrufen,
+      // bevor iOS UIScrollView die Geste als nativen Scroll kapert!
+      if (diffY > 0 && (diffY >= diffX * 0.75 || diffX <= 3)) {
+        const liveTarget = resolveLiveTarget(gestureTarget, e.target, x, y);
+        if (!canPull(liveTarget)) {
+          directionLocked = 'native';
           gestureActive = false;
           gestureTarget = null;
           return;
         }
         if (e.cancelable) e.preventDefault();
-        if (diffY >= 2) {
+        if (diffY >= 3 && diffY > diffX * 0.95) {
+          directionLocked = 'pull';
           isPulling = true;
+          armSuppressClick();
           beginVisualPull();
         } else {
           return;
         }
       } else {
+        // Noch im Sub-Pixel-Finger-Settle (< 6px nach oben) -> weiter beobachten
         return;
       }
     }
 
-    if (isPulling && diffY > 0) {
+    if (isPulling) {
       if (e.cancelable) e.preventDefault();
-      updatePullUI(diffY);
-    } else if (isPulling && diffY <= 0) {
-      indicator.style.height = '0px';
-      indicator.style.opacity = '0';
-      indicator.dataset.pullDist = '0';
+      if (diffY > 0) {
+        updatePullUI(diffY);
+      } else {
+        indicator.style.height = '0px';
+        indicator.style.opacity = '0';
+        indicator.dataset.pullDist = '0';
+      }
     }
   }
 
-  async function handleTouchEnd() {
+  async function finalizeTouchGesture(wasCancelled = false) {
     gestureTarget = null;
+    activeTouchId = null;
+    directionLocked = null;
     if (!gestureActive && !isPulling) return;
     gestureActive = false;
 
@@ -290,16 +360,25 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
       return;
     }
     isPulling = false;
+    armSuppressClick();
 
     const pullDist = parseFloat(indicator.dataset.pullDist || '0');
     delete indicator.dataset.pullDist;
 
-    if (pullDist >= THRESHOLD) {
+    if (!wasCancelled && pullDist >= THRESHOLD) {
       await executeRefresh();
     } else {
       indicator.classList.remove('ptr-ready');
       collapseIndicator();
     }
+  }
+
+  function handleTouchEnd() {
+    finalizeTouchGesture(false);
+  }
+
+  function handleTouchCancel() {
+    finalizeTouchGesture(true);
   }
 
   // ---------------------------------------------------------------------------
@@ -322,18 +401,13 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
     const diffY = e.clientY - mouseStartY;
 
     if (!isPulling) {
-      if (diffY < -2 || (diffX > 8 && diffX >= Math.max(diffY, 0))) {
+      if (diffY < -4 || (diffX > 8 && diffX >= Math.max(diffY, 0))) {
         pointerDown = false;
         return;
       }
-      if (diffY > 12 && diffY > diffX * 1.4 && canPull(e.target)) {
-        const sel = window.getSelection?.()?.toString();
-        if (sel && sel.length > 0) {
-          pointerDown = false;
-          return;
-        }
+      if (diffY > 14 && diffY > diffX * 1.8 && canPull(e.target)) {
         isPulling = true;
-        suppressNextClick = true;
+        armSuppressClick();
         try { window.getSelection?.()?.removeAllRanges(); } catch (_) {}
         beginVisualPull();
       } else {
@@ -355,11 +429,10 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
       return;
     }
     isPulling = false;
+    armSuppressClick();
 
     const pullDist = parseFloat(indicator.dataset.pullDist || '0');
     delete indicator.dataset.pullDist;
-
-    setTimeout(() => { suppressNextClick = false; }, 120);
 
     if (pullDist >= THRESHOLD) {
       await executeRefresh();
@@ -426,13 +499,17 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
       e.preventDefault();
       e.stopPropagation();
       suppressNextClick = false;
+      if (suppressClickTimer) {
+        clearTimeout(suppressClickTimer);
+        suppressClickTimer = null;
+      }
     }
   }, true);
 
-  document.addEventListener('touchstart', handleTouchStart, { passive: true });
-  document.addEventListener('touchmove', handleTouchMove, { passive: false });
-  document.addEventListener('touchend', handleTouchEnd, { passive: true });
-  document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+  document.addEventListener('touchstart', handleTouchStart, { passive: true, capture: true });
+  document.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+  document.addEventListener('touchend', handleTouchEnd, { passive: true, capture: true });
+  document.addEventListener('touchcancel', handleTouchCancel, { passive: true, capture: true });
 
   document.addEventListener('pointerdown', handlePointerDown, { passive: true });
   document.addEventListener('pointermove', handlePointerMove, { passive: true });

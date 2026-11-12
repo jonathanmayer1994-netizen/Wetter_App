@@ -5606,7 +5606,6 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     overflow-x: hidden !important;
     overscroll-behavior-y: none !important;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
   }
 
   body.mobile-map-fullscreen-active .app-layout,

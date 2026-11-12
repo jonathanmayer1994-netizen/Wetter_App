@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.23.0-dynamic-today-multifallback';
+const CACHE_NAME = 'best-weather-v2.24.0-ptr-ios-fix';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
 const MAX_TILES = 600;
 
