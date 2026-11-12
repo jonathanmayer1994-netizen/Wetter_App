@@ -5,7 +5,7 @@
  * and high-altitude offline fallbacks when off-grid in the Alps.
  */
 
-const CACHE_NAME = 'best-weather-v2.22.0-meteoswiss-map-rebuild';
+const CACHE_NAME = 'best-weather-v2.23.0-dynamic-today-multifallback';
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
 const MAX_TILES = 600;
 
@@ -176,7 +176,7 @@ self.addEventListener('fetch', (event) => {
 
   if (isCodeOrMarkup) {
     event.respondWith(
-      fetch(req)
+      fetch(new Request(req, { cache: 'no-cache' }))
         .then((networkRes) => {
           if (networkRes && networkRes.status === 200) {
             const clone = networkRes.clone();

@@ -49,6 +49,29 @@ function getDB() {
   return dbPromise;
 }
 
+function getTodayLocalDateKey() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isWeatherCacheValidForToday(entry, maxAgeMs = 48 * 60 * 60 * 1000) {
+  if (!entry || !entry.weatherData) return false;
+  const ts = Number(entry.timestamp) || 0;
+  if (ts > 0 && (Date.now() - ts) > maxAgeMs) return false;
+  const times = entry.weatherData?.daily?.time;
+  if (Array.isArray(times) && times.length > 0) {
+    const todayKey = getTodayLocalDateKey();
+    const lastKey = String(times[times.length - 1] || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(lastKey) && lastKey < todayKey) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export const AlpineStorage = {
   /**
    * Debounced Queue zum Speichern einer Tour (verhindert I/O-Spikes und Promise-Leaks)
@@ -209,39 +232,59 @@ export const AlpineStorage = {
   },
 
   /**
-   * Holt die gecachten Wetterdaten (bevorzugt passend zum Standort, sonst den zeitlich neuesten Eintrag)
+   * Holt die gecachten Wetterdaten (bevorzugt passend zum Standort, niemals komplett abgelaufene Vergangenheits-Snapshots wie z. B. vor 10 Tagen)
    */
   async getCachedWeather(locKey = null) {
+    const fallbackLocal = () => {
+      try {
+        const raw = localStorage.getItem('alpine_offline_weather');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!isWeatherCacheValidForToday(parsed)) {
+          try { localStorage.removeItem('alpine_offline_weather'); } catch (_) {}
+          return null;
+        }
+        return parsed;
+      } catch (err) {
+        return null;
+      }
+    };
+
     try {
       const db = await getDB();
       return new Promise((resolve) => {
-        const tx = db.transaction('weather', 'readonly');
+        const tx = db.transaction('weather', 'readwrite');
         const store = tx.objectStore('weather');
         if (locKey) {
           const req = store.get(locKey);
           req.onsuccess = () => {
             if (req.result) {
-              resolve(req.result);
-              return;
+              if (isWeatherCacheValidForToday(req.result)) {
+                resolve(req.result);
+                return;
+              }
+              try { store.delete(req.result.id); } catch (_) {}
             }
-            // Fallback: zeitlich neuesten Eintrag wählen (nicht alphabetisch nach Koordinaten!)
+            // Fallback: zeitlich neuesten GÜLTIGEN Eintrag wählen (ohne abgelaufene Altlasten)
             let newest = null;
             const cReq = store.openCursor();
             cReq.onsuccess = (ev) => {
               const cursor = ev.target.result;
               if (cursor) {
                 const val = cursor.value;
-                if (!newest || (val?.timestamp || 0) > (newest?.timestamp || 0)) {
+                if (!isWeatherCacheValidForToday(val)) {
+                  try { cursor.delete(); } catch (_) {}
+                } else if (!newest || (val?.timestamp || 0) > (newest?.timestamp || 0)) {
                   newest = val;
                 }
                 cursor.continue();
               } else {
-                resolve(newest);
+                resolve(newest || fallbackLocal());
               }
             };
-            cReq.onerror = () => resolve(null);
+            cReq.onerror = () => resolve(fallbackLocal());
           };
-          req.onerror = () => resolve(null);
+          req.onerror = () => resolve(fallbackLocal());
         } else {
           let newest = null;
           const req = store.openCursor();
@@ -249,24 +292,21 @@ export const AlpineStorage = {
             const cursor = e.target.result;
             if (cursor) {
               const val = cursor.value;
-              if (!newest || (val?.timestamp || 0) > (newest?.timestamp || 0)) {
+              if (!isWeatherCacheValidForToday(val)) {
+                try { cursor.delete(); } catch (_) {}
+              } else if (!newest || (val?.timestamp || 0) > (newest?.timestamp || 0)) {
                 newest = val;
               }
               cursor.continue();
             } else {
-              resolve(newest);
+              resolve(newest || fallbackLocal());
             }
           };
-          req.onerror = () => resolve(null);
+          req.onerror = () => resolve(fallbackLocal());
         }
       });
     } catch (e) {
-      try {
-        const raw = localStorage.getItem('alpine_offline_weather');
-        return raw ? JSON.parse(raw) : null;
-      } catch (err) {
-        return null;
-      }
+      return fallbackLocal();
     }
   },
 

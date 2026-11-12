@@ -248,6 +248,8 @@ export function renderOverviewTab() {
       const stName = m.biasCorrection.stationName || 'Bodenstation';
       const net = m.biasCorrection.stationNetwork || 'Station';
       src.innerText = `${stName} (${net})`;
+    } else if (w._providerFallback) {
+      src.innerText = `${w._providerFallback.replace(' (Fallback)', '')} • Live`;
     } else if (state.multiModel && state.multiModel.activeRegionalModel) {
       src.innerText = `${state.multiModel.activeRegionalModel} / ECMWF`;
     } else if (m && m.regionalModelName) {
@@ -1236,7 +1238,7 @@ export function render10DayForecast(daily, hourly) {
   const weekdaysFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
   const todayKey = getLocalDateKey(new Date());
-  let visibleDayIndices = [];
+  const visibleDayIndices = [];
   for (let i = 0; i < daily.time.length; i++) {
     const dk = String(daily.time[i] || '').slice(0, 10);
     if (!dk || dk >= todayKey) {
@@ -1244,19 +1246,26 @@ export function render10DayForecast(daily, hourly) {
       if (visibleDayIndices.length >= 10) break;
     }
   }
-  let allPastFallback = false;
   if (visibleDayIndices.length === 0) {
-    allPastFallback = true;
-    const startTail = Math.max(0, daily.time.length - 10);
-    for (let i = startTail; i < daily.time.length; i++) {
-      visibleDayIndices.push(i);
-    }
+    const todayLabel = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'short' });
     const lastCachedDate = parseLocalDateKey(String(daily.time[daily.time.length - 1] || '').slice(0, 10));
-    const staleNotice = document.createElement('div');
-    staleNotice.className = 'daily-stale-notice';
-    staleNotice.style.cssText = 'padding:8px 12px;margin-bottom:8px;border-radius:12px;background:rgba(245,158,11,0.16);border:1px solid rgba(245,158,11,0.4);color:#fde68a;font-size:12px;font-weight:700;';
-    staleNotice.innerText = `⚠️ Offline-/Cache-Stand (bis ${lastCachedDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}) — zum Aktualisieren auf heute nach unten ziehen.`;
-    fragment.appendChild(staleNotice);
+    const offlineCard = document.createElement('div');
+    offlineCard.className = 'daily-stale-notice';
+    offlineCard.style.cssText = 'padding:14px 16px;margin:4px 0;border-radius:16px;background:rgba(15,23,42,0.55);border:1px solid rgba(56,189,248,0.35);color:#e2e8f0;font-size:13px;line-height:1.45;display:flex;flex-direction:column;gap:10px;';
+    offlineCard.innerHTML = `
+      <div><strong>Heute ist ${escapeHtml(todayLabel)}</strong> — die gespeicherten Offline-Daten enden bereits am ${escapeHtml(lastCachedDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }))} und werden nicht mehr als aktueller Trend angezeigt.</div>
+      <button type="button" class="daily-retry-fresh-btn" style="align-self:flex-start;padding:8px 14px;border-radius:999px;border:1px solid rgba(56,189,248,0.5);background:rgba(56,189,248,0.18);color:#e0f2fe;font-weight:700;font-size:12px;cursor:pointer;">🔄 Live-Daten für heute laden</button>
+    `;
+    const retryBtn = offlineCard.querySelector('.daily-retry-fresh-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        if (window.loadLocation && state.currentLocation) {
+          window.loadLocation(state.currentLocation, { forceRefresh: true });
+        }
+      });
+    }
+    container.replaceChildren(offlineCard);
+    return;
   }
 
   let gMin = Infinity, gMax = -Infinity;

@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { resilientFetch, HttpStatusError, isApiCoolingDown } from './httpClient.js';
+import { resilientFetch, HttpStatusError, isApiCoolingDown, getLocalDateKey } from './httpClient.js';
 import { physicsBridge } from './core/physicsBridge.js';
 import { validateCurrentWeather, validateHourlyWeather, validateMultiModel } from './core/contracts.js';
 
@@ -71,17 +71,18 @@ export const MicroEngine = {
       terrain.elevation = officialElevation;
     }
 
-    // 2. Open-Meteo Daten, Stationsdaten (Bright Sky/DWD), Modell-Historie, Radar & Alpen-Druckgradient parallel abrufen
+    // 2. Primäre Vorhersage zuerst laden (so wird bei HTTP 429 sofort der Circuit-Breaker aktiv & auf BrightSky/MET umgeschaltet),
+    // anschließend Stationsdaten, Historie, Radar & Alpen-Druckgradient parallel abrufen
     const reqOpts = {
       ...(options && options.signal ? { signal: options.signal } : {}),
       ...(options && options.forceRefresh ? { forceRefresh: true } : {})
     };
-    const [weatherRaw, stationData, modelHistory, radarData, alpineFoehn] = await Promise.all([
-      this.fetchOpenMeteoMultiLayer(lat, lon, terrain, reqOpts),
+    const weatherRaw = await this.fetchOpenMeteoMultiLayer(lat, lon, terrain, reqOpts);
+    const [stationData, modelHistory, radarData, alpineFoehn] = await Promise.all([
       this.fetchStationData(lat, lon, terrain, isMountain, country, reqOpts),
-      this.fetchModelHistory(lat, lon, terrain.elevation, reqOpts),
+      isApiCoolingDown('https://api.open-meteo.com') ? Promise.resolve(null) : this.fetchModelHistory(lat, lon, terrain.elevation, reqOpts),
       this.fetchRadarNowcastData(lat, lon, reqOpts),
-      this.fetchAlpinePressureGradient(lat, lon, reqOpts)
+      isApiCoolingDown('https://api.open-meteo.com') ? Promise.resolve(null) : this.fetchAlpinePressureGradient(lat, lon, reqOpts)
     ]);
 
     // 2b. Dynamische Bias-Korrektur anwenden, BEVOR microWeather.temperature10m berechnet wird
@@ -430,17 +431,42 @@ export const MicroEngine = {
     });
 
     const modelPriority = this.getRegionalModelPriority(lat, lon, terrain.elevation);
+    const todayKey = getLocalDateKey(Date.now());
     // Open-Meteo's Standard (best_match) blendet regionale Modelle (ICON-D2, ICON-EU, AROME)
     // nahtlos mit ECMWF IFS für volle 10 Tage (240h) ein.
     // Ein starres "models=icon_eu" bricht nach 120h (Tag 5) ab und liefert danach Null-Werte!
     // Daher lassen wir den 10-Tage-Forecast nahtlos auf Best-Match laufen.
 
-    let raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
-      ttlMs: 30 * 60 * 1000, // 30 Minuten L1/L2 Cache (spart massive Open-Meteo Quota)
-      persist: true,
-      signal: options?.signal,
-      forceRefresh: Boolean(options?.forceRefresh)
-    });
+    let raw = null;
+    try {
+      raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+        ttlMs: 30 * 60 * 1000, // 30 Minuten L1/L2 Cache (spart massive Open-Meteo Quota)
+        persist: true,
+        signal: options?.signal,
+        forceRefresh: Boolean(options?.forceRefresh)
+      });
+    } catch (primaryErr) {
+      if (primaryErr?.name === 'AbortError') throw primaryErr;
+      console.warn('[MicroEngine] Open-Meteo nicht verfügbar, aktiviere Multi-Provider Live-Fallback:', primaryErr?.message || primaryErr);
+    }
+
+    const rawLastDaily = (raw && raw.daily && Array.isArray(raw.daily.time) && raw.daily.time.length > 0)
+      ? String(raw.daily.time[raw.daily.time.length - 1] || '').slice(0, 10)
+      : '';
+    const isRawStaleAllPast = Boolean(rawLastDaily && /^\d{4}-\d{2}-\d{2}$/.test(rawLastDaily) && rawLastDaily < todayKey);
+
+    if (!raw || !raw.daily || !raw.hourly || isRawStaleAllPast) {
+      const fallbackRaw = await this.fetchFallbackForecastMultiProvider(lat, lon, terrain, options);
+      if (fallbackRaw) {
+        fallbackRaw._regionalModel = modelPriority;
+        if (fallbackRaw.current) fallbackRaw.current = validateCurrentWeather(fallbackRaw.current);
+        if (fallbackRaw.hourly) fallbackRaw.hourly = validateHourlyWeather(fallbackRaw.hourly);
+        return fallbackRaw;
+      }
+      if (!raw) {
+        throw new HttpStatusError(429, 'Wetter-API Limit erreicht & Fallback offline', { url: 'https://api.open-meteo.com' });
+      }
+    }
 
     if (raw) {
       raw._regionalModel = modelPriority;
@@ -466,6 +492,437 @@ export const MicroEngine = {
       if (raw.hourly) raw.hourly = validateHourlyWeather(raw.hourly);
     }
     return raw;
+  },
+
+  /**
+   * Astronomische Sonnenauf- & -untergangsberechnung (NOAA Solar-Algorithmus, ±1 Min. genau)
+   */
+  computeSunTimesForDate(dateKey, lat, lon) {
+    const parts = String(dateKey || '').split('-').map(Number);
+    const y = parts[0] || new Date().getFullYear();
+    const m = parts[1] || (new Date().getMonth() + 1);
+    const d = parts[2] || new Date().getDate();
+    const refNoon = new Date(y, m - 1, d, 12, 0, 0, 0);
+    const startOfYear = new Date(y, 0, 0, 0, 0, 0, 0);
+    const dayOfYear = Math.floor((refNoon - startOfYear) / 86400000);
+
+    const rad = Math.PI / 180;
+    const deg = 180 / Math.PI;
+    const B = (2 * Math.PI / 365) * (dayOfYear - 81);
+    const eotMin = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+    const declRad = 23.44 * rad * Math.sin((2 * Math.PI / 365) * (dayOfYear - 81));
+    const latRad = Math.max(-89, Math.min(89, Number(lat) || 48)) * rad;
+    const cosH = (Math.cos(90.833 * rad) / (Math.cos(latRad) * Math.cos(declRad))) - Math.tan(latRad) * Math.tan(declRad);
+
+    const tzOffsetMin = -refNoon.getTimezoneOffset(); // Minuten ostwärts von UTC (z. B. +60 MEZ, +120 MESZ)
+    let sunriseLocalMin = 7 * 60 + 15;
+    let sunsetLocalMin = 17 * 60;
+    if (cosH > -1 && cosH < 1) {
+      const hourAngleDeg = Math.acos(cosH) * deg;
+      const solarNoonUtcMin = 720 - 4 * (Number(lon) || 10) - eotMin;
+      sunriseLocalMin = solarNoonUtcMin - 4 * hourAngleDeg + tzOffsetMin;
+      sunsetLocalMin = solarNoonUtcMin + 4 * hourAngleDeg + tzOffsetMin;
+    } else if (cosH <= -1) {
+      sunriseLocalMin = 0;
+      sunsetLocalMin = 24 * 60 - 1;
+    } else {
+      sunriseLocalMin = 12 * 60;
+      sunsetLocalMin = 12 * 60;
+    }
+
+    const formatMinIso = (totalMin) => {
+      const clamped = Math.max(0, Math.min(1439, Math.round(totalMin)));
+      const hh = String(Math.floor(clamped / 60)).padStart(2, '0');
+      const mm = String(clamped % 60).padStart(2, '0');
+      return `${dateKey}T${hh}:${mm}`;
+    };
+
+    const daylightSec = Math.max(0, Math.round((sunsetLocalMin - sunriseLocalMin) * 60));
+    return {
+      sunriseIso: formatMinIso(sunriseLocalMin),
+      sunsetIso: formatMinIso(sunsetLocalMin),
+      sunriseHour: sunriseLocalMin / 60,
+      sunsetHour: sunsetLocalMin / 60,
+      daylightSec
+    };
+  },
+
+  mapFallbackWeatherCode(symbolOrCond, precipMm = 0, snowCm = 0, cloudPct = 50) {
+    const s = String(symbolOrCond || '').toLowerCase();
+    if (s.includes('thunder') || s.includes('hail')) return s.includes('hail') ? 96 : 95;
+    if (s.includes('fog') || s.includes('mist')) return 45;
+    if (s.includes('sleet')) return precipMm >= 1.0 ? 69 : 68;
+    if (s.includes('snow') || snowCm >= 0.2) {
+      if (s.includes('heavy') || snowCm >= 2.0) return 75;
+      if (s.includes('shower')) return 85;
+      return precipMm >= 1.0 ? 73 : 71;
+    }
+    if (s.includes('rain') || s.includes('drizzle') || precipMm >= 0.15) {
+      if (s.includes('shower')) return precipMm >= 2.5 ? 82 : (precipMm >= 0.8 ? 81 : 80);
+      if (s.includes('heavy') || precipMm >= 4.0) return 65;
+      if (precipMm >= 1.0 || s === 'rain') return 63;
+      return 61;
+    }
+    if (s.includes('clearsky') || s.includes('clear-day') || s.includes('clear-night') || cloudPct < 15) return 0;
+    if (s.includes('fair') || cloudPct < 35) return 1;
+    if (s.includes('partly') || cloudPct < 65) return 2;
+    if (s.includes('cloudy') || s.includes('dry') || cloudPct >= 65) return 3;
+    return cloudPct >= 75 ? 3 : (cloudPct >= 35 ? 2 : 1);
+  },
+
+  /**
+   * Unabhängige Multi-Provider Live-Vorhersage (Bright Sky / DWD MOSMIX + MET Norway ECMWF/Yr)
+   * Verhindert leere Seiten & vergangene Cache-Daten (z. B. 2. Nov.), wenn Open-Meteo 429 liefert.
+   * Garantierter 10-Tage-Horizont exakt ab dem realen heutigen Datum (todayKey .. todayKey + 9).
+   */
+  async fetchFallbackForecastMultiProvider(lat, lon, terrain = {}, options = {}) {
+    const qLat = Number(lat).toFixed(3);
+    const qLon = Number(lon).toFixed(3);
+    const elev = Number(terrain?.elevation ?? 500) || 500;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const todayKey = getLocalDateKey(todayStart);
+    const endKey = getLocalDateKey(todayStart.getTime() + 10 * 86400000);
+    const forceRefresh = Boolean(options?.forceRefresh);
+
+    const bsUrl = `https://api.brightsky.dev/weather?lat=${qLat}&lon=${qLon}&date=${todayKey}&last_date=${endKey}`;
+    const bsCurUrl = `https://api.brightsky.dev/current_weather?lat=${qLat}&lon=${qLon}`;
+    const metUrl = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${qLat}&lon=${qLon}&altitude=${Math.round(elev)}`;
+
+    const [bsRes, bsCurRes, metRes] = await Promise.all([
+      resilientFetch(bsUrl, { ttlMs: 30 * 60 * 1000, persist: true, signal: options?.signal, forceRefresh }).catch(() => null),
+      resilientFetch(bsCurUrl, { ttlMs: 10 * 60 * 1000, persist: true, signal: options?.signal, forceRefresh }).catch(() => null),
+      resilientFetch(metUrl, { ttlMs: 30 * 60 * 1000, persist: true, signal: options?.signal, forceRefresh }).catch(() => null)
+    ]);
+
+    const points = [];
+    let providerLabel = '';
+
+    // 1. Primär: DWD Bright Sky (241 Stunden MOSMIX für 10 volle Tage ab heute)
+    if (bsRes && Array.isArray(bsRes.weather) && bsRes.weather.length >= 24) {
+      const sourceElevMap = new Map();
+      if (Array.isArray(bsRes.sources)) {
+        for (const s of bsRes.sources) {
+          if (s && s.id != null && typeof s.height === 'number') {
+            sourceElevMap.set(s.id, s.height);
+          }
+        }
+      }
+      const fallbackSrcElev = (bsRes.sources && bsRes.sources[0] && typeof bsRes.sources[0].height === 'number')
+        ? bsRes.sources[0].height
+        : elev;
+
+      for (const w of bsRes.weather) {
+        if (!w || !w.timestamp) continue;
+        const tMs = new Date(w.timestamp).getTime();
+        if (!Number.isFinite(tMs) || typeof w.temperature !== 'number') continue;
+        const srcElev = sourceElevMap.get(w.source_id) ?? fallbackSrcElev;
+        const dElev = elev - srcElev;
+        const tempAdj = Math.abs(dElev) > 80 ? (w.temperature - (dElev / 100) * 0.65) : w.temperature;
+        const precip = typeof w.precipitation === 'number' ? Math.max(0, w.precipitation) : 0;
+        const cloud = typeof w.cloud_cover === 'number' ? Math.max(0, Math.min(100, w.cloud_cover)) : 55;
+        const rh = typeof w.relative_humidity === 'number' ? Math.max(5, Math.min(100, w.relative_humidity)) : 75;
+        const windSpd = typeof w.wind_speed === 'number' ? Math.max(0, w.wind_speed) : 8;
+        const gustSpd = typeof w.wind_gust_speed === 'number' ? Math.max(windSpd, w.wind_gust_speed) : windSpd * 1.45;
+        const pop = typeof w.precipitation_probability === 'number'
+          ? w.precipitation_probability
+          : (precip > 0.3 ? Math.min(95, Math.round(45 + precip * 15)) : (precip > 0.05 ? 25 : Math.min(20, Math.round(cloud * 0.15))));
+        const snowCm = (tempAdj <= 1.2 && precip > 0.05) ? +(precip * 0.9).toFixed(2) : 0;
+        const sunSec = typeof w.sunshine === 'number' ? Math.max(0, Math.min(3600, w.sunshine * 60)) : null;
+        points.push({
+          tMs,
+          temp: Math.round(tempAdj * 10) / 10,
+          dewPoint: typeof w.dew_point === 'number' ? Math.round((w.dew_point - (Math.abs(dElev) > 80 ? (dElev / 100) * 0.5 : 0)) * 10) / 10 : Math.round((tempAdj - (100 - rh) / 5) * 10) / 10,
+          rh,
+          precip,
+          pop,
+          snowCm,
+          cloud,
+          windSpd: Math.round(windSpd * 10) / 10,
+          windDir: typeof w.wind_direction === 'number' ? w.wind_direction : 220,
+          gustSpd: Math.round(gustSpd * 10) / 10,
+          pressure: typeof w.pressure_msl === 'number' ? w.pressure_msl : 1013,
+          visibility: typeof w.visibility === 'number' ? w.visibility : (cloud > 85 ? 9000 : 25000),
+          sunSec,
+          code: this.mapFallbackWeatherCode(w.icon || w.condition, precip, snowCm, cloud)
+        });
+      }
+      providerLabel = 'DWD BrightSky (Fallback)';
+    }
+
+    // 2. Sekundär / Ergänzung: MET Norway Locationforecast 2.0 (weltweit & höhenkalibriert)
+    if (points.length < 48 && metRes && metRes.properties && Array.isArray(metRes.properties.timeseries)) {
+      points.length = 0;
+      for (const item of metRes.properties.timeseries) {
+        const tMs = new Date(item.time).getTime();
+        const inst = item.data?.instant?.details;
+        if (!Number.isFinite(tMs) || !inst || typeof inst.air_temperature !== 'number') continue;
+        const next1 = item.data?.next_1_hours;
+        const next6 = item.data?.next_6_hours;
+        const precip = next1?.details?.precipitation_amount ?? (next6?.details?.precipitation_amount != null ? next6.details.precipitation_amount / 6 : 0);
+        const sym = next1?.summary?.symbol_code || next6?.summary?.symbol_code || item.data?.next_12_hours?.summary?.symbol_code || '';
+        const cloud = typeof inst.cloud_area_fraction === 'number' ? inst.cloud_area_fraction : 55;
+        const rh = typeof inst.relative_humidity === 'number' ? inst.relative_humidity : 75;
+        const windSpd = typeof inst.wind_speed === 'number' ? inst.wind_speed * 3.6 : 10;
+        const snowCm = (inst.air_temperature <= 1.2 && precip > 0.05) ? +(precip * 0.9).toFixed(2) : 0;
+        points.push({
+          tMs,
+          temp: Math.round(inst.air_temperature * 10) / 10,
+          dewPoint: Math.round((inst.air_temperature - (100 - rh) / 5) * 10) / 10,
+          rh,
+          precip: Math.round(precip * 10) / 10,
+          pop: precip >= 0.4 ? Math.min(95, Math.round(45 + precip * 14)) : (precip > 0.05 ? 25 : Math.min(20, Math.round(cloud * 0.15))),
+          snowCm,
+          cloud,
+          windSpd: Math.round(windSpd * 10) / 10,
+          windDir: typeof inst.wind_from_direction === 'number' ? inst.wind_from_direction : 220,
+          gustSpd: Math.round(windSpd * 1.45 * 10) / 10,
+          pressure: typeof inst.air_pressure_at_sea_level === 'number' ? inst.air_pressure_at_sea_level : 1013,
+          visibility: 20000,
+          sunSec: null,
+          code: this.mapFallbackWeatherCode(sym, precip, snowCm, cloud)
+        });
+      }
+      providerLabel = 'MET Norway / ECMWF (Fallback)';
+    }
+
+    if (points.length === 0) return null;
+    points.sort((a, b) => a.tMs - b.tMs);
+
+    const findPointAtMs = (targetMs) => {
+      let lo = 0;
+      let hi = points.length - 1;
+      if (targetMs <= points[0].tMs) return points[0];
+      if (targetMs >= points[hi].tMs) return points[hi];
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (points[mid].tMs === targetMs) return points[mid];
+        if (points[mid].tMs < targetMs) lo = mid + 1;
+        else hi = mid - 1;
+      }
+      const pBefore = points[Math.max(0, hi)];
+      const pAfter = points[Math.min(points.length - 1, lo)];
+      const span = pAfter.tMs - pBefore.tMs;
+      if (!span || span > 12 * 3600000) {
+        return Math.abs(targetMs - pBefore.tMs) <= Math.abs(pAfter.tMs - targetMs) ? pBefore : pAfter;
+      }
+      const frac = (targetMs - pBefore.tMs) / span;
+      const lerp = (a, b) => a + (b - a) * frac;
+      const baseRef = frac < 0.5 ? pBefore : pAfter;
+      const temp = Math.round(lerp(pBefore.temp, pAfter.temp) * 10) / 10;
+      const precip = Math.round(lerp(pBefore.precip, pAfter.precip) * 10) / 10;
+      const cloud = Math.round(lerp(pBefore.cloud, pAfter.cloud));
+      const rh = Math.round(lerp(pBefore.rh, pAfter.rh));
+      const snowCm = (temp <= 1.2 && precip > 0.05) ? +(precip * 0.9).toFixed(2) : 0;
+      return {
+        tMs: targetMs,
+        temp,
+        dewPoint: Math.round(lerp(pBefore.dewPoint, pAfter.dewPoint) * 10) / 10,
+        rh,
+        precip,
+        pop: Math.round(lerp(pBefore.pop, pAfter.pop)),
+        snowCm,
+        cloud,
+        windSpd: Math.round(lerp(pBefore.windSpd, pAfter.windSpd) * 10) / 10,
+        windDir: Math.round(baseRef.windDir),
+        gustSpd: Math.round(lerp(pBefore.gustSpd, pAfter.gustSpd) * 10) / 10,
+        pressure: Math.round(lerp(pBefore.pressure, pAfter.pressure) * 10) / 10,
+        visibility: Math.round(lerp(pBefore.visibility, pAfter.visibility)),
+        sunSec: baseRef.sunSec,
+        code: baseRef.code
+      };
+    };
+
+    const hourly = {
+      time: [],
+      temperature_2m: [],
+      relative_humidity_2m: [],
+      dew_point_2m: [],
+      apparent_temperature: [],
+      is_day: [],
+      precipitation_probability: [],
+      precipitation: [],
+      weather_code: [],
+      pressure_msl: [],
+      surface_pressure: [],
+      visibility: [],
+      wind_speed_10m: [],
+      wind_direction_10m: [],
+      wind_gusts_10m: [],
+      uv_index: [],
+      cloud_cover: [],
+      snowfall: [],
+      freezing_level_height: [],
+      sunshine_duration: []
+    };
+
+    const daily = {
+      time: [],
+      weather_code: [],
+      temperature_2m_max: [],
+      temperature_2m_min: [],
+      apparent_temperature_max: [],
+      apparent_temperature_min: [],
+      sunrise: [],
+      sunset: [],
+      uv_index_max: [],
+      precipitation_sum: [],
+      precipitation_probability_max: [],
+      precipitation_hours: [],
+      snowfall_sum: [],
+      sunshine_duration: [],
+      daylight_duration: [],
+      wind_speed_10m_max: [],
+      wind_gusts_10m_max: []
+    };
+
+    const pSurface = Math.round(1013.25 * Math.pow(1 - 2.25577e-5 * elev, 5.25588));
+
+    for (let dayIdx = 0; dayIdx < 10; dayIdx++) {
+      const dayStartDate = new Date(todayStart.getTime() + dayIdx * 86400000);
+      const dateKey = getLocalDateKey(dayStartDate);
+      const sun = this.computeSunTimesForDate(dateKey, lat, lon);
+
+      const dTemps = [];
+      const dApp = [];
+      const dCodes = [];
+      let dPrecip = 0;
+      let dPrecipHours = 0;
+      let dMaxPop = 0;
+      let dSnow = 0;
+      let dSunSec = 0;
+      let dMaxUv = 0;
+      let dMaxWind = 0;
+      let dMaxGust = 0;
+
+      for (let h = 0; h < 24; h++) {
+        const hourDate = new Date(dayStartDate.getFullYear(), dayStartDate.getMonth(), dayStartDate.getDate(), h, 0, 0, 0);
+        const pt = findPointAtMs(hourDate.getTime());
+        const isDay = (h + 0.5) >= sun.sunriseHour && (h + 0.5) <= sun.sunsetHour ? 1 : 0;
+        const appT = (pt.temp <= 10 && pt.windSpd >= 4.8)
+          ? Math.round((13.12 + 0.6215 * pt.temp - 11.37 * Math.pow(pt.windSpd, 0.16) + 0.3965 * pt.temp * Math.pow(pt.windSpd, 0.16)) * 10) / 10
+          : Math.round((pt.temp + 0.02 * (pt.rh - 50) - 0.05 * pt.windSpd) * 10) / 10;
+        const sunSec = pt.sunSec !== null
+          ? (isDay ? pt.sunSec : 0)
+          : (isDay ? Math.max(0, Math.round(((100 - pt.cloud) / 100) * 3600)) : 0);
+        const solarFrac = isDay ? Math.sin(Math.PI * Math.max(0, (h + 0.5 - sun.sunriseHour) / Math.max(1, sun.sunsetHour - sun.sunriseHour))) : 0;
+        const uv = Math.round(Math.max(0, solarFrac * 4.2 * (1 - 0.68 * (pt.cloud / 100))) * 10) / 10;
+        const flMeters = Math.max(0, Math.min(5000, Math.round(elev + (pt.temp / 0.0065))));
+
+        const hhStr = String(h).padStart(2, '0');
+        hourly.time.push(`${dateKey}T${hhStr}:00`);
+        hourly.temperature_2m.push(pt.temp);
+        hourly.relative_humidity_2m.push(pt.rh);
+        hourly.dew_point_2m.push(pt.dewPoint);
+        hourly.apparent_temperature.push(appT);
+        hourly.is_day.push(isDay);
+        hourly.precipitation_probability.push(pt.pop);
+        hourly.precipitation.push(pt.precip);
+        hourly.weather_code.push(pt.code);
+        hourly.pressure_msl.push(pt.pressure);
+        hourly.surface_pressure.push(pSurface);
+        hourly.visibility.push(pt.visibility);
+        hourly.wind_speed_10m.push(pt.windSpd);
+        hourly.wind_direction_10m.push(pt.windDir);
+        hourly.wind_gusts_10m.push(pt.gustSpd);
+        hourly.uv_index.push(uv);
+        hourly.cloud_cover.push(pt.cloud);
+        hourly.snowfall.push(pt.snowCm);
+        hourly.freezing_level_height.push(flMeters);
+        hourly.sunshine_duration.push(sunSec);
+
+        dTemps.push(pt.temp);
+        dApp.push(appT);
+        dCodes.push(pt.code);
+        dPrecip += pt.precip;
+        if (pt.precip >= 0.1) dPrecipHours++;
+        if (pt.pop > dMaxPop) dMaxPop = pt.pop;
+        dSnow += pt.snowCm;
+        dSunSec += sunSec;
+        if (uv > dMaxUv) dMaxUv = uv;
+        if (pt.windSpd > dMaxWind) dMaxWind = pt.windSpd;
+        if (pt.gustSpd > dMaxGust) dMaxGust = pt.gustSpd;
+      }
+
+      const midCode = dCodes[13] ?? dCodes[12] ?? 2;
+      const domCode = dCodes.some(c => c >= 95) ? 95 : (dSnow >= 1.5 ? 73 : (dPrecip >= 1.0 ? 63 : midCode));
+
+      daily.time.push(dateKey);
+      daily.weather_code.push(domCode);
+      daily.temperature_2m_max.push(Math.round(Math.max(...dTemps) * 10) / 10);
+      daily.temperature_2m_min.push(Math.round(Math.min(...dTemps) * 10) / 10);
+      daily.apparent_temperature_max.push(Math.round(Math.max(...dApp) * 10) / 10);
+      daily.apparent_temperature_min.push(Math.round(Math.min(...dApp) * 10) / 10);
+      daily.sunrise.push(sun.sunriseIso);
+      daily.sunset.push(sun.sunsetIso);
+      daily.uv_index_max.push(Math.round(dMaxUv * 10) / 10);
+      daily.precipitation_sum.push(Math.round(dPrecip * 10) / 10);
+      daily.precipitation_probability_max.push(Math.round(dMaxPop));
+      daily.precipitation_hours.push(dPrecipHours);
+      daily.snowfall_sum.push(Math.round(dSnow * 10) / 10);
+      daily.sunshine_duration.push(Math.round(dSunSec));
+      daily.daylight_duration.push(sun.daylightSec);
+      daily.wind_speed_10m_max.push(Math.round(dMaxWind * 10) / 10);
+      daily.wind_gusts_10m_max.push(Math.round(dMaxGust * 10) / 10);
+    }
+
+    const curHourIdx = Math.min(23, Math.max(0, now.getHours()));
+    const bsCurW = bsCurRes?.weather;
+    const bsCurSrc = Array.isArray(bsCurRes?.sources) && bsCurRes.sources[0] ? bsCurRes.sources[0] : null;
+    let curTemp = hourly.temperature_2m[curHourIdx];
+    let curWind = hourly.wind_speed_10m[curHourIdx];
+    let curGust = hourly.wind_gusts_10m[curHourIdx];
+    let curWindDir = hourly.wind_direction_10m[curHourIdx];
+    let curRh = hourly.relative_humidity_2m[curHourIdx];
+    let curCloud = hourly.cloud_cover[curHourIdx];
+    let curPrecip = hourly.precipitation[curHourIdx];
+    let curCode = hourly.weather_code[curHourIdx];
+    let curPressure = hourly.pressure_msl[curHourIdx];
+
+    if (bsCurW && typeof bsCurW.temperature === 'number') {
+      const bsElev = bsCurSrc && typeof bsCurSrc.height === 'number' ? bsCurSrc.height : elev;
+      const dElev = elev - bsElev;
+      curTemp = Math.round((Math.abs(dElev) > 80 ? (bsCurW.temperature - (dElev / 100) * 0.65) : bsCurW.temperature) * 10) / 10;
+      if (typeof bsCurW.wind_speed_10 === 'number') curWind = Math.round(bsCurW.wind_speed_10 * 10) / 10;
+      else if (typeof bsCurW.wind_speed_60 === 'number') curWind = Math.round(bsCurW.wind_speed_60 * 10) / 10;
+      if (typeof bsCurW.wind_gust_speed_10 === 'number') curGust = Math.max(curWind, Math.round(bsCurW.wind_gust_speed_10 * 10) / 10);
+      if (typeof bsCurW.wind_direction_10 === 'number') curWindDir = bsCurW.wind_direction_10;
+      if (typeof bsCurW.relative_humidity === 'number') curRh = bsCurW.relative_humidity;
+      if (typeof bsCurW.cloud_cover === 'number') curCloud = bsCurW.cloud_cover;
+      if (typeof bsCurW.precipitation_60 === 'number') curPrecip = Math.round(bsCurW.precipitation_60 * 10) / 10;
+      if (typeof bsCurW.pressure_msl === 'number') curPressure = bsCurW.pressure_msl;
+      curCode = this.mapFallbackWeatherCode(bsCurW.icon || bsCurW.condition, curPrecip, 0, curCloud);
+    }
+
+    const current = {
+      time: hourly.time[curHourIdx],
+      temperature_2m: curTemp,
+      apparent_temperature: hourly.apparent_temperature[curHourIdx],
+      relative_humidity_2m: curRh,
+      is_day: hourly.is_day[curHourIdx],
+      precipitation: curPrecip,
+      rain: curTemp > 1.2 ? curPrecip : 0,
+      showers: 0,
+      snowfall: curTemp <= 1.2 ? +(curPrecip * 0.9).toFixed(2) : 0,
+      weather_code: curCode,
+      cloud_cover: curCloud,
+      pressure_msl: curPressure,
+      surface_pressure: pSurface,
+      wind_speed_10m: curWind,
+      wind_direction_10m: curWindDir,
+      wind_gusts_10m: curGust,
+      uv_index: hourly.uv_index[curHourIdx]
+    };
+
+    return {
+      latitude: Number(lat),
+      longitude: Number(lon),
+      elevation: Math.round(elev),
+      current,
+      hourly,
+      daily,
+      _providerFallback: providerLabel
+    };
   },
 
   /**

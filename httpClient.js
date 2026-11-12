@@ -577,15 +577,23 @@ export function tripCircuitBreakerFromResponse(url, res, fallbackMs = DEFAULT_42
   });
 }
 
+function hasOnlyPastForecastDays(data) {
+  const times = data && data.daily && Array.isArray(data.daily.time) ? data.daily.time : null;
+  if (!times || times.length === 0) return false;
+  const todayKey = getLocalDateKey(Date.now());
+  const lastDaily = String(times[times.length - 1] || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(lastDaily) && lastDaily < todayKey;
+}
+
 // Helper: Prüft L1 & L2 auf (ggf. abgelaufene) Stale-Fallback-Daten
 function getStaleFallbackData(cacheKey, allowStale = true) {
   if (!allowStale) return null;
   const l1 = memoryCache.getEntry(cacheKey);
-  if (l1 && l1.data !== undefined && l1.data !== null) {
+  if (l1 && l1.data !== undefined && l1.data !== null && !hasOnlyPastForecastDays(l1.data)) {
     return l1.data;
   }
   const l2 = readL2Cache(cacheKey);
-  if (l2 && l2.isStaleValid && l2.data !== undefined && l2.data !== null) {
+  if (l2 && l2.isStaleValid && l2.data !== undefined && l2.data !== null && !hasOnlyPastForecastDays(l2.data)) {
     return l2.data;
   }
   return null;

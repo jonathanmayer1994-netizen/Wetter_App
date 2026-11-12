@@ -10,7 +10,7 @@ import { BackgroundCanvasEngine } from './core/backgroundCanvas.js';
 import { WeatherTourCache } from './core/weatherTourCache.js';
 
 import { validateLocation } from './core/contracts.js';
-import { getLocalDateKey, isApiCoolingDown } from './httpClient.js';
+import { getLocalDateKey } from './httpClient.js';
 
 // Domain Feature Modules (Task 1a)
 import { setupLocationTypeToggle, updateLocationHeaderUI, updateAlpineSkyIllumination, renderOverviewTab, setupExpertModeToggle, renderMultiModelComparison, renderAirQualityAndUV, setupMeteogramControls, openDayDetailModal, convertTemp, setupHourlyGranularityToggle, getTodayDailyIndex } from './features/overview.js';
@@ -196,10 +196,10 @@ export function checkFreshnessAndRollover(reason = 'resume') {
     } catch (_) {}
   }
 
-  // Bei Tageswechsel sofort ein Live-Refresh anstoßen (ohne 30-Min-Cache),
+  // Bei Tageswechsel sofort ein Live-Refresh anstoßen (ohne 30-Min-Cache; bei Open-Meteo 429 greift BrightSky/MET Fallback)
   // solange das geladene Modell noch von gestern/früher stammt (4s Entprellung gegen Event-Stürme)
   if (isDateRolledOver) {
-    if ((now - lastAutoRolloverAttemptAt) >= 4000 && !isApiCoolingDown('https://api.open-meteo.com')) {
+    if ((now - lastAutoRolloverAttemptAt) >= 4000) {
       lastAutoRolloverAttemptAt = now;
       lastAutoFreshnessCheckAt = now;
       return loadLocation(state.currentLocation, { forceRefresh: true });
@@ -246,8 +246,20 @@ export async function loadLocation(loc, options = {}) {
     const customAzimuth = state.activeAspect.isAuto ? null : state.activeAspect.azimuth;
     const reqOpts = { signal: activeLocationAbortController.signal, forceRefresh };
 
-    const [microResult, multiModel, airQuality] = await Promise.all([
-      MicroEngine.getMicroScaleWeather(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain, customTilt, customAzimuth, validLoc.country, reqOpts),
+    const microResult = await MicroEngine.getMicroScaleWeather(
+      validLoc.lat,
+      validLoc.lon,
+      validLoc.elevation,
+      validLoc.isMountain,
+      customTilt,
+      customAzimuth,
+      validLoc.country,
+      reqOpts
+    );
+
+    if (currentSeq !== activeLocationSequence) return { ok: false, aborted: true };
+
+    const [multiModel, airQuality] = await Promise.all([
       MicroEngine.fetchMultiModelComparison(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain, reqOpts),
       MicroEngine.fetchAirQualityAndUV(validLoc.lat, validLoc.lon, validLoc.elevation, reqOpts)
     ]);
@@ -268,8 +280,7 @@ export async function loadLocation(loc, options = {}) {
       !forceRefresh &&
       !options?._retriedFresh &&
       typeof navigator !== 'undefined' &&
-      navigator.onLine !== false &&
-      !isApiCoolingDown('https://api.open-meteo.com')
+      navigator.onLine !== false
     ) {
       return loadLocation(validLoc, { ...options, forceRefresh: true, _retriedFresh: true });
     }

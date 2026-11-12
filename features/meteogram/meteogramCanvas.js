@@ -88,10 +88,12 @@ export class MeteogramCanvas {
 
     // 2. Vertikale Tages-Trennlinien & Beschriftungen
     const daysMap = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    const todayDateStr = new Date().toDateString();
     ctx.textAlign = 'center';
     for (let i = 0; i < count; i += 24) {
       const x = getX(i);
       const date = new Date(timestamps[i]);
+      const isActualToday = !isNaN(date.getTime()) && date.toDateString() === todayDateStr;
       const dayName = daysMap[date.getDay()];
       const dateNum = date.getDate();
 
@@ -102,8 +104,8 @@ export class MeteogramCanvas {
       ctx.lineTo(x, padT + plotH);
       ctx.stroke();
 
-      ctx.fillStyle = i === 0 ? '#38bdf8' : 'rgba(255, 255, 255, 0.65)';
-      ctx.fillText(i === 0 ? 'Heute' : `${dayName} ${dateNum}.`, x, padT + plotH + 18);
+      ctx.fillStyle = isActualToday ? '#38bdf8' : 'rgba(255, 255, 255, 0.65)';
+      ctx.fillText(isActualToday ? 'Heute' : `${dayName} ${dateNum}.`, x, padT + plotH + 18);
     }
 
     // 3. Ensemble-Spannbreiten-Korridor (Min-Max-Fläche)
