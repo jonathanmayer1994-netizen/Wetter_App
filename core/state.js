@@ -55,7 +55,14 @@ export const state = {
     radarRafId: null,
     radarImageBuffer: new Map(),
     radarPlaying: false,
-    radarPlaybackSpeed: 1,
+    radarPlaybackSpeed: (() => {
+      try {
+        const s = parseInt(localStorage.getItem('best_weather_radar_speed'), 10);
+        return (s === 1 || s === 2 || s === 4) ? s : 1;
+      } catch (e) {
+        return 1;
+      }
+    })(),
     radarHost: '',
     regionalStationsData: []
   },

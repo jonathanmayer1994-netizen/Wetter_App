@@ -5787,16 +5787,27 @@ export function setupUnifiedRadarControls() {
 
   const speedBtn = document.getElementById('radar-speed-btn');
   if (speedBtn) {
-    speedBtn.onclick = () => {
-      const speeds = [1, 2, 3];
+    const updateSpeedUI = (spd) => {
+      speedBtn.innerText = `${spd}×`;
+      speedBtn.title = `Geschwindigkeit: ${spd}× (Tippen für 1× → 2× → 4×)`;
+      speedBtn.setAttribute('aria-label', `Wiedergabegeschwindigkeit ${spd}x`);
+      speedBtn.classList.remove('speed-1x', 'speed-2x', 'speed-4x');
+      speedBtn.classList.add(`speed-${spd}x`);
+    };
+
+    const initialSpeed = state.map.radarPlaybackSpeed || 1;
+    updateSpeedUI(initialSpeed);
+
+    speedBtn.onclick = (e) => {
+      e.stopPropagation();
+      const speeds = [1, 2, 4];
       const curIdx = speeds.indexOf(state.map.radarPlaybackSpeed || 1);
       const nextSpeed = speeds[(curIdx + 1) % speeds.length];
       state.map.radarPlaybackSpeed = nextSpeed;
-      speedBtn.innerText = `${nextSpeed}x`;
-      if (state.map.radarPlaying) {
-        stopRadarAnimation();
-        startRadarAnimation();
-      }
+      try {
+        localStorage.setItem('best_weather_radar_speed', String(nextSpeed));
+      } catch (err) {}
+      updateSpeedUI(nextSpeed);
     };
   }
 
@@ -5919,8 +5930,8 @@ export function startRadarAnimation() {
   const playBtn = document.getElementById('radar-play-btn');
   if (playBtn) playBtn.innerText = '⏸';
 
-  const delays = { 1: 820, 2: 440, 3: 240 };
-  const stepMs = delays[state.map.radarPlaybackSpeed || 1] || 820;
+  // Flotte Delays für flüssige Animation: 1× (180ms), 2× (90ms), 4× (45ms)
+  const delays = { 1: 180, 2: 90, 4: 45 };
   let lastTickTime = performance.now();
   let lastCanvasDraw = 0;
 
@@ -5930,6 +5941,10 @@ export function startRadarAnimation() {
     if (frames && frames.length > 0) {
       const dt = Math.min(80, Math.max(0, currentTime - lastTickTime));
       lastTickTime = currentTime;
+
+      // Dynamischer Zugriff auf aktuelle Geschwindigkeit für nahtlose Umschaltung in Echtzeit
+      const currentSpeed = state.map.radarPlaybackSpeed || 1;
+      const stepMs = delays[currentSpeed] || 180;
 
       const maxIdx = Math.max(1, frames.length - 1);
       const curFloat = (state.map.radarFloatIndex !== undefined)

@@ -477,9 +477,23 @@ def run_tests():
         time_text_mid = page.inner_text("#radar-time-display")
         report("Scrubbing slider updates radar time display smoothly", len(time_text_mid) > 5)
 
+        # Close drawer if open so floating controls can receive direct pointer clicks
+        if page.is_visible("#map-layer-drawer"):
+            page.click("#map-layer-close-btn")
+            page.wait_for_timeout(200)
+
         # Verify MeteoSwiss left Play button IS visible and redundant step/jump buttons are removed
         play_btn = page.query_selector("#radar-play-btn")
         report("MeteoSwiss play button is present and visible", play_btn is not None and page.is_visible("#radar-play-btn"))
+        speed_btn = page.query_selector("#radar-speed-btn")
+        report("Radar speed button is present and visible", speed_btn is not None and page.is_visible("#radar-speed-btn"))
+        if speed_btn:
+            initial_speed_text = page.inner_text("#radar-speed-btn")
+            page.click("#radar-speed-btn")
+            page.wait_for_timeout(100)
+            new_speed_text = page.inner_text("#radar-speed-btn")
+            report("Radar speed button cycles speed on tap", initial_speed_text != new_speed_text and ("2" in new_speed_text or "4" in new_speed_text))
+
         next_btn = page.query_selector("#radar-next-btn")
         report("Radar step buttons cleanly removed from DOM", next_btn is None)
         jump_btns = page.query_selector(".radar-jump-btn")

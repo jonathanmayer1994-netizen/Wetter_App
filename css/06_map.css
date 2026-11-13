@@ -1833,12 +1833,88 @@
   transform: scale(1.06);
 }
 
-/* MAIN TIMELINE ROW: Left Play Button + Measured/Forecast Axis Track */
+/* MAIN TIMELINE ROW: Left Play/Speed Pill Group + Measured/Forecast Axis Track */
 .ms-timeline-main-row {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
+}
+
+.ms-player-pill-group {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.28);
+  flex-shrink: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  height: 42px;
+}
+
+.ms-player-pill-group .ms-play-btn {
+  width: 40px;
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  transform: none !important;
+}
+
+.ms-player-pill-group .ms-play-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.ms-player-pill-group .ms-play-btn:active {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.ms-speed-btn {
+  min-width: 36px;
+  height: 100%;
+  padding: 0 8px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: var(--ios-cyan, #38bdf8);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ms-speed-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.ms-speed-btn:active {
+  background: rgba(255, 255, 255, 0.26);
+  transform: scale(0.95);
+}
+
+.ms-speed-btn.speed-1x {
+  color: var(--ios-cyan, #38bdf8);
+}
+
+.ms-speed-btn.speed-2x {
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.35);
+}
+
+.ms-speed-btn.speed-4x {
+  color: #f43f5e;
+  text-shadow: 0 0 10px rgba(244, 63, 94, 0.45);
 }
 
 .ms-play-btn {
@@ -2093,6 +2169,22 @@
 
   .ms-timeline-main-row {
     gap: 9px;
+  }
+
+  .ms-player-pill-group {
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .ms-player-pill-group .ms-play-btn {
+    width: 35px;
+    font-size: 13.5px;
+  }
+
+  .ms-speed-btn {
+    min-width: 30px;
+    padding: 0 6px;
+    font-size: 10px;
   }
 
   .ms-play-btn {

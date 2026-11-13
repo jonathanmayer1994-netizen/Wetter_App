@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.9.5">
+  <link rel="stylesheet" href="style.css?v=2.9.6">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -1873,9 +1873,12 @@
                 </div>
               </div>
 
-              <!-- MeteoSwiss Timeline Track: Left Play Button + Measurement/Forecast Axis -->
+              <!-- MeteoSwiss Timeline Track: Left Play Button + Speed Capsule + Measurement/Forecast Axis -->
               <div class="ms-timeline-main-row">
-                <button id="radar-play-btn" class="ms-play-btn" type="button" title="Animation abspielen / pausieren" aria-label="Radar-Animation abspielen">▶</button>
+                <div class="ms-player-pill-group" id="ms-player-pill-group">
+                  <button id="radar-play-btn" class="ms-play-btn" type="button" title="Animation abspielen / pausieren" aria-label="Radar-Animation abspielen">▶</button>
+                  <button id="radar-speed-btn" class="ms-speed-btn speed-1x" type="button" title="Geschwindigkeit: 1× (Tippen für 1× → 2× → 4×)" aria-label="Wiedergabegeschwindigkeit 1x">1×</button>
+                </div>
 
                 <div class="radar-slider-container ms-axis-container">
                   <div class="ms-axis-ticks" id="ms-axis-ticks">
@@ -3031,11 +3034,11 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.9.5"></script>
+  <script type="module" src="app.js?v=2.9.6"></script>
 
   <!-- Autonome iOS-PWA & Service-Worker Update-Engine -->
   <script type="module">
-    import { initAppUpdater } from './core/appUpdater.js?v=2.9.5';
+    import { initAppUpdater } from './core/appUpdater.js?v=2.9.6';
     initAppUpdater();
   </script>
 </body>

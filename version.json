@@ -1,5 +1,5 @@
 {
-  "version": "2.25.5",
-  "build": "20261113-0820",
-  "notes": "Harmonize hourly weather conditions and display sunshine minutes consistently across accordion and detail modal"
+  "version": "2.25.6",
+  "build": "20261113-0828",
+  "notes": "Add 1-tap playback speed pill (1x, 2x, 4x) directly to map radar player"
 }
