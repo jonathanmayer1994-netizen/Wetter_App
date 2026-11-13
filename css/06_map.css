@@ -1874,7 +1874,7 @@
 }
 
 .ms-speed-btn {
-  min-width: 36px;
+  min-width: 40px;
   height: 100%;
   padding: 0 8px;
   border-radius: 0;
@@ -1907,12 +1907,13 @@
   color: var(--ios-cyan, #38bdf8);
 }
 
-.ms-speed-btn.speed-2x {
+.ms-speed-btn.speed-1-5x,
+.ms-speed-btn.speed-1_5x {
   color: #fbbf24;
   text-shadow: 0 0 8px rgba(251, 191, 36, 0.35);
 }
 
-.ms-speed-btn.speed-4x {
+.ms-speed-btn.speed-2x {
   color: #f43f5e;
   text-shadow: 0 0 10px rgba(244, 63, 94, 0.45);
 }
@@ -2182,9 +2183,9 @@
   }
 
   .ms-speed-btn {
-    min-width: 30px;
-    padding: 0 6px;
-    font-size: 10px;
+    min-width: 34px;
+    padding: 0 5px;
+    font-size: 10.5px;
   }
 
   .ms-play-btn {

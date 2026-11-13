@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.9.6">
+  <link rel="stylesheet" href="style.css?v=2.9.7">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -1877,7 +1877,7 @@
               <div class="ms-timeline-main-row">
                 <div class="ms-player-pill-group" id="ms-player-pill-group">
                   <button id="radar-play-btn" class="ms-play-btn" type="button" title="Animation abspielen / pausieren" aria-label="Radar-Animation abspielen">▶</button>
-                  <button id="radar-speed-btn" class="ms-speed-btn speed-1x" type="button" title="Geschwindigkeit: 1× (Tippen für 1× → 2× → 4×)" aria-label="Wiedergabegeschwindigkeit 1x">1×</button>
+                  <button id="radar-speed-btn" class="ms-speed-btn speed-1x" type="button" title="Geschwindigkeit: 1x (Tippen für 1x → 1,5x → 2x)" aria-label="Wiedergabegeschwindigkeit 1x">1x</button>
                 </div>
 
                 <div class="radar-slider-container ms-axis-container">
@@ -3034,11 +3034,11 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.9.6"></script>
+  <script type="module" src="app.js?v=2.9.7"></script>
 
   <!-- Autonome iOS-PWA & Service-Worker Update-Engine -->
   <script type="module">
-    import { initAppUpdater } from './core/appUpdater.js?v=2.9.6';
+    import { initAppUpdater } from './core/appUpdater.js?v=2.9.7';
     initAppUpdater();
   </script>
 </body>

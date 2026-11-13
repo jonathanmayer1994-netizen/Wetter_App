@@ -57,8 +57,8 @@ export const state = {
     radarPlaying: false,
     radarPlaybackSpeed: (() => {
       try {
-        const s = parseInt(localStorage.getItem('best_weather_radar_speed'), 10);
-        return (s === 1 || s === 2 || s === 4) ? s : 1;
+        const s = parseFloat(localStorage.getItem('best_weather_radar_speed'));
+        return (s === 1 || s === 1.5 || s === 2) ? s : 1;
       } catch (e) {
         return 1;
       }

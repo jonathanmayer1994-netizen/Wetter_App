@@ -1,5 +1,5 @@
 {
-  "version": "2.25.6",
-  "build": "20261113-0828",
-  "notes": "Add 1-tap playback speed pill (1x, 2x, 4x) directly to map radar player"
+  "version": "2.25.7",
+  "build": "20261113-0840",
+  "notes": "Adjust radar playback speed steps to 1x, 1,5x and 2x"
 }

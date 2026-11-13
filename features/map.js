@@ -5787,12 +5787,15 @@ export function setupUnifiedRadarControls() {
 
   const speedBtn = document.getElementById('radar-speed-btn');
   if (speedBtn) {
+    const formatSpeedLabel = (spd) => (spd === 1.5 ? '1,5x' : `${spd}x`);
     const updateSpeedUI = (spd) => {
-      speedBtn.innerText = `${spd}×`;
-      speedBtn.title = `Geschwindigkeit: ${spd}× (Tippen für 1× → 2× → 4×)`;
-      speedBtn.setAttribute('aria-label', `Wiedergabegeschwindigkeit ${spd}x`);
-      speedBtn.classList.remove('speed-1x', 'speed-2x', 'speed-4x');
-      speedBtn.classList.add(`speed-${spd}x`);
+      const label = formatSpeedLabel(spd);
+      speedBtn.innerText = label;
+      speedBtn.title = `Geschwindigkeit: ${label} (Tippen für 1x → 1,5x → 2x)`;
+      speedBtn.setAttribute('aria-label', `Wiedergabegeschwindigkeit ${label}`);
+      speedBtn.classList.remove('speed-1x', 'speed-1-5x', 'speed-2x', 'speed-4x');
+      const cls = spd === 1.5 ? 'speed-1-5x' : `speed-${spd}x`;
+      speedBtn.classList.add(cls);
     };
 
     const initialSpeed = state.map.radarPlaybackSpeed || 1;
@@ -5800,9 +5803,10 @@ export function setupUnifiedRadarControls() {
 
     speedBtn.onclick = (e) => {
       e.stopPropagation();
-      const speeds = [1, 2, 4];
-      const curIdx = speeds.indexOf(state.map.radarPlaybackSpeed || 1);
-      const nextSpeed = speeds[(curIdx + 1) % speeds.length];
+      const speeds = [1, 1.5, 2];
+      const cur = state.map.radarPlaybackSpeed || 1;
+      const curIdx = speeds.indexOf(cur);
+      const nextSpeed = speeds[(curIdx >= 0 ? curIdx + 1 : 0) % speeds.length];
       state.map.radarPlaybackSpeed = nextSpeed;
       try {
         localStorage.setItem('best_weather_radar_speed', String(nextSpeed));
@@ -5930,8 +5934,8 @@ export function startRadarAnimation() {
   const playBtn = document.getElementById('radar-play-btn');
   if (playBtn) playBtn.innerText = '⏸';
 
-  // Flotte Delays für flüssige Animation: 1× (180ms), 2× (90ms), 4× (45ms)
-  const delays = { 1: 180, 2: 90, 4: 45 };
+  // Präzise Delays für flüssige Animation: 1x (180ms), 1,5x (120ms), 2x (90ms)
+  const delays = { 1: 180, 1.5: 120, 2: 90 };
   let lastTickTime = performance.now();
   let lastCanvasDraw = 0;
 

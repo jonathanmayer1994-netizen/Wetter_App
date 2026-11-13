@@ -492,7 +492,7 @@ def run_tests():
             page.click("#radar-speed-btn")
             page.wait_for_timeout(100)
             new_speed_text = page.inner_text("#radar-speed-btn")
-            report("Radar speed button cycles speed on tap", initial_speed_text != new_speed_text and ("2" in new_speed_text or "4" in new_speed_text))
+            report("Radar speed button cycles speed on tap", initial_speed_text != new_speed_text and ("1,5" in new_speed_text or "2" in new_speed_text))
 
         next_btn = page.query_selector("#radar-next-btn")
         report("Radar step buttons cleanly removed from DOM", next_btn is None)
