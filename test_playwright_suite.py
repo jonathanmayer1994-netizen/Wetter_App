@@ -430,6 +430,16 @@ def run_tests():
             page.click("#map-layer-pill")
             page.wait_for_timeout(150)
 
+        # Verify Day/Night Solar Toggle Button in Drawer
+        solar_btn = page.query_selector("#map-solar-toggle-btn")
+        report("Map solar day/night toggle button present in drawer", solar_btn is not None)
+        page.click("#map-solar-toggle-btn")
+        page.wait_for_timeout(100)
+        report("Map solar toggle deactivates cleanly on tap", "Aus" in page.inner_text("#map-solar-toggle-text"))
+        page.click("#map-solar-toggle-btn")
+        page.wait_for_timeout(100)
+        report("Map solar toggle reactivates cleanly on tap", "An" in page.inner_text("#map-solar-toggle-text"))
+
         for base in ["osm-outdoor", "osm-dark", "satellite", "osm-standard"]:
             btn = page.query_selector(f".map-base-btn[data-base='{base}']")
             report(f"Map base button '{base}' present", btn is not None)
@@ -485,6 +495,8 @@ def run_tests():
         # Verify MeteoSwiss left Play button IS visible and redundant step/jump buttons are removed
         play_btn = page.query_selector("#radar-play-btn")
         report("MeteoSwiss play button is present and visible", play_btn is not None and page.is_visible("#radar-play-btn"))
+        solar_pill = page.query_selector("#mscb-solar-pill")
+        report("Astro sun/moon indicator pill present on radar callout badge", solar_pill is not None and len(page.inner_text("#mscb-solar-pill")) > 0)
         speed_btn = page.query_selector("#radar-speed-btn")
         report("Radar speed button is present and visible", speed_btn is not None and page.is_visible("#radar-speed-btn"))
         if speed_btn:

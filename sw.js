@@ -1,5 +1,5 @@
 /**
- * BEST WEATHER — Service Worker v2.25.7
+ * BEST WEATHER — Service Worker v2.26.0
  * Enterprise-Grade Alpine Offline PWA Cache Engine
  * Features:
  * - CDN Edge & iOS NSURLCache bypass on deploy token change (GitHub Pages max-age=600 fix)
@@ -8,8 +8,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.25.7';
-const CACHE_NAME = `best-weather-v2.25.7-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.26.0';
+const CACHE_NAME = `best-weather-v2.26.0-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
 const MAX_TILES = 600;
 
@@ -46,11 +46,13 @@ const STATIC_ASSETS = [
   './core/physicsBridge.js',
   './core/verificationStore.js',
   './core/actualEngine.js',
+  './core/solarEngine.js',
   './features/meteogram/meteogramCanvas.js',
   './features/overview.js',
   './features/mountain.js',
   './features/sports.js',
   './features/map.js',
+  './features/mapSolar.js',
   './features/search.js',
   './features/favorites.js',
   './features/networks.js',

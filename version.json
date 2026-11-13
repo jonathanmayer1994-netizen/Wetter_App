@@ -1,5 +1,5 @@
 {
-  "version": "2.25.7",
-  "build": "20261113-0840",
-  "notes": "Adjust radar playback speed steps to 1x, 1,5x and 2x"
+  "version": "2.26.0",
+  "build": "20261113-0905",
+  "notes": "Seamless Day/Night solar transition on timeline with astronomical lighting and continental terminator (Option D: Hybrid)"
 }

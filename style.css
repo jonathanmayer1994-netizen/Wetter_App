@@ -5042,7 +5042,13 @@ body {
 }
 
 .osm-dark-tiles .leaflet-tile-pane {
-  filter: brightness(0.62) contrast(1.14);
+  filter: brightness(var(--solar-dark-brightness, 0.62)) contrast(var(--solar-dark-contrast, 1.14));
+  transition: filter 0.08s linear;
+}
+
+#interactive-map:not(.osm-dark-tiles) .leaflet-tile-pane {
+  filter: brightness(var(--solar-tile-brightness, 1.0)) contrast(var(--solar-tile-contrast, 1.0));
+  transition: filter 0.08s linear;
 }
 
 .osm-dark-tiles .ms-hillshade-tile {
@@ -5052,6 +5058,26 @@ body {
 
 .osm-dark-tiles .ms-labels-tile {
   filter: contrast(1.18) brightness(1.08) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
+}
+
+/* Solar Day/Night Transition & Atmosphere (Option D: Hybrid) */
+.solar-terminator-polygon {
+  stroke: rgba(245, 158, 11, 0.50);
+  stroke-width: 1.8px;
+  stroke-dasharray: 4, 3;
+  fill: #060c1a;
+  pointer-events: none;
+  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.35));
+  transition: fill-opacity 0.12s linear, stroke-opacity 0.12s linear;
+}
+
+.map-solar-ambient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transition: opacity 0.12s linear, background 0.12s linear;
+  z-index: 255;
 }
 
 /* Wind Flow Canvas (Inside Leaflet overlayPane z-index 400 -> STRICTLY below labelsOverlayPane 450 & beacon 600+) */
@@ -5824,6 +5850,13 @@ body {
   background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mld-action-chip.active {
+  background: rgba(14, 165, 233, 0.22);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
 }
 
 .mld-footer {
@@ -6734,6 +6767,19 @@ body {
   font-weight: 700;
   color: #e2e8f0;
   white-space: nowrap;
+}
+
+.mscb-solar-pill {
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 3px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  user-select: none;
+  cursor: default;
+  transition: transform 0.2s ease;
 }
 
 .mscb-time {

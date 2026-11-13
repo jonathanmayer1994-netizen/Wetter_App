@@ -63,6 +63,15 @@ export const state = {
         return 1;
       }
     })(),
+    solarTransitionEnabled: (() => {
+      try {
+        return localStorage.getItem('best_weather_solar_transition') !== 'false';
+      } catch (e) {
+        return true;
+      }
+    })(),
+    solarTerminatorLayer: null,
+    solarAmbientOverlay: null,
     radarHost: '',
     regionalStationsData: []
   },

@@ -8,6 +8,7 @@ import { state } from '../core/state.js';
 import { BASE_LAYERS, REGIONAL_STATIONS, WMO_CODES } from '../core/constants.js';
 import { selectExactLocation } from './search.js';
 import { MicroEngine } from '../microEngine.js';
+import { initMapSolarTransition, updateMapSolarTransition } from './mapSolar.js';
 import {
   escapeHtml,
   resilientFetch,
@@ -138,6 +139,9 @@ export function initLeafletMap() {
   // 2b. Erstelle Layer-Gruppen für Zukunftsradar & Marker
   state.map.futureRadarLayerGroup = L.layerGroup().addTo(state.map.instance);
   state.map.weatherLayerGroup = L.layerGroup().addTo(state.map.instance);
+
+  // 2c. Initialisiere Tag/Nacht-Solar-Transition (Option D: Hybrid aus Terminator & Atmosphären-Filter)
+  initMapSolarTransition(state.map.instance);
 
   // 3. Setze Standard-Basiskarte synchron zu state & UI (MeteoSwiss Alpin-Dunkel 3D Relief)
   const initialBase = (state.map.activeBase && BASE_LAYERS[state.map.activeBase]) ? state.map.activeBase : 'osm-dark';
@@ -768,6 +772,7 @@ export function setMapBaseLayer(baseKey) {
 
   updateMapLayerPill();
   syncMeteoSwissHudControls();
+  updateMapSolarTransition();
 }
 
 export function getWindCardinalName(deg) {
@@ -1232,6 +1237,7 @@ export function setMapOverlay(overlayKey) {
   updateWeatherOverlay();
   updateMapLayerPill();
   syncMeteoSwissHudControls();
+  updateMapSolarTransition();
 }
 
 /**
@@ -5698,6 +5704,7 @@ export function showUnifiedRadarFrame(idx, renderOpts = {}) {
 
   updateJumpButtonsActive(spec.nearestIdx);
   updateMeteoSwissTimelineUI(spec.frame, spec.floatIdx, frames.length);
+  updateMapSolarTransition(spec.frame.timestampMs);
 
   // Rendere das aktuell gewählte Wetter-Overlay exakt für diesen stufenlosen Zeitschritt
   const activeOverlay = state.map.activeOverlay || 'precip';
@@ -5970,6 +5977,7 @@ export function startRadarAnimation() {
 
         updateJumpButtonsActive(spec.nearestIdx);
         updateMeteoSwissTimelineUI(spec.frame, spec.floatIdx, frames.length);
+        updateMapSolarTransition(spec.frame.timestampMs);
 
         const activeOverlay = state.map.activeOverlay || 'precip';
         if (lastCanvasDraw === 0 || (currentTime - lastCanvasDraw >= 32)) {
