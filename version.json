@@ -1,5 +1,5 @@
 {
-  "version": "2.27.0",
-  "build": "20261113-1430",
-  "notes": "macOS Silicon Glass optimization (85-90% less GPU/CPU load) & macOS Weather Pro Retina 14-16 inch workstation dashboard (Option A1 + Option B1)"
+  "version": "2.28.0",
+  "build": "20261113-1615",
+  "notes": "iOS Apple Native Ultra: ProMotion 60 FPS pacing, Motion-Aware Glass scroll bypass, WebKit content-visibility virtualization, and Super Retina OLED True Black (Option 1)"
 }

@@ -2115,3 +2115,50 @@
   color: var(--text-secondary);
 }
 
+/* =============================================================================
+   SÄULE 3: WEBKIT VIRTUALISIERUNG & OFFSCREEN-DOM-SCHLAF (iOS HIGH-PERFORMANCE)
+   ============================================================================= */
+.daily-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 460px;
+}
+
+.daily-card .day-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 68px;
+}
+
+.bento-compact-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 150px;
+}
+
+.verification-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 300px;
+}
+
+#expert-details-container {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 380px;
+}
+
+.altitude-tier-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 110px;
+}
+
+/* =============================================================================
+   SÄULE 2: MOTION-AWARE GLASS DECOUPLING (TOUCH-SCROLL BLUR-BYPASS)
+   ============================================================================= */
+body.is-scrolling .desktop-header-dock,
+body.is-scrolling .global-navbar,
+body.is-scrolling .map-floating-topbar,
+body.is-scrolling .radar-floating-controls {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--oled-glass-scrolling, rgba(12, 18, 32, 0.96)) !important;
+  box-shadow: var(--motion-glass-shadow, 0 10px 24px rgba(0, 0, 0, 0.5)) !important;
+  transition: none !important;
+}
+

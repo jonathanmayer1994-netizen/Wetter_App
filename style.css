@@ -47,6 +47,13 @@
   --silicon-glass-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.45), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
   --floating-chrome-blur: blur(20px) saturate(180%);
 
+  /* iOS Super Retina XDR OLED True Black & Motion-Glass Tokens (Option 1) */
+  --oled-black: #000000;
+  --oled-deep: #04070e;
+  --oled-surface: #0a101d;
+  --oled-glass-scrolling: rgba(12, 18, 32, 0.96);
+  --motion-glass-shadow: 0 10px 28px rgba(0, 0, 0, 0.52);
+
   /* iOS Accents */
   --ios-blue: #0a84ff;
   --ios-cyan: #64d2ff;
@@ -117,6 +124,17 @@ body.weather-fog {
   --bg-gradient-mid: #4e535a;
   --bg-gradient-bottom: #2b2e33;
   --accent-glow: rgba(200, 210, 220, 0.15);
+}
+
+/* True Super Retina XDR OLED Black anchoring for night modes (Option 1: Säule 4) */
+:root.weather-clear-night,
+body.weather-clear-night,
+:root.night,
+body.night {
+  --bg-gradient-top: #070e1a;
+  --bg-gradient-mid: #040810;
+  --bg-gradient-bottom: #000000;
+  --accent-glow: rgba(70, 130, 180, 0.18);
 }
 
 /* ==========================================================================
@@ -2669,6 +2687,53 @@ body {
 .bsp-label {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* =============================================================================
+   SÄULE 3: WEBKIT VIRTUALISIERUNG & OFFSCREEN-DOM-SCHLAF (iOS HIGH-PERFORMANCE)
+   ============================================================================= */
+.daily-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 460px;
+}
+
+.daily-card .day-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 68px;
+}
+
+.bento-compact-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 150px;
+}
+
+.verification-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 300px;
+}
+
+#expert-details-container {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 380px;
+}
+
+.altitude-tier-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 110px;
+}
+
+/* =============================================================================
+   SÄULE 2: MOTION-AWARE GLASS DECOUPLING (TOUCH-SCROLL BLUR-BYPASS)
+   ============================================================================= */
+body.is-scrolling .desktop-header-dock,
+body.is-scrolling .global-navbar,
+body.is-scrolling .map-floating-topbar,
+body.is-scrolling .radar-floating-controls {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--oled-glass-scrolling, rgba(12, 18, 32, 0.96)) !important;
+  box-shadow: var(--motion-glass-shadow, 0 10px 24px rgba(0, 0, 0, 0.5)) !important;
+  transition: none !important;
 }
 
 /* ==========================================================================
@@ -14239,13 +14304,12 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     border-top: 1.5px solid rgba(255, 255, 255, 0.45);
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 
-    /* Deep Floating Drop Shadow & Inner Glass Refraction */
+    /* Streamlined GPU-Optimized Shadows & Hardware Compositing */
     box-shadow:
-      0 20px 48px -4px rgba(0, 0, 0, 0.65),
-      0 10px 24px -2px rgba(0, 0, 0, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.5),
-      inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
+      0 14px 36px -4px rgba(0, 0, 0, 0.60),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.45);
+    transform: translateZ(0);
+    transition: backdrop-filter 0.18s ease, -webkit-backdrop-filter 0.18s ease, background 0.18s ease;
 
     z-index: 99999;
     align-items: center;
@@ -14253,6 +14317,15 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     pointer-events: auto;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* iOS Motion-Aware Glass: Instant Blur-Bypass during touch-scrolling (120Hz zero jank) */
+  body.is-scrolling .mobile-bottom-nav {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(12, 19, 36, 0.95) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
+    transition: none !important;
   }
 
   /* Specular sheen across top edge of curved liquid glass */

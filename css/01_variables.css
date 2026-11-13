@@ -34,6 +34,13 @@
   --silicon-glass-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.45), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
   --floating-chrome-blur: blur(20px) saturate(180%);
 
+  /* iOS Super Retina XDR OLED True Black & Motion-Glass Tokens (Option 1) */
+  --oled-black: #000000;
+  --oled-deep: #04070e;
+  --oled-surface: #0a101d;
+  --oled-glass-scrolling: rgba(12, 18, 32, 0.96);
+  --motion-glass-shadow: 0 10px 28px rgba(0, 0, 0, 0.52);
+
   /* iOS Accents */
   --ios-blue: #0a84ff;
   --ios-cyan: #64d2ff;
@@ -104,5 +111,16 @@ body.weather-fog {
   --bg-gradient-mid: #4e535a;
   --bg-gradient-bottom: #2b2e33;
   --accent-glow: rgba(200, 210, 220, 0.15);
+}
+
+/* True Super Retina XDR OLED Black anchoring for night modes (Option 1: Säule 4) */
+:root.weather-clear-night,
+body.weather-clear-night,
+:root.night,
+body.night {
+  --bg-gradient-top: #070e1a;
+  --bg-gradient-mid: #040810;
+  --bg-gradient-bottom: #000000;
+  --accent-glow: rgba(70, 130, 180, 0.18);
 }
 

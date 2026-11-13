@@ -5702,13 +5702,12 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     border-top: 1.5px solid rgba(255, 255, 255, 0.45);
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 
-    /* Deep Floating Drop Shadow & Inner Glass Refraction */
+    /* Streamlined GPU-Optimized Shadows & Hardware Compositing */
     box-shadow:
-      0 20px 48px -4px rgba(0, 0, 0, 0.65),
-      0 10px 24px -2px rgba(0, 0, 0, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.5),
-      inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
+      0 14px 36px -4px rgba(0, 0, 0, 0.60),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.45);
+    transform: translateZ(0);
+    transition: backdrop-filter 0.18s ease, -webkit-backdrop-filter 0.18s ease, background 0.18s ease;
 
     z-index: 99999;
     align-items: center;
@@ -5716,6 +5715,15 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     pointer-events: auto;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* iOS Motion-Aware Glass: Instant Blur-Bypass during touch-scrolling (120Hz zero jank) */
+  body.is-scrolling .mobile-bottom-nav {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(12, 19, 36, 0.95) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
+    transition: none !important;
   }
 
   /* Specular sheen across top edge of curved liquid glass */

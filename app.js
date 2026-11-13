@@ -23,9 +23,10 @@ import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/netwo
 import { ActualEngine } from './core/actualEngine.js';
 import { renderVerificationDashboard, setupVerificationUI, initVerificationHandlers } from './features/verificationUI.js';
 import { initBentoSheets } from './features/bentoSheets.js';
-import { initPullToRefresh } from './features/pullToRefresh.js?v=2.9.9';
+import { initPullToRefresh } from './features/pullToRefresh.js?v=3.0.0';
 import { GoogleSheetsSync } from './core/googleSheetsSync.js';
 import { AlpineStorage } from './storage.js';
+import { initScrollOptimizer } from './core/scrollOptimizer.js';
 
 // Central Dispatcher Event Bus Subscriptions
 export function setupDispatcherSubscriptions() {
@@ -432,6 +433,7 @@ window.updatePointWeatherCard = updatePointWeatherCard;
 // MAIN INITIALIZATION
 // =============================================================================
 document.addEventListener('DOMContentLoaded', () => {
+  initScrollOptimizer();
   state.canvasEngine = new BackgroundCanvasEngine('weather-canvas');
   initSearchHandlers({ onLoadLocation: loadLocation, onRenderOverview: renderOverviewTab, onRenderAdaptiveTab2: renderAdaptiveTab2 });
   initFavoritesHandlers({ onSelectLocation: selectExactLocation, onSwitchTab: switchTab });

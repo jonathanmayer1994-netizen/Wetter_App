@@ -21,6 +21,13 @@ export class BackgroundCanvasEngine {
     this.dpr = Math.min(window.devicePixelRatio || 1, 1.25);
     this.updateDimensions();
 
+    // iOS ProMotion 120Hz Frame-Pacing & Eco-Engine
+    this.lastFrameTime = 0;
+    this.targetFps = 60;
+    this.frameInterval = 1000 / this.targetFps; // 16.6ms
+    this.slowFrameStreak = 0;
+    this.isEcoMode = false;
+
     // Check OffscreenCanvas & Worker support
     const supportsOffscreen = typeof HTMLCanvasElement !== 'undefined' &&
       typeof HTMLCanvasElement.prototype.transferControlToOffscreen === 'function' &&
@@ -222,11 +229,41 @@ export class BackgroundCanvasEngine {
     }
   }
 
-  animate() {
+  setEcoMode(enabled) {
+    this.isEcoMode = Boolean(enabled);
+    this.targetFps = this.isEcoMode ? 30 : 60;
+    this.frameInterval = 1000 / this.targetFps;
+    if (this.useWorker && this.worker) {
+      this.worker.postMessage({ action: 'ecoMode', payload: { enabled: this.isEcoMode } });
+    }
+  }
+
+  animate(now) {
     if (this.isPaused || this.reducedMotion || !this.ctx) {
       this.rafId = null;
       return;
     }
+
+    // iOS ProMotion 120Hz Frame-Pacing
+    if (now && this.lastFrameTime && (now - this.lastFrameTime < this.frameInterval - 1.5)) {
+      this.rafId = requestAnimationFrame(this.animate);
+      return;
+    }
+
+    // Dynamic Thermal / Eco detection
+    if (now && this.lastFrameTime) {
+      const delta = now - this.lastFrameTime;
+      if (delta > 36) {
+        this.slowFrameStreak++;
+        if (this.slowFrameStreak > 8 && !this.isEcoMode) {
+          this.setEcoMode(true);
+        }
+      } else if (delta < 20 && this.slowFrameStreak > 0) {
+        this.slowFrameStreak--;
+      }
+    }
+    this.lastFrameTime = now || performance.now();
+
     this.ctx.clearRect(0, 0, this.width, this.height);
 
     if (!this.isDay || this.currentMode === 'clear-night') {

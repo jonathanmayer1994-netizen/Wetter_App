@@ -16,6 +16,12 @@ let reducedMotion = false;
 let particles = [];
 let stars = [];
 
+// ProMotion 120Hz Frame-Pacing & iOS Eco Engine
+let lastFrameTime = 0;
+let targetFps = 60;
+let frameInterval = 1000 / targetFps; // 16.6ms for 60 FPS cap on 120Hz ProMotion
+let isEcoMode = false;
+
 function initStars() {
   stars = [];
   for (let i = 0; i < 45; i++) {
@@ -85,11 +91,18 @@ function setMode(theme, day) {
   }
 }
 
-function renderFrame() {
+function renderFrame(now) {
   if (!ctx || isPaused || reducedMotion) {
     rafId = null;
     return;
   }
+
+  // iOS ProMotion 120Hz Frame-Pacing: Throttle to 60 FPS (or 30 FPS Eco)
+  if (now && lastFrameTime && (now - lastFrameTime < frameInterval - 1.5)) {
+    rafId = requestAnimationFrame(renderFrame);
+    return;
+  }
+  lastFrameTime = now || performance.now();
 
   ctx.clearRect(0, 0, width, height);
 
@@ -181,5 +194,9 @@ self.onmessage = function (e) {
         renderStaticFrame();
       }
     }
+  } else if (action === 'ecoMode') {
+    isEcoMode = Boolean(payload && payload.enabled);
+    targetFps = isEcoMode ? 30 : 60;
+    frameInterval = 1000 / targetFps;
   }
 };
