@@ -527,6 +527,12 @@
 .hourly-wind {
   font-size: 10px;
   color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.hourly-wind small {
+  font-size: 8.5px;
+  opacity: 0.85;
 }
 
 /* ==========================================================================

@@ -1,5 +1,5 @@
 {
-  "version": "2.25.4",
-  "build": "20261113-0745",
-  "notes": "Fix sticky info button state and guarantee real-time live radar updates on map open and tab resume"
+  "version": "2.25.5",
+  "build": "20261113-0820",
+  "notes": "Harmonize hourly weather conditions and display sunshine minutes consistently across accordion and detail modal"
 }

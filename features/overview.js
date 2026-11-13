@@ -65,6 +65,106 @@ export function getDayHourlyStartIndex(dateKey, rawDayIdx, hourly) {
   return matched >= 0 ? matched : Math.min(defaultIdx, Math.max(0, hourly.time.length - 1));
 }
 
+/**
+ * Meteorologisch harmonisierte Zustandserkennung für stündliche Vorhersagen.
+ * Verhindert Widersprüche zwischen Sonnenscheindauer und rohen Modell-WMO-Codes
+ * (z. B. wenn NWP-Modelle WMO-Code 3 "Bedeckt" wegen harmloser hoher Schleierwolken ausgeben,
+ * obwohl 45-60 Minuten heller Sonnenschein gemessen/prognostiziert werden).
+ */
+export function getHarmonizedHourlyCondition({
+  code = 0,
+  sunSec = 0,
+  precip = 0,
+  pop = 0,
+  cloudCover = null,
+  isDay = true,
+  temp = 10
+}) {
+  const sunMin = Math.round(Math.max(0, Math.min(60, (sunSec || 0) / 60)));
+  const hasPrecip = (precip >= 0.08) || (pop >= 65 && precip > 0.02);
+  const isSnow = (code >= 71 && code <= 77) || code === 85 || code === 86 || (hasPrecip && temp <= 1.0);
+  const isThunder = code >= 95;
+
+  let icon = '☀️';
+  let label = 'Sonnig';
+
+  if (isThunder) {
+    icon = '⛈️';
+    label = 'Gewitter';
+  } else if (isSnow) {
+    if (sunMin >= 15 && isDay) {
+      icon = '🌨️';
+      label = 'Sonne & Schnee';
+    } else {
+      icon = precip >= 1.5 ? '❄️' : '🌨️';
+      label = 'Schneefall';
+    }
+  } else if (hasPrecip) {
+    if (sunMin >= 15 && isDay) {
+      icon = '🌦️';
+      label = 'Sonne & Schauer';
+    } else if (precip >= 2.0) {
+      icon = '🌧️';
+      label = 'Kräftiger Regen';
+    } else if (precip >= 0.5) {
+      icon = '🌧️';
+      label = 'Regen';
+    } else {
+      icon = '🌦️';
+      label = 'Leichter Regen';
+    }
+  } else {
+    // Trocken (kein Niederschlag)
+    if (isDay) {
+      if (sunMin >= 40) {
+        icon = '☀️';
+        label = 'Sonnig';
+      } else if (sunMin >= 20) {
+        icon = '🌤️';
+        label = 'Überwiegend sonnig';
+      } else if (sunMin >= 8) {
+        icon = '⛅';
+        label = 'Teils sonnig';
+      } else {
+        // Unter 8 Min. Sonne
+        const cc = (cloudCover !== null && cloudCover !== undefined)
+          ? cloudCover
+          : (code === 3 ? 90 : (code === 2 ? 60 : (code === 1 ? 30 : 10)));
+        if (cc <= 25) {
+          icon = '☀️';
+          label = 'Sonnig';
+        } else if (cc <= 55) {
+          icon = '🌤️';
+          label = 'Heiter';
+        } else if (cc <= 80) {
+          icon = '⛅';
+          label = 'Wolkig';
+        } else {
+          icon = '☁️';
+          label = 'Bedeckt';
+        }
+      }
+    } else {
+      // Nacht
+      const cc = (cloudCover !== null && cloudCover !== undefined)
+        ? cloudCover
+        : (code === 3 ? 90 : (code === 2 ? 60 : (code === 1 ? 30 : 10)));
+      if (cc <= 30) {
+        icon = '🌙';
+        label = 'Klar';
+      } else if (cc <= 75) {
+        icon = '☁️';
+        label = 'Teils bewölkt';
+      } else {
+        icon = '☁️';
+        label = 'Bedeckt';
+      }
+    }
+  }
+
+  return { icon, label, sunMin, hasPrecip };
+}
+
 export function convertTemp(celsius) {
   if (state.unit === 'fahrenheit') {
     return (celsius * 9/5) + 32;
@@ -642,11 +742,21 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
     const pr1 = (hourly.precipitation && hourly.precipitation[h1] !== undefined) ? hourly.precipitation[h1] : pr0;
     const precip = Math.round((pr0 * (1 - frac) + pr1 * frac) * 10) / 10;
 
+    const s0 = (hourly.sunshine_duration && hourly.sunshine_duration[h0] !== undefined) ? hourly.sunshine_duration[h0] : 0;
+    const s1 = (hourly.sunshine_duration && hourly.sunshine_duration[h1] !== undefined) ? hourly.sunshine_duration[h1] : s0;
+    const sunSec = Math.round(s0 * (1 - frac) + s1 * frac);
+
+    const cc0 = (hourly.cloud_cover && hourly.cloud_cover[h0] !== undefined) ? hourly.cloud_cover[h0] : null;
+    const cc1 = (hourly.cloud_cover && hourly.cloud_cover[h1] !== undefined) ? hourly.cloud_cover[h1] : cc0;
+    const cloudCover = (cc0 !== null && cc1 !== null) ? Math.round(cc0 * (1 - frac) + cc1 * frac) : null;
+
     const code = frac < 0.5
       ? (hourly.weather_code ? hourly.weather_code[h0] : 0)
       : (hourly.weather_code ? hourly.weather_code[h1] : 0);
 
-    const isDay = targetDate.getHours() >= 6 && targetDate.getHours() <= 20;
+    const isDay = (hourly.is_day && hourly.is_day[h0] !== undefined)
+      ? hourly.is_day[h0] === 1
+      : (targetDate.getHours() >= 6 && targetDate.getHours() <= 20);
 
     return {
       timestamp: targetDate,
@@ -655,6 +765,8 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
       pop,
       wind,
       precip,
+      sunSec,
+      cloudCover,
       code,
       isDay
     };
@@ -668,8 +780,18 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
     const pop = (hourly.precipitation_probability && hourly.precipitation_probability[currentClosestIdx] !== undefined) ? hourly.precipitation_probability[currentClosestIdx] : 0;
     const wind = cur.wind_speed_10m !== undefined ? Math.round(cur.wind_speed_10m) : 10;
     const precip = cur.precipitation !== undefined ? cur.precipitation : 0;
+    const s0 = (hourly.sunshine_duration && hourly.sunshine_duration[prevHourIdx] !== undefined) ? hourly.sunshine_duration[prevHourIdx] : 0;
+    const s1 = (hourly.sunshine_duration && hourly.sunshine_duration[currentClosestIdx] !== undefined) ? hourly.sunshine_duration[currentClosestIdx] : s0;
+    const sunSec = Math.round(s0 * (1 - frac) + s1 * frac);
+
+    const cc0 = (hourly.cloud_cover && hourly.cloud_cover[prevHourIdx] !== undefined) ? hourly.cloud_cover[prevHourIdx] : null;
+    const cc1 = (hourly.cloud_cover && hourly.cloud_cover[currentClosestIdx] !== undefined) ? hourly.cloud_cover[currentClosestIdx] : cc0;
+    const cloudCover = (cc0 !== null && cc1 !== null) ? Math.round(cc0 * (1 - frac) + cc1 * frac) : null;
+
     const code = cur.weather_code !== undefined ? cur.weather_code : 0;
-    const isDay = targetDate.getHours() >= 6 && targetDate.getHours() <= 20;
+    const isDay = (hourly.is_day && hourly.is_day[currentClosestIdx] !== undefined)
+      ? hourly.is_day[currentClosestIdx] === 1
+      : (targetDate.getHours() >= 6 && targetDate.getHours() <= 20);
 
     return {
       timestamp: targetDate,
@@ -678,6 +800,8 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
       pop,
       wind,
       precip,
+      sunSec,
+      cloudCover,
       code,
       isDay
     };
@@ -686,8 +810,12 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
     const pop = hourly.precipitation_probability ? hourly.precipitation_probability[currentClosestIdx] : 0;
     const wind = cur.wind_speed_10m !== undefined ? Math.round(cur.wind_speed_10m) : 10;
     const precip = cur.precipitation !== undefined ? cur.precipitation : 0;
+    const sunSec = (hourly.sunshine_duration && hourly.sunshine_duration[currentClosestIdx] !== undefined) ? hourly.sunshine_duration[currentClosestIdx] : 0;
+    const cloudCover = (hourly.cloud_cover && hourly.cloud_cover[currentClosestIdx] !== undefined) ? hourly.cloud_cover[currentClosestIdx] : null;
     const code = cur.weather_code !== undefined ? cur.weather_code : 0;
-    const isDay = targetDate.getHours() >= 6 && targetDate.getHours() <= 20;
+    const isDay = (hourly.is_day && hourly.is_day[currentClosestIdx] !== undefined)
+      ? hourly.is_day[currentClosestIdx] === 1
+      : (targetDate.getHours() >= 6 && targetDate.getHours() <= 20);
 
     return {
       timestamp: targetDate,
@@ -696,6 +824,8 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
       pop,
       wind,
       precip,
+      sunSec,
+      cloudCover,
       code,
       isDay,
       isNow: true
@@ -705,11 +835,18 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
 
 function createHourlyItemElement(pt, label, tag, typeClass) {
   const item = document.createElement('div');
-  item.className = `hourly-item ${typeClass}`;
+  item.className = `hourly-item ${typeClass || ''}`;
   
   const temp = Math.round(convertTemp(pt.temp));
-  const info = WMO_CODES[pt.code] || WMO_CODES[0];
-  const icon = pt.isDay ? info.icon : info.iconNight;
+  const harm = getHarmonizedHourlyCondition({
+    code: pt.code,
+    sunSec: pt.sunSec,
+    precip: pt.precip,
+    pop: pt.pop,
+    cloudCover: pt.cloudCover,
+    isDay: pt.isDay,
+    temp: pt.temp
+  });
   const timeClock = pt.timestamp ? `${String(pt.timestamp.getHours()).padStart(2, '0')}:${String(pt.timestamp.getMinutes()).padStart(2, '0')}` : '';
 
   let tagHtml = '';
@@ -719,9 +856,14 @@ function createHourlyItemElement(pt, label, tag, typeClass) {
     tagHtml = `<span class="hourly-sub-tag tag-15m" title="15-Minuten Intervall">15m</span>`;
   }
 
-  const precipText = (pt.precip && pt.precip > 0.05)
-    ? `<span style="font-size:9px; color:#38bdf8;">💧 ${pt.precip.toFixed(1)}</span>`
-    : (pt.pop > 10 ? `${pt.pop}%` : '');
+  let metricText = '';
+  if (pt.precip && pt.precip > 0.05) {
+    metricText = `<span style="font-size:9px; color:#38bdf8; font-weight:700;">💧 ${pt.precip.toFixed(1)}</span>`;
+  } else if (pt.pop > 15) {
+    metricText = `<span style="font-size:9px; color:var(--ios-cyan);">${pt.pop}%</span>`;
+  } else if (harm.sunMin >= 15 && pt.isDay) {
+    metricText = `<span style="font-size:9px; color:#fbbf24; font-weight:700;">☀️ ${harm.sunMin}m</span>`;
+  }
 
   item.innerHTML = `
     ${tagHtml}
@@ -729,10 +871,10 @@ function createHourlyItemElement(pt, label, tag, typeClass) {
       <span class="ht-label">${label}</span>
       ${timeClock ? `<small class="ht-clock">${timeClock}</small>` : ''}
     </div>
-    <div class="hourly-icon">${icon}</div>
-    <div class="hourly-pop">${precipText}</div>
+    <div class="hourly-icon">${harm.icon}</div>
+    <div class="hourly-pop">${metricText}</div>
     <div class="hourly-temp">${temp}°</div>
-    <div class="hourly-wind">💨 ${pt.wind}</div>
+    <div class="hourly-wind">💨 ${pt.wind} <small>km/h</small></div>
   `;
   return item;
 }
@@ -794,23 +936,34 @@ export function renderHourlySlider(hourly) {
       const t = new Date(hourly.time[idx]);
       const label = `${String(t.getHours()).padStart(2, '0')}:00`;
       const temp = Math.round(convertTemp(hourly.temperature_2m[idx]));
-      const pop = hourly.precipitation_probability ? hourly.precipitation_probability[idx] : 0;
+      const pop = hourly.precipitation_probability ? (hourly.precipitation_probability[idx] || 0) : 0;
+      const precip = hourly.precipitation ? (hourly.precipitation[idx] || 0) : 0;
+      const sunSec = hourly.sunshine_duration ? (hourly.sunshine_duration[idx] || 0) : 0;
+      const cloudCover = hourly.cloud_cover ? hourly.cloud_cover[idx] : null;
       const code = hourly.weather_code ? hourly.weather_code[idx] : 0;
       const isDay = (hourly.is_day && hourly.is_day[idx] !== undefined)
         ? hourly.is_day[idx] === 1
         : (t.getHours() >= 6 && t.getHours() <= 20);
-      const info = WMO_CODES[code] || WMO_CODES[0];
-      const icon = isDay ? info.icon : info.iconNight;
+      const harm = getHarmonizedHourlyCondition({ code, sunSec, precip, pop, cloudCover, isDay, temp: hourly.temperature_2m[idx] });
       const wind = hourly.wind_speed_10m ? Math.round(hourly.wind_speed_10m[idx]) : '--';
+
+      let metricText = '';
+      if (precip > 0.05) {
+        metricText = `<span style="font-size:9px; color:#38bdf8; font-weight:700;">💧 ${precip.toFixed(1)}</span>`;
+      } else if (pop > 15) {
+        metricText = `<span style="font-size:9px; color:var(--ios-cyan);">${pop}%</span>`;
+      } else if (harm.sunMin >= 15 && isDay) {
+        metricText = `<span style="font-size:9px; color:#fbbf24; font-weight:700;">☀️ ${harm.sunMin}m</span>`;
+      }
 
       const item = document.createElement('div');
       item.className = 'hourly-item';
       item.innerHTML = `
         <div class="hourly-time">${label}</div>
-        <div class="hourly-icon">${icon}</div>
-        <div class="hourly-pop">${pop > 10 ? `${pop}%` : ''}</div>
+        <div class="hourly-icon">${harm.icon}</div>
+        <div class="hourly-pop">${metricText}</div>
         <div class="hourly-temp">${temp}°</div>
-        <div class="hourly-wind">💨 ${wind}</div>
+        <div class="hourly-wind">💨 ${wind} <small>km/h</small></div>
       `;
       fragment.appendChild(item);
     }
@@ -824,23 +977,34 @@ export function renderHourlySlider(hourly) {
       const isNow = i === currentClosestIdx;
       const label = isNow ? 'Jetzt' : `${String(t.getHours()).padStart(2, '0')}:00`;
       const temp = Math.round(convertTemp(hourly.temperature_2m[i]));
-      const pop = hourly.precipitation_probability ? hourly.precipitation_probability[i] : 0;
+      const pop = hourly.precipitation_probability ? (hourly.precipitation_probability[i] || 0) : 0;
+      const precip = hourly.precipitation ? (hourly.precipitation[i] || 0) : 0;
+      const sunSec = hourly.sunshine_duration ? (hourly.sunshine_duration[i] || 0) : 0;
+      const cloudCover = hourly.cloud_cover ? hourly.cloud_cover[i] : null;
       const code = hourly.weather_code ? hourly.weather_code[i] : 0;
       const isDay = (hourly.is_day && hourly.is_day[i] !== undefined)
         ? hourly.is_day[i] === 1
         : (t.getHours() >= 6 && t.getHours() <= 20);
-      const info = WMO_CODES[code] || WMO_CODES[0];
-      const icon = isDay ? info.icon : info.iconNight;
+      const harm = getHarmonizedHourlyCondition({ code, sunSec, precip, pop, cloudCover, isDay, temp: hourly.temperature_2m[i] });
       const wind = hourly.wind_speed_10m ? Math.round(hourly.wind_speed_10m[i]) : '--';
+
+      let metricText = '';
+      if (precip > 0.05) {
+        metricText = `<span style="font-size:9px; color:#38bdf8; font-weight:700;">💧 ${precip.toFixed(1)}</span>`;
+      } else if (pop > 15) {
+        metricText = `<span style="font-size:9px; color:var(--ios-cyan);">${pop}%</span>`;
+      } else if (harm.sunMin >= 15 && isDay) {
+        metricText = `<span style="font-size:9px; color:#fbbf24; font-weight:700;">☀️ ${harm.sunMin}m</span>`;
+      }
 
       const item = document.createElement('div');
       item.className = `hourly-item ${isNow ? 'current-now' : ''}`;
       item.innerHTML = `
         <div class="hourly-time">${label}</div>
-        <div class="hourly-icon">${icon}</div>
-        <div class="hourly-pop">${pop > 10 ? `${pop}%` : ''}</div>
+        <div class="hourly-icon">${harm.icon}</div>
+        <div class="hourly-pop">${metricText}</div>
         <div class="hourly-temp">${temp}°</div>
-        <div class="hourly-wind">💨 ${wind}</div>
+        <div class="hourly-wind">💨 ${wind} <small>km/h</small></div>
       `;
       fragment.appendChild(item);
     }
@@ -1390,6 +1554,12 @@ export function render10DayForecast(daily, hourly) {
     const sunriseDec = sunriseDate && !isNaN(sunriseDate.getTime()) ? (sunriseDate.getHours() + sunriseDate.getMinutes() / 60) : 7.25;
     const sunsetDec = sunsetDate && !isNaN(sunsetDate.getTime()) ? (sunsetDate.getHours() + sunsetDate.getMinutes() / 60) : 16.75;
 
+    // Harmonisiere Min/Max-Temperaturen mit den stündlichen Werten (verhindert Widersprüche zwischen Badge und Chart)
+    const minHourlyT = hourlyTemps.length ? Math.min(...hourlyTemps) : convertTemp(minVal);
+    const maxHourlyT = hourlyTemps.length ? Math.max(...hourlyTemps) : convertTemp(maxVal);
+    const harmonizedMin = Math.min(convertTemp(minVal), minHourlyT);
+    const harmonizedMax = Math.max(convertTemp(maxVal), maxHourlyT);
+
     // SVG Chart für den 24h-Tagesüberblick
     const dayChartSvg = renderDayOverviewSVG({
       dayIndex: i,
@@ -1401,8 +1571,8 @@ export function render10DayForecast(daily, hourly) {
       sunsetStr,
       sunriseDec,
       sunsetDec,
-      tMin: convertTemp(minVal),
-      tMax: convertTemp(maxVal)
+      tMin: harmonizedMin,
+      tMax: harmonizedMax
     });
 
     const isExtended = visibleIdx >= 3;
@@ -1432,9 +1602,9 @@ export function render10DayForecast(daily, hourly) {
           <!-- 3. Minimalist Crisp Temperature Min / Max -->
           <div class="daily-temp-cell">
             <span class="daily-temp-badge">
-              <span class="dt-min" title="Tiefsttemperatur">${Math.round(convertTemp(minVal))}°</span>
+              <span class="dt-min" title="Tiefsttemperatur">${Math.round(harmonizedMin)}°</span>
               <span class="dt-sep">/</span>
-              <span class="dt-max" title="Höchsttemperatur">${Math.round(convertTemp(maxVal))}°</span>
+              <span class="dt-max" title="Höchsttemperatur">${Math.round(harmonizedMax)}°</span>
             </span>
           </div>
 
@@ -2166,9 +2336,11 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
   const hoursCloudCover = (hourly && hourly.cloud_cover) ? hourly.cloud_cover.slice(dayStartHourIdx, dayEndHourIdx) : [];
   const hoursFreezingLevel = (hourly && hourly.freezing_level_height) ? hourly.freezing_level_height.slice(dayStartHourIdx, dayEndHourIdx).filter(v => v !== null && !isNaN(v)) : [];
 
-  // Bento Metriken
-  const maxT = Math.round(convertTemp(daily.temperature_2m_max[dayIndex]));
-  const minT = Math.round(convertTemp(daily.temperature_2m_min[dayIndex]));
+  // Bento Metriken — harmonisiert mit stündlichen Extremwerten
+  const minHourlyT = hoursTemp.length ? Math.min(...hoursTemp.map(t => convertTemp(t))) : convertTemp(daily.temperature_2m_min[dayIndex]);
+  const maxHourlyT = hoursTemp.length ? Math.max(...hoursTemp.map(t => convertTemp(t))) : convertTemp(daily.temperature_2m_max[dayIndex]);
+  const maxT = Math.round(Math.max(convertTemp(daily.temperature_2m_max[dayIndex]), maxHourlyT));
+  const minT = Math.round(Math.min(convertTemp(daily.temperature_2m_min[dayIndex]), minHourlyT));
   document.getElementById('modal-max-temp').innerText = `${maxT}°`;
   document.getElementById('modal-min-temp').innerText = `${minT}°`;
 
@@ -2180,8 +2352,45 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
   const rawSum = (daily.precipitation_sum && daily.precipitation_sum[dayIndex] != null) ? Number(daily.precipitation_sum[dayIndex]) : 0;
   const precipSum = rawSum.toFixed(1);
   const precipHours = daily.precipitation_hours ? Math.round(daily.precipitation_hours[dayIndex]) : 0;
+
+  // Präzise zeitliche Einordnung des Niederschlags (beseitigt scheinbare Widersprüche zu Sonnenstunden)
+  let morningRainSum = 0;      // 00:00 - 08:00
+  let middayRainSum = 0;       // 08:00 - 17:00
+  let eveningNightRainSum = 0;  // 17:00 - 24:00
+  let lastMorningRainHour = -1;
+
+  for (let h = 0; h < 24; h++) {
+    const p = hoursPrecip[h] || 0;
+    if (p > 0.05) {
+      if (h < 9) {
+        morningRainSum += p;
+        lastMorningRainHour = Math.max(lastMorningRainHour, h);
+      } else if (h < 18) {
+        middayRainSum += p;
+      } else {
+        eveningNightRainSum += p;
+      }
+    }
+  }
+
+  let rainTimingDesc = '';
+  if (rawSum > 0.05) {
+    if (morningRainSum > 0.75 * rawSum && middayRainSum <= 0.2) {
+      const endH = lastMorningRainHour >= 0 ? `${String(lastMorningRainHour + 1).padStart(2, '0')}:00` : '08:00';
+      rainTimingDesc = `Frühregen (bis ~${endH} Uhr)`;
+    } else if (eveningNightRainSum > 0.75 * rawSum && middayRainSum <= 0.2) {
+      rainTimingDesc = 'Später Abend / Nachtregen';
+    } else if (middayRainSum > 0.5 * rawSum) {
+      rainTimingDesc = 'Tagsüber Schauer / Regen';
+    } else {
+      rainTimingDesc = precipHours > 0 ? `~${precipHours} h Dauer` : 'Gelegentliche Schauer';
+    }
+  } else {
+    rainTimingDesc = 'Trocken';
+  }
+
   document.getElementById('modal-pop').innerText = `${popMax}%`;
-  document.getElementById('modal-precip-sum').innerText = `Menge: ${precipSum} mm ${precipHours > 0 ? `• ~${precipHours} h Dauer` : '• Trocken'}`;
+  document.getElementById('modal-precip-sum').innerText = `Menge: ${precipSum} mm • ${rainTimingDesc}`;
 
   const windSpdMax = Math.round(daily.wind_speed_10m_max ? daily.wind_speed_10m_max[dayIndex] : (hoursWind.length ? Math.max(...hoursWind) : 0));
   const windGustMax = Math.round(daily.wind_gusts_10m_max ? daily.wind_gusts_10m_max[dayIndex] : (hoursGusts.length ? Math.max(...hoursGusts) : 0));
@@ -2196,8 +2405,13 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
       modalSunSumSec += hourly.sunshine_duration[hIdx];
     }
   }
+  const daylightSec = (daily.daylight_duration && daily.daylight_duration[dayIndex] !== undefined)
+    ? daily.daylight_duration[dayIndex]
+    : 0;
+  const sunDurSec = Math.max(modalSunSumSec, daily.sunshine_duration ? (daily.sunshine_duration[dayIndex] || 0) : 0);
+  const sunQuotaPct = daylightSec > 0 ? Math.min(100, Math.round((sunDurSec / daylightSec) * 100)) : 0;
+
   if (modalSunSumSec > 0 || (daily.sunshine_duration && daily.sunshine_duration[dayIndex] !== undefined)) {
-    const sunDurSec = Math.max(modalSunSumSec, daily.sunshine_duration ? (daily.sunshine_duration[dayIndex] || 0) : 0);
     const sunHours = (sunDurSec / 3600).toFixed(1).replace('.', ',');
     document.getElementById('modal-sunshine-dur').innerText = `${sunHours} h`;
   } else {
@@ -2205,11 +2419,10 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
     document.getElementById('modal-sunshine-dur').innerText = wCode <= 1 ? '~8 h' : (wCode <= 3 ? '~4 h' : '< 1 h');
   }
 
-  if (daily.daylight_duration && daily.daylight_duration[dayIndex] !== undefined) {
-    const durSec = daily.daylight_duration[dayIndex];
-    const dlH = Math.floor(durSec / 3600);
-    const dlM = Math.round((durSec % 3600) / 60);
-    document.getElementById('modal-daylight-dur').innerText = `Tageslänge: ${dlH} h ${dlM} min`;
+  if (daylightSec > 0) {
+    const dlH = Math.floor(daylightSec / 3600);
+    const dlM = Math.round((daylightSec % 3600) / 60);
+    document.getElementById('modal-daylight-dur').innerText = `Tageslänge: ${dlH} h ${dlM} min (${sunQuotaPct}% Sonne)`;
     document.getElementById('modal-daylight-hours').innerText = `${dlH} h ${dlM} m`;
   } else {
     document.getElementById('modal-daylight-dur').innerText = 'Tageslänge: ~11 h';
@@ -2239,91 +2452,171 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
     document.getElementById('modal-dew-point').innerText = 'Taupunkt: 7°C';
   }
 
+  // Astronomische Zeiten für Tag/Nacht-Erkennung
+  const sunriseDate = daily.sunrise && daily.sunrise[dayIndex] ? new Date(daily.sunrise[dayIndex]) : null;
+  const sunsetDate = daily.sunset && daily.sunset[dayIndex] ? new Date(daily.sunset[dayIndex]) : null;
+  const sunriseDec = sunriseDate && !isNaN(sunriseDate.getTime()) ? (sunriseDate.getHours() + sunriseDate.getMinutes() / 60) : 7.25;
+  const sunsetDec = sunsetDate && !isNaN(sunsetDate.getTime()) ? (sunsetDate.getHours() + sunsetDate.getMinutes() / 60) : 16.75;
+
   // 3. Stündlicher 24-Stunden-Verlauf für DIESEN Tag
   const hourlyContainer = document.getElementById('modal-day-hourly-list');
   hourlyContainer.innerHTML = '';
 
   for (let h = 0; h < 24; h++) {
-    const idx = dayStartHourIdx + h;
     const timeLabel = `${String(h).padStart(2, '0')}:00`;
     const hCode = hoursCode[h] !== undefined ? hoursCode[h] : 0;
-    const isDay = (h >= 7 && h <= 19);
-    const hInfo = WMO_CODES[hCode] || WMO_CODES[0];
-    const hIcon = (!isDay && (hCode === 0 || hCode === 1)) ? '🌙' : hInfo.icon;
+    const hSunSec = (hourly && hourly.sunshine_duration) ? (hourly.sunshine_duration[dayStartHourIdx + h] || 0) : 0;
+    const hCloud = (hourly && hourly.cloud_cover) ? (hourly.cloud_cover[dayStartHourIdx + h] ?? null) : null;
+    const hPrecip = hoursPrecip[h] !== undefined ? hoursPrecip[h] : 0;
+    const hPop = hoursPop[h] !== undefined ? hoursPop[h] : 0;
+    const rawTempC = hoursTemp[h] !== undefined ? hoursTemp[h] : 10;
+    const isDay = (h >= Math.floor(sunriseDec) && h < Math.ceil(sunsetDec));
+
+    const harm = getHarmonizedHourlyCondition({
+      code: hCode,
+      sunSec: hSunSec,
+      precip: hPrecip,
+      pop: hPop,
+      cloudCover: hCloud,
+      isDay,
+      temp: rawTempC
+    });
+
     const hTemp = hoursTemp[h] !== undefined ? Math.round(convertTemp(hoursTemp[h])) : '--';
     const hApp = hoursApparent[h] !== undefined ? Math.round(convertTemp(hoursApparent[h])) : hTemp;
-    const hPop = hoursPop[h] !== undefined ? hoursPop[h] : 0;
-    const hPrecip = hoursPrecip[h] !== undefined ? hoursPrecip[h] : 0;
     const hWind = hoursWind[h] !== undefined ? Math.round(hoursWind[h]) : 0;
     const hGust = hoursGusts[h] !== undefined ? Math.round(hoursGusts[h]) : hWind;
 
+    let cardExtraClass = '';
+    let metricSpan = '';
+
+    if (harm.hasPrecip) {
+      cardExtraClass = 'is-rain-card';
+      const pDisplay = hPrecip >= 0.1 ? `${hPrecip.toFixed(1)} mm` : `${hPop}%`;
+      metricSpan = `<span class="mhi-pop is-rain">💧 ${pDisplay}</span>`;
+    } else if (isDay && harm.sunMin >= 15) {
+      cardExtraClass = 'is-sunny-card';
+      metricSpan = `<span class="mhi-sun">☀️ ${harm.sunMin}m</span>`;
+    } else if (hPop >= 15) {
+      metricSpan = `<span class="mhi-pop-dim">💧 ${hPop}%</span>`;
+    } else {
+      metricSpan = `<span class="mhi-dry">Trocken</span>`;
+    }
+
+    const windDisplay = (hGust >= hWind + 6)
+      ? `💨 ${hWind} <small>(${hGust})</small>`
+      : `💨 ${hWind} <small>km/h</small>`;
+
     const item = document.createElement('div');
-    item.className = 'modal-hourly-item';
+    item.className = `modal-hourly-item ${cardExtraClass}`.trim();
     item.innerHTML = `
       <span class="mhi-time">${timeLabel}</span>
-      <span class="mhi-icon">${hIcon}</span>
+      <span class="mhi-icon">${harm.icon}</span>
       <span class="mhi-temp">${hTemp}°</span>
-      <span class="mhi-apparent" style="font-size: 10px; color: var(--text-tertiary);">${hApp}° gef.</span>
-      <span class="mhi-pop">${hPop > 5 || hPrecip > 0 ? `💧 ${hPop}%` : '<span style="color:rgba(255,255,255,0.25);">—</span>'}</span>
-      <span class="mhi-wind">💨 ${hWind} <small>(${hGust})</small></span>
+      <span class="mhi-apparent">${hApp}° gef.</span>
+      ${metricSpan}
+      <span class="mhi-wind">${windDisplay}</span>
     `;
     hourlyContainer.appendChild(item);
   }
 
-  // 4. Vier ausführliche Tagesabschnitte
+  // 4. Vier ausführliche Tagesabschnitte mit echter Aggregation der 5-6 Stundenblöcke
   const partsContainer = document.getElementById('modal-day-parts');
   partsContainer.innerHTML = '';
 
   const dayParts = [
-    { name: 'Morgens', timeRange: '06:00 – 11:00', hourOffset: 8, icon: '🌅' },
-    { name: 'Mittags', timeRange: '11:00 – 16:00', hourOffset: 13, icon: '☀️' },
-    { name: 'Abends', timeRange: '16:00 – 21:00', hourOffset: 18, icon: '🌇' },
-    { name: 'Nachts', timeRange: '21:00 – 06:00', hourOffset: 23, icon: '🌙' }
+    { name: 'Morgens', timeRange: '06:00 – 11:00', startH: 6, endH: 11, defaultIcon: '🌅' },
+    { name: 'Mittags', timeRange: '11:00 – 16:00', startH: 11, endH: 16, defaultIcon: '☀️' },
+    { name: 'Abends', timeRange: '16:00 – 21:00', startH: 16, endH: 21, defaultIcon: '🌇' },
+    { name: 'Nachts', timeRange: '21:00 – 06:00', startH: 21, endH: 24, defaultIcon: '🌙' }
   ];
 
   for (const part of dayParts) {
-    const pIdx = dayStartHourIdx + part.hourOffset;
-    const pCode = (hourly && hourly.weather_code && hourly.weather_code[pIdx] !== undefined)
-      ? hourly.weather_code[pIdx]
-      : (daily.weather_code && daily.weather_code[dayIndex] !== undefined ? daily.weather_code[dayIndex] : 0);
-    const pInfo = WMO_CODES[pCode] || WMO_CODES[0];
-    const pTemp = (hourly && hourly.temperature_2m && hourly.temperature_2m[pIdx] !== undefined)
-      ? Math.round(convertTemp(hourly.temperature_2m[pIdx]))
-      : (part.hourOffset === 13 ? maxT : (part.hourOffset === 23 ? minT : Math.round((maxT + minT) / 2)));
-    const pApp = (hourly && hourly.apparent_temperature && hourly.apparent_temperature[pIdx] !== undefined)
-      ? Math.round(convertTemp(hourly.apparent_temperature[pIdx]))
-      : pTemp;
-    const pPop = (hourly && hourly.precipitation_probability && hourly.precipitation_probability[pIdx] !== undefined)
-      ? hourly.precipitation_probability[pIdx]
-      : popMax;
-    const pPrecip = (hourly && hourly.precipitation && hourly.precipitation[pIdx] !== undefined)
-      ? hourly.precipitation[pIdx].toFixed(1)
-      : '0.0';
-    const pWind = (hourly && hourly.wind_speed_10m && hourly.wind_speed_10m[pIdx] !== undefined)
-      ? Math.round(hourly.wind_speed_10m[pIdx])
-      : windSpdMax;
-    const pGust = (hourly && hourly.wind_gusts_10m && hourly.wind_gusts_10m[pIdx] !== undefined)
-      ? Math.round(hourly.wind_gusts_10m[pIdx])
-      : windGustMax;
-    const pRH = (hourly && hourly.relative_humidity_2m && hourly.relative_humidity_2m[pIdx] !== undefined)
-      ? Math.round(hourly.relative_humidity_2m[pIdx])
-      : 70;
-    const pDP = (hourly && hourly.dew_point_2m && hourly.dew_point_2m[pIdx] !== undefined)
-      ? Math.round(convertTemp(hourly.dew_point_2m[pIdx]))
-      : 8;
+    const partTemps = [];
+    const partApparent = [];
+    const partPop = [];
+    let partPrecipSum = 0;
+    let partSunSec = 0;
+    const partWinds = [];
+    const partGusts = [];
+    const partRH = [];
+    const partDP = [];
+
+    for (let h = part.startH; h < part.endH; h++) {
+      if (hoursTemp[h] !== undefined) partTemps.push(hoursTemp[h]);
+      if (hoursApparent[h] !== undefined) partApparent.push(hoursApparent[h]);
+      if (hoursPop[h] !== undefined) partPop.push(hoursPop[h]);
+      if (hoursPrecip[h] !== undefined) partPrecipSum += hoursPrecip[h];
+      const hSun = (hourly && hourly.sunshine_duration) ? (hourly.sunshine_duration[dayStartHourIdx + h] || 0) : 0;
+      partSunSec += hSun;
+      if (hoursWind[h] !== undefined) partWinds.push(hoursWind[h]);
+      if (hoursGusts[h] !== undefined) partGusts.push(hoursGusts[h]);
+      if (hoursHumidity[h] !== undefined) partRH.push(hoursHumidity[h]);
+      if (hoursDewPoint[h] !== undefined) partDP.push(hoursDewPoint[h]);
+    }
+
+    const avgT = partTemps.length ? Math.round(convertTemp(partTemps.reduce((a, b) => a + b, 0) / partTemps.length)) : 10;
+    const avgApp = partApparent.length ? Math.round(convertTemp(partApparent.reduce((a, b) => a + b, 0) / partApparent.length)) : avgT;
+    const maxPop = partPop.length ? Math.max(...partPop) : 0;
+    const maxWind = partWinds.length ? Math.round(Math.max(...partWinds)) : 10;
+    const maxGust = partGusts.length ? Math.round(Math.max(...partGusts)) : maxWind;
+    const avgRH = partRH.length ? Math.round(partRH.reduce((a, b) => a + b, 0) / partRH.length) : 70;
+    const avgDP = partDP.length ? Math.round(convertTemp(partDP.reduce((a, b) => a + b, 0) / partDP.length)) : 5;
+
+    const sunHoursPart = (partSunSec / 3600);
+    const hasPartRain = (partPrecipSum >= 0.2) || (maxPop >= 60 && partPrecipSum > 0.05);
+
+    let partIcon = part.defaultIcon;
+    let partLabel = 'Heiter';
+
+    if (hasPartRain) {
+      if (sunHoursPart >= 1.0) {
+        partIcon = '🌦️';
+        partLabel = 'Sonne & Schauer';
+      } else if (partPrecipSum >= 2.0) {
+        partIcon = '🌧️';
+        partLabel = 'Dauerregen';
+      } else {
+        partIcon = '🌧️';
+        partLabel = 'Regnerisch';
+      }
+    } else {
+      if (sunHoursPart >= 2.5) {
+        partIcon = '☀️';
+        partLabel = 'Sonnig';
+      } else if (sunHoursPart >= 1.0) {
+        partIcon = '🌤️';
+        partLabel = 'Überwiegend sonnig';
+      } else if (sunHoursPart >= 0.3) {
+        partIcon = '⛅';
+        partLabel = 'Teils sonnig';
+      } else {
+        partIcon = part.name === 'Nachts' ? '🌙' : '☁️';
+        partLabel = part.name === 'Nachts' ? 'Klar' : 'Bedeckt';
+      }
+    }
+
+    let rainHtml = '';
+    if (partPrecipSum > 0.05) {
+      rainHtml = `💧 ${maxPop}% (${partPrecipSum.toFixed(1)} mm)`;
+    } else if (sunHoursPart >= 0.5) {
+      rainHtml = `☀️ ${sunHoursPart.toFixed(1).replace('.', ',')} h Sonne`;
+    } else {
+      rainHtml = '💧 Trocken (0%)';
+    }
 
     const box = document.createElement('div');
     box.className = 'day-part-box';
     box.innerHTML = `
       <div class="dp-name">${part.name}</div>
       <div style="font-size: 10px; color: var(--text-tertiary);">${part.timeRange}</div>
-      <div class="dp-icon">${pInfo.icon}</div>
-      <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">${pInfo.label}</div>
-      <div class="dp-temp">${pTemp}°C</div>
-      <div class="dp-apparent">Gefühlt ${pApp}°C</div>
-      <div class="dp-rain" style="margin-top: 4px;">${pPop > 10 || parseFloat(pPrecip) > 0 ? `💧 ${pPop}% (${pPrecip} mm)` : '💧 Trocken (0%)'}</div>
-      <div class="dp-wind">💨 ${pWind} km/h • Böen ${pGust}</div>
-      <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">💧 ${pRH}% • TP ${pDP}°C</div>
+      <div class="dp-icon">${partIcon}</div>
+      <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">${partLabel}</div>
+      <div class="dp-temp">${avgT}°C</div>
+      <div class="dp-apparent">Gefühlt ${avgApp}°C</div>
+      <div class="dp-rain" style="margin-top: 4px;">${rainHtml}</div>
+      <div class="dp-wind">💨 ${maxWind} km/h • Böen ${maxGust}</div>
+      <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">💧 ${avgRH}% • TP ${avgDP}°C</div>
     `;
     partsContainer.appendChild(box);
   }
@@ -2380,9 +2673,6 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
   }
 
   // 6. Astronomie & Mond
-  const sunriseDate = daily.sunrise && daily.sunrise[dayIndex] ? new Date(daily.sunrise[dayIndex]) : null;
-  const sunsetDate = daily.sunset && daily.sunset[dayIndex] ? new Date(daily.sunset[dayIndex]) : null;
-
   if (sunriseDate) {
     document.getElementById('modal-sunrise').innerText = sunriseDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     const dawn = new Date(sunriseDate.getTime() - 32 * 60 * 1000);

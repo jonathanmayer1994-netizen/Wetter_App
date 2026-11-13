@@ -23,7 +23,7 @@ import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/netwo
 import { ActualEngine } from './core/actualEngine.js';
 import { renderVerificationDashboard, setupVerificationUI, initVerificationHandlers } from './features/verificationUI.js';
 import { initBentoSheets } from './features/bentoSheets.js';
-import { initPullToRefresh } from './features/pullToRefresh.js?v=2.9.4';
+import { initPullToRefresh } from './features/pullToRefresh.js?v=2.9.5';
 import { GoogleSheetsSync } from './core/googleSheetsSync.js';
 import { AlpineStorage } from './storage.js';
 
