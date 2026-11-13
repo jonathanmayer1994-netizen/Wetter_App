@@ -5241,7 +5241,7 @@ export const MicroEngine = {
    * STUFE 11: 48-Stunden-Zukunfts-Radar & Niederschlags-Prognose (DWD ICON & ECMWF)
    * Lädt stündliche hochauflösende Niederschlags-, Phasen-, Feuchtkugel- und Nullgrad-Felder (bis zu +48h)
    */
-  async fetch48hRadarForecast(stations, fallbackWeather = null) {
+  async fetch48hRadarForecast(stations, fallbackWeather = null, forceRefresh = false) {
     if (!stations || stations.length === 0) return null;
 
     const CACHE_TTL = 45 * 60 * 1000; // 45 Minuten TTL in L1 + kompaktem L2 localStorage
@@ -5257,6 +5257,7 @@ export const MicroEngine = {
         persist: true,
         staleTtlMs: 24 * 60 * 60 * 1000,
         allowStaleOnError: true,
+        forceRefresh: !!forceRefresh,
         timeoutMs: 12000,
         transformResponse: (rawData) => this._compactRadarBatchResponse(rawData)
       });

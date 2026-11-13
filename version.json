@@ -1,5 +1,5 @@
 {
-  "version": "2.25.3",
-  "build": "20261112-2140",
-  "notes": "Remove map black shortcut bar, crisp blur-free top headers across all tabs, stepless smooth radar timeline & transitions"
+  "version": "2.25.4",
+  "build": "20261113-0745",
+  "notes": "Fix sticky info button state and guarantee real-time live radar updates on map open and tab resume"
 }

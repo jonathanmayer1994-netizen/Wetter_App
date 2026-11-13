@@ -15,7 +15,7 @@ import { getLocalDateKey } from './httpClient.js';
 // Domain Feature Modules (Task 1a)
 import { setupLocationTypeToggle, updateLocationHeaderUI, updateAlpineSkyIllumination, renderOverviewTab, setupExpertModeToggle, renderMultiModelComparison, renderAirQualityAndUV, setupMeteogramControls, openDayDetailModal, convertTemp, setupHourlyGranularityToggle, getTodayDailyIndex } from './features/overview.js';
 import { setupWallSelector, setupAltitudeSlider, setupMountainControls, setupMountain3DControls, setupWebcamModal, renderAdaptiveTab2 } from './features/mountain.js';
-import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard, updateWeatherOverlay, enterMobileMapFullscreen, exitMobileMapFullscreen } from './features/map.js';
+import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard, updateWeatherOverlay, enterMobileMapFullscreen, exitMobileMapFullscreen, ensureFreshMapRadar } from './features/map.js';
 import { setupGPXInspector, setupSportsTab, initSportsTour } from './features/sports.js';
 import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers, triggerExactGps } from './features/search.js';
 import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandlers } from './features/favorites.js';
@@ -23,7 +23,7 @@ import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/netwo
 import { ActualEngine } from './core/actualEngine.js';
 import { renderVerificationDashboard, setupVerificationUI, initVerificationHandlers } from './features/verificationUI.js';
 import { initBentoSheets } from './features/bentoSheets.js';
-import { initPullToRefresh } from './features/pullToRefresh.js?v=2.9.3';
+import { initPullToRefresh } from './features/pullToRefresh.js?v=2.9.4';
 import { GoogleSheetsSync } from './core/googleSheetsSync.js';
 import { AlpineStorage } from './storage.js';
 
@@ -98,6 +98,7 @@ export function switchTab(tabId) {
     if (isMobile) {
       enterMobileMapFullscreen();
     }
+    ensureFreshMapRadar();
     setTimeout(() => {
       if (state.map.instance) {
         state.map.instance.invalidateSize();
@@ -143,15 +144,24 @@ export function setupTabs() {
     } else {
       if (state.canvasEngine) state.canvasEngine.resume();
       checkFreshnessAndRollover('visibility');
+      if (state.activeTab === 'tab-map' || document.body.classList.contains('mobile-map-fullscreen-active')) {
+        ensureFreshMapRadar();
+      }
     }
   });
 
   window.addEventListener('pageshow', () => {
     checkFreshnessAndRollover('pageshow');
+    if (state.activeTab === 'tab-map' || document.body.classList.contains('mobile-map-fullscreen-active')) {
+      ensureFreshMapRadar();
+    }
   });
 
   window.addEventListener('focus', () => {
     checkFreshnessAndRollover('focus');
+    if (state.activeTab === 'tab-map' || document.body.classList.contains('mobile-map-fullscreen-active')) {
+      ensureFreshMapRadar();
+    }
   });
 
   window.addEventListener('online', () => {
@@ -199,6 +209,7 @@ export function checkFreshnessAndRollover(reason = 'resume') {
   // Bei Tageswechsel sofort ein Live-Refresh anstoßen (ohne 30-Min-Cache; bei Open-Meteo 429 greift BrightSky/MET Fallback)
   // solange das geladene Modell noch von gestern/früher stammt (4s Entprellung gegen Event-Stürme)
   if (isDateRolledOver) {
+    ensureFreshMapRadar(true);
     if ((now - lastAutoRolloverAttemptAt) >= 4000) {
       lastAutoRolloverAttemptAt = now;
       lastAutoFreshnessCheckAt = now;
@@ -233,6 +244,9 @@ export async function loadLocation(loc, options = {}) {
   updateGeoRoutingNetworks();
   renderAdaptiveTab2();
   updateMapLocation();
+  if (state.activeTab === 'tab-map' || forceRefresh) {
+    ensureFreshMapRadar(forceRefresh);
+  }
 
   // Bricht laufende Vorhersage-Anfragen des vorherigen Standorts zuverlässig ab
   if (activeLocationAbortController) {

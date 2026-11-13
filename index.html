@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.9.3">
+  <link rel="stylesheet" href="style.css?v=2.9.4">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -1840,6 +1840,7 @@
 
             <!-- Precipitation & Weather Color Legend (Toggleable via ⓘ on Mobile, visible on Desktop) -->
             <div class="map-legend-card" id="map-legend-card">
+              <button type="button" class="map-legend-close-btn" id="map-legend-close-btn" aria-label="Legende schließen" title="Legende schließen">✕</button>
               <div class="legend-title" id="map-legend-title">Niederschlagsintensität &amp; Typ:</div>
               <div class="legend-gradient-bar" id="map-legend-bar"></div>
               <div class="legend-scale-labels" id="map-legend-labels">
@@ -3030,11 +3031,11 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.9.3"></script>
+  <script type="module" src="app.js?v=2.9.4"></script>
 
   <!-- Autonome iOS-PWA & Service-Worker Update-Engine -->
   <script type="module">
-    import { initAppUpdater } from './core/appUpdater.js?v=2.9.3';
+    import { initAppUpdater } from './core/appUpdater.js?v=2.9.4';
     initAppUpdater();
   </script>
 </body>

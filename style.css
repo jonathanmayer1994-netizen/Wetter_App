@@ -5369,13 +5369,31 @@ body {
   justify-content: center;
   cursor: pointer;
   transition: all 0.18s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.ms-info-btn:hover,
+@media (hover: hover) and (pointer: fine) {
+  .ms-info-btn:hover {
+    background: rgba(56, 189, 248, 0.28);
+    border-color: #7dd3fc;
+    color: #ffffff;
+  }
+}
+
 .ms-info-btn.is-active {
-  background: rgba(56, 189, 248, 0.28);
-  border-color: #7dd3fc;
-  color: #ffffff;
+  background: rgba(56, 189, 248, 0.28) !important;
+  border-color: #7dd3fc !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+}
+
+.ms-info-btn:not(.is-active) {
+  background: #1d2432 !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .ms-map-attribution {
@@ -5854,6 +5872,36 @@ body {
   font-size: 10px;
   font-weight: 700;
   color: var(--text-secondary);
+  padding-right: 22px;
+}
+
+.map-legend-close-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #cbd5e1;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.18s ease;
+  z-index: 2;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.map-legend-close-btn:hover,
+.map-legend-close-btn:active {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #ffffff;
 }
 
 .legend-gradient-bar {
@@ -8943,6 +8991,14 @@ body {
     color: #ffffff;
   }
 
+  .ms-info-btn:not(.is-active) {
+    background: #1d2432 !important;
+    border-color: rgba(255, 255, 255, 0.26) !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
   .ms-map-attribution,
   .ms-radar-watermark {
     position: absolute !important;
@@ -9333,6 +9389,15 @@ body {
   .legend-title {
     font-size: 9.5px;
     font-weight: 700;
+    padding-right: 28px;
+  }
+
+  .map-legend-close-btn {
+    top: 8px !important;
+    right: 8px !important;
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 13px !important;
   }
 
   /* 5. MeteoSwiss 48h Timeline Dock (Unten verankert — Schlank & Zero-Kollision) */

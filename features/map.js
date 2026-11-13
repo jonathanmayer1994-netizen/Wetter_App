@@ -97,6 +97,9 @@ export function syncMeteoSwissHudControls() {
     legendCard.classList.toggle('ms-legend-force-open', isVis);
     legendBtn.classList.toggle('is-active', isVis);
     legendBtn.setAttribute('aria-pressed', isVis ? 'true' : 'false');
+    if (!isVis && typeof legendBtn.blur === 'function') {
+      legendBtn.blur();
+    }
   }
 }
 
@@ -237,7 +240,17 @@ export function initLeafletMap() {
   const layerCloseBtn = document.getElementById('map-layer-close-btn');
   const layerDoneBtn = document.getElementById('map-layer-done-btn');
 
+  function closeMapLegend() {
+    if (state.map && state.map.legendVisible) {
+      state.map.legendVisible = false;
+      syncMeteoSwissHudControls();
+    }
+    const btn = document.getElementById('map-legend-toggle-btn');
+    if (btn && typeof btn.blur === 'function') btn.blur();
+  }
+
   function openMapLayerDrawer() {
+    closeMapLegend();
     if (layerDrawer) {
       layerDrawer.classList.add('is-open');
       layerDrawer.style.display = 'flex';
@@ -387,11 +400,50 @@ export function initLeafletMap() {
 
   // 13. Info Legend & Right FAB Stack
   const legendToggleBtn = document.getElementById('map-legend-toggle-btn');
+  const legendCloseBtn = document.getElementById('map-legend-close-btn');
+  const legendCard = document.getElementById('map-legend-card');
+
   if (legendToggleBtn) {
     legendToggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      state.map.legendVisible = !state.map.legendVisible;
+      const willBeVisible = !state.map.legendVisible;
+      if (willBeVisible) {
+        closeMapLayerDrawer();
+      }
+      state.map.legendVisible = willBeVisible;
       syncMeteoSwissHudControls();
+      if (!willBeVisible && typeof legendToggleBtn.blur === 'function') {
+        legendToggleBtn.blur();
+      }
+    });
+  }
+
+  if (legendCloseBtn) {
+    legendCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeMapLegend();
+    });
+  }
+
+  if (legendCard) {
+    legendCard.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+
+  // Dismiss legend when clicking/tapping on map or outside
+  document.addEventListener('click', (e) => {
+    if (!state.map?.legendVisible) return;
+    const t = e.target;
+    if (t && (t.closest('#map-legend-card') || t.closest('#map-legend-toggle-btn'))) {
+      return;
+    }
+    closeMapLegend();
+  });
+
+  if (state.map?.instance) {
+    state.map.instance.on('click', () => {
+      closeMapLegend();
     });
   }
 
@@ -1518,11 +1570,9 @@ export async function updateWeatherOverlay() {
   // Konfiguriere Legende je nach gewähltem Wetterfilter
   updateMapLegend(overlay);
 
-  // Lazy-Start der 48h-Radar-Engine & DEM-Topographie sobald Karten-Tab sichtbar ist
+  // Lazy-Start & Frische-Garantie der 48h-Radar-Engine & DEM-Topographie sobald Karten-Tab sichtbar ist
   if (state.activeTab === 'tab-map') {
-    if (!state.map._radarLoaded) {
-      loadUnifiedRadarEngine();
-    }
+    ensureFreshMapRadar();
     if (overlay === 'precip' || overlay === 'rainviewer-radar') {
       ViewportDemStore.scheduleFetchForMap(state.map.instance);
       ViewportForecastGridStore.scheduleFetchForMap(state.map.instance);
@@ -5079,11 +5129,88 @@ export function interpolateStationsForMinute(forecastFrames, minuteOffset, baseL
  * - Stunden 4 bis 48: Stündliche Detailprognose (+4h .. +48h)
  */
 let _radarLoadInFlight = null;
+let _radarFreshnessInterval = null;
+let _lastRadarFreshnessCheckAt = 0;
 
-export async function loadUnifiedRadarEngine() {
-  if (_radarLoadInFlight) return _radarLoadInFlight;
+/**
+ * Richtet die Zeitstempel der existierenden Radar-Frames sofort (0ms) an der aktuellen Wanduhrzeit aus.
+ */
+export function realignRadarTimelineTimestamps(nowMs = Date.now()) {
+  const frames = state.map?.unifiedRadarFrames;
+  if (!frames || !frames.length) return;
+
+  for (let i = 0; i < frames.length; i++) {
+    const f = frames[i];
+    if (f.minuteOffset !== undefined) {
+      f.timestampMs = nowMs + f.minuteOffset * 60000;
+      f.time = Math.floor(f.timestampMs / 1000);
+      const fDate = new Date(f.timestampMs);
+      f.timeStr = fDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+
+  const curIdx = Number.isFinite(state.map.radarFloatIndex)
+    ? state.map.radarFloatIndex
+    : (state.map.liveRadarIndex !== undefined ? state.map.liveRadarIndex : 0);
+
+  showUnifiedRadarFrame(curIdx);
+}
+
+/**
+ * Stellt sicher, dass das Radar immer sekundengenau aktuell ist beim Öffnen der Karte oder Rückkehr aus dem Hintergrund.
+ */
+export async function ensureFreshMapRadar(force = false) {
+  const now = Date.now();
+
+  // Sofortige 0ms-Neuausrichtung der Zeitleiste
+  realignRadarTimelineTimestamps(now);
+
+  const lastLoaded = state.map?._lastRadarEngineLoadedAt || 0;
+  const ageMs = now - lastLoaded;
+
+  let liveDriftMs = 0;
+  if (state.map?.unifiedRadarFrames && state.map?.liveRadarIndex !== undefined) {
+    const liveFrame = state.map.unifiedRadarFrames[state.map.liveRadarIndex];
+    if (liveFrame && liveFrame.timestampMs) {
+      liveDriftMs = Math.abs(now - liveFrame.timestampMs);
+    }
+  }
+
+  const isStale = force || !state.map?._radarLoaded || ageMs >= (2.5 * 60 * 1000) || liveDriftMs >= (2.5 * 60 * 1000);
+
+  if (!isStale) {
+    if (liveDriftMs >= 45 * 1000) {
+      realignRadarTimelineTimestamps(now);
+    }
+    return;
+  }
+
+  if (!force && (now - _lastRadarFreshnessCheckAt) < 15000 && _radarLoadInFlight) {
+    return _radarLoadInFlight;
+  }
+  _lastRadarFreshnessCheckAt = now;
+
+  return loadUnifiedRadarEngine(force);
+}
+
+export async function loadUnifiedRadarEngine(force = false) {
+  if (_radarLoadInFlight && !force) return _radarLoadInFlight;
   _radarLoadInFlight = (async () => {
     try {
+      if (!_radarFreshnessInterval) {
+        _radarFreshnessInterval = setInterval(() => {
+          if (state.activeTab === 'tab-map' && !document.hidden && !state.map?.radarPlaying) {
+            const now = Date.now();
+            const lastLoaded = state.map?._lastRadarEngineLoadedAt || 0;
+            if ((now - lastLoaded) >= 2.5 * 60 * 1000) {
+              ensureFreshMapRadar(true);
+            } else {
+              realignRadarTimelineTimestamps(now);
+            }
+          }
+        }, 60000);
+      }
+
       // Sofortige Baseline-Frames damit Zeitleiste & Windkompass bei Tab-Öffnung 0ms-Latenz haben
       if (!state.map.unifiedRadarFrames || state.map.unifiedRadarFrames.length === 0) {
         const initNow = Date.now();
@@ -5112,12 +5239,15 @@ export async function loadUnifiedRadarEngine() {
           quickSlider.value = livePos;
         }
         showUnifiedRadarFrame(livePos);
+      } else {
+        realignRadarTimelineTimestamps(Date.now());
       }
 
       // 1. RainViewer Doppler-Radar (Vergangenheit bis jetzt, via resilientFetch 5-Min-Cache + Deduplication)
       const rvPromise = resilientFetch('https://api.rainviewer.com/public/weather-maps.json', {
         ttlMs: 5 * 60 * 1000,
-        persist: true
+        persist: true,
+        forceRefresh: !!force
       }).catch(e => {
         console.warn('RainViewer API nicht erreichbar:', e);
         return null;
@@ -5125,7 +5255,7 @@ export async function loadUnifiedRadarEngine() {
 
       // 2. 48h Open-Meteo Niederschlags- & Schneeprognose für 36 alpine Stationen (DWD ICON & ECMWF)
       const forecastPromise = MicroEngine.fetch48hRadarForecast
-        ? MicroEngine.fetch48hRadarForecast(REGIONAL_STATIONS, state.weatherData)
+        ? MicroEngine.fetch48hRadarForecast(REGIONAL_STATIONS, state.weatherData, !!force)
         : MicroEngine.fetch24hRadarForecast(REGIONAL_STATIONS, state.weatherData);
 
       const [rvData, forecastFrames] = await Promise.all([rvPromise, forecastPromise]);
@@ -5268,10 +5398,30 @@ export async function loadUnifiedRadarEngine() {
       });
     }
 
+      const prevLiveIdx = state.map.liveRadarIndex !== undefined ? state.map.liveRadarIndex : liveIdx;
+      const prevFloat = state.map.radarFloatIndex;
+      const wasAtLive = !Number.isFinite(prevFloat) || Math.abs(prevFloat - prevLiveIdx) < 0.4;
+
+      let targetIdx = liveIdx;
+      if (!wasAtLive && Number.isFinite(state.map._currentScrubbedMinuteOffset)) {
+        const prevOffset = state.map._currentScrubbedMinuteOffset;
+        let bestDist = Infinity;
+        let bestMatch = liveIdx;
+        for (let i = 0; i < unifiedFrames.length; i++) {
+          const d = Math.abs(unifiedFrames[i].minuteOffset - prevOffset);
+          if (d < bestDist) {
+            bestDist = d;
+            bestMatch = i;
+          }
+        }
+        targetIdx = bestMatch;
+      }
+
       state.map.unifiedRadarFrames = unifiedFrames;
       state.map.liveRadarIndex = liveIdx;
-      state.map.radarFloatIndex = liveIdx;
+      state.map.radarFloatIndex = targetIdx;
       state.map._radarLoaded = true;
+      state.map._lastRadarEngineLoadedAt = nowMs;
 
       // Konfiguriere Timeline-Slider (stufenlos!)
       const slider = document.getElementById('radar-time-slider');
@@ -5279,11 +5429,11 @@ export async function loadUnifiedRadarEngine() {
         slider.min = 0;
         slider.max = Math.max(0, unifiedFrames.length - 1);
         slider.step = 'any';
-        slider.value = liveIdx;
+        slider.value = targetIdx;
       }
 
-      // Starte standardmäßig auf Live-Scan
-      showUnifiedRadarFrame(liveIdx);
+      // Starte standardmäßig auf Live-Scan (bzw. gemerkter Position)
+      showUnifiedRadarFrame(targetIdx);
 
       // Feature 4A: Preload sichtbare 512px 2/0_1.png Radar-Tiles & DEM-Höhengitter
       preloadRadarFrames(unifiedFrames, state.map.radarHost);
@@ -5574,12 +5724,22 @@ export function setupUnifiedRadarControls() {
       stopRadarAnimation();
       const val = parseFloat(e.target.value);
       if (Number.isFinite(val)) {
+        const frames = state.map?.unifiedRadarFrames;
+        if (frames && frames.length) {
+          const nearest = Math.max(0, Math.min(frames.length - 1, Math.round(val)));
+          state.map._currentScrubbedMinuteOffset = frames[nearest]?.minuteOffset;
+        }
         showUnifiedRadarFrame(val, { isScrubOrPlay: true });
       }
     });
     slider.addEventListener('change', (e) => {
       const val = parseFloat(e.target.value);
       if (Number.isFinite(val)) {
+        const frames = state.map?.unifiedRadarFrames;
+        if (frames && frames.length) {
+          const nearest = Math.max(0, Math.min(frames.length - 1, Math.round(val)));
+          state.map._currentScrubbedMinuteOffset = frames[nearest]?.minuteOffset;
+        }
         showUnifiedRadarFrame(val, { isScrubOrPlay: false });
       }
     });
@@ -5870,4 +6030,6 @@ if (typeof window !== 'undefined') {
   window.showUnifiedRadarFrame = showUnifiedRadarFrame;
   window.getInterpolatedRadarSpec = getInterpolatedRadarSpec;
   window.setMapBaseLayer = setMapBaseLayer;
+  window.ensureFreshMapRadar = ensureFreshMapRadar;
+  window.realignRadarTimelineTimestamps = realignRadarTimelineTimestamps;
 }
