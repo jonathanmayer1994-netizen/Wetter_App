@@ -15,11 +15,18 @@ def run_tests():
             self.send_header('Connection', 'close')
             self.send_header('Cache-Control', 'no-cache')
             super().end_headers()
+        def copyfile(self, source, outputfile):
+            try:
+                super().copyfile(source, outputfile)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
     class TestHTTPServer(http.server.ThreadingHTTPServer):
         request_queue_size = 128
         allow_reuse_address = True
         daemon_threads = True
+        def handle_error(self, request, client_address):
+            pass
 
     httpd = TestHTTPServer(('127.0.0.1', 0), QuietHandler)
     port = httpd.server_address[1]
@@ -255,7 +262,11 @@ def run_tests():
         page = browser.new_page(viewport={"width": 1280, "height": 850})
         page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#hero-location-name", timeout=10000)
-        page.wait_for_timeout(500)
+        try:
+            page.wait_for_function("() => document.getElementById('hero-temp') && document.getElementById('hero-temp').innerText.includes('°')", timeout=5000)
+        except Exception:
+            pass
+        page.wait_for_timeout(300)
         page.wait_for_selector("#hero-hazard-alert", state="attached", timeout=10000)
         
         alert_in_dom = page.query_selector("#hero-hazard-alert") is not None

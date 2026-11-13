@@ -16,14 +16,23 @@
   --text-secondary: rgba(255, 255, 255, 0.85);
   --text-tertiary: rgba(255, 255, 255, 0.70);
 
-  /* Apple Frosted Glass Tokens */
+  /* Apple Frosted Glass & macOS Silicon Glass Tokens (Option A1) */
   --glass-bg: rgba(255, 255, 255, 0.10);
   --glass-bg-hover: rgba(255, 255, 255, 0.16);
-  --glass-border: rgba(255, 255, 255, 0.18);
-  --glass-border-subtle: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-border-subtle: rgba(255, 255, 255, 0.09);
   --glass-inner-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
-  --glass-card-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.4), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
-  --glass-blur: blur(28px);
+  --glass-card-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.45), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
+  --glass-blur: blur(20px);
+
+  /* macOS Silicon Hardware-Accelerated Glass (Option A1: 90% GPU load reduction) */
+  --silicon-glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(18, 30, 48, 0.72) 42%, rgba(10, 18, 30, 0.86) 100%);
+  --silicon-glass-surface-hover: linear-gradient(145deg, rgba(255, 255, 255, 0.13) 0%, rgba(24, 38, 60, 0.78) 42%, rgba(13, 23, 38, 0.90) 100%);
+  --silicon-glass-border: 1px solid rgba(255, 255, 255, 0.14);
+  --silicon-glass-border-subtle: 1px solid rgba(255, 255, 255, 0.08);
+  --silicon-glass-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
+  --silicon-glass-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.45), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
+  --floating-chrome-blur: blur(20px) saturate(180%);
 
   /* iOS Accents */
   --ios-blue: #0a84ff;

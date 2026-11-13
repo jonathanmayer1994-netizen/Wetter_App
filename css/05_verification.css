@@ -10,9 +10,9 @@
   border: 1px solid rgba(100, 210, 255, 0.28);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   position: relative;
-  background: rgba(16, 24, 38, 0.85);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  background: var(--silicon-glass-surface, rgba(16, 24, 38, 0.85));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: var(--radius-card);
   transition: all 0.25s ease;
 }
@@ -1274,9 +1274,9 @@
   display: flex;
   flex-direction: column;
   background: rgba(16, 24, 38, 0.78);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   padding: 10px 14px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);

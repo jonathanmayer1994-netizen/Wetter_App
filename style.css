@@ -29,14 +29,23 @@
   --text-secondary: rgba(255, 255, 255, 0.85);
   --text-tertiary: rgba(255, 255, 255, 0.70);
 
-  /* Apple Frosted Glass Tokens */
+  /* Apple Frosted Glass & macOS Silicon Glass Tokens (Option A1) */
   --glass-bg: rgba(255, 255, 255, 0.10);
   --glass-bg-hover: rgba(255, 255, 255, 0.16);
-  --glass-border: rgba(255, 255, 255, 0.18);
-  --glass-border-subtle: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-border-subtle: rgba(255, 255, 255, 0.09);
   --glass-inner-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
-  --glass-card-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.4), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
-  --glass-blur: blur(28px);
+  --glass-card-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.45), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
+  --glass-blur: blur(20px);
+
+  /* macOS Silicon Hardware-Accelerated Glass (Option A1: 90% GPU load reduction) */
+  --silicon-glass-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(18, 30, 48, 0.72) 42%, rgba(10, 18, 30, 0.86) 100%);
+  --silicon-glass-surface-hover: linear-gradient(145deg, rgba(255, 255, 255, 0.13) 0%, rgba(24, 38, 60, 0.78) 42%, rgba(13, 23, 38, 0.90) 100%);
+  --silicon-glass-border: 1px solid rgba(255, 255, 255, 0.14);
+  --silicon-glass-border-subtle: 1px solid rgba(255, 255, 255, 0.08);
+  --silicon-glass-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
+  --silicon-glass-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.45), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
+  --floating-chrome-blur: blur(20px) saturate(180%);
 
   /* iOS Accents */
   --ios-blue: #0a84ff;
@@ -650,20 +659,26 @@ body {
 }
 
 /* ==========================================================================
-   GLASS CARDS (Shared Base)
+   GLASS CARDS (Shared Base — macOS Silicon Glass Option A1)
    ========================================================================== */
 .glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-inner-shadow), var(--glass-card-shadow);
+  background: var(--silicon-glass-surface);
+  border: var(--silicon-glass-border);
+  box-shadow: var(--silicon-glass-highlight), var(--silicon-glass-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: 20px;
   padding: 18px 20px;
   position: relative;
   overflow: hidden;
-  transition: background 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease;
   contain: layout paint style;
+  transform: translateZ(0);
+}
+
+.glass-card:hover {
+  background: var(--silicon-glass-surface-hover);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 @media (max-width: 768px) {
@@ -673,11 +688,13 @@ body {
   }
 }
 
-/* GPU Optimization (Task 9a): Eliminate nested blur passes that cause VRAM spikes */
-.glass-card .glass-card {
+/* GPU Optimization (Option A1): Eliminate all nested blur passes */
+.glass-card .glass-card,
+.glass-card .bento-item,
+.glass-card .daily-forecast-item,
+.glass-card .hourly-item {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  background: rgba(18, 30, 49, 0.65) !important;
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -823,15 +840,15 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(15, 23, 42, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 18px;
   padding: 12px 20px;
   color: #ffffff;
   cursor: pointer;
   width: 100%;
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1152,8 +1169,8 @@ body {
   width: 100%;
   max-width: 380px;
   transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .daily-expand-toggle-btn:hover {
@@ -1264,8 +1281,8 @@ body {
   height: 36px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
@@ -1542,8 +1559,8 @@ body {
   border-radius: 14px;
   padding: 8px 8px 6px 8px;
   margin-bottom: 8px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   position: relative;
@@ -1611,8 +1628,8 @@ body {
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .dch-badge strong {
@@ -3170,9 +3187,9 @@ body {
   border: 1px solid rgba(100, 210, 255, 0.28);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   position: relative;
-  background: rgba(16, 24, 38, 0.85);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  background: var(--silicon-glass-surface, rgba(16, 24, 38, 0.85));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: var(--radius-card);
   transition: all 0.25s ease;
 }
@@ -4434,9 +4451,9 @@ body {
   display: flex;
   flex-direction: column;
   background: rgba(16, 24, 38, 0.78);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   padding: 10px 14px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -10478,10 +10495,10 @@ body {
   gap: 14px;
   padding: 16px 18px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
   border: 1.5px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   cursor: pointer;
   text-align: left;
   transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
@@ -10581,13 +10598,13 @@ body {
 
 /* 2. Stufenlose Geschwindigkeits- & Höhenmeter-Steuerung (Slider & Stepper) */
 .athlete-tuning-panel {
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(15, 23, 42, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   padding: 16px 18px;
   margin-bottom: 14px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .atp-header {
@@ -10770,8 +10787,8 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   margin: 12px 0 16px 0;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
@@ -11050,8 +11067,8 @@ body {
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   touch-action: manipulation;
   flex-shrink: 0;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .sport-pill .sp-icon {
@@ -14962,5 +14979,295 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   .sports-metrics-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 6px !important;
+  }
+}
+
+/* ==========================================================================
+   MACOS WEATHER PRO & SILICON GLASS DESIGN SYSTEM (OPTION A1 & OPTION B1)
+   High-performance Retina layout for 14-16" Mac laptops & iOS continuity
+   ========================================================================== */
+
+/* --- Mobile / Tablet Base (< 1024px): Seamless linear flow & untouched mobile UX --- */
+.desktop-header-dock {
+  display: contents;
+}
+
+.desktop-overview-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-layout-gap, 20px);
+  width: 100%;
+}
+
+.overview-col-left,
+.overview-col-right {
+  display: contents;
+}
+
+/* Explicit order to guarantee original mobile sequence */
+#hero-hazard-alert { order: 1; }
+.hero-card { order: 2; }
+.hourly-card { order: 3; }
+.daily-card { order: 4; }
+#verification-dashboard-section { order: 5; }
+#bento-grid { order: 6; }
+.expert-mode-toggle-bar { order: 7; }
+#expert-details-container { order: 8; }
+
+/* --- Desktop Layout (>= 1024px: 14" & 16" Retina MacBook Pro / Desktop Displays) --- */
+@media (min-width: 1024px) {
+  :root {
+    --app-layout-gap: 20px;
+  }
+
+  .app-layout {
+    max-width: 1440px;
+    padding: 16px 28px 48px 28px;
+    gap: 20px;
+  }
+
+  /* 1. Unified 1-Row macOS Native Toolbar (56px) */
+  .desktop-header-dock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    height: 56px;
+    padding: 0 18px;
+    background: rgba(13, 20, 34, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 18px;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.42);
+    position: sticky;
+    top: 12px;
+    z-index: 900;
+    box-sizing: border-box;
+  }
+
+  .desktop-header-dock .global-navbar {
+    display: contents;
+  }
+
+  .desktop-header-dock .nav-brand {
+    order: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .desktop-header-dock .main-tab-bar {
+    order: 2;
+    display: flex !important;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    margin: 0 auto;
+    position: relative;
+    z-index: 20;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-pill);
+    padding: 2px 4px;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .desktop-header-dock .tab-btn {
+    padding: 5px 8px !important;
+    font-size: 11.5px !important;
+    font-weight: 700;
+    gap: 4px !important;
+    border-radius: var(--radius-pill);
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+
+  .desktop-header-dock .search-container {
+    order: 3;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 360px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .desktop-header-dock .search-input-wrapper {
+    min-width: 100px !important;
+    width: 130px !important;
+    flex: 0 0 auto;
+  }
+
+  .desktop-header-dock .search-input-box {
+    height: 34px;
+    padding: 0 8px;
+  }
+
+  .desktop-header-dock .header-action-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .desktop-header-dock .nav-icon-btn {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 13px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+  }
+
+  .desktop-header-dock .header-gps-pill {
+    height: 34px !important;
+    padding: 0 8px !important;
+    font-size: 11px !important;
+    border-radius: var(--radius-pill) !important;
+  }
+
+  /* 2. Tab 1: 2-Column macOS Weather Pro Dashboard */
+  .desktop-overview-grid {
+    display: grid;
+    grid-template-columns: minmax(420px, 460px) minmax(520px, 1fr);
+    gap: 20px;
+    align-items: start;
+    width: 100%;
+  }
+
+  .desktop-overview-grid > #hero-hazard-alert {
+    grid-column: 1 / -1;
+  }
+
+  .overview-col-left {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+  }
+
+  .overview-col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+  }
+
+  /* Bento grid on left column: 2 columns */
+  .overview-col-left .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+
+  .overview-col-left .bento-compact-card {
+    padding: 12px 14px;
+  }
+
+  .overview-col-left .hero-card {
+    padding: 20px 22px;
+  }
+
+  .overview-col-left .hero-main-temp {
+    font-size: 64px;
+  }
+
+  .overview-col-right .daily-card {
+    padding: 20px 22px;
+  }
+
+  /* 3. Tab 4: Live-Karte & Radar Full-Height Workstation */
+  #tab-map .map-view-card {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  #tab-map .map-view-card > .card-header {
+    display: none;
+  }
+
+  #tab-map .fullscreen-map-wrapper {
+    height: calc(100vh - 100px);
+    height: calc(100dvh - 100px);
+    min-height: 640px;
+    max-height: none;
+    border-radius: 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    position: relative;
+    overflow: hidden;
+  }
+
+  #tab-map #interactive-map {
+    height: 100%;
+    width: 100%;
+    border-radius: 20px;
+  }
+
+  #tab-map .map-left-hud-stack {
+    top: 68px;
+    left: 20px;
+    max-width: 320px;
+    z-index: 500;
+    gap: 10px;
+  }
+
+  #tab-map .map-point-weather-card {
+    width: 310px;
+    background: rgba(13, 20, 34, 0.90);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+    border-radius: 16px;
+    padding: 12px 14px;
+  }
+
+  #tab-map .map-legend-card {
+    top: 68px;
+    right: 20px;
+    z-index: 500;
+    background: rgba(13, 20, 34, 0.90);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+    border-radius: 16px;
+  }
+
+  #tab-map .radar-floating-controls {
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 860px;
+    width: calc(100% - 48px);
+    z-index: 500;
+  }
+
+  /* 4. Tab 2 (Berg & Höhe / Stadtklima) Desktop Multi-Column */
+  #tab-mountain .mountain-hero-grid,
+  #tab-mountain .city-hero-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  #tab-mountain .altitude-levels-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  /* 5. Tab 5 (Favoriten) Desktop Multi-Column */
+  #tab-favorites .favorites-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
   }
 }

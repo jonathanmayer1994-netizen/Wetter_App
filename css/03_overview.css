@@ -103,20 +103,26 @@
 }
 
 /* ==========================================================================
-   GLASS CARDS (Shared Base)
+   GLASS CARDS (Shared Base — macOS Silicon Glass Option A1)
    ========================================================================== */
 .glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-inner-shadow), var(--glass-card-shadow);
+  background: var(--silicon-glass-surface);
+  border: var(--silicon-glass-border);
+  box-shadow: var(--silicon-glass-highlight), var(--silicon-glass-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: 20px;
   padding: 18px 20px;
   position: relative;
   overflow: hidden;
-  transition: background 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease;
   contain: layout paint style;
+  transform: translateZ(0);
+}
+
+.glass-card:hover {
+  background: var(--silicon-glass-surface-hover);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 @media (max-width: 768px) {
@@ -126,11 +132,13 @@
   }
 }
 
-/* GPU Optimization (Task 9a): Eliminate nested blur passes that cause VRAM spikes */
-.glass-card .glass-card {
+/* GPU Optimization (Option A1): Eliminate all nested blur passes */
+.glass-card .glass-card,
+.glass-card .bento-item,
+.glass-card .daily-forecast-item,
+.glass-card .hourly-item {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  background: rgba(18, 30, 49, 0.65) !important;
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -276,15 +284,15 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(15, 23, 42, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 18px;
   padding: 12px 20px;
   color: #ffffff;
   cursor: pointer;
   width: 100%;
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -605,8 +613,8 @@
   width: 100%;
   max-width: 380px;
   transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .daily-expand-toggle-btn:hover {
@@ -717,8 +725,8 @@
   height: 36px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
@@ -995,8 +1003,8 @@
   border-radius: 14px;
   padding: 8px 8px 6px 8px;
   margin-bottom: 8px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   position: relative;
@@ -1064,8 +1072,8 @@
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .dch-badge strong {

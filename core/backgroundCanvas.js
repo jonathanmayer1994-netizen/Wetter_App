@@ -17,8 +17,8 @@ export class BackgroundCanvasEngine {
     this.worker = null;
     this.rafId = null;
 
-    // DPR Clamping for fillrate optimization on retina mobile screens
-    this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    // DPR Clamping for fillrate optimization on retina mobile & mac screens
+    this.dpr = Math.min(window.devicePixelRatio || 1, 1.25);
     this.updateDimensions();
 
     // Check OffscreenCanvas & Worker support
@@ -49,16 +49,28 @@ export class BackgroundCanvasEngine {
     }
 
     if (!this.useWorker) {
-      this.ctx = this.canvas.getContext('2d');
+      this.ctx = this.canvas.getContext('2d', { alpha: true });
       this.particles = [];
       this.stars = [];
       this.initStars();
       this.animate = this.animate.bind(this);
-      if (!this.reducedMotion) {
+      const hasParticles = (this.currentMode === 'rain' || this.currentMode === 'thunder' || this.currentMode === 'snow');
+      if (!this.reducedMotion && hasParticles) {
         this.animate();
       } else {
         this.renderStaticFrame();
       }
+    }
+
+    // Tab visibility listener: immediately sleep background animations when tab is hidden
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this.pause();
+        } else {
+          this.resume();
+        }
+      });
     }
 
     // Handle Window, Orientation & VisualViewport Resize (Adaptive full-screen canvas on iOS PWA)
@@ -123,8 +135,13 @@ export class BackgroundCanvasEngine {
       this.isPaused = false;
       if (this.useWorker && this.worker) {
         this.worker.postMessage({ action: 'resume' });
-      } else if (!this.rafId) {
-        this.animate();
+      } else {
+        const hasParticles = (this.currentMode === 'rain' || this.currentMode === 'thunder' || this.currentMode === 'snow');
+        if (hasParticles && !this.rafId) {
+          this.animate();
+        } else {
+          this.renderStaticFrame();
+        }
       }
     }
   }
@@ -142,39 +159,52 @@ export class BackgroundCanvasEngine {
     }
 
     this.particles = [];
+    const hasParticles = (theme === 'rain' || theme === 'thunder' || theme === 'snow');
+
     if (theme === 'rain' || theme === 'thunder') {
-      const count = Math.min(70, Math.floor(this.width / 14));
+      const count = Math.min(45, Math.floor(this.width / 24));
       for (let i = 0; i < count; i++) {
         this.particles.push({
           x: Math.random() * this.width,
           y: Math.random() * this.height,
-          len: 14 + Math.random() * 14,
-          speed: 14 + Math.random() * 8
+          len: 12 + Math.random() * 12,
+          speed: 12 + Math.random() * 6
         });
       }
     } else if (theme === 'snow') {
-      const count = Math.min(50, Math.floor(this.width / 18));
+      const count = Math.min(35, Math.floor(this.width / 28));
       for (let i = 0; i < count; i++) {
         this.particles.push({
           x: Math.random() * this.width,
           y: Math.random() * this.height,
-          r: 1.5 + Math.random() * 2.5,
-          speed: 1 + Math.random() * 1.5,
+          r: 1.2 + Math.random() * 2.0,
+          speed: 0.9 + Math.random() * 1.2,
           sway: Math.random() * Math.PI * 2
         });
       }
+    }
+
+    // Performance: If no precipitation, render once and sleep!
+    if (!hasParticles) {
+      if (this.rafId) {
+        cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+      this.renderStaticFrame();
+    } else if (!this.isPaused && !this.reducedMotion && !this.rafId) {
+      this.animate();
     }
   }
 
   initStars() {
     this.stars = [];
-    for (let i = 0; i < 65; i++) {
+    for (let i = 0; i < 45; i++) {
       this.stars.push({
         x: Math.random() * this.width,
         y: Math.random() * (this.height * 0.6),
-        radius: 0.8 + Math.random() * 1.5,
-        alpha: Math.random(),
-        speed: 0.01 + Math.random() * 0.02
+        radius: 0.8 + Math.random() * 1.4,
+        alpha: 0.35 + Math.random() * 0.45,
+        speed: 0.008 + Math.random() * 0.015
       });
     }
   }
@@ -184,7 +214,7 @@ export class BackgroundCanvasEngine {
     this.ctx.clearRect(0, 0, this.width, this.height);
     if (!this.isDay || this.currentMode === 'clear-night') {
       for (const star of this.stars) {
-        this.ctx.fillStyle = `rgba(255, 255, 255, 0.65)`;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
         this.ctx.beginPath();
         this.ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
         this.ctx.fill();
@@ -193,13 +223,16 @@ export class BackgroundCanvasEngine {
   }
 
   animate() {
-    if (this.isPaused || this.reducedMotion || !this.ctx) return;
+    if (this.isPaused || this.reducedMotion || !this.ctx) {
+      this.rafId = null;
+      return;
+    }
     this.ctx.clearRect(0, 0, this.width, this.height);
 
     if (!this.isDay || this.currentMode === 'clear-night') {
       for (const star of this.stars) {
         star.alpha += star.speed;
-        const op = (Math.sin(star.alpha) + 1) / 2 * 0.7 + 0.1;
+        const op = (Math.sin(star.alpha) + 1) / 2 * 0.5 + 0.2;
         this.ctx.fillStyle = `rgba(255, 255, 255, ${op})`;
         this.ctx.beginPath();
         this.ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
@@ -208,28 +241,28 @@ export class BackgroundCanvasEngine {
     }
 
     if (this.currentMode === 'rain' || this.currentMode === 'thunder') {
-      this.ctx.strokeStyle = 'rgba(180, 225, 255, 0.55)';
-      this.ctx.lineWidth = 1.2;
+      this.ctx.strokeStyle = 'rgba(180, 225, 255, 0.50)';
+      this.ctx.lineWidth = 1.1;
       for (const p of this.particles) {
         p.y += p.speed;
-        p.x -= 2;
+        p.x -= 1.5;
         if (p.y > this.height) {
           p.y = -p.len;
           p.x = Math.random() * (this.width + 100);
         }
         this.ctx.beginPath();
         this.ctx.moveTo(p.x, p.y);
-        this.ctx.lineTo(p.x - 2, p.y + p.len);
+        this.ctx.lineTo(p.x - 1.5, p.y + p.len);
         this.ctx.stroke();
       }
     }
 
     if (this.currentMode === 'snow') {
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
       for (const s of this.particles) {
         s.sway += 0.02;
         s.y += s.speed;
-        s.x += Math.sin(s.sway) * 1;
+        s.x += Math.sin(s.sway) * 0.8;
         if (s.y > this.height) {
           s.y = -5;
           s.x = Math.random() * this.width;

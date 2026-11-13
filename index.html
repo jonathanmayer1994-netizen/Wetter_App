@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.9.8">
+  <link rel="stylesheet" href="style.css?v=2.9.9">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -119,75 +119,78 @@
       </div>
     </div>
 
-    <!-- Top Global App Bar -->
-    <header class="global-navbar">
-      <div class="nav-brand">
-        <img src="./logo.png" srcset="./logo.png 1x, ./apple-touch-icon.png 2x" alt="Best Weather Logo" class="brand-logo" width="38" height="38" onerror="this.onerror=null; this.src='./favicon.png';">
-        <div class="brand-text">
-          <span class="brand-title">Best Weather</span>
-          <span class="brand-badge" id="location-type-badge">📍 Ort</span>
+    <!-- Unified macOS Header Dock (Option B1: 1-Row Native Toolbar on Desktop) -->
+    <div class="desktop-header-dock" id="desktop-header-dock">
+      <!-- Top Global App Bar -->
+      <header class="global-navbar">
+        <div class="nav-brand">
+          <img src="./logo.png" srcset="./logo.png 1x, ./apple-touch-icon.png 2x" alt="Best Weather Logo" class="brand-logo" width="38" height="38" onerror="this.onerror=null; this.src='./favicon.png';">
+          <div class="brand-text">
+            <span class="brand-title">Best Weather</span>
+            <span class="brand-badge" id="location-type-badge">📍 Ort</span>
+          </div>
         </div>
-      </div>
 
-      <!-- Main Search & Location Input Bar -->
-      <div class="search-container">
-        <div class="search-input-wrapper" id="search-input-wrapper">
-          <div class="search-input-box">
-            <span class="search-icon">🔍</span>
-            <input 
-              type="text" 
-              id="location-search-input" 
-              placeholder="Ort, Gipfel oder Koordinaten suchen..." 
-              autocomplete="off"
-              spellcheck="false"
-            >
-            <button id="spotlight-trigger-btn" class="stp-kbd" type="button" title="Globale Schnellsuche öffnen (⌘K)" style="cursor:pointer; border:1px solid rgba(255,255,255,0.2);">⌘K</button>
-            <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
+        <!-- Main Search & Location Input Bar -->
+        <div class="search-container">
+          <div class="search-input-wrapper" id="search-input-wrapper">
+            <div class="search-input-box">
+              <span class="search-icon">🔍</span>
+              <input 
+                type="text" 
+                id="location-search-input" 
+                placeholder="Ort, Gipfel oder Koordinaten suchen..." 
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button id="spotlight-trigger-btn" class="stp-kbd" type="button" title="Globale Schnellsuche öffnen (⌘K)" style="cursor:pointer; border:1px solid rgba(255,255,255,0.2);">⌘K</button>
+              <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
+            </div>
+
+            <!-- Live Search Autocomplete Dropdown (100% aligned directly below search input) -->
+            <div id="search-results-dropdown" class="search-dropdown" style="display:none;"></div>
           </div>
 
-          <!-- Live Search Autocomplete Dropdown (100% aligned directly below search input) -->
-          <div id="search-results-dropdown" class="search-dropdown" style="display:none;"></div>
+          <div class="header-action-group">
+            <!-- 1-Klick GPS-Standort Pill -->
+            <button id="quick-gps-btn" class="header-gps-pill" type="button" title="1-Klick: Meinen genauen GPS-Standort & Berghöhe ermitteln">
+              <span class="hgp-icon">📍</span>
+              <span class="hgp-text">Standort</span>
+            </button>
+
+            <button id="gps-btn" class="nav-icon-btn" style="display:none;" title="Exakten GPS-Standort abfragen">📍</button>
+            <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
+            <button id="unit-toggle-btn" class="nav-icon-btn unit-btn" title="Einheit wechseln">°C</button>
+          </div>
         </div>
+      </header>
 
-        <div class="header-action-group">
-          <!-- 1-Klick GPS-Standort Pill -->
-          <button id="quick-gps-btn" class="header-gps-pill" type="button" title="1-Klick: Meinen genauen GPS-Standort & Berghöhe ermitteln">
-            <span class="hgp-icon">📍</span>
-            <span class="hgp-text">Standort</span>
-          </button>
-
-          <button id="gps-btn" class="nav-icon-btn" style="display:none;" title="Exakten GPS-Standort abfragen">📍</button>
-          <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
-          <button id="unit-toggle-btn" class="nav-icon-btn unit-btn" title="Einheit wechseln">°C</button>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Navigation Tabs (Desktop Top / Mobile Bottom) -->
-    <nav class="main-tab-bar" id="main-tab-bar">
-      <button class="tab-btn active" data-tab="tab-overview">
-        <span class="tab-icon">🌤️</span>
-        <span class="tab-label">Übersicht</span>
-      </button>
-      <button class="tab-btn" id="tab-btn-mountain" data-tab="tab-mountain" style="position:relative;">
-        <span class="tab-icon" id="tab-2-icon">🏔️</span>
-        <span class="tab-label" id="tab-2-label">Berg & Höhe</span>
-        <span class="nav-warning-dot" id="tab-dot-mountain"></span>
-      </button>
-      <button class="tab-btn" id="tab-btn-sports" data-tab="tab-sports" style="position:relative;">
-        <span class="tab-icon">🚴</span>
-        <span class="tab-label">Sport & Route</span>
-        <span class="nav-warning-dot" id="tab-dot-sports"></span>
-      </button>
-      <button class="tab-btn" data-tab="tab-map">
-        <span class="tab-icon">🗺️</span>
-        <span class="tab-label">Live-Karte & Radar</span>
-      </button>
-      <button class="tab-btn" data-tab="tab-favorites">
-        <span class="tab-icon">⭐</span>
-        <span class="tab-label">Favoriten</span>
-      </button>
-    </nav>
+      <!-- Main Navigation Tabs (Desktop Top / Mobile Bottom) -->
+      <nav class="main-tab-bar" id="main-tab-bar">
+        <button class="tab-btn active" data-tab="tab-overview">
+          <span class="tab-icon">🌤️</span>
+          <span class="tab-label">Übersicht</span>
+        </button>
+        <button class="tab-btn" id="tab-btn-mountain" data-tab="tab-mountain" style="position:relative;">
+          <span class="tab-icon" id="tab-2-icon">🏔️</span>
+          <span class="tab-label" id="tab-2-label">Berg & Höhe</span>
+          <span class="nav-warning-dot" id="tab-dot-mountain"></span>
+        </button>
+        <button class="tab-btn" id="tab-btn-sports" data-tab="tab-sports" style="position:relative;">
+          <span class="tab-icon">🚴</span>
+          <span class="tab-label">Sport & Route</span>
+          <span class="nav-warning-dot" id="tab-dot-sports"></span>
+        </button>
+        <button class="tab-btn" data-tab="tab-map">
+          <span class="tab-icon">🗺️</span>
+          <span class="tab-label">Live-Karte & Radar</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-favorites">
+          <span class="tab-icon">⭐</span>
+          <span class="tab-label">Favoriten</span>
+        </button>
+      </nav>
+    </div>
 
     <!-- Content Area Container -->
     <main class="main-container">
@@ -197,20 +200,23 @@
       <!-- =================================================================== -->
       <div class="tab-pane active" id="tab-overview">
 
-        <!-- AKUTER UNWETTER- & GEFAHREN-BANNER (TOP PRIORITY ALERT) -->
-        <div class="hero-hazard-alert" id="hero-hazard-alert" style="display:none;" role="alert">
-          <div class="hha-content">
-            <span class="hha-icon" id="hha-icon">⚡</span>
-            <div class="hha-text-wrap">
-              <span class="hha-badge" id="hha-badge">WETTERWARNUNG</span>
-              <span class="hha-msg" id="hha-msg">Starkes Gewitter im Anzug</span>
+        <div class="desktop-overview-grid" id="desktop-overview-grid">
+          <!-- AKUTER UNWETTER- & GEFAHREN-BANNER (TOP PRIORITY ALERT) -->
+          <div class="hero-hazard-alert" id="hero-hazard-alert" style="display:none;" role="alert">
+            <div class="hha-content">
+              <span class="hha-icon" id="hha-icon">⚡</span>
+              <div class="hha-text-wrap">
+                <span class="hha-badge" id="hha-badge">WETTERWARNUNG</span>
+                <span class="hha-msg" id="hha-msg">Starkes Gewitter im Anzug</span>
+              </div>
             </div>
+            <button class="hha-action-btn" id="hha-action-btn" type="button">Details ➔</button>
           </div>
-          <button class="hha-action-btn" id="hha-action-btn" type="button">Details ➔</button>
-        </div>
 
-        <!-- Hero Section: Current Weather -->
-        <section class="hero-card glass-card">
+          <!-- DESKTOP LEFT COLUMN (Hero, 24h Hourly & Bento Grid) -->
+          <div class="overview-col-left">
+            <!-- Hero Section: Current Weather -->
+            <section class="hero-card glass-card">
           <div class="hero-location-row">
             <h1 class="hero-city-name" id="hero-location-name">München</h1>
             <span class="elevation-pill" id="hero-elevation-pill">🏔️ 519 m</span>
@@ -258,38 +264,6 @@
             <!-- Dynamisch befüllt -->
           </div>
         </section>
-
-        <!-- 10-TAGE-VORHERSAGE MIT KLICK-DETAILS -->
-        <section class="glass-card daily-card">
-          <div class="card-header">
-            <h2 class="card-title">
-              <span class="card-icon">📅</span>
-              <span>10-TAGE-TREND & METEOROLOGISCHE DETAILS</span>
-            </h2>
-            <span class="card-tag">Tippe Zeile für Details</span>
-          </div>
-
-          <!-- Spaltenüberschrift für Desktop & iPad -->
-          <div class="daily-table-header desktop-tablet-only">
-            <span class="dth-day">Tag & Datum</span>
-            <span class="dth-cond">Wetterlage</span>
-            <span class="dth-precip">Niederschlag</span>
-            <span class="dth-sun">Sonne & Verlauf</span>
-            <span class="dth-temp">Min / Max</span>
-            <span class="dth-act"></span>
-          </div>
-
-          <div class="daily-list-container" id="daily-forecast-list">
-            <!-- Dynamisch befüllt mit Klick-Event -->
-          </div>
-        </section>
-
-        <!-- =================================================================== -->
-        <!-- A.C.T.U.A.L. ENGINE: PROGNOSE VS. REALITÄT (IST-ABGLEICH & INTELLIGENZ) -->
-        <!-- =================================================================== -->
-        <div id="verification-dashboard-section">
-          <!-- Dynamisch durch features/verificationUI.js gerendert -->
-        </div>
 
         <!-- BENTO DETAIL GRID (KOMPAKT-MATRIX MIT DETAIL-LAYER) -->
         <section class="bento-grid" id="bento-grid">
@@ -391,6 +365,41 @@
           </div>
 
         </section>
+      </div><!-- /overview-col-left -->
+
+      <!-- DESKTOP RIGHT COLUMN (10-Tage-Trend, Ist-Abgleich & Experten-Analyse) -->
+      <div class="overview-col-right">
+        <!-- 10-TAGE-VORHERSAGE MIT KLICK-DETAILS -->
+        <section class="glass-card daily-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <span class="card-icon">📅</span>
+              <span>10-TAGE-TREND & METEOROLOGISCHE DETAILS</span>
+            </h2>
+            <span class="card-tag">Tippe Zeile für Details</span>
+          </div>
+
+          <!-- Spaltenüberschrift für Desktop & iPad -->
+          <div class="daily-table-header desktop-tablet-only">
+            <span class="dth-day">Tag & Datum</span>
+            <span class="dth-cond">Wetterlage</span>
+            <span class="dth-precip">Niederschlag</span>
+            <span class="dth-sun">Sonne & Verlauf</span>
+            <span class="dth-temp">Min / Max</span>
+            <span class="dth-act"></span>
+          </div>
+
+          <div class="daily-list-container" id="daily-forecast-list">
+            <!-- Dynamisch befüllt mit Klick-Event -->
+          </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- A.C.T.U.A.L. ENGINE: PROGNOSE VS. REALITÄT (IST-ABGLEICH & INTELLIGENZ) -->
+        <!-- =================================================================== -->
+        <div id="verification-dashboard-section">
+          <!-- Dynamisch durch features/verificationUI.js gerendert -->
+        </div>
 
         <!-- =================================================================== -->
         <!-- KOMPAKT- VS. EXPERTEN-MODUS TOGGLE -->
@@ -598,7 +607,9 @@
         </section>
         </div>
 
-      </div>
+        </div><!-- /overview-col-right -->
+      </div><!-- /desktop-overview-grid -->
+    </div><!-- /tab-overview -->
 
       <!-- =================================================================== -->
       <!-- TAB 2: ADAPTIVE ANSICHT: STADTKLIMA (STADT) ODER ALPIN-ENGINE (BERG) -->
@@ -3039,11 +3050,11 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=2.9.8"></script>
+  <script type="module" src="app.js?v=2.9.9"></script>
 
   <!-- Autonome iOS-PWA & Service-Worker Update-Engine -->
   <script type="module">
-    import { initAppUpdater } from './core/appUpdater.js?v=2.9.8';
+    import { initAppUpdater } from './core/appUpdater.js?v=2.9.9';
     initAppUpdater();
   </script>
 </body>

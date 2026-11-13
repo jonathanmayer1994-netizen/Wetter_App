@@ -201,3 +201,4 @@ export function getSolarAtmosphereStyle(solar) {
     warmthColor: `rgba(255, 140, 50, ${warmthOpacity.toFixed(3)})`
   };
 }
+
