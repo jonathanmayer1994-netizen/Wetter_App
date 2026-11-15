@@ -259,7 +259,7 @@ export async function triggerExactGps(options = {}) {
     return;
   }
 
-  // Beim App-Start NIEMALS erneut eine Browser-/iOS-Abfrage erzwingen, wenn bereits einmal bestätigt/abgelehnt wurde
+  // Beim App-Start immer GPS abfragen, außer der Nutzer hat Geolocation explizit verweigert ('denied')
   if (isStartup) {
     const prevLsGps = AlpineStorage.safeGetItem('best_weather_last_gps', null);
     const [permState, storedPerm, idbLastGps] = await Promise.all([
@@ -268,7 +268,7 @@ export async function triggerExactGps(options = {}) {
       AlpineStorage.getMeta('best_weather_last_gps', null)
     ]);
 
-    if (permState === 'denied') {
+    if (permState === 'denied' || (storedPerm && storedPerm.status === 'denied')) {
       AlpineStorage.setMeta(GPS_PERM_META_KEY, { status: 'denied', updatedAt: Date.now() });
       return;
     }
@@ -278,23 +278,11 @@ export async function triggerExactGps(options = {}) {
       AlpineStorage.safeSetItem('best_weather_last_gps', idbLastGps);
       selectExactLocation(idbLastGps);
     }
-
-    // Nur im Hintergrund still aktualisieren wenn der Browser/OS die Berechtigung dauerhaft erteilt hat ('granted')
-    // oder beim allerersten Start (noch nie abgefragt & noch kein gespeicherter GPS-Standort)
-    const alreadyInteracted = !!(cachedGps || (storedPerm && storedPerm.status));
-    if (permState !== 'granted' && alreadyInteracted) {
-      return;
-    }
-
-    // Merke sofort vor dem System-Dialog, dass bereits einmal angefragt wurde
-    if (!storedPerm) {
-      AlpineStorage.setMeta(GPS_PERM_META_KEY, { status: 'prompted', updatedAt: Date.now() });
-    }
   } else {
     if (quickGpsBtn) {
       quickGpsBtn.style.opacity = '0.6';
-      const txt = quickGpsBtn.querySelector('.hgp-text');
-      if (txt) txt.innerText = 'Ermittle Standort... 🛰️';
+      const txt = quickGpsBtn.querySelector('.hgp-text, .sig-text');
+      if (txt) txt.innerText = 'Ermittle... 🛰️';
     }
     if (gpsBtn) gpsBtn.style.opacity = '0.5';
   }
@@ -309,8 +297,8 @@ export async function triggerExactGps(options = {}) {
 
       if (quickGpsBtn) {
         quickGpsBtn.style.opacity = '1';
-        const txt = quickGpsBtn.querySelector('.hgp-text');
-        if (txt) txt.innerText = 'Mein Standort';
+        const txt = quickGpsBtn.querySelector('.hgp-text, .sig-text');
+        if (txt) txt.innerText = 'Standort';
       }
       if (gpsBtn) gpsBtn.style.opacity = '1';
 
@@ -367,8 +355,8 @@ export async function triggerExactGps(options = {}) {
       }
       if (quickGpsBtn) {
         quickGpsBtn.style.opacity = '1';
-        const txt = quickGpsBtn.querySelector('.hgp-text');
-        if (txt) txt.innerText = 'Mein Standort';
+        const txt = quickGpsBtn.querySelector('.hgp-text, .sig-text');
+        if (txt) txt.innerText = 'Standort';
       }
       if (gpsBtn) gpsBtn.style.opacity = '1';
       console.warn('GPS location notice:', err);

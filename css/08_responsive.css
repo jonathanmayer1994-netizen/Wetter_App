@@ -527,23 +527,39 @@
     order: 3;
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
+    gap: 8px;
+    flex: 0 1 auto;
     width: auto;
-    max-width: 360px;
+    max-width: 480px;
     position: relative;
     z-index: 10;
   }
 
   .desktop-header-dock .search-input-wrapper {
-    min-width: 100px !important;
-    width: 130px !important;
-    flex: 0 0 auto;
+    min-width: 240px !important;
+    width: 320px !important;
+    flex: 1 1 auto;
+    transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .desktop-header-dock .search-input-wrapper:focus-within {
+    width: 380px !important;
   }
 
   .desktop-header-dock .search-input-box {
-    height: 34px;
-    padding: 0 8px;
+    height: 36px;
+    padding: 0 6px 0 10px;
+    gap: 6px;
+  }
+
+  .desktop-header-dock .search-input-box input {
+    font-size: 13px !important;
+  }
+
+  .desktop-header-dock .search-inline-gps-btn {
+    height: 26px !important;
+    padding: 0 8px !important;
+    font-size: 11px !important;
   }
 
   .desktop-header-dock .header-action-group {
@@ -559,13 +575,6 @@
     font-size: 13px !important;
     padding: 0 !important;
     border-radius: 50% !important;
-  }
-
-  .desktop-header-dock .header-gps-pill {
-    height: 34px !important;
-    padding: 0 8px !important;
-    font-size: 11px !important;
-    border-radius: var(--radius-pill) !important;
   }
 
   /* 2. Tab 1: 2-Column macOS Weather Pro Dashboard */

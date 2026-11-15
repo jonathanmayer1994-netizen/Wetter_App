@@ -207,7 +207,7 @@ export function updateLocationHeaderUI() {
   }
   const searchInput = document.getElementById('location-search-input');
   if (searchInput) {
-    searchInput.placeholder = `${loc.isMountain ? '🏔️' : '🏙️'} ${loc.name} (${loc.elevation.toLocaleString('de-DE')} m) — Ort oder Gipfel suchen...`;
+    searchInput.placeholder = `${loc.name} · Suchen...`;
   }
 
   const badge = document.getElementById('location-type-badge');

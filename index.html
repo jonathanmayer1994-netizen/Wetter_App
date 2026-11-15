@@ -135,7 +135,7 @@
         <div class="search-container">
           <div class="search-input-wrapper" id="search-input-wrapper">
             <div class="search-input-box">
-              <span class="search-icon">🔍</span>
+              <span class="search-icon" aria-hidden="true">🔍</span>
               <input 
                 type="text" 
                 id="location-search-input" 
@@ -143,8 +143,13 @@
                 autocomplete="off"
                 spellcheck="false"
               >
-              <button id="spotlight-trigger-btn" class="stp-kbd" type="button" title="Globale Schnellsuche öffnen (⌘K)" style="cursor:pointer; border:1px solid rgba(255,255,255,0.2);">⌘K</button>
-              <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen">✕</button>
+              <!-- Integrierter 1-Klick GPS-Standort Button direkt in der Suche -->
+              <button id="quick-gps-btn" class="search-inline-gps-btn" type="button" title="Mein genauer GPS-Standort (1-Klick)" aria-label="Aktuellen GPS-Standort ermitteln">
+                <span class="sig-icon">📍</span>
+                <span class="sig-text">Standort</span>
+              </button>
+              <button id="spotlight-trigger-btn" class="stp-kbd" type="button" title="Globale Schnellsuche öffnen (⌘K)" aria-label="Schnellsuche ⌘K" style="cursor:pointer; border:1px solid rgba(255,255,255,0.2);">⌘K</button>
+              <button id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen" aria-label="Suche löschen">✕</button>
             </div>
 
             <!-- Live Search Autocomplete Dropdown (100% aligned directly below search input) -->
@@ -152,12 +157,6 @@
           </div>
 
           <div class="header-action-group">
-            <!-- 1-Klick GPS-Standort Pill -->
-            <button id="quick-gps-btn" class="header-gps-pill" type="button" title="1-Klick: Meinen genauen GPS-Standort & Berghöhe ermitteln">
-              <span class="hgp-icon">📍</span>
-              <span class="hgp-text">Standort</span>
-            </button>
-
             <button id="gps-btn" class="nav-icon-btn" style="display:none;" title="Exakten GPS-Standort abfragen">📍</button>
             <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
             <button id="unit-toggle-btn" class="nav-icon-btn unit-btn" title="Einheit wechseln">°C</button>
