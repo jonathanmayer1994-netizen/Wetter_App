@@ -11,6 +11,16 @@ const ACTUAL_PREFIX = 'bw_vfy_act_';
 const CROWD_PREFIX = 'bw_vfy_crowd_';
 const MAX_HOURS_HISTORY = 72; // 3 Tage rollierendes Archiv
 
+export const CROWD_CONDITIONS = {
+  clear: { key: 'clear', label: 'Sonnig', icon: '☀️', wmo: 0, desc: 'Wolkenlos / Klar' },
+  partlyCloudy: { key: 'partlyCloudy', label: 'Heiter', icon: '🌤️', wmo: 2, desc: 'Leicht bewölkt' },
+  cloudy: { key: 'cloudy', label: 'Bewölkt', icon: '☁️', wmo: 3, desc: 'Bedeckt / Wolkig' },
+  fog: { key: 'fog', label: 'Nebel', icon: '🌫️', wmo: 45, desc: 'Nebel / Hochnebel' },
+  rain: { key: 'rain', label: 'Regen', icon: '🌧️', wmo: 61, desc: 'Regen / Schauer' },
+  thunderstorm: { key: 'thunderstorm', label: 'Gewitter', icon: '⛈️', wmo: 95, desc: 'Gewitter / Blitz & Donner' },
+  snow: { key: 'snow', label: 'Schnee', icon: '❄️', wmo: 71, desc: 'Schneefall' }
+};
+
 export const VerificationStore = {
   /**
    * Generiert einen eindeutigen Schlüssel basierend auf Koordinaten (~1.1 km Genauigkeit)
@@ -156,10 +166,14 @@ export const VerificationStore = {
     let list = AlpineStorage.safeGetItem(storeKey, []);
     if (!Array.isArray(list)) list = [];
 
+    const meta = CROWD_CONDITIONS[condition] || { label: condition, icon: '📍', wmo: 0 };
+
     const report = {
       id: `gt_${Date.now()}`,
       timestamp: new Date().toISOString(),
-      condition, // 'clear' | 'partlyCloudy' | 'cloudy' | 'fog' | 'rain' | 'snow'
+      condition, // 'clear' | 'partlyCloudy' | 'cloudy' | 'fog' | 'rain' | 'thunderstorm' | 'snow'
+      label: meta.label,
+      icon: meta.icon,
       note: String(note).slice(0, 100)
     };
 
@@ -167,6 +181,15 @@ export const VerificationStore = {
     // Behalte maximal 10 Meldungen
     AlpineStorage.safeSetItem(storeKey, list.slice(0, 10));
     return report;
+  },
+
+  /**
+   * Entfernt / setzt das Nutzerfeedback für einen Standort zurück
+   */
+  clearUserGroundTruth(lat, lon) {
+    const locKey = this.getLocationKey(lat, lon);
+    const storeKey = `${CROWD_PREFIX}${locKey}`;
+    AlpineStorage.safeRemoveItem(storeKey);
   },
 
   /**
@@ -181,8 +204,11 @@ export const VerificationStore = {
     const latest = list[0];
     const ageMs = Date.now() - new Date(latest.timestamp).getTime();
     if (ageMs <= maxAgeMinutes * 60 * 1000) {
+      const meta = CROWD_CONDITIONS[latest.condition] || { label: latest.condition, icon: '📍', wmo: 0 };
       return {
         ...latest,
+        label: latest.label || meta.label,
+        icon: latest.icon || meta.icon,
         ageMinutes: Math.round(ageMs / 60000)
       };
     }

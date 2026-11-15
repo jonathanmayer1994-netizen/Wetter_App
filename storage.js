@@ -341,6 +341,19 @@ export const AlpineStorage = {
   },
 
   /**
+   * Sicheres Löschen aus LocalStorage
+   */
+  safeRemoveItem(key) {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (e) {
+      console.warn(`LocalStorage remove blocked (${key}):`, e);
+      return false;
+    }
+  },
+
+  /**
    * Persistiert Metadaten zusätzlich in IndexedDB (überlebt Safari/PWA Session-Resets)
    */
   async setMeta(key, value) {

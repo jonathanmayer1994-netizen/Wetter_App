@@ -542,19 +542,41 @@ export const ActualEngine = {
   applyUserGroundTruthAdjustment(current, hourly, userReport) {
     if (!userReport || !current) return;
 
-    if (userReport.condition === 'rain' && (current.weather_code < 50 || current.weather_code > 69)) {
-      current.weather_code = 61; // Regen
+    const cond = userReport.condition;
+
+    if (cond === 'rain') {
+      current.weather_code = 61; // Regen / Schauer
       current.precipitation = Math.max(0.8, current.precipitation || 0);
       if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[0] !== undefined) {
         hourly.precipitation_probability[0] = Math.max(90, hourly.precipitation_probability[0]);
       }
-    } else if (userReport.condition === 'snow' && current.weather_code < 70) {
+    } else if (cond === 'thunderstorm') {
+      current.weather_code = 95; // Alpingewitter / Starkregen
+      current.precipitation = Math.max(2.5, current.precipitation || 0);
+      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[0] !== undefined) {
+        hourly.precipitation_probability[0] = Math.max(95, hourly.precipitation_probability[0]);
+      }
+    } else if (cond === 'snow') {
       current.weather_code = 71; // Schneefall
       current.precipitation = Math.max(1.0, current.precipitation || 0);
-    } else if (userReport.condition === 'fog') {
-      current.weather_code = 45; // Nebel
-    } else if (userReport.condition === 'clear') {
-      current.weather_code = 0; // Klar/Sonnig
+      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[0] !== undefined) {
+        hourly.precipitation_probability[0] = Math.max(85, hourly.precipitation_probability[0]);
+      }
+    } else if (cond === 'fog') {
+      current.weather_code = 45; // Nebel / Inversion
+      current.cloud_cover = 100;
+    } else if (cond === 'cloudy') {
+      current.weather_code = 3; // Bedeckt / stark bewölkt
+      current.cloud_cover = Math.max(85, current.cloud_cover || 85);
+      current.precipitation = 0;
+    } else if (cond === 'partlyCloudy') {
+      current.weather_code = 2; // Heiter / teils bewölkt
+      current.cloud_cover = 40;
+      current.precipitation = 0;
+    } else if (cond === 'clear') {
+      current.weather_code = 0; // Klar / wolkenlos
+      current.cloud_cover = 5;
+      current.precipitation = 0;
     }
   },
 

@@ -5,7 +5,7 @@
  */
 
 import { state } from '../core/state.js';
-import { VerificationStore } from '../core/verificationStore.js';
+import { VerificationStore, CROWD_CONDITIONS } from '../core/verificationStore.js';
 import { ActualEngine } from '../core/actualEngine.js';
 import { escapeHtml } from '../httpClient.js';
 import { WMO_CODES } from '../core/constants.js';
@@ -27,6 +27,9 @@ export function setupVerificationUI() {
 export function renderVerificationDashboard() {
   const container = document.getElementById('verification-dashboard-section');
   if (!container) return;
+
+  const existingDetails = document.getElementById('verification-card');
+  const wasOpen = existingDetails ? existingDetails.hasAttribute('open') : false;
 
   const data = state.actualVerification;
   const loc = state.currentLocation;
@@ -127,20 +130,74 @@ export function renderVerificationDashboard() {
     `;
   }
 
-  // 6. User Feedback Status
-  let userFeedbackStatusHtml = '';
+  // 6. User Feedback Status & Kacheln
+  const activeConditionKey = userReport ? userReport.condition : null;
+  const conditionsList = Object.keys(CROWD_CONDITIONS).map(k => CROWD_CONDITIONS[k]);
+
+  const buttonsHtml = conditionsList.map(cond => {
+    const isSelected = (activeConditionKey === cond.key);
+    return `
+      <button type="button"
+              class="vcb-btn${isSelected ? ' is-selected' : ''}"
+              data-condition="${cond.key}"
+              aria-pressed="${isSelected ? 'true' : 'false'}"
+              title="${escapeHtml(cond.desc)}">
+        ${isSelected ? '<span class="vcb-check-badge" aria-hidden="true">✓</span>' : ''}
+        <span class="vcb-icon">${cond.icon}</span>
+        <span class="vcb-label">${escapeHtml(cond.label)}</span>
+      </button>
+    `;
+  }).join('');
+
+  let crowdFeedbackCardHtml = '';
   if (userReport) {
-    userFeedbackStatusHtml = `
-      <div class="vfy-user-active-badge">
-        <span>📍 Dein Feedback vor ${userReport.ageMinutes} Min. aktiv berücksichtigt (${userReport.condition})</span>
+    const reportCond = CROWD_CONDITIONS[userReport.condition] || { label: userReport.label || userReport.condition, icon: userReport.icon || '📍', desc: '' };
+    const ageMin = userReport.ageMinutes !== undefined ? userReport.ageMinutes : 0;
+    const timeText = ageMin <= 0 ? 'gerade eben' : (ageMin === 1 ? 'vor 1 Minute' : `vor ${ageMin} Minuten`);
+    const locName = loc ? loc.name : 'diesem Ort';
+    const elevText = loc && loc.elevation ? ` (${Math.round(loc.elevation)} m)` : '';
+
+    crowdFeedbackCardHtml = `
+      <div class="vcb-confirmation-card is-active" id="vcb-confirmation-card" role="status">
+        <div class="vcc-header-row">
+          <div class="vcc-status-badge">
+            <span class="vcc-pulse-dot" aria-hidden="true"></span>
+            <span class="vcc-status-text">✓ Feedback erfolgreich erfasst &amp; aktiv</span>
+          </div>
+          <span class="vcc-time-badge">⏱️ ${timeText}</span>
+        </div>
+        <div class="vcc-body">
+          <div class="vcc-icon-pill" aria-hidden="true">${reportCond.icon}</div>
+          <div class="vcc-text-col">
+            <div class="vcc-title">
+              Du hast <b>${escapeHtml(reportCond.label)}</b> vor Ort gemeldet
+            </div>
+            <div class="vcc-sub">
+              Echtzeit-Kompensation für <b>${escapeHtml(locName)}</b>${elevText} aktiv. Alpine Prognosemodelle und Nowcast-Parameter wurden unmittelbar kalibriert.
+            </div>
+          </div>
+        </div>
+        <div class="vcc-footer-row">
+          <button type="button" class="vcc-reset-btn" id="vcc-reset-btn" title="Meldung zurücksetzen" aria-label="Meldung zurücksetzen">
+            ✕ Meldung aufheben
+          </button>
+        </div>
       </div>
+    `;
+  } else {
+    crowdFeedbackCardHtml = `
+      <div class="vcb-hint-row" id="vcb-hint-row">
+        <span class="vcb-hint-icon">💡</span>
+        <span class="vcb-hint-text">Tippe auf deine aktuelle Wetterlage, um die Vorhersage für alle Tourengeher in Echtzeit zu kalibrieren.</span>
+      </div>
+      <div class="vcb-feedback-msg" id="vcb-feedback-msg" style="display:none;" role="status"></div>
     `;
   }
 
   const winnerModel = modelEvaluation && modelEvaluation.models && modelEvaluation.winnerKey ? modelEvaluation.models[modelEvaluation.winnerKey] : null;
 
   container.innerHTML = `
-    <details class="glass-card verification-accordion" id="verification-card">
+    <details class="glass-card verification-accordion" id="verification-card"${wasOpen ? ' open' : ''}>
       <summary class="verification-summary">
         <div class="vs-summary-left">
           <span class="vs-summary-icon">⚖️</span>
@@ -268,15 +325,10 @@ export function renderVerificationDashboard() {
             </div>
             <span class="vcb-sub">Kalibriert das alpine Mikroklima unmittelbar für alle Tourengeher</span>
           </div>
-          <div class="vcb-buttons-row" id="vcb-buttons-row">
-            <button type="button" class="vcb-btn" data-condition="clear">☀️ Sonnig</button>
-            <button type="button" class="vcb-btn" data-condition="partlyCloudy">⛅ Heiter</button>
-            <button type="button" class="vcb-btn" data-condition="fog">🌫️ Nebel</button>
-            <button type="button" class="vcb-btn" data-condition="rain">🌧️ Regen</button>
-            <button type="button" class="vcb-btn" data-condition="snow">❄️ Schnee</button>
+          <div class="vcb-buttons-row${activeConditionKey ? ' has-selected' : ''}" id="vcb-buttons-row">
+            ${buttonsHtml}
           </div>
-          <div class="vcb-feedback-msg" id="vcb-feedback-msg" style="display:none;"></div>
-          ${userFeedbackStatusHtml}
+          ${crowdFeedbackCardHtml}
         </div>
 
         <!-- Ausklappbare Experten-Details (Kalman-Decay & Formeln) -->
@@ -445,39 +497,78 @@ function setupChartHoverTooltip(svg) {
 }
 
 /**
- * 1-Tap Feedback Knöpfe für Nutzer
+ * 1-Tap Feedback Knöpfe für Nutzer mit direkter visueller Bestätigung
  */
 export function setupCrowdGroundTruthControls() {
-  const row = document.getElementById('vcb-buttons-row');
-  const msg = document.getElementById('vcb-feedback-msg');
-  if (!row) return;
+  const container = document.getElementById('verification-dashboard-section');
+  if (!container) return;
 
-  row.addEventListener('click', (e) => {
+  // Verhindere mehrfaches Registrieren des globalen Delegated-Listeners
+  if (container._crowdListenerAttached) return;
+  container._crowdListenerAttached = true;
+
+  container.addEventListener('click', (e) => {
+    // 1. Klick auf eine Wetterlagen-Kachel
     const btn = e.target.closest('.vcb-btn');
-    if (!btn) return;
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
 
-    const condition = btn.dataset.condition;
-    const loc = state.currentLocation;
-    if (!loc) return;
+      const condition = btn.dataset.condition;
+      const loc = state.currentLocation;
+      if (!loc || !condition) return;
 
-    // 1. Speichere Ground Truth
-    VerificationStore.saveUserGroundTruth(loc.lat, loc.lon, condition);
+      // 1. Sofort in VerificationStore persistieren
+      const report = VerificationStore.saveUserGroundTruth(loc.lat, loc.lon, condition);
 
-    // 2. Feedback Meldung anzeigen
-    if (msg) {
-      msg.style.display = 'block';
-      msg.className = 'vcb-feedback-msg success';
-      msg.innerHTML = `✅ <b>Vielen Dank!</b> Deine Meldung (${btn.innerText}) kalibriert das alpine Wetter für diese Höhe in Echtzeit.`;
-      setTimeout(() => {
-        msg.style.display = 'none';
-      }, 5000);
+      // 2. Sofort im State spiegeln
+      if (state.actualVerification) {
+        state.actualVerification.userReport = report;
+      }
+
+      // 3. Sofortige mikroklimatische Kalibrierung in ActualEngine & State
+      if (state.weatherData && state.weatherData.current) {
+        ActualEngine.applyUserGroundTruthAdjustment(state.weatherData.current, state.weatherData.hourly, report);
+      }
+
+      // 4. Accordion-Zustand offen halten & Dashboard re-rendern
+      const card = document.getElementById('verification-card');
+      if (card) card.setAttribute('open', '');
+
+      renderVerificationDashboard();
+
+      // 5. Asynchrones Neuladen für Konsistenz anstoßen
+      if (onReloadCallback) {
+        onReloadCallback(loc);
+      }
+      return;
     }
 
-    // 3. UI neu berechnen & triggern
-    if (onReloadCallback) {
-      onReloadCallback(loc);
-    } else if (window.loadLocation) {
-      window.loadLocation(loc);
+    // 2. Klick auf 'Meldung aufheben' (Reset)
+    const resetBtn = e.target.closest('#vcc-reset-btn');
+    if (resetBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const loc = state.currentLocation;
+      if (!loc) return;
+
+      // 1. Aus Storage entfernen & State leeren
+      VerificationStore.clearUserGroundTruth(loc.lat, loc.lon);
+      if (state.actualVerification) {
+        state.actualVerification.userReport = null;
+      }
+
+      // 2. Accordion-Zustand offen halten & Dashboard re-rendern
+      const card = document.getElementById('verification-card');
+      if (card) card.setAttribute('open', '');
+
+      renderVerificationDashboard();
+
+      // 3. Asynchrones Neuladen anstoßen
+      if (onReloadCallback) {
+        onReloadCallback(loc);
+      }
     }
   });
 }
