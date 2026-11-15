@@ -1144,6 +1144,32 @@
   fill-opacity: 1 !important;
 }
 
+/* Dezent-eleganter JETZT-Indikator im 24h-Tagesverlauf */
+.day-chart-now-marker {
+  transition: opacity 0.25s ease;
+}
+
+@keyframes dayNowGlowPulse {
+  0%, 100% {
+    opacity: 0.18;
+  }
+  50% {
+    opacity: 0.42;
+  }
+}
+
+.day-now-glow {
+  animation: dayNowGlowPulse 2.8s ease-in-out infinite;
+}
+
+.day-now-dot {
+  filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.7));
+}
+
+.day-now-line {
+  filter: drop-shadow(0 0 2px rgba(0, 229, 255, 0.35));
+}
+
 .day-precip-bar {
   transition: filter 0.15s ease, fill-opacity 0.15s ease;
 }

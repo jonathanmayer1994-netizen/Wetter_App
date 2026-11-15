@@ -1038,7 +1038,8 @@ export function renderDayOverviewSVG({
   sunriseDec,
   sunsetDec,
   tMin,
-  tMax
+  tMax,
+  isToday = (dayIndex === 0)
 }) {
   const isDesktop = (typeof window !== 'undefined' && window.innerWidth >= 900);
   const validTemps = (Array.isArray(hourlyTemps) && hourlyTemps.length === 24) ? hourlyTemps : new Array(24).fill(10);
@@ -1179,6 +1180,70 @@ export function renderDayOverviewSVG({
     `;
   }
 
+  // 4. Dezent-eleganter JETZT-Indikator (nur für den aktuellen Tag)
+  const isCurrentDay = (isToday === true || dayIndex === 0);
+  let nowIndicatorHtml = '';
+  if (isCurrentDay) {
+    const now = new Date();
+    const curHourDec = now.getHours() + (now.getMinutes() / 60);
+
+    if (curHourDec >= 0 && curHourDec <= 24) {
+      const xNow = getX(curHourDec);
+
+      // Temperatur am aktuellen Zeitpunkt entlang der Kurve interpolieren
+      const hFloor = Math.min(22, Math.floor(curHourDec));
+      const hCeil = Math.min(23, hFloor + 1);
+      const hFrac = curHourDec - hFloor;
+      const tNow = validTemps[hFloor] + (validTemps[hCeil] - validTemps[hFloor]) * hFrac;
+      const yNow = getY(tNow);
+
+      const lineBottomY = hasPrecip ? pBaseY : chartBottom;
+
+      // Kollisions-Prüfung mit Sonnenaufgang & Sonnenuntergang (y = 16)
+      const distSunrise = Math.abs(xNow - xSunrise);
+      const distSunset = Math.abs(xNow - xSunset);
+      const distMaxLabel = Math.abs(xNow - maxLabelX);
+
+      let badgeY = 15;
+      let badgeX = xNow;
+
+      if (distSunrise < 38) {
+        badgeX = (xNow >= xSunrise) ? (xNow + 18) : (xNow - 18);
+      } else if (distSunset < 38) {
+        badgeX = (xNow <= xSunset) ? (xNow - 18) : (xNow + 18);
+      } else if (distMaxLabel < 38) {
+        badgeX = (xNow <= maxLabelX) ? (xNow - 20) : (xNow + 20);
+      }
+
+      // Verhindere Randüberlauf links/rechts
+      const pillW = 28;
+      const pillHalfW = pillW / 2;
+      if (badgeX - pillHalfW < padLeft) {
+        badgeX = padLeft + pillHalfW;
+      } else if (badgeX + pillHalfW > W - padRight) {
+        badgeX = W - padRight - pillHalfW;
+      }
+
+      const pillH = isDesktop ? 13 : 14;
+
+      nowIndicatorHtml = `
+        <!-- Dezent-eleganter JETZT-Indikator (Aktuelle Position im Tagesverlauf) -->
+        <g class="day-chart-now-marker" style="pointer-events:none;">
+          <!-- Vertikale zarte Zeitlinie -->
+          <line class="day-now-line" x1="${xNow.toFixed(1)}" y1="20" x2="${xNow.toFixed(1)}" y2="${lineBottomY}" stroke="#00e5ff" stroke-width="1.1" stroke-dasharray="2,3" stroke-opacity="0.55" />
+
+          <!-- Sanfter Glow-Ring & Core-Punkt auf der Temperaturkurve -->
+          <circle class="day-now-glow" cx="${xNow.toFixed(1)}" cy="${yNow.toFixed(1)}" r="${isDesktop ? '5.5' : '6'}" fill="rgba(0, 229, 255, 0.18)" />
+          <circle class="day-now-dot" cx="${xNow.toFixed(1)}" cy="${yNow.toFixed(1)}" r="${isDesktop ? '2.4' : '2.8'}" fill="#00e5ff" stroke="#ffffff" stroke-width="1.2" />
+
+          <!-- Minimalistisches 'JETZT'-Pill-Badge -->
+          <rect x="${(badgeX - pillW / 2).toFixed(1)}" y="${(badgeY - pillH / 2 - 1).toFixed(1)}" width="${pillW}" height="${pillH}" rx="3.5" fill="rgba(15, 23, 42, 0.88)" stroke="rgba(0, 229, 255, 0.55)" stroke-width="0.8" />
+          <text x="${badgeX.toFixed(1)}" y="${(badgeY + 3).toFixed(1)}" text-anchor="middle" font-size="${isDesktop ? '8' : '8.5'}" font-weight="800" fill="#00e5ff" letter-spacing="0.5">JETZT</text>
+        </g>
+      `;
+    }
+  }
+
   return `
     <svg class="inline-day-svg" viewBox="0 0 ${W} ${H}" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <defs>
@@ -1244,6 +1309,9 @@ export function renderDayOverviewSVG({
       <g class="chart-time-axis" font-size="${isDesktop ? '10.5' : '11'}" font-weight="700" fill="#94a3b8">
         ${timeAxisHtml}
       </g>
+
+      <!-- Dezent-eleganter JETZT-Indikator (Aktuelle Position im Tagesverlauf) -->
+      ${nowIndicatorHtml}
 
       <!-- Interaktiver Scrubber (Linie & Punkt auf Temperaturkurve) -->
       <g class="chart-scrubber-group" style="display:none; pointer-events:none;">
@@ -1572,7 +1640,8 @@ export function render10DayForecast(daily, hourly) {
       sunriseDec,
       sunsetDec,
       tMin: harmonizedMin,
-      tMax: harmonizedMax
+      tMax: harmonizedMax,
+      isToday: (i === 0)
     });
 
     const isExtended = visibleIdx >= 3;
@@ -1744,8 +1813,9 @@ export function render10DayForecast(daily, hourly) {
               sunsetStr,
               sunriseDec,
               sunsetDec,
-              tMin: convertTemp(minVal),
-              tMax: convertTemp(maxVal)
+              tMin: harmonizedMin,
+              tMax: harmonizedMax,
+              isToday: (i === 0)
             });
           }
           setupDayChartScrubber(chartCard, {
