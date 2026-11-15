@@ -5675,11 +5675,58 @@ export function updateMeteoSwissTimelineUI(frame, idx, total) {
   const dotNow = document.getElementById('ms-dot-now');
   if (dotNow) dotNow.style.left = `${livePct.toFixed(2)}%`;
 
+  const tickNow = document.querySelector('.ms-tick-now');
+  if (tickNow) tickNow.style.left = `${livePct.toFixed(2)}%`;
+
   const barForecast = document.getElementById('ms-bar-forecast');
   if (barForecast) {
     barForecast.style.left = `${livePct.toFixed(2)}%`;
     barForecast.style.width = `${Math.max(0, 100 - livePct).toFixed(2)}%`;
   }
+
+  positionMeteoSwissAxisTicks(frames, liveIdx);
+}
+
+/**
+ * Richtet die Zeitmarken (-1h, Jetzt, +1h, +3h, +12h, +24h, +48h) exakt
+ * an den echten Frame-Positionen der Slider-Zeitleiste aus (0.00px Mismatch).
+ */
+export function positionMeteoSwissAxisTicks(frames, liveIdx) {
+  if (!frames || frames.length === 0) return;
+  const maxIdx = Math.max(1, frames.length - 1);
+  const liveIndex = (liveIdx !== undefined)
+    ? liveIdx
+    : ((state.map && state.map.liveRadarIndex !== undefined) ? state.map.liveRadarIndex : 4);
+  const livePct = (liveIndex / maxIdx) * 100;
+
+  const tickNow = document.querySelector('.ms-tick-now');
+  if (tickNow) {
+    tickNow.style.left = `${livePct.toFixed(2)}%`;
+  }
+
+  const findClosestFrameIdx = (matchFn) => {
+    for (let i = 0; i < frames.length; i++) {
+      if (matchFn(frames[i])) return i;
+    }
+    return -1;
+  };
+
+  const idx1h = findClosestFrameIdx(f => f.minuteOffset === 60 || f.hoursFromNow === 1);
+  const idx3h = findClosestFrameIdx(f => f.minuteOffset === 180 || f.hoursFromNow === 3);
+  const idx12h = findClosestFrameIdx(f => f.hoursFromNow === 12);
+  const idx24h = findClosestFrameIdx(f => f.hoursFromNow === 24);
+
+  const tick1h = document.querySelector('.ms-tick-1h');
+  if (tick1h && idx1h >= 0) tick1h.style.left = `${((idx1h / maxIdx) * 100).toFixed(2)}%`;
+
+  const tick3h = document.querySelector('.ms-tick-3h');
+  if (tick3h && idx3h >= 0) tick3h.style.left = `${((idx3h / maxIdx) * 100).toFixed(2)}%`;
+
+  const tick12h = document.querySelector('.ms-tick-12h');
+  if (tick12h && idx12h >= 0) tick12h.style.left = `${((idx12h / maxIdx) * 100).toFixed(2)}%`;
+
+  const tick24h = document.querySelector('.ms-tick-24h');
+  if (tick24h && idx24h >= 0) tick24h.style.left = `${((idx24h / maxIdx) * 100).toFixed(2)}%`;
 }
 
 /**
@@ -5773,7 +5820,12 @@ export function setupUnifiedRadarControls() {
 
   const playBtn = document.getElementById('radar-play-btn');
   if (playBtn) {
-    playBtn.onclick = () => toggleRadarPlay();
+    playBtn.onclick = null;
+    playBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleRadarPlay();
+    });
   }
 
   const prevBtn = document.getElementById('radar-prev-btn');
@@ -5808,18 +5860,20 @@ export function setupUnifiedRadarControls() {
     const initialSpeed = state.map.radarPlaybackSpeed || 1;
     updateSpeedUI(initialSpeed);
 
-    speedBtn.onclick = (e) => {
+    speedBtn.onclick = null;
+    speedBtn.addEventListener('click', (e) => {
+      e.preventDefault();
       e.stopPropagation();
       const speeds = [1, 1.5, 2];
       const cur = state.map.radarPlaybackSpeed || 1;
       const curIdx = speeds.indexOf(cur);
       const nextSpeed = speeds[(curIdx >= 0 ? curIdx + 1 : 0) % speeds.length];
       state.map.radarPlaybackSpeed = nextSpeed;
+      updateSpeedUI(nextSpeed);
       try {
         localStorage.setItem('best_weather_radar_speed', String(nextSpeed));
       } catch (err) {}
-      updateSpeedUI(nextSpeed);
-    };
+    });
   }
 
   // Quick Jump Buttons
@@ -5939,10 +5993,14 @@ export function startRadarAnimation() {
   stopRadarAnimation();
   state.map.radarPlaying = true;
   const playBtn = document.getElementById('radar-play-btn');
-  if (playBtn) playBtn.innerText = '⏸';
+  if (playBtn) {
+    playBtn.innerText = '⏸';
+    playBtn.title = 'Animation pausieren';
+    playBtn.setAttribute('aria-label', 'Radar-Animation pausieren');
+  }
 
-  // Präzise Delays für flüssige Animation: 1x (180ms), 1,5x (120ms), 2x (90ms)
-  const delays = { 1: 180, 1.5: 120, 2: 90 };
+  // Präzise Delays für flüssige Animation: 1x (160ms), 1,5x (105ms), 2x (75ms)
+  const delays = { 1: 160, 1.5: 105, 2: 75 };
   let lastTickTime = performance.now();
   let lastCanvasDraw = 0;
 
@@ -6009,7 +6067,11 @@ export function stopRadarAnimation() {
   }
   state.map.radarPlaying = false;
   const playBtn = document.getElementById('radar-play-btn');
-  if (playBtn) playBtn.innerText = '▶';
+  if (playBtn) {
+    playBtn.innerText = '▶';
+    playBtn.title = 'Animation abspielen';
+    playBtn.setAttribute('aria-label', 'Radar-Animation abspielen');
+  }
 }
 
 export function toggleRadarPlay() {

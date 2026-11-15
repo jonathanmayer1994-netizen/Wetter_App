@@ -1908,15 +1908,21 @@
   border: none;
   border-right: 1px solid rgba(255, 255, 255, 0.16);
   background: transparent;
-  transform: none !important;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.12s cubic-bezier(0.16, 1, 0.3, 1), transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ms-player-pill-group .ms-play-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .ms-player-pill-group .ms-play-btn:active {
-  background: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.32) !important;
+  transform: scale(0.90) !important;
+  transition: none !important;
 }
 
 .ms-speed-btn {
@@ -1934,19 +1940,20 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background 0.12s cubic-bezier(0.16, 1, 0.3, 1), transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .ms-speed-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .ms-speed-btn:active {
-  background: rgba(255, 255, 255, 0.26);
-  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.32) !important;
+  transform: scale(0.90) !important;
+  transition: none !important;
 }
 
 .ms-speed-btn.speed-1x {
@@ -2002,19 +2009,42 @@
 }
 
 .ms-axis-ticks {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 10.5px;
+  position: relative;
+  width: 100%;
+  height: 15px;
+  font-size: 10px;
   font-weight: 700;
   color: rgba(226, 232, 240, 0.85);
   font-variant-numeric: tabular-nums;
-  padding: 0 2px;
+  pointer-events: none;
+  overflow: visible;
 }
 
-.ms-tick-now {
+.ms-axis-ticks .ms-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.ms-axis-ticks .ms-tick-past,
+.ms-axis-ticks .ms-tick:first-child {
+  left: 0;
+  transform: translateX(0);
+}
+
+.ms-axis-ticks .ms-tick-now {
   color: #f87171;
   font-weight: 800;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.45);
+  z-index: 2;
+}
+
+.ms-axis-ticks .ms-tick-48h,
+.ms-axis-ticks .ms-tick:last-child {
+  left: 100%;
+  transform: translateX(-100%);
 }
 
 .radar-slider-track-wrap,
@@ -2245,6 +2275,7 @@
     font-size: 9px;
   }
 
+  .ms-axis-ticks .ms-tick-past,
   .ms-axis-ticks .rtm-hide-mobile,
   .radar-timeline-markers .rtm-hide-mobile {
     display: none !important;
