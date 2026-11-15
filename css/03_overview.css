@@ -548,10 +548,10 @@
    ========================================================================== */
 .daily-table-header {
   display: grid;
-  grid-template-columns: 130px 175px 135px 1fr 105px 28px;
+  grid-template-columns: 100px 135px 95px minmax(0, 1fr) 85px 22px;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px 12px 16px;
+  gap: 8px;
+  padding: 8px 12px 10px 12px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -559,6 +559,15 @@
   color: var(--text-tertiary);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 8px;
+}
+
+.dth-temp {
+  text-align: right;
+  padding-right: 4px;
+}
+
+.dth-act {
+  text-align: center;
 }
 
 .daily-list-container {
@@ -638,10 +647,10 @@
 
 .daily-interactive-row {
   display: grid;
-  grid-template-columns: 130px 175px 135px 1fr 105px 28px;
+  grid-template-columns: 100px 135px 95px minmax(0, 1fr) 85px 22px;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 10px 12px;
   cursor: pointer;
   user-select: none;
 }
@@ -810,13 +819,16 @@
 .daily-sun-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .daily-sun-mini-group {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 .dsm-hours {
@@ -830,11 +842,12 @@
   display: inline-flex;
   align-items: flex-end;
   gap: 1.5px;
-  height: 16px;
-  padding: 1.5px 3px;
+  height: 15px;
+  padding: 1px 2.5px;
   background: rgba(0, 0, 0, 0.35);
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .msb-bar {
@@ -867,15 +880,19 @@
 .daily-astro-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
+  gap: 4px;
+  padding: 2.5px 6.5px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--text-tertiary);
   white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dap-dot {
@@ -888,29 +905,32 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .daily-temp-badge {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 3px;
   font-family: var(--font-mono, -apple-system, BlinkMacSystemFont, monospace);
+  white-space: nowrap;
 }
 
 .dt-min {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: #94a3b8;
 }
 
 .dt-sep {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.25);
   font-weight: 400;
 }
 
 .dt-max {
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 800;
   color: #ffffff;
 }

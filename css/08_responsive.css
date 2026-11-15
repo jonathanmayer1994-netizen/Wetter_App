@@ -580,7 +580,7 @@
   /* 2. Tab 1: 2-Column macOS Weather Pro Dashboard */
   .desktop-overview-grid {
     display: grid;
-    grid-template-columns: minmax(420px, 460px) minmax(520px, 1fr);
+    grid-template-columns: minmax(380px, 430px) minmax(520px, 1fr);
     gap: 20px;
     align-items: start;
     width: 100%;
@@ -625,7 +625,14 @@
   }
 
   .overview-col-right .daily-card {
-    padding: 20px 22px;
+    padding: 20px 20px;
+  }
+
+  /* Responsive Astro-Pill in 10-Tage-Trend on Desktop: If viewport is tight (< 1260px), hide astro times to keep Min/Max 100% visible */
+  @media (max-width: 1260px) {
+    .overview-col-right .daily-astro-pill {
+      display: none !important;
+    }
   }
 
   /* 3. Tab 4: Live-Karte & Radar Full-Height Workstation */
