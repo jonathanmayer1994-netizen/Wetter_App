@@ -43,3 +43,4 @@ export function initScrollOptimizer() {
     appLayout.addEventListener('scroll', onScrollStart, { passive: true });
   }
 }
+

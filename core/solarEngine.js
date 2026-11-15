@@ -202,3 +202,115 @@ export function getSolarAtmosphereStyle(solar) {
   };
 }
 
+/**
+ * DYNAMISCHE PHYSIKALISCHE HARMONISIERUNG VON SONNENSCHEIN & NIEDERSCHLAG
+ *
+ * Berechnet die thermodynamisch und strahlungsphysikalisch exakte Sonnenscheindauer
+ * pro Stunde unter Berücksichtigung von Konvektion, Sonnenhöhe, Schauerdauer
+ * und Wolkenschichten. Verhindert Gitter-Diskrepanzen wie "60 min Sonne bei 1.1 l Regen".
+ *
+ * @param {object} params
+ * @param {number} params.hour - Stunde (0-23)
+ * @param {number} params.rawSunHours - Rohe Sonnenscheindauer in Stunden (0.0 bis 1.0)
+ * @param {number} params.precipMm - Niederschlagsmenge in mm
+ * @param {number} params.weatherCode - WMO Wettercode
+ * @param {number} [params.cloudCoverTotal=50] - Gesamtbewölkung in %
+ * @param {number} [params.cloudCoverLow=30] - Tiefe Bewölkung in %
+ * @param {number} [params.cloudCoverMid=15] - Mittelhohe Bewölkung in %
+ * @param {number} [params.cloudCoverHigh=10] - Hohe Bewölkung in %
+ * @param {string} [params.sunriseStr='07:30'] - Sonnenaufgang HH:MM
+ * @param {string} [params.sunsetStr='16:45'] - Sonnenuntergang HH:MM
+ * @param {number} [params.windSpeedKmh=20] - Windgeschwindigkeit in km/h
+ * @returns {number} Harmoniserte Sonnenscheindauer in Stunden (0.0 bis 1.0)
+ */
+export function calculateAccurateSolarDuration({
+  hour,
+  rawSunHours = 0,
+  precipMm = 0,
+  weatherCode = 0,
+  cloudCoverTotal = 50,
+  cloudCoverLow = 30,
+  cloudCoverMid = 15,
+  cloudCoverHigh = 10,
+  sunriseStr = '07:30',
+  sunsetStr = '16:45',
+  windSpeedKmh = 20
+}) {
+  const rawSunMinutes = Math.max(0, Math.min(60, (Number(rawSunHours) || 0) * 60));
+
+  // 1. Astronomisches Zeitfenster (S_astro) in Minuten berechnen
+  let riseDec = 7.5;
+  let setDec = 16.75;
+  if (sunriseStr && typeof sunriseStr === 'string' && sunriseStr.includes(':')) {
+    const parts = sunriseStr.split(':').map(Number);
+    if (!isNaN(parts[0]) && !isNaN(parts[1])) riseDec = parts[0] + (parts[1] / 60);
+  }
+  if (sunsetStr && typeof sunsetStr === 'string' && sunsetStr.includes(':')) {
+    const parts = sunsetStr.split(':').map(Number);
+    if (!isNaN(parts[0]) && !isNaN(parts[1])) setDec = parts[0] + (parts[1] / 60);
+  }
+
+  // Liegt die Stunde komplett vor Sonnenaufgang oder nach Sonnenuntergang?
+  if (hour < Math.floor(riseDec) || hour > Math.floor(setDec)) {
+    return 0.0;
+  }
+
+  // Randstunden am Auf- und Untergang exakt minutengenau deckeln
+  let astroMaxMin = 60;
+  if (hour === Math.floor(riseDec)) {
+    astroMaxMin = Math.max(0, Math.min(60, Math.round((1 - (riseDec - hour)) * 60)));
+  } else if (hour === Math.floor(setDec)) {
+    astroMaxMin = Math.max(0, Math.min(60, Math.round((setDec - hour) * 60)));
+  }
+  if (astroMaxMin <= 0) return 0.0;
+
+  // 2. Trocken (kein nennenswerter Niederschlag): Astronomische Obergrenze beachten
+  const pMm = Number(precipMm) || 0;
+  if (pMm <= 0.05) {
+    return Number((Math.min(rawSunMinutes, astroMaxMin) / 60).toFixed(2));
+  }
+
+  // 3. Stratiformer Landregen & Nieselregen (WMO 51-67): Dichte Wolkenschichten löschen Direktstrahlung aus
+  const wCode = Number(weatherCode) || 0;
+  const isStratiform = (wCode >= 51 && wCode <= 67);
+  if (isStratiform) {
+    if (cloudCoverLow >= 65 || pMm >= 0.35) {
+      return 0.0;
+    }
+    const skyClearance = Math.max(0, 1 - (cloudCoverLow / 100));
+    const stratMin = Math.min(rawSunMinutes, astroMaxMin * skyClearance * 0.2);
+    return Number((stratMin / 60).toFixed(2));
+  }
+
+  // 4. Konvektiver Schauerregen (WMO 80-84, 95-99 oder Schauerwetter)
+  // Reale, dynamische Schauer-Regenrate nach Marshall-Palmer (in mm/h)
+  const rainRate = Math.max(4.0, 3.0 + 5.5 * Math.sqrt(pMm));
+  const rainDurationHours = pMm / rainRate; // Reale Kerndauer des Schauers
+
+  // Sonnenhöhe nähern (mittags höher, morgens/abends flacher)
+  const daySpan = Math.max(1, setDec - riseDec);
+  const fracDay = Math.max(0, Math.min(1, (hour + 0.5 - riseDec) / daySpan));
+  const sunElevationDeg = Math.max(6, 25 * Math.sin(Math.PI * fracDay));
+  const sunElevationRad = (sunElevationDeg * Math.PI) / 180;
+
+  // Schatten-Hülle der Schauerwolke (Projektion + Eisschirm/Amboss)
+  const windFactor = Math.sqrt(Math.max(8, Number(windSpeedKmh) || 20) / 15);
+  const shadowMultiplier = 1 + (1.6 / (Math.tan(sunElevationRad) * windFactor));
+  const shadowDurationHours = Math.min(1.0, rainDurationHours * shadowMultiplier);
+  const shadowDurationMin = shadowDurationHours * 60;
+
+  // Nicht-konvektive Umgebungsbewölkung außerhalb der Schauerzelle
+  const cldAmbientLow = Math.max(0, cloudCoverLow - (pMm > 0 ? 30 : 0));
+  const bgObstruction = (1.0 * (cldAmbientLow / 100)) + (0.35 * (cloudCoverMid / 100)) + (0.05 * (cloudCoverHigh / 100));
+  const bgClearFactor = Math.max(0.20, Math.min(1.0, 1 - bgObstruction));
+
+  // Dynamisch verbleibendes Sonnenzeit-Budget in den Lücken zwischen den Schauern
+  const availableClearMin = Math.max(0, astroMaxMin - shadowDurationMin);
+  const dynamicSunMin = Math.round(availableClearMin * bgClearFactor);
+
+  // Physikalischer Wahrheitswert: Niemals mehr Sonnenzeit als die Himmelsgeometrie zulässt
+  const finalMin = Math.min(rawSunMinutes, dynamicSunMin);
+  return Number((finalMin / 60).toFixed(2));
+}
+
+

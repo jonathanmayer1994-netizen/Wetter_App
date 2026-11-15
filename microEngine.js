@@ -7,6 +7,7 @@
 import { resilientFetch, HttpStatusError, isApiCoolingDown, getLocalDateKey } from './httpClient.js';
 import { physicsBridge } from './core/physicsBridge.js';
 import { validateCurrentWeather, validateHourlyWeather, validateMultiModel } from './core/contracts.js';
+import { calculateAccurateSolarDuration } from './core/solarEngine.js';
 
 const EARTH_CIRCUMFERENCE_M = 40075016.686;
 const TILE_SIZE = 256;
@@ -490,6 +491,55 @@ export const MicroEngine = {
       }
       if (raw.current) raw.current = validateCurrentWeather(raw.current);
       if (raw.hourly) raw.hourly = validateHourlyWeather(raw.hourly);
+
+      // Dynamische thermodynamische Harmonisierung von Sonnenscheindauer und Niederschlag
+      if (raw.hourly && Array.isArray(raw.hourly.sunshine_duration) && Array.isArray(raw.hourly.precipitation)) {
+        for (let i = 0; i < raw.hourly.time.length; i++) {
+          const timeStr = raw.hourly.time[i];
+          const dateStr = timeStr.slice(0, 10);
+          const hourNum = parseInt(timeStr.slice(11, 13), 10);
+          const dayIdx = raw.daily?.time ? raw.daily.time.indexOf(dateStr) : -1;
+          const sunriseStr = (dayIdx >= 0 && raw.daily.sunrise?.[dayIdx]) ? String(raw.daily.sunrise[dayIdx]).slice(11, 16) : '07:30';
+          const sunsetStr = (dayIdx >= 0 && raw.daily.sunset?.[dayIdx]) ? String(raw.daily.sunset[dayIdx]).slice(11, 16) : '16:45';
+
+          const rawSec = raw.hourly.sunshine_duration[i] || 0;
+          const precip = raw.hourly.precipitation[i] || 0;
+          const wCode = raw.hourly.weather_code ? raw.hourly.weather_code[i] : 0;
+          const cld = raw.hourly.cloud_cover ? raw.hourly.cloud_cover[i] : 50;
+          const wind = raw.hourly.wind_speed_10m ? raw.hourly.wind_speed_10m[i] : 15;
+
+          const harmonizedH = calculateAccurateSolarDuration({
+            hour: hourNum,
+            rawSunHours: rawSec / 3600,
+            precipMm: precip,
+            weatherCode: wCode,
+            cloudCoverTotal: cld,
+            cloudCoverLow: Math.round(cld * 0.6),
+            cloudCoverMid: Math.round(cld * 0.3),
+            cloudCoverHigh: Math.round(cld * 0.1),
+            sunriseStr,
+            sunsetStr,
+            windSpeedKmh: wind
+          });
+          raw.hourly.sunshine_duration[i] = Math.round(harmonizedH * 3600);
+        }
+
+        // Täglich summierten Sonnenschein mathematisch exakt mit den Stundenwerten synchronisieren
+        if (raw.daily && Array.isArray(raw.daily.time) && Array.isArray(raw.daily.sunshine_duration)) {
+          for (let d = 0; d < raw.daily.time.length; d++) {
+            const dKey = raw.daily.time[d];
+            let daySunSumSec = 0;
+            for (let i = 0; i < raw.hourly.time.length; i++) {
+              if (raw.hourly.time[i].startsWith(dKey)) {
+                daySunSumSec += raw.hourly.sunshine_duration[i];
+              }
+            }
+            if (daySunSumSec > 0 || raw.daily.sunshine_duration[d] !== undefined) {
+              raw.daily.sunshine_duration[d] = daySunSumSec;
+            }
+          }
+        }
+      }
     }
     return raw;
   },
@@ -802,9 +852,23 @@ export const MicroEngine = {
         const appT = (pt.temp <= 10 && pt.windSpd >= 4.8)
           ? Math.round((13.12 + 0.6215 * pt.temp - 11.37 * Math.pow(pt.windSpd, 0.16) + 0.3965 * pt.temp * Math.pow(pt.windSpd, 0.16)) * 10) / 10
           : Math.round((pt.temp + 0.02 * (pt.rh - 50) - 0.05 * pt.windSpd) * 10) / 10;
-        const sunSec = pt.sunSec !== null
+        const baseSunSec = pt.sunSec !== null
           ? (isDay ? pt.sunSec : 0)
           : (isDay ? Math.max(0, Math.round(((100 - pt.cloud) / 100) * 3600)) : 0);
+        const harmonizedSunH = calculateAccurateSolarDuration({
+          hour: h,
+          rawSunHours: baseSunSec / 3600,
+          precipMm: pt.precip,
+          weatherCode: pt.code,
+          cloudCoverTotal: pt.cloud,
+          cloudCoverLow: Math.round(pt.cloud * 0.6),
+          cloudCoverMid: Math.round(pt.cloud * 0.3),
+          cloudCoverHigh: Math.round(pt.cloud * 0.1),
+          sunriseStr: sun.sunriseIso ? String(sun.sunriseIso).slice(11, 16) : '07:30',
+          sunsetStr: sun.sunsetIso ? String(sun.sunsetIso).slice(11, 16) : '16:45',
+          windSpeedKmh: pt.windSpd
+        });
+        const sunSec = Math.round(harmonizedSunH * 3600);
         const solarFrac = isDay ? Math.sin(Math.PI * Math.max(0, (h + 0.5 - sun.sunriseHour) / Math.max(1, sun.sunsetHour - sun.sunriseHour))) : 0;
         const uv = Math.round(Math.max(0, solarFrac * 4.2 * (1 - 0.68 * (pt.cloud / 100))) * 10) / 10;
         const flMeters = Math.max(0, Math.min(5000, Math.round(elev + (pt.temp / 0.0065))));
