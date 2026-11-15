@@ -370,6 +370,7 @@ export function openWebcamModal(cam) {
   const img = document.getElementById('webcam-modal-img');
   const meta = document.getElementById('webcam-modal-meta');
   const link = document.getElementById('webcam-external-link');
+  const officialLink = document.getElementById('webcam-official-link');
 
   if (!modal) return;
   if (title) title.innerText = cam.title;
@@ -393,11 +394,25 @@ export function openWebcamModal(cam) {
       </div>
     `;
   }
+  if (officialLink) {
+    if (cam.officialUrl) {
+      officialLink.href = cam.officialUrl;
+      officialLink.style.display = 'inline-flex';
+      officialLink.innerText = '🏔️ Offizielle Gipfel-Livecam';
+    } else {
+      officialLink.style.display = 'none';
+    }
+  }
   if (link) {
-    link.href = cam.streamUrl;
-    link.innerText = cam.provider === 'bergfex' 
-      ? '🔗 Auf bergfex.de in voller Auflösung ansehen' 
-      : '🔗 Zur offiziellen Livecam-Seite';
+    if (cam.streamUrl) {
+      link.href = cam.streamUrl;
+      link.style.display = 'inline-flex';
+      link.innerText = (cam.streamUrl && cam.streamUrl.includes('bergfex'))
+        ? '🔗 Auf bergfex.de ansehen' 
+        : '🔗 Zur Livecam-Seite';
+    } else {
+      link.style.display = 'none';
+    }
   }
 
   modal.style.display = 'flex';

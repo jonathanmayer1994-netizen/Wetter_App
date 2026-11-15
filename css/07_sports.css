@@ -1894,6 +1894,27 @@
   margin-top: 6px;
 }
 
+#webcam-official-link {
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+}
+
+#webcam-official-link:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%) !important;
+}
+
+#webcam-external-link {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+
+#webcam-external-link:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
 .action-btn-secondary {
   background: rgba(255, 255, 255, 0.12) !important;
   color: #ffffff !important;
