@@ -22,6 +22,9 @@
   ],
   "author": "Jona",
   "license": "MIT",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  },
   "devDependencies": {
     "vite": "^5.4.10",
     "vitest": "^2.1.4"

@@ -1,0 +1,23 @@
+{
+  "subscription": null,
+  "rules": {
+    "rainAlert": true,
+    "rainThreshold": 50,
+    "windAlert": true,
+    "windThreshold": 60,
+    "frostAlert": true,
+    "frostThreshold": 0,
+    "briefingAlert": true,
+    "briefingTime": "07:00",
+    "severeAlert": true,
+    "locationMode": "gps"
+  },
+  "location": {
+    "name": "München",
+    "lat": 48.137,
+    "lon": 11.575,
+    "elevation": 520
+  },
+  "vapidPublicKey": "BFXeGAET8G6YxsiL0HvXELcaDIoZyeIgPYokZuqpueq3NFJs8xG7KsyvViif44MAxMkBI_OQ93OXewHGRhMSOmI",
+  "updatedAt": "2026-11-16T20:00:00.000Z"
+}

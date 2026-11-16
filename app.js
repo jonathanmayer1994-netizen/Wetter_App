@@ -27,6 +27,7 @@ import { initPullToRefresh } from './features/pullToRefresh.js?v=3.0.0';
 import { GoogleSheetsSync } from './core/googleSheetsSync.js';
 import { AlpineStorage } from './storage.js';
 import { initScrollOptimizer } from './core/scrollOptimizer.js';
+import { initNotifications, openNotificationModal } from './features/notifications.js';
 
 // Central Dispatcher Event Bus Subscriptions
 export function setupDispatcherSubscriptions() {
@@ -428,6 +429,7 @@ window.drawMountain3DCanvas = () => {};
 window.openDayDetailModal = openDayDetailModal;
 window.convertTemp = convertTemp;
 window.updatePointWeatherCard = updatePointWeatherCard;
+window.openNotificationModal = openNotificationModal;
 
 // =============================================================================
 // MAIN INITIALIZATION
@@ -458,6 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSourcesQuickNav();
   setupExpertModeToggle();
   initBentoSheets();
+  initNotifications();
 
   // Pull-Down-to-Refresh: Aktualisiert Wetter & Cloud-Favoriten per Wischgeste auf Dashboard & Stadt-/Bergklima
   initPullToRefresh({

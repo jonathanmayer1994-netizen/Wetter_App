@@ -324,7 +324,7 @@ def run_tests():
         page.wait_for_timeout(200)
         report("Radar timeline controls stay visible on Temp overlay", page.is_visible("#radar-floating-controls"))
 
-        page.click(".map-overlay-btn[data-overlay='precip']") # back to precip
+        page.click(".map-overlay-btn[data-overlay='precip']", force=True) # back to precip
         
         page.close()
 
@@ -583,7 +583,7 @@ def run_tests():
 
         def close_active_modals():
             page.evaluate("""() => {
-                ['day-detail-modal', 'gpx-modal-overlay', 'webcam-modal-overlay', 'spotlight-modal-overlay'].forEach(id => {
+                ['day-detail-modal', 'gpx-modal-overlay', 'webcam-modal-overlay', 'spotlight-modal-overlay', 'notif-modal-overlay'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.style.display = 'none';
                 });

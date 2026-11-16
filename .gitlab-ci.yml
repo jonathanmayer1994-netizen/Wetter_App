@@ -1,0 +1,38 @@
+# =============================================================================
+# BEST WEATHER — GitLab CI/CD Pipeline for Automated Web Push Notifications
+# =============================================================================
+# Optimized for Ultra-Fast Execution (< 15 seconds) on Alpine Linux
+
+stages:
+  - notify
+
+# Caching für Node-Module (vermeidet wiederholtes Herunterladen in jedem Takt)
+cache:
+  key:
+    files:
+      - package.json
+  paths:
+    - node_modules/
+
+# Scheduled Push Dispatcher Job
+weather_push_dispatch:
+  stage: notify
+  image: node:20-alpine
+  rules:
+    # 1. Automatischer Start durch Pipeline-Schedules (z. B. alle 20 Minuten)
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    # 2. Manueller Test-Start über das GitLab Web-UI
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    # 3. Auslösung über die GitLab REST API (Trigger-Token oder Personal Access Token)
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+
+  before_script:
+    - test -d node_modules/web-push || npm install --no-audit --no-fund --production web-push
+
+  script:
+    - echo "Starte Best Weather Push Dispatcher..."
+    - node scripts/weather-push-dispatcher.mjs
+
+  variables:
+    NODE_ENV: "production"

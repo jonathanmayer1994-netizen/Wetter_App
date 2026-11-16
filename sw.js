@@ -1,15 +1,16 @@
 /**
- * BEST WEATHER — Service Worker v2.28.0
+ * BEST WEATHER — Service Worker v2.29.0
  * Enterprise-Grade Alpine Offline PWA Cache Engine
  * Features:
+ * - Native Web Push Notifications (iOS 16.4+ APNs & macOS Notification Center)
  * - CDN Edge & iOS NSURLCache bypass on deploy token change (GitHub Pages max-age=600 fix)
  * - Network-First for code/markup with instant offline CacheStorage fallback
  * - Bounded 600-tile map cache
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.28.0';
-const CACHE_NAME = `best-weather-v2.28.0-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.29.0';
+const CACHE_NAME = `best-weather-v2.29.0-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
 const MAX_TILES = 600;
 
@@ -60,6 +61,7 @@ const STATIC_ASSETS = [
   './features/verificationUI.js',
   './features/bentoSheets.js',
   './features/pullToRefresh.js',
+  './features/notifications.js',
   './manifest.json',
   './logo.png',
   './apple-touch-icon.png',
@@ -320,3 +322,89 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// =============================================================================
+// NATIVE WEB PUSH NOTIFICATIONS (iOS 16.4+ APNs & macOS Notification Center)
+// =============================================================================
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (_) {
+      try {
+        payload = { title: 'Best Weather', body: event.data.text() };
+      } catch (_) {
+        payload = { title: 'Best Weather', body: 'Neue Wetteraktualisierung' };
+      }
+    }
+  } else {
+    payload = { title: 'Best Weather', body: 'Wetteraktualisierung verfügbar' };
+  }
+
+  const title = payload.title || 'Best Weather';
+  const tag = payload.tag || 'best-weather-alert';
+  const notificationOptions = {
+    body: payload.body || 'Neue Wetterdaten verfügbar',
+    icon: payload.icon || './icon-192.png',
+    badge: payload.badge || './favicon.png',
+    image: payload.image || undefined,
+    tag: tag,
+    renotify: payload.renotify !== false,
+    requireInteraction: Boolean(payload.requireInteraction),
+    vibrate: payload.vibrate || [200, 100, 200],
+    data: {
+      url: payload.data?.url || './',
+      tab: payload.data?.tab || 'tab-overview',
+      timestamp: Date.now(),
+      type: payload.data?.type || 'weather'
+    },
+    actions: payload.actions || [
+      { action: 'open', title: 'App öffnen' },
+      { action: 'dismiss', title: 'Schließen' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, notificationOptions)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'dismiss') {
+    return;
+  }
+
+  const notifData = event.notification.data || {};
+  const targetTab = notifData.tab || 'tab-overview';
+  const targetUrl = notifData.url || './';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Prüfen, ob bereits ein Best Weather Tab/Fenster offen ist
+      for (const client of windowClients) {
+        if ('focus' in client) {
+          client.postMessage({
+            type: 'NOTIFICATION_OPENED',
+            tab: targetTab,
+            data: notifData
+          });
+          return client.focus();
+        }
+      }
+      // Wenn noch kein Fenster offen ist, neu öffnen
+      if (clients.openWindow) {
+        const fullUrl = targetTab ? `${targetUrl}?tab=${targetTab}` : targetUrl;
+        return clients.openWindow(fullUrl);
+      }
+    })
+  );
+});
+
+self.addEventListener('notificationclose', (event) => {
+  // Verworfen
+});
+

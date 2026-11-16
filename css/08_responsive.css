@@ -527,23 +527,23 @@
     order: 3;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex: 0 1 auto;
     width: auto;
-    max-width: 480px;
+    max-width: 440px;
     position: relative;
     z-index: 10;
   }
 
   .desktop-header-dock .search-input-wrapper {
-    min-width: 240px !important;
-    width: 320px !important;
+    min-width: 190px !important;
+    width: 230px !important;
     flex: 1 1 auto;
     transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .desktop-header-dock .search-input-wrapper:focus-within {
-    width: 380px !important;
+    width: 300px !important;
   }
 
   .desktop-header-dock .search-input-box {
@@ -565,7 +565,7 @@
   .desktop-header-dock .header-action-group {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex-shrink: 0;
   }
 
