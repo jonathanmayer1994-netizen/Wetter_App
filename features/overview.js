@@ -1705,8 +1705,16 @@ export function render10DayForecast(daily, hourly) {
             ${(() => {
               const snowSum = daily.snowfall_sum ? (daily.snowfall_sum[i] || 0) : 0;
               const parts = [];
-              if (pop > 10 || rainSum > 0.05) parts.push(`💧 ${pop}% ${rainSum.toFixed(1)} mm`);
-              if (snowSum > 0.05) parts.push(`❄️ ${snowSum.toFixed(1)} cm`);
+              if (pop > 10 || rainSum > 0.05) {
+                const rainVal = (rainSum >= 10 && Math.abs(rainSum - Math.round(rainSum)) < 0.05) ? Math.round(rainSum) : (Math.round(rainSum * 10) / 10);
+                const rainStr = String(rainVal).replace('.', ',');
+                parts.push(`💧 ${pop}% ${rainStr} mm`);
+              }
+              if (snowSum > 0.05) {
+                const snowVal = (snowSum >= 10 && Math.abs(snowSum - Math.round(snowSum)) < 0.05) ? Math.round(snowSum) : (Math.round(snowSum * 10) / 10);
+                const snowStr = String(snowVal).replace('.', ',');
+                parts.push(`❄️ ${snowStr} cm`);
+              }
               if (parts.length === 0) return '<span class="daily-precip-dry">💧 0%</span>';
               return `<span class="daily-precip-chip ${rainSum >= 5 || snowSum >= 5 ? 'heavy-rain' : ''}">${parts.join(' · ')}</span>`;
             })()}

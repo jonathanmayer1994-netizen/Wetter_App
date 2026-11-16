@@ -9154,7 +9154,7 @@ body.is-scrolling .radar-floating-controls {
     display: flex;
     flex-direction: column;
     gap: 7px;
-    padding: 10px 10px;
+    padding: 10px 12px;
     box-sizing: border-box;
     width: 100%;
   }
@@ -9163,16 +9163,17 @@ body.is-scrolling .radar-floating-controls {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: 8px;
     width: 100%;
     min-width: 0;
+    box-sizing: border-box;
   }
 
   .daily-row-mobile-bottom {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 5px;
+    gap: 6px;
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
@@ -9285,19 +9286,19 @@ body.is-scrolling .radar-floating-controls {
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     overflow: hidden;
   }
 
   .daily-sun-mini-group {
     display: inline-flex;
     align-items: center;
-    gap: 3.5px;
+    gap: 4px;
     flex-shrink: 0;
   }
 
   .dsm-hours {
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: -0.2px;
     white-space: nowrap;
@@ -9305,14 +9306,14 @@ body.is-scrolling .radar-floating-controls {
 
   .dsm-chart {
     height: 12px;
-    padding: 1px 1.5px;
-    gap: 1px;
+    padding: 1px 2px;
+    gap: 1.5px;
     border-radius: 3px;
     flex-shrink: 0;
   }
 
   .msb-bar {
-    width: 1.8px;
+    width: 2px;
     border-radius: 0.5px;
   }
 
@@ -9349,45 +9350,55 @@ body.is-scrolling .radar-floating-controls {
   }
 
   .daily-precip-chip {
-    padding: 2px 6px;
-    font-size: 9.5px;
+    padding: 2.5px 7px;
+    font-size: 10px;
     font-weight: 700;
     gap: 3px;
     white-space: nowrap;
     border-radius: 8px;
     letter-spacing: -0.15px;
+    box-sizing: border-box;
+    flex-shrink: 0;
   }
 
   .daily-precip-dry {
-    font-size: 9.5px;
+    font-size: 10px;
     white-space: nowrap;
     opacity: 0.85;
   }
 
+  /* Mobile screens <= 600px (smartphones in portrait):
+     Hide redundant astro-pill (sunrise/sunset are shown in hero header and 24h detail accordion)
+     to guarantee generous breathing room (+100px) and 0% clipping on heavy precipitation chips */
+  @media (max-width: 600px) {
+    .daily-astro-pill {
+      display: none !important;
+    }
+    .daily-precip-cell {
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+  }
+
   @media (max-width: 360px) {
     .daily-interactive-row {
-      padding: 9px 8px;
+      padding: 9px 9px;
     }
     .daily-row-mobile-bottom {
-      gap: 3px;
+      gap: 4px;
     }
     .daily-sun-cell {
-      gap: 3px;
+      gap: 4px;
     }
     .dsm-hours {
       font-size: 10px;
     }
     .msb-bar {
-      width: 1.5px;
-    }
-    .daily-astro-pill {
-      font-size: 8.5px;
-      padding: 1px 3.5px;
-      gap: 1.5px;
+      width: 1.6px;
     }
     .daily-precip-chip {
-      padding: 1.5px 4.5px;
-      font-size: 9px;
+      padding: 2px 5px;
+      font-size: 9.5px;
     }
   }
 
