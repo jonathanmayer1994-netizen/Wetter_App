@@ -149,6 +149,7 @@ export function updateMapSolarTransition(targetTimeMs) {
 
   // Astronomical Solar Calculation
   const solar = getSolarPosition(timeMs, centerLat, centerLon);
+  state.map.currentSolar = solar;
   const style = getSolarAtmosphereStyle(solar);
 
   // Hybrid Zoom Weighting (Option D):
@@ -212,6 +213,67 @@ export function updateMapSolarTransition(targetTimeMs) {
     pill.title = `${solar.label} (Sonnenstand ${solar.altitude >= 0 ? '+' : ''}${solar.altitude.toFixed(1)}°)`;
     pill.setAttribute('aria-label', `Sonnenstand: ${solar.label}`);
   }
+
+  // 5. Notify dynamic overlays (e.g. wind streamlines & legend) if day/night visual mode flipped
+  const isDark = isMapCurrentlyDark(timeMs);
+  if (state.map._lastIsDark !== isDark) {
+    state.map._lastIsDark = isDark;
+    if (typeof state.map.updateLegend === 'function' && state.map.activeOverlay === 'wind') {
+      state.map.updateLegend('wind');
+    }
+  }
+}
+
+/**
+ * Determines whether the map is currently rendered in a dark environment:
+ * - Explicit dark base layer (osm-dark, satellite)
+ * - Or nighttime / twilight under solar lighting (lightFactor < 0.50)
+ *
+ * @param {number} [targetTimeMs]
+ * @returns {boolean}
+ */
+export function isMapCurrentlyDark(targetTimeMs) {
+  if (!state.map) return false;
+  const base = state.map.activeBase || 'osm-dark';
+  if (base === 'osm-dark' || base === 'satellite') {
+    return true;
+  }
+
+  // If solar day/night transitions are active (default is on)
+  if (state.map.solarTransitionEnabled !== false) {
+    if (state.map.currentSolar && targetTimeMs === undefined) {
+      return state.map.currentSolar.lightFactor < 0.50;
+    }
+
+    let timeMs = targetTimeMs;
+    if (!timeMs) {
+      const floatIdx = (state.map && state.map.radarFloatIndex !== undefined) ? state.map.radarFloatIndex : 0;
+      const frames = (state.map && state.map.unifiedRadarFrames) ? state.map.unifiedRadarFrames : [];
+      if (frames.length > 0) {
+        const i0 = Math.max(0, Math.min(frames.length - 1, Math.floor(floatIdx)));
+        timeMs = frames[i0]?.timestampMs || Date.now();
+      } else {
+        timeMs = Date.now();
+      }
+    }
+
+    let lat = 47.72, lon = 10.32;
+    if (state.map.instance) {
+      try {
+        const c = state.map.instance.getCenter();
+        lat = c.lat;
+        lon = c.lng;
+      } catch (e) {}
+    } else if (state.currentLocation) {
+      lat = state.currentLocation.lat;
+      lon = state.currentLocation.lon;
+    }
+
+    const s = getSolarPosition(timeMs, lat, lon);
+    return s.lightFactor < 0.50;
+  }
+
+  return false;
 }
 
 /**
@@ -242,6 +304,9 @@ export function setupSolarToggleButton() {
     }
 
     updateMapSolarTransition();
+    if (typeof state.map.updateLegend === 'function' && state.map.activeOverlay === 'wind') {
+      state.map.updateLegend('wind');
+    }
   };
 }
 

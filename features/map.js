@@ -8,7 +8,7 @@ import { state } from '../core/state.js';
 import { BASE_LAYERS, REGIONAL_STATIONS, WMO_CODES } from '../core/constants.js';
 import { selectExactLocation } from './search.js';
 import { MicroEngine } from '../microEngine.js';
-import { initMapSolarTransition, updateMapSolarTransition } from './mapSolar.js';
+import { initMapSolarTransition, updateMapSolarTransition, isMapCurrentlyDark } from './mapSolar.js';
 import {
   escapeHtml,
   resilientFetch,
@@ -141,6 +141,7 @@ export function initLeafletMap() {
   state.map.weatherLayerGroup = L.layerGroup().addTo(state.map.instance);
 
   // 2c. Initialisiere Tag/Nacht-Solar-Transition (Option D: Hybrid aus Terminator & Atmosphären-Filter)
+  state.map.updateLegend = updateMapLegend;
   initMapSolarTransition(state.map.instance);
 
   // 3. Setze Standard-Basiskarte synchron zu state & UI (MeteoSwiss Alpin-Dunkel 3D Relief)
@@ -1497,17 +1498,17 @@ export function updateMapLegend(overlay = state.map.activeOverlay) {
 
   if (overlay === 'wind') {
     legendTitle.innerText = '💨 48h Windströmung & Böen (Alpen & Flachland):';
-    const isDark = (state.map && state.map.activeBase === 'osm-dark');
+    const isDark = isMapCurrentlyDark();
     if (isDark) {
       legendBar.style.background = 'linear-gradient(90deg, #22c55e, #38bdf8, #f59e0b, #ef4444, #c084fc)';
       legendLabels.innerHTML = `
-        <span style="color:#22c55e;">< 20 km/h</span>
-        <span style="color:#38bdf8;">35 km/h</span>
-        <span style="color:#f59e0b;">55 km/h</span>
-        <span style="color:#c084fc;">> 75 km/h Sturm</span>
+        <span style="color:#22c55e; font-weight:800;">< 20 km/h</span>
+        <span style="color:#38bdf8; font-weight:700;">35 km/h</span>
+        <span style="color:#f59e0b; font-weight:700;">55 km/h</span>
+        <span style="color:#c084fc; font-weight:700;">> 75 km/h Sturm</span>
       `;
     } else {
-      // Auf hellen Karten (Standard, Topo, Satellit): Dunkelblau-Skala für optimalen Kontrast
+      // Auf hellen Karten am Tag (Standard, Topo): Dunkelblau-Skala für optimalen Kontrast
       legendBar.style.background = 'linear-gradient(90deg, #002855, #0d47a1, #1e40af, #b45309, #991b1b)';
       legendLabels.innerHTML = `
         <span style="color:#7dd3fc; font-weight:800;">< 20 km/h</span>
@@ -2926,16 +2927,16 @@ const WeatherCanvasEngine = {
 
       // Erhalte die darunterliegende OSM-Karte 100% transparent sichtbar!
       // Faded bestehende Partikelspuren sauber mit destination-out ab, ohne eine deckende Farbschicht aufzubauen.
-      const isDarkMap = (state.map && state.map.activeBase === 'osm-dark');
+      const isDarkMap = isMapCurrentlyDark();
       ctx.save();
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillStyle = isDarkMap ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.12)';
+      ctx.fillStyle = isDarkMap ? 'rgba(0, 0, 0, 0.09)' : 'rgba(0, 0, 0, 0.12)';
       ctx.fillRect(0, 0, width, height);
       ctx.restore();
 
       ctx.save();
       ctx.globalCompositeOperation = 'source-over';
-      ctx.lineWidth = isDarkMap ? 2.2 : 2.8;
+      ctx.lineWidth = isDarkMap ? 2.6 : 2.8;
       ctx.lineCap = 'round';
 
       for (let i = 0; i < self.particles.length; i++) {
@@ -2953,14 +2954,15 @@ const WeatherCanvasEngine = {
 
         let color;
         if (isDarkMap) {
-          // Auf dunkler Karte: Neon-Grün / Cyan / Orange / Rot für perfekten Kontrast
-          color = '#22c55e';
-          if (p.speed >= 75) color = '#c084fc';
-          else if (p.speed >= 55) color = '#ef4444';
-          else if (p.speed >= 35) color = '#f59e0b';
-          else if (p.speed >= 20) color = '#38bdf8';
+          // Auf dunkler Karte (Nacht, osm-dark, Satellit):
+          // Strahlende, kontraststarke Signalfarben für gestochen scharfe Lesbarkeit:
+          color = '#22c55e'; // Leuchtendes Smaragd-Grün (< 20 km/h)
+          if (p.speed >= 75) color = '#c084fc'; // Luminous Violett (> 75 km/h Sturm)
+          else if (p.speed >= 55) color = '#ef4444'; // Signalrot (55-75 km/h)
+          else if (p.speed >= 35) color = '#f59e0b'; // Kräftiges Bernstein-Orange (35-55 km/h)
+          else if (p.speed >= 20) color = '#38bdf8'; // Helles Himmels-Cyan (20-35 km/h)
         } else {
-          // Auf hellen Karten (Standard, Topo, Satellit): Kräftiges Dunkelblau für höchste Sichtbarkeit!
+          // Auf hellen Karten am Tag (Standard, Topo): Kräftiges Dunkelblau für höchste Sichtbarkeit!
           color = '#002855'; // Sattes Tiefblau (< 20 km/h)
           if (p.speed >= 75) color = '#312e81'; // Tiefes Nachtblau / Sturm
           else if (p.speed >= 55) color = '#991b1b'; // Dunkelrot
@@ -2969,10 +2971,10 @@ const WeatherCanvasEngine = {
         }
 
         const lifeRatio = p.age / p.maxAge;
-        const alpha = Math.sin(lifeRatio * Math.PI) * (isDarkMap ? 0.85 : 0.95);
+        const alpha = Math.sin(lifeRatio * Math.PI);
 
         ctx.strokeStyle = color;
-        ctx.globalAlpha = Math.max(isDarkMap ? 0.05 : 0.35, alpha);
+        ctx.globalAlpha = isDarkMap ? Math.max(0.40, alpha * 0.95) : Math.max(0.35, alpha * 0.95);
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(nextX, nextY);
@@ -3189,8 +3191,7 @@ const WeatherCanvasEngine = {
   _traceRateMin: 0.04,
 
   isDarkBasemap() {
-    const base = (state.map && state.map.activeBase) || 'osm-outdoor';
-    return base === 'osm-dark' || base === 'satellite';
+    return isMapCurrentlyDark();
   },
 
   getPrecipTier(rateMmH) {
@@ -4711,7 +4712,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay, renderOpts = 
         const spd = st.windSpeed !== undefined ? st.windSpeed : 15;
         const gust = st.windGusts !== undefined ? st.windGusts : Math.round(spd * 1.35);
         const dir = st.windDirection !== undefined ? st.windDirection : 240;
-        const isDarkMap = (state.map && state.map.activeBase === 'osm-dark');
+        const isDarkMap = isMapCurrentlyDark();
         let color = isDarkMap ? '#22c55e' : '#002855';
         let bftClass = 'Schwache Brise';
         if (isDarkMap) {
@@ -6119,6 +6120,10 @@ if (typeof window !== 'undefined') {
   window.showUnifiedRadarFrame = showUnifiedRadarFrame;
   window.getInterpolatedRadarSpec = getInterpolatedRadarSpec;
   window.setMapBaseLayer = setMapBaseLayer;
+  window.setMapOverlay = setMapOverlay;
+  window.updateMapLegend = updateMapLegend;
+  window.isMapCurrentlyDark = isMapCurrentlyDark;
+  window.updateMapSolarTransition = updateMapSolarTransition;
   window.ensureFreshMapRadar = ensureFreshMapRadar;
   window.realignRadarTimelineTimestamps = realignRadarTimelineTimestamps;
 }
