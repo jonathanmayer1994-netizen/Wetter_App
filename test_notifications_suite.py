@@ -194,19 +194,71 @@ def run_tests():
         test_btn_text = test_btn.inner_text()
         assert_test("Test-Push execution gives feedback ('✓ Gesendet!' or 'Test-Push')", "✓" in test_btn_text or "Test" in test_btn_text)
 
-        # 12. Close Modal via Close Button
+        # 12. Close Modal via Close Button (No unsaved changes -> closes immediately without dialog)
+        unsaved_dialog = page.locator("#notif-unsaved-dialog")
         close_btn = page.locator("#notif-modal-close")
         close_btn.click()
         page.wait_for_timeout(300)
-        assert_test("Close button closes modal", not modal.is_visible())
+        assert_test("Close button closes modal immediately when no unsaved changes exist", not modal.is_visible() and not unsaved_dialog.is_visible())
 
-        # 13. Re-open and close with ESC key
+        # 13. Re-open and close with ESC key (No unsaved changes)
         notif_btn.click()
         page.wait_for_timeout(300)
         assert_test("Modal re-opens cleanly", modal.is_visible())
         page.keyboard.press("Escape")
         page.wait_for_timeout(300)
-        assert_test("Escape key closes modal", not modal.is_visible())
+        assert_test("Escape key closes modal when clean", not modal.is_visible())
+
+        # 14. Unsaved Changes Dialog: Edit -> X -> Cancel -> X -> Discard -> Verify Reverted
+        notif_btn.click()
+        page.wait_for_timeout(250)
+        preset_cards.nth(1).click()  # Switch Eco -> Hourly (unsaved)
+        rule_frost.evaluate("el => { el.checked = false; el.dispatchEvent(new Event('change')); }")
+        page.wait_for_timeout(150)
+        assert_test("Unsaved changes detected after editing preset and frost rule", page.evaluate("() => window.hasUnsavedNotificationChanges() === true"))
+        assert_test("Save button highlights unsaved state (.has-unsaved)", "has-unsaved" in (save_btn.get_attribute("class") or ""))
+
+        close_btn.click()
+        page.wait_for_timeout(200)
+        assert_test("Clicking X with unsaved changes opens #notif-unsaved-dialog", unsaved_dialog.is_visible() and modal.is_visible())
+
+        # Click Cancel -> dialog closes, modal stays open with edits preserved
+        page.locator("#notif-unsaved-cancel-btn").click()
+        page.wait_for_timeout(200)
+        assert_test("Clicking 'Abbrechen' closes only unsaved dialog and keeps modal open", not unsaved_dialog.is_visible() and modal.is_visible() and not rule_frost.is_checked())
+
+        # Click X again -> Click Discard -> both close and original state is restored
+        close_btn.click()
+        page.wait_for_timeout(200)
+        assert_test("Unsaved dialog re-opens on second X click", unsaved_dialog.is_visible())
+        page.locator("#notif-unsaved-discard-btn").click()
+        page.wait_for_timeout(250)
+        assert_test("Clicking 'Änderungen verwerfen' closes dialog and modal", not unsaved_dialog.is_visible() and not modal.is_visible())
+
+        # Re-open and verify original state was NOT overwritten
+        notif_btn.click()
+        page.wait_for_timeout(250)
+        assert_test("Discarded changes were reverted (Frost still checked, Eco still selected)", rule_frost.is_checked() and gl_schedule.input_value() == "eco")
+
+        # 15. Unsaved Changes Dialog: Edit -> X -> Save -> Verify Persisted
+        preset_cards.nth(1).click()  # Hourly
+        rule_briefing_time.fill("08:30")
+        rule_briefing_time.dispatch_event("change")
+        page.wait_for_timeout(150)
+        close_btn.click()
+        page.wait_for_timeout(200)
+        assert_test("Unsaved dialog opens before saving via dialog", unsaved_dialog.is_visible())
+        page.locator("#notif-unsaved-save-btn").click()
+        page.wait_for_timeout(300)
+        assert_test("Clicking 'Änderungen speichern' closes dialog and modal", not unsaved_dialog.is_visible() and not modal.is_visible())
+
+        # Re-open and verify changes were persisted
+        notif_btn.click()
+        page.wait_for_timeout(250)
+        assert_test("Saved changes persisted across reopen (Hourly & 08:30)", gl_schedule.input_value() == "hourly" and rule_briefing_time.input_value() == "08:30")
+        close_btn.click()
+        page.wait_for_timeout(200)
+        assert_test("Closing after saved state needs no dialog", not modal.is_visible() and not unsaved_dialog.is_visible())
 
         browser.close()
 

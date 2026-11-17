@@ -70,6 +70,7 @@ const DEFAULT_GITLAB = {
 let currentConfig = { ...DEFAULT_CONFIG };
 let currentGitLab = { ...DEFAULT_GITLAB };
 let currentSubscription = null;
+let savedFormSnapshot = null;
 
 /**
  * Standard Web Push Helper: Konvertiert URL-safe Base64 String in Uint8Array
@@ -528,8 +529,9 @@ export function updateTimelineVisualizer() {
 /**
  * Synchronisiert die Preset-Karten mit dem Formular
  */
-export function updatePresetCards() {
-  const currentKey = currentGitLab.schedulePreset || 'eco';
+export function updatePresetCards(selectedPreset) {
+  const select = document.getElementById('notif-gitlab-schedule');
+  const currentKey = selectedPreset || (select ? select.value : null) || currentGitLab.schedulePreset || 'eco';
   const cards = document.querySelectorAll('.notif-preset-card');
   cards.forEach(card => {
     const isSel = card.dataset.preset === currentKey;
@@ -537,7 +539,6 @@ export function updatePresetCards() {
     card.setAttribute('aria-selected', isSel ? 'true' : 'false');
   });
 
-  const select = document.getElementById('notif-gitlab-schedule');
   if (select && select.value !== currentKey) {
     select.value = currentKey;
   }
@@ -603,14 +604,9 @@ function updateUIElements() {
 }
 
 /**
- * Modal Öffnen & Schließen
+ * Befüllt die Formularfelder aus dem aktuell persistierten Zustand
  */
-export function openNotificationModal() {
-  loadNotificationState();
-  const modal = document.getElementById('notif-modal-overlay');
-  if (!modal) return;
-
-  // Felder befüllen
+function populateNotificationFormFromState() {
   const elWind = document.getElementById('notif-rule-wind');
   const elWindVal = document.getElementById('notif-rule-wind-val');
   const elFrost = document.getElementById('notif-rule-frost');
@@ -623,27 +619,149 @@ export function openNotificationModal() {
   const elToken = document.getElementById('notif-gitlab-token');
   const elSchedule = document.getElementById('notif-gitlab-schedule');
 
-  if (elWind) elWind.checked = currentConfig.windAlert;
+  if (elWind) elWind.checked = Boolean(currentConfig.windAlert);
   if (elWindVal) elWindVal.value = String(currentConfig.windThreshold || 60);
-  if (elFrost) elFrost.checked = currentConfig.frostAlert;
-  if (elBriefing) elBriefing.checked = currentConfig.briefingAlert;
+  if (elFrost) elFrost.checked = Boolean(currentConfig.frostAlert);
+  if (elBriefing) elBriefing.checked = Boolean(currentConfig.briefingAlert);
   if (elBriefingTime) elBriefingTime.value = currentConfig.briefingTime || '07:00';
-  if (elSevere) elSevere.checked = currentConfig.severeAlert;
+  if (elSevere) elSevere.checked = Boolean(currentConfig.severeAlert);
 
   if (elHost) elHost.value = currentGitLab.host || 'https://gitlab.com';
   if (elProject) elProject.value = currentGitLab.projectId || '';
   if (elToken) elToken.value = currentGitLab.token || '';
   if (elSchedule) elSchedule.value = currentGitLab.schedulePreset || 'eco';
+}
 
+/**
+ * Erzeugt einen normalisierten Snapshot der aktuellen Formularwerte
+ */
+function getFormSnapshot() {
+  const elWind = document.getElementById('notif-rule-wind');
+  const elWindVal = document.getElementById('notif-rule-wind-val');
+  const elFrost = document.getElementById('notif-rule-frost');
+  const elBriefing = document.getElementById('notif-rule-briefing');
+  const elBriefingTime = document.getElementById('notif-rule-briefing-time');
+  const elSevere = document.getElementById('notif-rule-severe');
+
+  const elHost = document.getElementById('notif-gitlab-host');
+  const elProject = document.getElementById('notif-gitlab-project');
+  const elToken = document.getElementById('notif-gitlab-token');
+  const elSchedule = document.getElementById('notif-gitlab-schedule');
+
+  return JSON.stringify({
+    windAlert: elWind ? Boolean(elWind.checked) : Boolean(currentConfig.windAlert),
+    windThreshold: elWindVal ? (parseInt(elWindVal.value, 10) || 60) : (currentConfig.windThreshold || 60),
+    frostAlert: elFrost ? Boolean(elFrost.checked) : Boolean(currentConfig.frostAlert),
+    briefingAlert: elBriefing ? Boolean(elBriefing.checked) : Boolean(currentConfig.briefingAlert),
+    briefingTime: elBriefingTime ? (elBriefingTime.value || '07:00') : (currentConfig.briefingTime || '07:00'),
+    severeAlert: elSevere ? Boolean(elSevere.checked) : Boolean(currentConfig.severeAlert),
+    host: elHost ? elHost.value.trim() : (currentGitLab.host || 'https://gitlab.com'),
+    projectId: elProject ? elProject.value.trim() : (currentGitLab.projectId || ''),
+    token: elToken ? elToken.value.trim() : (currentGitLab.token || ''),
+    schedulePreset: elSchedule ? elSchedule.value : (currentGitLab.schedulePreset || 'eco')
+  });
+}
+
+/**
+ * Prüft ob ungespeicherte Änderungen im Formular vorliegen
+ */
+export function hasUnsavedChanges() {
+  if (savedFormSnapshot === null) return false;
+  return getFormSnapshot() !== savedFormSnapshot;
+}
+
+/**
+ * Markiert den Speichern-Button visuell bei ungespeicherten Änderungen
+ */
+function updateUnsavedIndicator() {
+  const saveBtn = document.getElementById('notif-save-sync-btn');
+  if (!saveBtn) return;
+  saveBtn.classList.toggle('has-unsaved', hasUnsavedChanges());
+}
+
+/**
+ * Öffnet / schließt den Unsaved-Changes-Bestätigungsdialog
+ */
+function openUnsavedChangesDialog() {
+  const dialog = document.getElementById('notif-unsaved-dialog');
+  if (!dialog) {
+    forceCloseNotificationModal();
+    return;
+  }
+  dialog.style.display = 'flex';
+  const saveBtn = document.getElementById('notif-unsaved-save-btn');
+  if (saveBtn) saveBtn.focus();
+}
+
+function closeUnsavedChangesDialog() {
+  const dialog = document.getElementById('notif-unsaved-dialog');
+  if (dialog) dialog.style.display = 'none';
+}
+
+function forceCloseNotificationModal() {
+  closeUnsavedChangesDialog();
+  const modal = document.getElementById('notif-modal-overlay');
+  if (modal) modal.style.display = 'none';
+  document.body.classList.remove('modal-open');
+  savedFormSnapshot = null;
+}
+
+/**
+ * Speichert alle Formularänderungen persistent (inkl. stiller GitLab-Sync)
+ */
+async function persistNotificationForm() {
+  readFormValues();
+  saveNotificationState();
+  savedFormSnapshot = getFormSnapshot();
+  updateUnsavedIndicator();
+
+  if (currentGitLab.projectId && currentGitLab.token) {
+    await syncToGitLab();
+    return { synced: true };
+  }
+
+  currentGitLab.lastSyncStatus = 'Lokal aktiv & gesichert';
+  currentGitLab.lastSyncAt = Date.now();
+  saveNotificationState();
   updateUIElements();
+  return { synced: false };
+}
+
+/**
+ * Verwirft ungespeicherte Formularänderungen und stellt den gespeicherten Zustand wieder her
+ */
+function discardNotificationChanges() {
+  loadNotificationState();
+  populateNotificationFormFromState();
+  updateUIElements();
+  savedFormSnapshot = getFormSnapshot();
+  updateUnsavedIndicator();
+}
+
+/**
+ * Modal Öffnen & Schließen
+ */
+export function openNotificationModal() {
+  loadNotificationState();
+  const modal = document.getElementById('notif-modal-overlay');
+  if (!modal) return;
+
+  closeUnsavedChangesDialog();
+  populateNotificationFormFromState();
+  updateUIElements();
+  savedFormSnapshot = getFormSnapshot();
+  updateUnsavedIndicator();
+
   modal.style.display = 'flex';
   document.body.classList.add('modal-open');
 }
 
-export function closeNotificationModal() {
-  const modal = document.getElementById('notif-modal-overlay');
-  if (modal) modal.style.display = 'none';
-  document.body.classList.remove('modal-open');
+export function closeNotificationModal(force = false) {
+  if (force === true || !hasUnsavedChanges()) {
+    forceCloseNotificationModal();
+    return;
+  }
+  openUnsavedChangesDialog();
 }
 
 /**
@@ -690,23 +808,67 @@ export function initNotifications() {
     });
   }
 
-  // Modal Close Buttons
+  // Modal Close Buttons & Unsaved Changes Guard
   const closeBtn = document.getElementById('notif-modal-close');
   const closeBtnAction = document.getElementById('notif-modal-close-action');
   const overlay = document.getElementById('notif-modal-overlay');
+  const unsavedDialog = document.getElementById('notif-unsaved-dialog');
+  const unsavedSaveBtn = document.getElementById('notif-unsaved-save-btn');
+  const unsavedDiscardBtn = document.getElementById('notif-unsaved-discard-btn');
+  const unsavedCancelBtn = document.getElementById('notif-unsaved-cancel-btn');
 
-  if (closeBtn) closeBtn.addEventListener('click', closeNotificationModal);
-  if (closeBtnAction) closeBtnAction.addEventListener('click', closeNotificationModal);
+  if (closeBtn) closeBtn.addEventListener('click', () => closeNotificationModal(false));
+  if (closeBtnAction) closeBtnAction.addEventListener('click', () => closeNotificationModal(false));
 
   if (overlay) {
     overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeNotificationModal();
+      if (e.target === overlay) closeNotificationModal(false);
+    });
+  }
+
+  if (unsavedDialog) {
+    unsavedDialog.addEventListener('click', (e) => {
+      if (e.target === unsavedDialog) closeUnsavedChangesDialog();
+    });
+  }
+
+  if (unsavedSaveBtn) {
+    unsavedSaveBtn.addEventListener('click', async () => {
+      unsavedSaveBtn.disabled = true;
+      unsavedSaveBtn.innerText = '⏳ Speichere...';
+      try {
+        await persistNotificationForm();
+      } catch (err) {
+        console.warn('Sync notice:', err.message);
+      } finally {
+        unsavedSaveBtn.disabled = false;
+        unsavedSaveBtn.innerText = '✓ Änderungen speichern';
+        forceCloseNotificationModal();
+      }
+    });
+  }
+
+  if (unsavedDiscardBtn) {
+    unsavedDiscardBtn.addEventListener('click', () => {
+      discardNotificationChanges();
+      forceCloseNotificationModal();
+    });
+  }
+
+  if (unsavedCancelBtn) {
+    unsavedCancelBtn.addEventListener('click', () => {
+      closeUnsavedChangesDialog();
     });
   }
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay && overlay.style.display !== 'none') {
-      closeNotificationModal();
+    if (e.key !== 'Escape') return;
+    if (unsavedDialog && unsavedDialog.style.display !== 'none') {
+      closeUnsavedChangesDialog();
+      return;
+    }
+    if (overlay && overlay.style.display !== 'none') {
+      closeNotificationModal(false);
     }
   });
 
@@ -753,22 +915,12 @@ export function initNotifications() {
   const saveSyncBtn = document.getElementById('notif-save-sync-btn');
   if (saveSyncBtn) {
     saveSyncBtn.addEventListener('click', async () => {
-      readFormValues();
-      saveNotificationState();
-
       saveSyncBtn.disabled = true;
       saveSyncBtn.innerText = '⏳ Speichere...';
 
       try {
-        if (currentGitLab.projectId && currentGitLab.token) {
-          await syncToGitLab();
-          saveSyncBtn.innerText = '✓ Gesichert & Synchronisiert!';
-        } else {
-          currentGitLab.lastSyncStatus = 'Lokal aktiv & gesichert';
-          currentGitLab.lastSyncAt = Date.now();
-          saveSyncBtn.innerText = '✓ Einstellungen gesichert!';
-        }
-        updateUIElements();
+        const res = await persistNotificationForm();
+        saveSyncBtn.innerText = res.synced ? '✓ Gesichert & Synchronisiert!' : '✓ Einstellungen gesichert!';
         setTimeout(() => {
           saveSyncBtn.disabled = false;
           saveSyncBtn.innerText = '✓ Einstellungen sichern';
@@ -790,6 +942,8 @@ export function initNotifications() {
     scheduleBtn.addEventListener('click', async () => {
       readFormValues();
       saveNotificationState();
+      savedFormSnapshot = getFormSnapshot();
+      updateUnsavedIndicator();
 
       scheduleBtn.disabled = true;
       scheduleBtn.innerText = '⏳ Richte Schedule ein...';
@@ -845,22 +999,11 @@ export function initNotifications() {
     });
   });
 
-  let syncDebounceTimer = null;
-  const triggerSilentBackgroundSync = () => {
-    if (!currentGitLab.projectId || !currentGitLab.token) return;
-    clearTimeout(syncDebounceTimer);
-    syncDebounceTimer = setTimeout(() => {
-      syncToGitLab().catch(err => console.debug('Hintergrund-Sync Info:', err.message));
-    }, 1200);
-  };
-
-  // Preset Cards Sync & Selection
+  // Preset Cards Live Preview (ohne Auto-Save, sodass Verwerfen / Speichern sauber greift)
   document.querySelectorAll('.notif-preset-card[data-preset]').forEach(card => {
     const handleSelect = () => {
-      currentGitLab.schedulePreset = card.dataset.preset;
-      updatePresetCards();
-      saveNotificationState();
-      triggerSilentBackgroundSync();
+      updatePresetCards(card.dataset.preset);
+      updateUnsavedIndicator();
     };
     card.addEventListener('click', handleSelect);
     card.addEventListener('keydown', (e) => {
@@ -874,10 +1017,8 @@ export function initNotifications() {
   const elScheduleSelect = document.getElementById('notif-gitlab-schedule');
   if (elScheduleSelect) {
     elScheduleSelect.addEventListener('change', () => {
-      currentGitLab.schedulePreset = elScheduleSelect.value;
-      updatePresetCards();
-      saveNotificationState();
-      triggerSilentBackgroundSync();
+      updatePresetCards(elScheduleSelect.value);
+      updateUnsavedIndicator();
     });
   }
 
@@ -895,7 +1036,7 @@ export function initNotifications() {
     });
   }
 
-  // Realtime Auto-Save & Card Dimming
+  // Live UI Preview & Unsaved-Changes Tracking (kein vorzeitiges Auto-Save)
   const formFieldIds = [
     'notif-rule-wind', 'notif-rule-wind-val',
     'notif-rule-frost', 'notif-rule-briefing', 'notif-rule-briefing-time',
@@ -904,18 +1045,13 @@ export function initNotifications() {
   formFieldIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener('change', () => {
-        readFormValues();
-        saveNotificationState();
+      const handleDirty = () => {
         updateRuleCardDimming();
-        triggerSilentBackgroundSync();
-      });
-      if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'password' || el.type === 'url')) {
-        el.addEventListener('blur', () => {
-          readFormValues();
-          saveNotificationState();
-          triggerSilentBackgroundSync();
-        });
+        updateUnsavedIndicator();
+      };
+      el.addEventListener('change', handleDirty);
+      if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'password' || el.type === 'url' || el.type === 'time')) {
+        el.addEventListener('input', handleDirty);
       }
     }
   });
@@ -935,6 +1071,7 @@ export function initNotifications() {
 // Global Bindings für Tests und Integration
 window.openNotificationModal = openNotificationModal;
 window.closeNotificationModal = closeNotificationModal;
+window.hasUnsavedNotificationChanges = hasUnsavedChanges;
 window.enablePushNotifications = enablePushNotifications;
 window.disablePushNotifications = disablePushNotifications;
 window.sendLocalTestPush = sendLocalTestPush;
