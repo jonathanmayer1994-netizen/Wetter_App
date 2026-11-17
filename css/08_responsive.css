@@ -725,3 +725,86 @@
     gap: 16px;
   }
 }
+
+/* ==========================================================================
+   UNIVERSAL iPHONE & MOBILE ZERO-CLIPPING GUARDRAILS (320px - 768px)
+   Prevents CSS Grid intrinsic min-content blowouts & horizontal clipping
+   across all iPhone models (SE, Mini, 12-16, Pro, Pro Max).
+   ========================================================================== */
+@media (max-width: 768px) {
+  .glass-card,
+  .bento-item,
+  .modal-card,
+  .modal-content,
+  .modal-dialog,
+  .map-layer-drawer,
+  .notif-modal-card {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .mld-grid,
+  .bento-grid,
+  .notif-schedule-presets,
+  .vfy-scorecard-grid,
+  .mtn-metrics-grid,
+  .city-metrics-grid,
+  .modal-day-parts-grid,
+  .modal-astro-grid,
+  .sports-summary-grid,
+  .sports-controls-grid {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .mld-grid > *,
+  .bento-grid > *,
+  .notif-schedule-presets > *,
+  .vfy-scorecard-grid > *,
+  .mtn-metrics-grid > *,
+  .city-metrics-grid > *,
+  .modal-day-parts-grid > *,
+  .modal-astro-grid > *,
+  .sports-summary-grid > *,
+  .sports-controls-grid > * {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .card-title > span {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+}
+
+@media (max-width: 380px) {
+  .map-layer-drawer {
+    left: 6px !important;
+    right: 6px !important;
+  }
+  .mld-header {
+    padding: 10px 12px;
+  }
+  .mld-body {
+    padding: 10px 12px;
+    gap: 12px;
+  }
+  .mld-grid {
+    gap: 6px;
+  }
+  .map-overlay-btn,
+  .map-base-btn {
+    padding: 7px 18px 7px 8px;
+    gap: 6px;
+  }
+  .mob-name,
+  .mbb-name {
+    font-size: 11px;
+  }
+  .mob-desc,
+  .mbb-desc {
+    font-size: 9.5px;
+  }
+}

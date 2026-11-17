@@ -156,7 +156,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   margin-bottom: 12px;
+  min-width: 0;
 }
 
 .card-title {
@@ -169,6 +172,8 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .card-icon {
@@ -185,6 +190,9 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   white-space: nowrap;
   flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ==========================================================================
@@ -2598,6 +2606,29 @@ body.is-scrolling .radar-floating-controls {
   color: #ffffff;
   user-select: none;
   transition: opacity 0.2s ease;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+.ntb-seg-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ntb-seg-icon {
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .ntb-segment {
+    font-size: 0.64rem;
+    gap: 2px;
+    padding: 0 3px;
+  }
+  .notif-timeline-bar .ntb-segment:last-child .ntb-seg-text {
+    display: none;
+  }
 }
 .ntb-segment.ntb-quiet {
   background: linear-gradient(90deg, #1e1b4b 0%, #312e81 100%);

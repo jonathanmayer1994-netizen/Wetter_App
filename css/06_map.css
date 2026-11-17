@@ -759,7 +759,14 @@
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
   scrollbar-width: thin;
+}
+
+.mld-section {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .mld-section-header {
@@ -776,17 +783,25 @@
 
 .mld-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .map-overlay-btn,
 .map-base-btn {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   text-align: left;
-  padding: 9px 12px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 9px 26px 9px 11px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
@@ -824,8 +839,9 @@
 .mbb-text {
   display: flex;
   flex-direction: column;
-  flex-grow: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
 }
 
 .mob-name,
@@ -834,6 +850,9 @@
   font-weight: 700;
   color: #f1f5f9;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .map-overlay-btn.active .mob-name,
@@ -845,21 +864,24 @@
 .mbb-desc {
   font-size: 10px;
   color: #64748b;
-  line-height: 1.2;
+  line-height: 1.25;
   margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .mob-check,
 .mbb-check {
+  position: absolute;
+  top: 8px;
+  right: 9px;
   font-size: 12px;
   font-weight: 800;
+  line-height: 1;
   color: transparent;
   flex-shrink: 0;
-  margin-left: auto;
   transition: color 0.15s ease;
+  pointer-events: none;
 }
 
 .map-overlay-btn.active .mob-check,
@@ -867,10 +889,48 @@
   color: #38bdf8;
 }
 
+@media (max-width: 480px) {
+  .mld-header {
+    padding: 12px 14px;
+  }
+  .mld-body {
+    padding: 12px 14px;
+    gap: 14px;
+  }
+  .mld-grid {
+    gap: 7px;
+  }
+  .map-overlay-btn,
+  .map-base-btn {
+    padding: 8px 20px 8px 9px;
+    gap: 7px;
+  }
+  .mob-icon,
+  .mbb-icon {
+    font-size: 16px;
+  }
+  .mob-name,
+  .mbb-name {
+    font-size: 11.5px;
+  }
+  .mob-desc,
+  .mbb-desc {
+    font-size: 9.8px;
+    line-height: 1.22;
+  }
+  .mob-check,
+  .mbb-check {
+    top: 7px;
+    right: 7px;
+    font-size: 11px;
+  }
+}
+
 .mld-actions-flex {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .mld-action-chip {
@@ -884,6 +944,8 @@
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  max-width: 100%;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 
@@ -2808,6 +2870,12 @@
   background: rgba(48, 209, 88, 0.2) !important;
   color: #30d158 !important;
   border-color: rgba(48, 209, 88, 0.4) !important;
+  white-space: normal !important;
+  flex-shrink: 1 !important;
+  max-width: 100%;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
 /* Quick Navigation Anchor Pills */

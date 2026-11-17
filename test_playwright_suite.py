@@ -853,6 +853,78 @@ def run_tests():
             }}""")
             report(f"Tab #{t} has zero unwanted horizontal layout overflow", not has_h_overflow)
 
+        # =====================================================================
+        # TEST SUITE 14: iPHONE ZERO-CLIPPING & OVERFLOW GUARD (ALL iPHONES)
+        # =====================================================================
+        print("\n--- SUITE 14: iPhone Zero-Clipping & Overflow Guard (Mini, SE, 15 Pro, 15 Pro Max) ---")
+        iphone_viewports = [
+            ("iPhone Mini 360px", {"width": 360, "height": 780}),
+            ("iPhone SE 375px", {"width": 375, "height": 667}),
+            ("iPhone 15 Pro 393px", {"width": 393, "height": 852}),
+            ("iPhone 15 Pro Max 430px", {"width": 430, "height": 932}),
+        ]
+        for label, vp in iphone_viewports:
+            ipage = browser.new_page(viewport=vp, is_mobile=True, has_touch=True)
+            ipage.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
+            ipage.wait_for_timeout(1200)
+
+            # 1. Overview Bento Cards zero clipping
+            bento_ok = ipage.evaluate("""() => {
+                const pills = Array.from(document.querySelectorAll('.bento-compact-card .bento-open-pill'));
+                return pills.every(p => {
+                    const card = p.closest('.bento-compact-card');
+                    if (!card) return true;
+                    const pr = p.getBoundingClientRect();
+                    const cr = card.getBoundingClientRect();
+                    return pr.width === 0 || pr.right <= cr.right + 1;
+                });
+            }""")
+            report(f"{label}: Overview Bento 'Details' pills fit inside cards without clipping", bento_ok)
+
+            # 2. Map Tab + Ebenen & Kartenstil Drawer zero clipping
+            ipage.locator(".mbn-btn[data-tab='tab-map']").click()
+            ipage.wait_for_timeout(450)
+            map_container_ok = ipage.evaluate("""() => {
+                const mc = document.querySelector('main.main-container');
+                if (!mc) return true;
+                return mc.getBoundingClientRect().right <= window.innerWidth + 1;
+            }""")
+            report(f"{label}: Fullscreen map container fits strictly within viewport", map_container_ok)
+
+            if ipage.locator("#map-layer-pill").is_visible():
+                ipage.click("#map-layer-pill")
+                ipage.wait_for_timeout(300)
+                drawer_ok = ipage.evaluate("""() => {
+                    const drawer = document.getElementById('map-layer-drawer');
+                    const body = drawer ? drawer.querySelector('.mld-body') : null;
+                    if (!drawer || !body) return false;
+                    const dr = drawer.getBoundingClientRect();
+                    if (dr.right > window.innerWidth + 1 || dr.left < -1) return false;
+                    if (body.scrollWidth > body.clientWidth + 2) return false;
+                    const btns = Array.from(drawer.querySelectorAll('.map-overlay-btn, .map-base-btn'));
+                    return btns.length > 0 && btns.every(b => b.getBoundingClientRect().right <= dr.right + 1);
+                }""")
+                report(f"{label}: Ebenen & Kartenstil drawer 2-col grid fits with zero right-edge clipping", drawer_ok)
+                ipage.click("#map-layer-close-btn")
+                ipage.wait_for_timeout(150)
+
+            if ipage.locator("#map-mobile-close-btn").is_visible():
+                ipage.click("#map-mobile-close-btn")
+                ipage.wait_for_timeout(200)
+
+            # 3. Networks tab routing badge zero clipping
+            ipage.locator(".mbn-btn[data-tab='tab-networks']").click()
+            ipage.wait_for_timeout(250)
+            net_ok = ipage.evaluate("""() => {
+                const badge = document.getElementById('active-routing-badge');
+                const card = badge ? badge.closest('.networks-card') : null;
+                if (!badge || !card) return true;
+                return badge.getBoundingClientRect().right <= card.getBoundingClientRect().right + 1;
+            }""")
+            report(f"{label}: Networks routing badge wraps cleanly inside card", net_ok)
+
+            ipage.close()
+
         page.close()
         browser.close()
 

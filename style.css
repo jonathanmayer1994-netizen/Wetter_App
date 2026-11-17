@@ -777,7 +777,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   margin-bottom: 12px;
+  min-width: 0;
 }
 
 .card-title {
@@ -790,6 +793,8 @@ body {
   color: var(--text-secondary);
   text-transform: uppercase;
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .card-icon {
@@ -806,6 +811,9 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   white-space: nowrap;
   flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ==========================================================================
@@ -6078,7 +6086,14 @@ body.is-scrolling .radar-floating-controls {
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
   scrollbar-width: thin;
+}
+
+.mld-section {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .mld-section-header {
@@ -6095,17 +6110,25 @@ body.is-scrolling .radar-floating-controls {
 
 .mld-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .map-overlay-btn,
 .map-base-btn {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   text-align: left;
-  padding: 9px 12px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 9px 26px 9px 11px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
@@ -6143,8 +6166,9 @@ body.is-scrolling .radar-floating-controls {
 .mbb-text {
   display: flex;
   flex-direction: column;
-  flex-grow: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
 }
 
 .mob-name,
@@ -6153,6 +6177,9 @@ body.is-scrolling .radar-floating-controls {
   font-weight: 700;
   color: #f1f5f9;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .map-overlay-btn.active .mob-name,
@@ -6164,21 +6191,24 @@ body.is-scrolling .radar-floating-controls {
 .mbb-desc {
   font-size: 10px;
   color: #64748b;
-  line-height: 1.2;
+  line-height: 1.25;
   margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .mob-check,
 .mbb-check {
+  position: absolute;
+  top: 8px;
+  right: 9px;
   font-size: 12px;
   font-weight: 800;
+  line-height: 1;
   color: transparent;
   flex-shrink: 0;
-  margin-left: auto;
   transition: color 0.15s ease;
+  pointer-events: none;
 }
 
 .map-overlay-btn.active .mob-check,
@@ -6186,10 +6216,48 @@ body.is-scrolling .radar-floating-controls {
   color: #38bdf8;
 }
 
+@media (max-width: 480px) {
+  .mld-header {
+    padding: 12px 14px;
+  }
+  .mld-body {
+    padding: 12px 14px;
+    gap: 14px;
+  }
+  .mld-grid {
+    gap: 7px;
+  }
+  .map-overlay-btn,
+  .map-base-btn {
+    padding: 8px 20px 8px 9px;
+    gap: 7px;
+  }
+  .mob-icon,
+  .mbb-icon {
+    font-size: 16px;
+  }
+  .mob-name,
+  .mbb-name {
+    font-size: 11.5px;
+  }
+  .mob-desc,
+  .mbb-desc {
+    font-size: 9.8px;
+    line-height: 1.22;
+  }
+  .mob-check,
+  .mbb-check {
+    top: 7px;
+    right: 7px;
+    font-size: 11px;
+  }
+}
+
 .mld-actions-flex {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .mld-action-chip {
@@ -6203,6 +6271,8 @@ body.is-scrolling .radar-floating-controls {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  max-width: 100%;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 
@@ -8127,6 +8197,12 @@ body.is-scrolling .radar-floating-controls {
   background: rgba(48, 209, 88, 0.2) !important;
   color: #30d158 !important;
   border-color: rgba(48, 209, 88, 0.4) !important;
+  white-space: normal !important;
+  flex-shrink: 1 !important;
+  max-width: 100%;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
 /* Quick Navigation Anchor Pills */
@@ -8930,23 +9006,43 @@ body.is-scrolling .radar-floating-controls {
   }
 
   .bento-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 10px !important;
   }
 
   .bento-compact-card {
-    padding: 10px 12px !important;
+    padding: 10px 10px !important;
     min-height: 94px !important;
+    min-width: 0 !important;
+  }
+
+  .bento-compact-card .card-header {
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    min-width: 0 !important;
   }
 
   .bento-compact-card .card-title {
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     gap: 4px !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .bento-compact-card .card-title > span:not(.card-icon) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   .bento-compact-card .bento-open-pill {
-    font-size: 10px !important;
-    padding: 1px 6px !important;
+    font-size: 9.5px !important;
+    padding: 1px 5px !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
   }
 
   .bento-compact-card .bento-main-val {
@@ -9544,11 +9640,18 @@ body.is-scrolling .radar-floating-controls {
     visibility: hidden !important;
   }
 
+  body.mobile-map-fullscreen-active .app-layout {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
   body.mobile-map-fullscreen-active .main-container {
     margin: 0 !important;
     padding: 0 !important;
-    max-width: 100vw !important;
-    width: 100vw !important;
+    max-width: 100% !important;
+    width: 100% !important;
     height: 100% !important;
     overflow: hidden !important;
   }
@@ -16151,6 +16254,29 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   color: #ffffff;
   user-select: none;
   transition: opacity 0.2s ease;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+.ntb-seg-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ntb-seg-icon {
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .ntb-segment {
+    font-size: 0.64rem;
+    gap: 2px;
+    padding: 0 3px;
+  }
+  .notif-timeline-bar .ntb-segment:last-child .ntb-seg-text {
+    display: none;
+  }
 }
 .ntb-segment.ntb-quiet {
   background: linear-gradient(90deg, #1e1b4b 0%, #312e81 100%);
@@ -16373,4 +16499,87 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* ==========================================================================
+   UNIVERSAL iPHONE & MOBILE ZERO-CLIPPING GUARDRAILS (320px - 768px)
+   Prevents CSS Grid intrinsic min-content blowouts & horizontal clipping
+   across all iPhone models (SE, Mini, 12-16, Pro, Pro Max).
+   ========================================================================== */
+@media (max-width: 768px) {
+  .glass-card,
+  .bento-item,
+  .modal-card,
+  .modal-content,
+  .modal-dialog,
+  .map-layer-drawer,
+  .notif-modal-card {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .mld-grid,
+  .bento-grid,
+  .notif-schedule-presets,
+  .vfy-scorecard-grid,
+  .mtn-metrics-grid,
+  .city-metrics-grid,
+  .modal-day-parts-grid,
+  .modal-astro-grid,
+  .sports-summary-grid,
+  .sports-controls-grid {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .mld-grid > *,
+  .bento-grid > *,
+  .notif-schedule-presets > *,
+  .vfy-scorecard-grid > *,
+  .mtn-metrics-grid > *,
+  .city-metrics-grid > *,
+  .modal-day-parts-grid > *,
+  .modal-astro-grid > *,
+  .sports-summary-grid > *,
+  .sports-controls-grid > * {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .card-title > span {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+}
+
+@media (max-width: 380px) {
+  .map-layer-drawer {
+    left: 6px !important;
+    right: 6px !important;
+  }
+  .mld-header {
+    padding: 10px 12px;
+  }
+  .mld-body {
+    padding: 10px 12px;
+    gap: 12px;
+  }
+  .mld-grid {
+    gap: 6px;
+  }
+  .map-overlay-btn,
+  .map-base-btn {
+    padding: 7px 18px 7px 8px;
+    gap: 6px;
+  }
+  .mob-name,
+  .mbb-name {
+    font-size: 11px;
+  }
+  .mob-desc,
+  .mbb-desc {
+    font-size: 9.5px;
+  }
 }
