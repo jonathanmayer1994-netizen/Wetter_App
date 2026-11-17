@@ -3948,10 +3948,14 @@ export const MicroEngine = {
       const pop = (h.precipitation_probability && h.precipitation_probability[hIdx] !== undefined) ? h.precipitation_probability[hIdx] : 0;
       const freezingLevel = (h.freezing_level_height && h.freezing_level_height[hIdx] !== undefined) ? h.freezing_level_height[hIdx] : 2600;
       const code = (h.weather_code && h.weather_code[hIdx] !== undefined) ? h.weather_code[hIdx] : 1;
+      const hTimePt = (h.time && h.time[hIdx]) ? new Date(h.time[hIdx]) : null;
+      const isDayAtPt = (h.is_day && h.is_day[hIdx] !== undefined)
+        ? h.is_day[hIdx] === 1
+        : (hTimePt && !isNaN(hTimePt.getTime()) ? (hTimePt.getHours() >= 6 && hTimePt.getHours() <= 20) : true);
 
       const isSnow = m.ele >= freezingLevel || pointTemp <= 0.5;
       let weatherCondition = 'Trocken';
-      let weatherIcon = '☀️';
+      let weatherIcon = isDayAtPt ? '☀️' : '🌙';
 
       if (code >= 95) {
         weatherIcon = '⚡';
@@ -3963,14 +3967,14 @@ export const MicroEngine = {
         weatherIcon = '🌧️';
         weatherCondition = 'Starkregen';
       } else if (precip > 0.3) {
-        weatherIcon = '🌦️';
+        weatherIcon = isDayAtPt ? '🌦️' : '🌧️';
         weatherCondition = 'Regenschauer';
       } else if (code >= 3) {
         weatherIcon = '☁️';
         weatherCondition = 'Bedeckt';
       } else if (code >= 1) {
-        weatherIcon = '⛅';
-        weatherCondition = 'Heiter';
+        weatherIcon = isDayAtPt ? '⛅' : '☁️';
+        weatherCondition = isDayAtPt ? 'Heiter' : 'Teils bewölkt';
       }
 
       // Statischer Windchill
@@ -4344,10 +4348,14 @@ export const MicroEngine = {
       const pop = (h.precipitation_probability && h.precipitation_probability[hIdx] !== undefined) ? h.precipitation_probability[hIdx] : 0;
       const freezingLevel = (h.freezing_level_height && h.freezing_level_height[hIdx] !== undefined) ? h.freezing_level_height[hIdx] : 2600;
       const code = (h.weather_code && h.weather_code[hIdx] !== undefined) ? h.weather_code[hIdx] : 1;
+      const hTimePt = (h.time && h.time[hIdx]) ? new Date(h.time[hIdx]) : null;
+      const isDayAtPt = (h.is_day && h.is_day[hIdx] !== undefined)
+        ? h.is_day[hIdx] === 1
+        : (hTimePt && !isNaN(hTimePt.getTime()) ? (hTimePt.getHours() >= 6 && hTimePt.getHours() <= 20) : true);
       const isSnow = m.ele >= freezingLevel || pointTemp <= 0.5;
 
       let weatherCondition = 'Trocken';
-      let weatherIcon = '☀️';
+      let weatherIcon = isDayAtPt ? '☀️' : '🌙';
       if (code >= 95) {
         weatherIcon = '⚡';
         weatherCondition = 'Gewitter';
@@ -4358,14 +4366,14 @@ export const MicroEngine = {
         weatherIcon = '🌧️';
         weatherCondition = 'Starkregen';
       } else if (precip > 0.3) {
-        weatherIcon = '🌦️';
+        weatherIcon = isDayAtPt ? '🌦️' : '🌧️';
         weatherCondition = 'Regenschauer';
       } else if (code >= 3) {
         weatherIcon = '☁️';
         weatherCondition = 'Bedeckt';
       } else if (code >= 1) {
-        weatherIcon = '⛅';
-        weatherCondition = 'Heiter';
+        weatherIcon = isDayAtPt ? '⛅' : '☁️';
+        weatherCondition = isDayAtPt ? 'Heiter' : 'Teils bewölkt';
       }
 
       // Abfahrts-Windchill

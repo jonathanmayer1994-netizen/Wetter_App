@@ -67,9 +67,14 @@ export function renderVerificationDashboard() {
   const tempDeltaFormatted = `${tempSign}${liveDelta.tempDelta}°C`;
   const windDeltaFormatted = `${windSign}${liveDelta.windDelta} km/h`;
 
-  // 3. WMO Wetterzustand Name
-  const actualWmo = WMO_CODES[liveDelta.actualCode] || { label: 'Bedeckt', icon: '☁️' };
-  const forecastWmo = WMO_CODES[liveDelta.forecastCode] || { label: 'Bedeckt', icon: '☁️' };
+  // 3. WMO Wetterzustand Name (Tag/Nacht-bewusst)
+  const isDayNow = (state.weatherData && state.weatherData.current && state.weatherData.current.is_day !== undefined)
+    ? state.weatherData.current.is_day === 1
+    : (new Date().getHours() >= 6 && new Date().getHours() <= 20);
+  const actualWmo = WMO_CODES[liveDelta.actualCode] || { label: 'Bedeckt', icon: '☁️', iconNight: '☁️' };
+  const forecastWmo = WMO_CODES[liveDelta.forecastCode] || { label: 'Bedeckt', icon: '☁️', iconNight: '☁️' };
+  const actualWmoIcon = isDayNow ? actualWmo.icon : (actualWmo.iconNight || actualWmo.icon);
+  const forecastWmoIcon = isDayNow ? forecastWmo.icon : (forecastWmo.iconNight || forecastWmo.icon);
 
   // 4. Orographie-Alerts HTML
   let orographicAlertsHtml = '';
@@ -278,12 +283,12 @@ export function renderVerificationDashboard() {
             </div>
             <div class="vt-comparison">
               <div class="vt-col">
-                <span class="vt-icon">${actualWmo.icon}</span>
+                <span class="vt-icon">${actualWmoIcon}</span>
                 <span class="vt-val-sub">${escapeHtml(actualWmo.label)}</span>
               </div>
               <div class="vt-divider">vs</div>
               <div class="vt-col">
-                <span class="vt-icon opacity-75">${forecastWmo.icon}</span>
+                <span class="vt-icon opacity-75">${forecastWmoIcon}</span>
                 <span class="vt-val-sub">${escapeHtml(forecastWmo.label)}</span>
               </div>
             </div>

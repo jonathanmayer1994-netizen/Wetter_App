@@ -125,8 +125,21 @@ export function validateHourlyWeather(hourly) {
     });
   };
 
+  const sanitizeIsDay = (arr) => {
+    const deriveFromTime = (idx) => {
+      const d = new Date(hourly.time[idx]);
+      const h = !isNaN(d.getTime()) ? d.getHours() : 12;
+      return (h >= 6 && h <= 20) ? 1 : 0;
+    };
+    if (Array.isArray(arr) && arr.length === length) {
+      return arr.map((v, idx) => (v === 0 || v === 1) ? v : deriveFromTime(idx));
+    }
+    return hourly.time.map((_, idx) => deriveFromTime(idx));
+  };
+
   const result = {
     time: hourly.time,
+    is_day: sanitizeIsDay(hourly.is_day),
     temperature_2m: sanitizeArray(hourly.temperature_2m, 10.0),
     apparent_temperature: sanitizeArray(hourly.apparent_temperature, 10.0),
     relative_humidity_2m: sanitizeArray(hourly.relative_humidity_2m, 60),

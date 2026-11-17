@@ -56,7 +56,7 @@ export const OFFICIAL_KNOWN_ELEVATIONS = {
 
 export const WMO_CODES = {
   0: { label: 'Klar / Wolkenlos', icon: '☀️', iconNight: '🌙', theme: 'clear-day', themeNight: 'clear-night' },
-  1: { label: 'Überwiegend klar', icon: '🌤️', iconNight: '🌤️', theme: 'clear-day', themeNight: 'clear-night' },
+  1: { label: 'Überwiegend klar', icon: '🌤️', iconNight: '🌙', theme: 'clear-day', themeNight: 'clear-night' },
   2: { label: 'Teilweise bewölkt', icon: '⛅', iconNight: '☁️', theme: 'cloudy', themeNight: 'cloudy' },
   3: { label: 'Bedeckt', icon: '☁️', iconNight: '☁️', theme: 'cloudy', themeNight: 'cloudy' },
   45: { label: 'Nebel', icon: '🌫️', iconNight: '🌫️', theme: 'fog', themeNight: 'fog' },

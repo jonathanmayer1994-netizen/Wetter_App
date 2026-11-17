@@ -845,7 +845,8 @@ export function getLocationWeatherForFrame(frame) {
       snow: snowVal,
       cloudCover: cur.cloud_cover !== undefined ? cur.cloud_cover : 40,
       pressure: cur.surface_pressure !== undefined ? Math.round(cur.surface_pressure) : 1014,
-      weatherCode: wCodeVal
+      weatherCode: wCodeVal,
+      isDay: cur.is_day !== undefined ? cur.is_day === 1 : (new Date().getHours() >= 6 && new Date().getHours() <= 20)
     };
   }
 
@@ -977,6 +978,14 @@ export function getLocationWeatherForFrame(frame) {
     }
   }
 
+  const targetDateForDay = new Date(targetTimeMs);
+  const nearestDayIdx = fraction < 0.5 ? idxBefore : idxAfter;
+  const isDay = (hourly.is_day && hourly.is_day[nearestDayIdx] !== undefined)
+    ? hourly.is_day[nearestDayIdx] === 1
+    : (isLiveNow && cur.is_day !== undefined)
+      ? cur.is_day === 1
+      : (targetDateForDay.getHours() >= 6 && targetDateForDay.getHours() <= 20);
+
   return {
     name: locName,
     isMountain: !!loc.isMountain,
@@ -995,7 +1004,8 @@ export function getLocationWeatherForFrame(frame) {
     snow,
     cloudCover: clouds,
     pressure: press,
-    weatherCode: code
+    weatherCode: code,
+    isDay
   };
 }
 
@@ -1135,7 +1145,8 @@ export function updatePointWeatherCard(frame) {
   }
 
   // 2. Temp & Icon
-  const phaseIcon = effPhase === 'snow' ? '❄️' : effPhase === 'sleet' ? '🌨️' : effPhase === 'rain' ? '🌧️' : (codeInfo.icon || '🌤️');
+  const wmoIcon = locWeather.isDay === false ? (codeInfo.iconNight || '🌙') : (codeInfo.icon || '🌤️');
+  const phaseIcon = effPhase === 'snow' ? '❄️' : effPhase === 'sleet' ? '🌨️' : effPhase === 'rain' ? '🌧️' : wmoIcon;
   const iconEl = document.getElementById('mpw-condition-icon');
   if (iconEl) iconEl.innerText = phaseIcon;
 

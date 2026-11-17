@@ -80,13 +80,13 @@ export function getHarmonizedHourlyCondition({
   isDay = true,
   temp = 10
 }) {
-  const sunMin = Math.round(Math.max(0, Math.min(60, (sunSec || 0) / 60)));
+  const sunMin = isDay ? Math.round(Math.max(0, Math.min(60, (sunSec || 0) / 60))) : 0;
   const hasPrecip = (precip >= 0.08) || (pop >= 65 && precip > 0.02);
   const isSnow = (code >= 71 && code <= 77) || code === 85 || code === 86 || (hasPrecip && temp <= 1.0);
   const isThunder = code >= 95;
 
-  let icon = '☀️';
-  let label = 'Sonnig';
+  let icon = isDay ? '☀️' : '🌙';
+  let label = isDay ? 'Sonnig' : 'Klar';
 
   if (isThunder) {
     icon = '⛈️';
@@ -110,7 +110,7 @@ export function getHarmonizedHourlyCondition({
       icon = '🌧️';
       label = 'Regen';
     } else {
-      icon = '🌦️';
+      icon = isDay ? '🌦️' : '🌧️';
       label = 'Leichter Regen';
     }
   } else {
@@ -160,6 +160,13 @@ export function getHarmonizedHourlyCondition({
         label = 'Bedeckt';
       }
     }
+  }
+
+  // Striktes Nacht-Guardrail: Nachts darf niemals ein Sonnensymbol erscheinen
+  if (!isDay) {
+    if (icon === '☀️' || icon === '🌤️') icon = '🌙';
+    else if (icon === '⛅' || icon === '🌥️') icon = '☁️';
+    else if (icon === '🌦️') icon = '🌧️';
   }
 
   return { icon, label, sunMin, hasPrecip };
@@ -432,9 +439,11 @@ export function renderOverviewTab() {
         const iconEl = document.getElementById('hero-weather-icon');
         if (iconEl) iconEl.innerText = '🌫️';
       } else {
-        conditionLabel = `Sonnig über dem Nebelmeer (Inversion bis ~${invTopStr} m)`;
+        conditionLabel = isDay
+          ? `Sonnig über dem Nebelmeer (Inversion bis ~${invTopStr} m)`
+          : `Sternenklar über dem Nebelmeer (Inversion bis ~${invTopStr} m)`;
         const iconEl = document.getElementById('hero-weather-icon');
-        if (iconEl) iconEl.innerText = '☀️🏔️';
+        if (iconEl) iconEl.innerText = isDay ? '☀️🏔️' : '🌙🏔️';
       }
     } else {
       // Trocken: Cloud-Cover in die Bedingung einbeziehen (Hero und Karte konsistent)
@@ -442,7 +451,7 @@ export function renderOverviewTab() {
       if (isMountainSummitAboveFog && m && m.atmosphere && m.atmosphere.freezingLevelMeters > state.currentLocation.elevation + 400 && cloud < 45) {
         conditionLabel = 'Klar / Wolkenlos';
         const iconEl = document.getElementById('hero-weather-icon');
-        if (iconEl) iconEl.innerText = '☀️';
+        if (iconEl) iconEl.innerText = isDay ? '☀️' : '🌙';
       } else if (cloud >= 75) conditionLabel = 'Bedeckt';
       else if (cloud >= 50) conditionLabel = 'Wolkig';
       else if (cloud >= 25) conditionLabel = 'Teilweise bewölkt';
@@ -754,8 +763,9 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
       ? (hourly.weather_code ? hourly.weather_code[h0] : 0)
       : (hourly.weather_code ? hourly.weather_code[h1] : 0);
 
-    const isDay = (hourly.is_day && hourly.is_day[h0] !== undefined)
-      ? hourly.is_day[h0] === 1
+    const dayIdx = frac < 0.5 ? h0 : h1;
+    const isDay = (hourly.is_day && hourly.is_day[dayIdx] !== undefined)
+      ? hourly.is_day[dayIdx] === 1
       : (targetDate.getHours() >= 6 && targetDate.getHours() <= 20);
 
     return {
@@ -2548,7 +2558,9 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
     const hPrecip = hoursPrecip[h] !== undefined ? hoursPrecip[h] : 0;
     const hPop = hoursPop[h] !== undefined ? hoursPop[h] : 0;
     const rawTempC = hoursTemp[h] !== undefined ? hoursTemp[h] : 10;
-    const isDay = (h >= Math.floor(sunriseDec) && h < Math.ceil(sunsetDec));
+    const isDay = (hourly && hourly.is_day && hourly.is_day[dayStartHourIdx + h] !== undefined)
+      ? hourly.is_day[dayStartHourIdx + h] === 1
+      : (h >= Math.floor(sunriseDec) && h < Math.ceil(sunsetDec));
 
     const harm = getHarmonizedHourlyCondition({
       code: hCode,
@@ -2641,14 +2653,15 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
     const avgRH = partRH.length ? Math.round(partRH.reduce((a, b) => a + b, 0) / partRH.length) : 70;
     const avgDP = partDP.length ? Math.round(convertTemp(partDP.reduce((a, b) => a + b, 0) / partDP.length)) : 5;
 
-    const sunHoursPart = (partSunSec / 3600);
+    const isNightPart = part.name === 'Nachts';
+    const sunHoursPart = isNightPart ? 0 : (partSunSec / 3600);
     const hasPartRain = (partPrecipSum >= 0.2) || (maxPop >= 60 && partPrecipSum > 0.05);
 
     let partIcon = part.defaultIcon;
-    let partLabel = 'Heiter';
+    let partLabel = isNightPart ? 'Klar' : 'Heiter';
 
     if (hasPartRain) {
-      if (sunHoursPart >= 1.0) {
+      if (!isNightPart && sunHoursPart >= 1.0) {
         partIcon = '🌦️';
         partLabel = 'Sonne & Schauer';
       } else if (partPrecipSum >= 2.0) {
@@ -2658,6 +2671,9 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
         partIcon = '🌧️';
         partLabel = 'Regnerisch';
       }
+    } else if (isNightPart) {
+      partIcon = '🌙';
+      partLabel = 'Klar';
     } else {
       if (sunHoursPart >= 2.5) {
         partIcon = '☀️';
@@ -2669,15 +2685,15 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
         partIcon = '⛅';
         partLabel = 'Teils sonnig';
       } else {
-        partIcon = part.name === 'Nachts' ? '🌙' : '☁️';
-        partLabel = part.name === 'Nachts' ? 'Klar' : 'Bedeckt';
+        partIcon = '☁️';
+        partLabel = 'Bedeckt';
       }
     }
 
     let rainHtml = '';
     if (partPrecipSum > 0.05) {
       rainHtml = `💧 ${maxPop}% (${partPrecipSum.toFixed(1)} mm)`;
-    } else if (sunHoursPart >= 0.5) {
+    } else if (!isNightPart && sunHoursPart >= 0.5) {
       rainHtml = `☀️ ${sunHoursPart.toFixed(1).replace('.', ',')} h Sonne`;
     } else {
       rainHtml = '💧 Trocken (0%)';
