@@ -3046,7 +3046,6 @@
         <div class="notif-quick-nav" role="navigation" aria-label="Abschnittsnavigation">
           <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-rules">⚡ Alarmregeln</button>
           <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-schedule">⏱️ Zeitplan &amp; Taktung</button>
-          <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-gitlab">🦊 GitLab CI Backend</button>
         </div>
 
         <!-- Master Toggle Card -->
@@ -3210,15 +3209,25 @@
           </div>
         </div>
 
-        <!-- GitLab CI REST API Anbindung Card -->
-        <div class="notif-section-card" id="notif-section-gitlab">
-          <div class="notif-card-header">
-            <span class="notif-card-icon">🦊</span>
-            <span class="notif-card-title">GitLab REST API Anbindung &amp; Scheduled Pipeline</span>
+        <!-- Action & Status Card (Minimalistisch & Nativ für Endnutzer) -->
+        <div class="notif-section-card notif-user-actions-card">
+          <div class="notif-user-actions-row">
+            <button type="button" class="action-btn action-btn-secondary" id="notif-test-btn">🧪 Test-Push senden</button>
+            <button type="button" class="action-btn" id="notif-save-sync-btn">✓ Einstellungen sichern</button>
           </div>
-          <p class="notif-card-desc">
-            Synchronisiert deine Push-Subscription und Alarm-Regeln direkt mit deinem GitLab CI-Projekt. Das CI-Skript prüft per Cron die Wetterlage und sendet Web-Push-Nachrichten über das Apple APNs Gateway.
-          </p>
+          <div class="notif-footer-status">
+            <span class="nfs-label">Status:</span>
+            <span class="nfs-val" id="notif-sync-status-msg">Bereit zur Nutzung</span>
+          </div>
+        </div>
+
+        <!-- Optionaler Entwickler-Bereich (Eingeklappt, für normale Nutzer unsichtbar) -->
+        <details class="notif-dev-accordion" id="notif-section-gitlab">
+          <summary class="notif-dev-summary">⚙️ Erweitert: GitLab CI Backend &amp; Runner Einstellungen</summary>
+          <div class="notif-dev-content">
+            <p class="notif-card-desc">
+              Für Entwickler/Admins: Verbindet die App direkt mit deiner GitLab CI-Pipeline für den automatisierten Cron-Dispatcher.
+            </p>
 
           <div class="notif-form-grid">
             <div class="notif-field">
@@ -3250,18 +3259,12 @@
             </div>
           </div>
 
-          <div class="notif-actions-row">
-            <button type="button" class="action-btn" id="notif-save-sync-btn">💾 Speichern &amp; mit GitLab syncen</button>
-            <button type="button" class="action-btn action-btn-secondary" id="notif-create-schedule-btn">📅 Pipeline-Schedule einrichten</button>
-            <button type="button" class="action-btn action-btn-secondary" id="notif-test-btn">🧪 Test-Push senden</button>
-            <button type="button" class="action-btn action-btn-secondary" id="notif-trigger-pipeline-btn">⚡ Pipeline jetzt starten</button>
+            <div class="notif-actions-row">
+              <button type="button" class="action-btn action-btn-secondary" id="notif-create-schedule-btn">📅 Pipeline-Schedule einrichten</button>
+              <button type="button" class="action-btn action-btn-secondary" id="notif-trigger-pipeline-btn">⚡ Pipeline jetzt starten</button>
+            </div>
           </div>
-
-          <div class="notif-footer-status">
-            <span class="nfs-label">Status:</span>
-            <span class="nfs-val" id="notif-sync-status-msg">Bereit zur Synchronisation</span>
-          </div>
-        </div>
+        </details>
       </div>
 
       <div class="modal-footer-actions">

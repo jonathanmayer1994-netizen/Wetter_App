@@ -80,10 +80,10 @@ def run_tests():
         badge = page.locator("#notif-status-badge")
         assert_test("Status badge is rendered", badge.is_visible())
 
-        # 4. Quick-Nav Pills
+        # 4. Quick-Nav Pills (Clean 2-pill layout for end users)
         nav_pills = page.locator(".notif-nav-pill")
-        assert_test("Quick-Nav contains 3 section pills", nav_pills.count() == 3)
-        nav_pills.nth(1).click()  # Click Option B Zeitplan
+        assert_test("Quick-Nav contains 2 section pills", nav_pills.count() == 2)
+        nav_pills.nth(1).click()  # Click Zeitplan
         page.wait_for_timeout(100)
         assert_test("Target section #notif-section-schedule exists", page.locator("#notif-section-schedule").count() == 1)
 
@@ -145,7 +145,14 @@ def run_tests():
         page.wait_for_timeout(150)
         assert_test("Schedule select synced back to 'eco'", gl_schedule.input_value() == "eco")
 
-        # 9. GitLab REST API Form Fields & Password Eye Toggle
+        # 9. End-User Action Card & Collapsible GitLab Backend Drawer
+        dev_drawer = page.locator("#notif-section-gitlab")
+        assert_test("GitLab dev accordion is collapsed by default for end users", not dev_drawer.evaluate("el => el.open"))
+
+        # Expand dev accordion to verify admin controls
+        dev_drawer.evaluate("el => el.open = true")
+        page.wait_for_timeout(100)
+
         gl_host = page.locator("#notif-gitlab-host")
         gl_project = page.locator("#notif-gitlab-project")
         gl_token = page.locator("#notif-gitlab-token")
@@ -170,16 +177,16 @@ def run_tests():
         modal_text = page.locator("#notif-modal-overlay").inner_text()
         assert_test("Zero instances of 'Option B' in notification modal UI text", "Option B" not in modal_text)
 
-        # 10. Action Buttons
+        # 10. Action Buttons (Clean End-User Action Bar + Admin Buttons)
         save_btn = page.locator("#notif-save-sync-btn")
         sched_btn = page.locator("#notif-create-schedule-btn")
         test_btn = page.locator("#notif-test-btn")
         pipeline_btn = page.locator("#notif-trigger-pipeline-btn")
 
-        assert_test("Save & Sync button is visible", save_btn.is_visible())
-        assert_test("Schedule Provisioning button is visible", sched_btn.is_visible())
-        assert_test("Test-Push button is visible", test_btn.is_visible())
-        assert_test("Trigger-Pipeline button is visible", pipeline_btn.is_visible())
+        assert_test("Save button is visible in primary user actions", save_btn.is_visible())
+        assert_test("Test-Push button is visible in primary user actions", test_btn.is_visible())
+        assert_test("Schedule Provisioning button is present", sched_btn.count() == 1)
+        assert_test("Trigger-Pipeline button is present", pipeline_btn.count() == 1)
 
         # 11. Test Push Execution
         test_btn.click()

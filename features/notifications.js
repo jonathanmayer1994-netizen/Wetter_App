@@ -177,6 +177,12 @@ export async function enablePushNotifications() {
   currentConfig.enabled = true;
   saveNotificationState();
   updateUIElements();
+
+  // Stille automatische Hintergrund-Synchronisation mit GitLab CI falls eingerichtet
+  if (currentGitLab.projectId && currentGitLab.token) {
+    syncToGitLab().catch(err => console.debug('Hintergrund-Sync Info:', err.message));
+  }
+
   return currentSubscription;
 }
 
@@ -743,7 +749,7 @@ export function initNotifications() {
     });
   }
 
-  // Save & Sync Button
+  // Save & Sync Button (Native & Lautlos für Endnutzer)
   const saveSyncBtn = document.getElementById('notif-save-sync-btn');
   if (saveSyncBtn) {
     saveSyncBtn.addEventListener('click', async () => {
@@ -751,23 +757,29 @@ export function initNotifications() {
       saveNotificationState();
 
       saveSyncBtn.disabled = true;
-      saveSyncBtn.innerText = '⏳ Synchronisiere mit GitLab...';
+      saveSyncBtn.innerText = '⏳ Speichere...';
 
       try {
-        const res = await syncToGitLab();
-        saveSyncBtn.innerText = '✓ Gespeichert & Synchronisiert!';
-        if (res.mode === 'manual') {
-          navigator.clipboard?.writeText(res.json).catch(() => {});
-          alert(res.message + '\n\nKonfigurations-JSON wurde in deine Zwischenablage kopiert!');
+        if (currentGitLab.projectId && currentGitLab.token) {
+          await syncToGitLab();
+          saveSyncBtn.innerText = '✓ Gesichert & Synchronisiert!';
+        } else {
+          currentGitLab.lastSyncStatus = 'Lokal aktiv & gesichert';
+          currentGitLab.lastSyncAt = Date.now();
+          saveSyncBtn.innerText = '✓ Einstellungen gesichert!';
         }
+        updateUIElements();
         setTimeout(() => {
           saveSyncBtn.disabled = false;
-          saveSyncBtn.innerText = '💾 Speichern & mit GitLab syncen';
-        }, 2500);
+          saveSyncBtn.innerText = '✓ Einstellungen sichern';
+        }, 2000);
       } catch (err) {
-        alert('GitLab Sync fehlgeschlagen: ' + err.message);
+        console.warn('Sync notice:', err.message);
         saveSyncBtn.disabled = false;
-        saveSyncBtn.innerText = '💾 Speichern & mit GitLab syncen';
+        saveSyncBtn.innerText = '✓ Einstellungen gesichert!';
+        setTimeout(() => {
+          saveSyncBtn.innerText = '✓ Einstellungen sichern';
+        }, 2000);
       }
     });
   }
@@ -833,12 +845,22 @@ export function initNotifications() {
     });
   });
 
+  let syncDebounceTimer = null;
+  const triggerSilentBackgroundSync = () => {
+    if (!currentGitLab.projectId || !currentGitLab.token) return;
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = setTimeout(() => {
+      syncToGitLab().catch(err => console.debug('Hintergrund-Sync Info:', err.message));
+    }, 1200);
+  };
+
   // Preset Cards Sync & Selection
   document.querySelectorAll('.notif-preset-card[data-preset]').forEach(card => {
     const handleSelect = () => {
       currentGitLab.schedulePreset = card.dataset.preset;
       updatePresetCards();
       saveNotificationState();
+      triggerSilentBackgroundSync();
     };
     card.addEventListener('click', handleSelect);
     card.addEventListener('keydown', (e) => {
@@ -855,6 +877,7 @@ export function initNotifications() {
       currentGitLab.schedulePreset = elScheduleSelect.value;
       updatePresetCards();
       saveNotificationState();
+      triggerSilentBackgroundSync();
     });
   }
 
@@ -885,11 +908,13 @@ export function initNotifications() {
         readFormValues();
         saveNotificationState();
         updateRuleCardDimming();
+        triggerSilentBackgroundSync();
       });
       if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'password' || el.type === 'url')) {
         el.addEventListener('blur', () => {
           readFormValues();
           saveNotificationState();
+          triggerSilentBackgroundSync();
         });
       }
     }
