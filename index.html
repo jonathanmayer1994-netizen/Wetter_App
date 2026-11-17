@@ -119,7 +119,7 @@
       </div>
     </div>
 
-    <!-- Unified macOS Header Dock (Option B1: 1-Row Native Toolbar on Desktop) -->
+    <!-- Unified macOS Header Dock (1-Row Native Toolbar on Desktop) -->
     <div class="desktop-header-dock" id="desktop-header-dock">
       <!-- Top Global App Bar -->
       <header class="global-navbar">
@@ -3045,7 +3045,7 @@
         <!-- Quick Navigation Pills -->
         <div class="notif-quick-nav" role="navigation" aria-label="Abschnittsnavigation">
           <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-rules">⚡ Alarmregeln</button>
-          <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-schedule">⏱️ Option B Zeitplan</button>
+          <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-schedule">⏱️ Zeitplan &amp; Taktung</button>
           <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-gitlab">🦊 GitLab CI Backend</button>
         </div>
 
@@ -3069,20 +3069,7 @@
           </div>
           
           <div class="notif-rules-list">
-            <!-- 1. Regenalarm -->
-            <div class="notif-rule-item" id="notif-rule-item-rain">
-              <div class="notif-rule-icon">🌧️</div>
-              <div class="notif-rule-info">
-                <div class="notif-rule-title">Regenalarm (Nowcasting)</div>
-                <div class="notif-rule-desc">Frühwarnung 30–60 Min. vor einsetzendem Regen oder Schnee</div>
-              </div>
-              <label class="ios-switch">
-                <input type="checkbox" id="notif-rule-rain" checked>
-                <span class="ios-slider"></span>
-              </label>
-            </div>
-
-            <!-- 2. Sturm & Böen -->
+            <!-- 1. Sturm & Böen -->
             <div class="notif-rule-item" id="notif-rule-item-wind">
               <div class="notif-rule-icon">💨</div>
               <div class="notif-rule-info">
@@ -3147,11 +3134,11 @@
           </div>
         </div>
 
-        <!-- Option B: Zeitplan & Nachtruhe-Visualisierung Card -->
+        <!-- Zeitplan & Nachtruhe-Visualisierung Card -->
         <div class="notif-section-card" id="notif-section-schedule">
           <div class="notif-card-header">
             <span class="notif-card-icon">⏱️</span>
-            <span class="notif-card-title">Option B Zeitplan &amp; 24h Ruhezeit-Fenster</span>
+            <span class="notif-card-title">Zeitplan &amp; 24h Ruhezeit-Fenster</span>
           </div>
 
           <!-- 24-Stunden Zeitstrahl Visualizer -->
@@ -3194,19 +3181,19 @@
           <div class="notif-presets-grid" id="notif-presets-grid">
             <div class="notif-preset-card is-selected" data-preset="eco" role="button" tabindex="0">
               <span class="npc-badge">⭐ Empfohlen</span>
-              <div class="npc-title">Option B: Eco</div>
+              <div class="npc-title">Eco</div>
               <div class="npc-runs">12 Läufe/Tag • 360 Min./Mo.</div>
               <div class="npc-runs" style="font-size:0.68rem; margin-top:2px;">100% Free-Tier Safe (&le; 400 Min.)</div>
             </div>
             <div class="notif-preset-card" data-preset="hourly" role="button" tabindex="0">
               <span class="npc-badge">Stündlich</span>
-              <div class="npc-title">Option B: Stündlich</div>
+              <div class="npc-title">Stündlich</div>
               <div class="npc-runs">16 Läufe/Tag • 480 Min./Mo.</div>
               <div class="npc-runs" style="font-size:0.68rem; margin-top:2px;">Prüfung zur vollen Stunde</div>
             </div>
             <div class="notif-preset-card" data-preset="highfreq" role="button" tabindex="0">
               <span class="npc-badge">High-Freq</span>
-              <div class="npc-title">Option B: 20-Minuten</div>
+              <div class="npc-title">20-Minuten</div>
               <div class="npc-runs">48 Läufe/Tag • Unbegrenzt</div>
               <div class="npc-runs" style="font-size:0.68rem; margin-top:2px;">Ideal für eigenen Runner</div>
             </div>
@@ -3215,15 +3202,15 @@
           <!-- Form Select (synced with preset cards) -->
           <div class="notif-field notif-field-full" style="margin-top: 4px;">
             <label for="notif-gitlab-schedule" class="notif-field-label">Ausgewähltes Intervall:</label>
-            <select id="notif-gitlab-schedule" class="stsp-glass-input" style="cursor:pointer;" aria-label="Option B Zeitintervall">
-              <option value="eco" selected>Option B: Eco (06:00–22:00 Uhr — 12 Läufe/Tag = 360 Min/Monat, 100% Free-Tier Safe)</option>
-              <option value="hourly">Option B: Stündlich (06:00–22:00 Uhr — 16 Läufe/Tag = 480 Min/Monat)</option>
-              <option value="highfreq">Option B: Alle 20 Min tagsüber (06:00–22:00 Uhr — 48 Läufe/Tag, für eigenen Runner)</option>
+            <select id="notif-gitlab-schedule" class="stsp-glass-input" style="cursor:pointer;" aria-label="Zeitintervall">
+              <option value="eco" selected>Eco (06:00–22:00 Uhr — 12 Läufe/Tag = 360 Min/Monat, 100% Free-Tier Safe)</option>
+              <option value="hourly">Stündlich (06:00–22:00 Uhr — 16 Läufe/Tag = 480 Min/Monat)</option>
+              <option value="highfreq">Alle 20 Min tagsüber (06:00–22:00 Uhr — 48 Läufe/Tag, für eigenen Runner)</option>
             </select>
           </div>
         </div>
 
-        <!-- GitLab CI REST API Anbindung Card (Option 1) -->
+        <!-- GitLab CI REST API Anbindung Card -->
         <div class="notif-section-card" id="notif-section-gitlab">
           <div class="notif-card-header">
             <span class="notif-card-icon">🦊</span>
@@ -3254,12 +3241,12 @@
 
           <!-- Limit & Runner Analyse Box -->
           <div class="notif-quota-box">
-            <div class="nqb-title">⏱️ Option B Zeitanpassung (06:00–22:00 Uhr) &amp; GitLab Compute-Limit</div>
+            <div class="nqb-title">⏱️ Zeitplan &amp; GitLab Compute-Limit</div>
             <div class="nqb-text">
               • <strong>Nachtruhe 22:00 bis 06:00 Uhr</strong>: 8 Stunden Pause spart täglich 33% Compute-Zeit und schützt vor nächtlichen Push-Tönen!<br>
               • <strong>Eco-Takt (12 Läufe/Tag)</strong> = <strong>360 Min./Monat</strong> &rarr; Garantiert unter dem kostenlosen 400-Minuten-Limit auf GitLab.com!<br>
               • <strong>Stündlich (16 Läufe/Tag)</strong> = 480 Min./Monat | <strong>20-Minuten-Takt</strong> = 48 Läufe/Tag (Ideal für eigenen kostenlosen Runner).<br>
-              • <strong>Intelligenter Cooldown</strong>: Regen- und Sturmwarnungen haben Cooldowns, um Spam bei Dauerregen zu verhindern.
+              • <strong>Intelligenter Cooldown</strong>: Sturm- und Unwetterwarnungen besitzen automatische Cooldowns, um wiederholten Spam zu verhindern.
             </div>
           </div>
 

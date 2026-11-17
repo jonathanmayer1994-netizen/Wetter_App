@@ -17,7 +17,7 @@ const STORAGE_KEYS = {
 export const SCHEDULE_PRESETS = {
   eco: {
     key: 'eco',
-    name: 'Option B: Eco (06:00–22:00 Uhr, 100% Free-Tier Safe)',
+    name: 'Eco (06:00–22:00 Uhr, 100% Free-Tier Safe)',
     cron: '0 6,7,8,10,12,14,16,17,18,19,20,21 * * *',
     runsPerDay: 12,
     monthlyMinutes: 360,
@@ -25,7 +25,7 @@ export const SCHEDULE_PRESETS = {
   },
   hourly: {
     key: 'hourly',
-    name: 'Option B: Stündlich (06:00–22:00 Uhr)',
+    name: 'Stündlich (06:00–22:00 Uhr)',
     cron: '0 6-21 * * *',
     runsPerDay: 16,
     monthlyMinutes: 480,
@@ -33,7 +33,7 @@ export const SCHEDULE_PRESETS = {
   },
   highfreq: {
     key: 'highfreq',
-    name: 'Option B: Alle 20 Min tagsüber (06:00–22:00 Uhr)',
+    name: 'Alle 20 Min tagsüber (06:00–22:00 Uhr)',
     cron: '*/20 6-21 * * *',
     runsPerDay: 48,
     monthlyMinutes: 1440,
@@ -43,8 +43,6 @@ export const SCHEDULE_PRESETS = {
 
 const DEFAULT_CONFIG = {
   enabled: false,
-  rainAlert: true,
-  rainThreshold: 50, // %
   windAlert: true,
   windThreshold: 60, // km/h
   frostAlert: true,
@@ -263,8 +261,6 @@ export async function syncToGitLab() {
   const configPayload = {
     subscription: currentSubscription,
     rules: {
-      rainAlert: currentConfig.rainAlert,
-      rainThreshold: currentConfig.rainThreshold,
       windAlert: currentConfig.windAlert,
       windThreshold: currentConfig.windThreshold,
       frostAlert: currentConfig.frostAlert,
@@ -376,7 +372,7 @@ export async function triggerGitLabPipeline() {
 }
 
 /**
- * Erstellt oder aktualisiert den Pipeline Schedule via GitLab REST API (Option B)
+ * Erstellt oder aktualisiert den Pipeline Schedule via GitLab REST API
  */
 export async function createOrUpdateGitLabSchedule() {
   const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
@@ -459,7 +455,6 @@ export async function createOrUpdateGitLabSchedule() {
  */
 export function updateRuleCardDimming() {
   const mapping = [
-    { inputId: 'notif-rule-rain', itemId: 'notif-rule-item-rain' },
     { inputId: 'notif-rule-wind', itemId: 'notif-rule-item-wind' },
     { inputId: 'notif-rule-frost', itemId: 'notif-rule-item-frost' },
     { inputId: 'notif-rule-briefing', itemId: 'notif-rule-item-briefing' },
@@ -525,7 +520,7 @@ export function updateTimelineVisualizer() {
 }
 
 /**
- * Synchronisiert die Option B Preset-Karten mit dem Formular
+ * Synchronisiert die Preset-Karten mit dem Formular
  */
 export function updatePresetCards() {
   const currentKey = currentGitLab.schedulePreset || 'eco';
@@ -610,7 +605,6 @@ export function openNotificationModal() {
   if (!modal) return;
 
   // Felder befüllen
-  const elRain = document.getElementById('notif-rule-rain');
   const elWind = document.getElementById('notif-rule-wind');
   const elWindVal = document.getElementById('notif-rule-wind-val');
   const elFrost = document.getElementById('notif-rule-frost');
@@ -623,7 +617,6 @@ export function openNotificationModal() {
   const elToken = document.getElementById('notif-gitlab-token');
   const elSchedule = document.getElementById('notif-gitlab-schedule');
 
-  if (elRain) elRain.checked = currentConfig.rainAlert;
   if (elWind) elWind.checked = currentConfig.windAlert;
   if (elWindVal) elWindVal.value = String(currentConfig.windThreshold || 60);
   if (elFrost) elFrost.checked = currentConfig.frostAlert;
@@ -651,7 +644,6 @@ export function closeNotificationModal() {
  * Liest die Formulardaten aus
  */
 function readFormValues() {
-  const elRain = document.getElementById('notif-rule-rain');
   const elWind = document.getElementById('notif-rule-wind');
   const elWindVal = document.getElementById('notif-rule-wind-val');
   const elFrost = document.getElementById('notif-rule-frost');
@@ -664,7 +656,6 @@ function readFormValues() {
   const elToken = document.getElementById('notif-gitlab-token');
   const elSchedule = document.getElementById('notif-gitlab-schedule');
 
-  if (elRain) currentConfig.rainAlert = elRain.checked;
   if (elWind) currentConfig.windAlert = elWind.checked;
   if (elWindVal) currentConfig.windThreshold = parseInt(elWindVal.value, 10) || 60;
   if (elFrost) currentConfig.frostAlert = elFrost.checked;
@@ -781,7 +772,7 @@ export function initNotifications() {
     });
   }
 
-  // Schedule Provisioning Button (Option B)
+  // Schedule Provisioning Button
   const scheduleBtn = document.getElementById('notif-create-schedule-btn');
   if (scheduleBtn) {
     scheduleBtn.addEventListener('click', async () => {
@@ -883,7 +874,7 @@ export function initNotifications() {
 
   // Realtime Auto-Save & Card Dimming
   const formFieldIds = [
-    'notif-rule-rain', 'notif-rule-wind', 'notif-rule-wind-val',
+    'notif-rule-wind', 'notif-rule-wind-val',
     'notif-rule-frost', 'notif-rule-briefing', 'notif-rule-briefing-time',
     'notif-rule-severe', 'notif-gitlab-host', 'notif-gitlab-project', 'notif-gitlab-token'
   ];

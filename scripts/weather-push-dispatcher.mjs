@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * BEST WEATHER — Enterprise GitLab CI Push Notification Dispatcher
- * Runs as a Scheduled Pipeline (Option B: 06:00–22:00 active, 22:00–06:00 quiet hours).
+ * Runs as a Scheduled Pipeline (06:00–22:00 active, 22:00–06:00 quiet hours).
  * Evaluates live weather via Open-Meteo with stateful anti-spam cooldowns and
  * dispatches Web Push notifications to Apple APNs (iOS / iPadOS / macOS) & Google FCM.
  */
@@ -121,8 +121,6 @@ function loadPushConfig() {
   return {
     subscription: null,
     rules: {
-      rainAlert: true,
-      rainThreshold: 50,
       windAlert: true,
       windThreshold: 60,
       frostAlert: true,
@@ -171,7 +169,7 @@ function getLocalTimeInfo(timeZoneName) {
     const dateString = `${year}-${month}-${day}`;
     const formattedTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 
-    // Option B: Pause strikt zwischen 22:00 und 06:00 Uhr lokaler Zeit
+    // Pause strikt zwischen 22:00 und 06:00 Uhr lokaler Zeit
     // 22:00:00 bis 05:59:59 ist Ruhezeit
     const isQuietHours = (hour >= 22 || hour < 6);
 
@@ -313,31 +311,7 @@ function evaluateAlertRules(config, weather, state, timeInfo) {
     }
   }
 
-  // 3. REGEL: Regenalarm (Nowcasting: In den nächsten 60-90 Min setzt Regen ein)
-  if (rules.rainAlert && alerts.length === 0) {
-    const isCurrentlyRaining = (current.precipitation || 0) > 0.3;
-    const nextHoursPrecip = (hourly.precipitation || []).slice(currentHour + 1, currentHour + 3);
-    const nextHoursPop = (hourly.precipitation_probability || []).slice(currentHour + 1, currentHour + 3);
-    const willRainSoon = nextHoursPrecip.some(p => p >= 0.3) || nextHoursPop.some(prob => prob >= (rules.rainThreshold || 50));
-
-    // Cooldown: 3 Stunden (180 Minuten) zwischen Regenalarmen
-    const rainCooldown = 3 * 60 * 60 * 1000;
-    const isRainCooldownActive = (nowMs - (state.lastRainAlertAt || 0)) < rainCooldown;
-
-    if (!isCurrentlyRaining && willRainSoon && !isRainCooldownActive) {
-      const maxExpected = Math.max(...nextHoursPrecip, 0.5).toFixed(1);
-      alerts.push({
-        type: 'rain',
-        title: `🌧️ Regenalarm für ${locName}`,
-        body: `In Kürze setzt Niederschlag ein (~${maxExpected} mm erwartet). Schirm einpacken!`,
-        tag: `rain-${timeInfo.dateString}-${Math.floor(currentHour / 3)}`,
-        data: { url: './', tab: 'tab-map', type: 'rain' }
-      });
-      state.lastRainAlertAt = nowMs;
-    }
-  }
-
-  // 4. REGEL: Sturm- & Böenwarnung
+  // 3. REGEL: Sturm- & Böenwarnung
   if (rules.windAlert && alerts.length === 0) {
     const threshold = rules.windThreshold || 60;
     const nextGusts = (hourly.wind_gusts_10m || []).slice(currentHour, currentHour + 4);
@@ -361,7 +335,7 @@ function evaluateAlertRules(config, weather, state, timeInfo) {
     }
   }
 
-  // 5. REGEL: Frost- & Glättewarnung
+  // 4. REGEL: Frost- & Glättewarnung
   if (rules.frostAlert && alerts.length === 0) {
     const nextTemps = (hourly.temperature_2m || []).slice(currentHour, currentHour + 6);
     const minUpcomingTemp = Math.min(current.temperature_2m ?? 99, ...nextTemps);
@@ -418,7 +392,7 @@ async function dispatchPushNotification(subscription, payload, vapidKeys) {
 async function main() {
   const startTime = Date.now();
   console.log('=============================================================================');
-  console.log('⚡ BEST WEATHER — Enterprise Push Notification Dispatcher (Option B)');
+  console.log('⚡ BEST WEATHER — Enterprise Push Notification Dispatcher');
   console.log(`⏰ System-Start (UTC): ${new Date().toISOString()}`);
   console.log('=============================================================================');
 
@@ -444,13 +418,13 @@ async function main() {
     process.exit(1);
   }
 
-  // 2. ZEITZONEN- & RUHEZEIT-ANALYSE (OPTION B: 22:00 - 06:00 UHR)
+  // 2. ZEITZONEN- & RUHEZEIT-ANALYSE (22:00 - 06:00 UHR)
   const stationTz = weatherData.timezone || preferredTz;
   const timeInfo = getLocalTimeInfo(stationTz);
   console.log(`🕒 Lokale Stationszeit: ${timeInfo.formattedTime} Uhr (${timeInfo.tz})`);
 
   if (timeInfo.isQuietHours) {
-    console.log(`🌙 [OPTION B: RUHEZEIT AKTIV] 22:00 - 06:00 Uhr Ortszeit (${timeInfo.formattedTime} Uhr).`);
+    console.log(`🌙 [RUHEZEIT AKTIV] 22:00 - 06:00 Uhr Ortszeit (${timeInfo.formattedTime} Uhr).`);
     
     // Notfall-Bypass Check: Falls akutes Hagelunwetter (WMO 99) vorliegt und Bypass erlaubt ist
     const curCode = weatherData.current?.weather_code;
@@ -466,7 +440,7 @@ async function main() {
       return;
     }
   } else {
-    console.log(`☀️ [OPTION B: AKTIVITÄTSFENSTER] 06:00 - 22:00 Uhr Ortszeit (${timeInfo.formattedTime} Uhr). Alarme aktiv.`);
+    console.log(`☀️ [AKTIVITÄTSFENSTER] 06:00 - 22:00 Uhr Ortszeit (${timeInfo.formattedTime} Uhr). Alarme aktiv.`);
   }
 
   // 3. REGEL-EVALUATION MIT ANTI-SPAM COOLDOWNS

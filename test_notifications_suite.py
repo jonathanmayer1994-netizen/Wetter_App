@@ -91,27 +91,26 @@ def run_tests():
         master_toggle = page.locator("#notif-master-toggle")
         assert_test("Master toggle is present in DOM", master_toggle.count() == 1)
 
-        # 6. Alarm Rules Controls & Dimming
-        rule_rain = page.locator("#notif-rule-rain")
-        rule_rain_item = page.locator("#notif-rule-item-rain")
+        # 6. Alarm Rules Controls & Dimming (Regenalarm cleanly removed as requested)
         rule_wind = page.locator("#notif-rule-wind")
+        rule_wind_item = page.locator("#notif-rule-item-wind")
         rule_wind_val = page.locator("#notif-rule-wind-val")
         rule_frost = page.locator("#notif-rule-frost")
         rule_briefing = page.locator("#notif-rule-briefing")
         rule_briefing_time = page.locator("#notif-rule-briefing-time")
         rule_severe = page.locator("#notif-rule-severe")
 
-        assert_test("Regenalarm checkbox present and checked", rule_rain.is_checked())
-        assert_test("Regenalarm card is not dimmed when checked", "is-disabled" not in (rule_rain_item.get_attribute("class") or ""))
+        assert_test("Regenalarm is cleanly removed from DOM", page.locator("#notif-rule-rain").count() == 0)
+        assert_test("Sturmwarnung checkbox present and checked", rule_wind.is_checked())
+        assert_test("Sturmwarnung card is not dimmed when checked", "is-disabled" not in (rule_wind_item.get_attribute("class") or ""))
         
-        # Test dimming interaction
-        rule_rain.evaluate("el => { el.checked = false; el.dispatchEvent(new Event('change')); }")
+        # Test dimming interaction on wind rule
+        rule_wind.evaluate("el => { el.checked = false; el.dispatchEvent(new Event('change')); }")
         page.wait_for_timeout(100)
-        assert_test("Regenalarm card dims (is-disabled) when unchecked", "is-disabled" in (rule_rain_item.get_attribute("class") or ""))
-        rule_rain.evaluate("el => { el.checked = true; el.dispatchEvent(new Event('change')); }")
+        assert_test("Sturmwarnung card dims (is-disabled) when unchecked", "is-disabled" in (rule_wind_item.get_attribute("class") or ""))
+        rule_wind.evaluate("el => { el.checked = true; el.dispatchEvent(new Event('change')); }")
         page.wait_for_timeout(100)
 
-        assert_test("Sturmwarnung checkbox present and checked", rule_wind.is_checked())
         assert_test("Wind threshold dropdown has options", rule_wind_val.locator("option").count() >= 4)
         assert_test("Frostwarnung checkbox present and checked", rule_frost.is_checked())
         assert_test("Morgen-Briefing checkbox present and checked", rule_briefing.is_checked())
@@ -167,7 +166,9 @@ def run_tests():
         page.wait_for_timeout(100)
         assert_test("Clicking eye again re-masks token (type='password')", gl_token.get_attribute("type") == "password")
 
-        assert_test("Option B Quota & Quiet Hours Box is visible", quota_box.is_visible() and "Option B" in quota_box.inner_text() and "360" in quota_box.inner_text())
+        assert_test("Quota & Quiet Hours Box is visible", quota_box.is_visible() and "360" in quota_box.inner_text())
+        modal_text = page.locator("#notif-modal-overlay").inner_text()
+        assert_test("Zero instances of 'Option B' in notification modal UI text", "Option B" not in modal_text)
 
         # 10. Action Buttons
         save_btn = page.locator("#notif-save-sync-btn")

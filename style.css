@@ -16050,7 +16050,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 }
 
 /* =============================================================================
-   OPTION B INTERACTIVE TIMELINE & APPLE GLASS NOTIFICATION ENHANCEMENTS
+   INTERACTIVE TIMELINE & APPLE GLASS NOTIFICATION ENHANCEMENTS
    ============================================================================= */
 .notif-quick-nav {
   display: flex;
@@ -16204,7 +16204,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   background: #818cf8;
 }
 
-/* Option B Schedule Preset Selection Cards */
+/* Schedule Preset Selection Cards */
 .notif-presets-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
