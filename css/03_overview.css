@@ -2495,3 +2495,271 @@ body.is-scrolling .radar-floating-controls {
   box-shadow: 0 0 0 1px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.4);
   color: #38bdf8;
 }
+
+/* =============================================================================
+   OPTION B INTERACTIVE TIMELINE & APPLE GLASS NOTIFICATION ENHANCEMENTS
+   ============================================================================= */
+.notif-quick-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.notif-quick-nav::-webkit-scrollbar {
+  display: none;
+}
+.notif-nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.notif-nav-pill:hover,
+.notif-nav-pill:focus-visible {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+/* Interactive 24-Hour Day/Night Timeline Bar */
+.notif-timeline-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ntc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ntc-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+.ntc-current-badge {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.ntc-current-badge.badge-quiet {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+.ntc-tz {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+.notif-timeline-bar-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 14px;
+}
+.notif-timeline-bar {
+  display: flex;
+  width: 100%;
+  height: 28px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.ntb-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ffffff;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+.ntb-segment.ntb-quiet {
+  background: linear-gradient(90deg, #1e1b4b 0%, #312e81 100%);
+  color: #c7d2fe;
+}
+.ntb-segment.ntb-active {
+  background: linear-gradient(90deg, #0284c7 0%, #0ea5e9 40%, #f59e0b 100%);
+  color: #ffffff;
+  font-weight: 700;
+}
+.notif-timeline-indicator {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  transition: left 0.3s ease;
+}
+.nti-pin {
+  width: 3px;
+  height: 38px;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.9), 0 0 2px #000;
+  border-radius: 2px;
+}
+.notif-timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.ntl-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ntl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.ntl-dot.dot-active {
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+.ntl-dot.dot-quiet {
+  background: #818cf8;
+}
+
+/* Option B Schedule Preset Selection Cards */
+.notif-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+.notif-preset-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.notif-preset-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+.notif-preset-card.is-selected {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(14, 165, 233, 0.1) 100%);
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+}
+.npc-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+}
+.notif-preset-card.is-selected .npc-badge {
+  background: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+.npc-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+.npc-runs {
+  font-size: 0.74rem;
+  color: #94a3b8;
+}
+.notif-preset-card.is-selected .npc-runs {
+  color: #e2e8f0;
+}
+
+/* Rule Card Dimming when toggled off */
+.notif-rule-item {
+  transition: all 0.25s ease;
+}
+.notif-rule-item.is-disabled {
+  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.015);
+}
+.notif-rule-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Password Toggle Wrapper */
+.notif-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.notif-input-wrapper input {
+  width: 100%;
+  padding-right: 40px;
+}
+.notif-toggle-eye-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s ease;
+}
+.notif-toggle-eye-btn:hover {
+  color: #ffffff;
+}
+
+.notif-help-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #38bdf8;
+  text-decoration: none;
+  margin-top: 2px;
+  transition: opacity 0.15s ease;
+}
+.notif-help-link:hover {
+  text-decoration: underline;
+  opacity: 0.9;
+}

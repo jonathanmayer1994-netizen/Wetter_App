@@ -455,6 +455,94 @@ export async function createOrUpdateGitLabSchedule() {
 }
 
 /**
+ * Aktualisiert die visuelle Dimmung der Regel-Karten basierend auf deren Schalter
+ */
+export function updateRuleCardDimming() {
+  const mapping = [
+    { inputId: 'notif-rule-rain', itemId: 'notif-rule-item-rain' },
+    { inputId: 'notif-rule-wind', itemId: 'notif-rule-item-wind' },
+    { inputId: 'notif-rule-frost', itemId: 'notif-rule-item-frost' },
+    { inputId: 'notif-rule-briefing', itemId: 'notif-rule-item-briefing' },
+    { inputId: 'notif-rule-severe', itemId: 'notif-rule-item-severe' },
+  ];
+  for (const { inputId, itemId } of mapping) {
+    const input = document.getElementById(inputId);
+    const item = document.getElementById(itemId);
+    if (input && item) {
+      item.classList.toggle('is-disabled', !input.checked);
+    }
+  }
+}
+
+/**
+ * Aktualisiert den interaktiven 24-Stunden Zeitstrahl mit Nadel und Zeitzone
+ */
+export function updateTimelineVisualizer() {
+  const clockBadge = document.getElementById('notif-live-clock-badge');
+  const tzLabel = document.getElementById('notif-live-tz-label');
+  const indicator = document.getElementById('notif-timeline-indicator');
+
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin';
+  const now = new Date();
+
+  let hour = now.getHours();
+  let minute = now.getMinutes();
+
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    hour = parseInt(parts.find(p => p.type === 'hour')?.value ?? String(hour), 10);
+    minute = parseInt(parts.find(p => p.type === 'minute')?.value ?? String(minute), 10);
+  } catch {}
+
+  const isQuiet = (hour >= 22 || hour < 6);
+  const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const totalMinutes = hour * 60 + minute;
+  const percent = Math.min(100, Math.max(0, (totalMinutes / 1440) * 100));
+
+  if (indicator) {
+    indicator.style.left = `${percent.toFixed(2)}%`;
+  }
+
+  if (clockBadge) {
+    if (isQuiet) {
+      clockBadge.innerText = `🌙 Jetzt: ${timeStr} Uhr • Nachtruhe (Pause)`;
+      clockBadge.className = 'ntc-current-badge badge-quiet';
+    } else {
+      clockBadge.innerText = `☀️ Jetzt: ${timeStr} Uhr • Aktiv (Alarme scharf)`;
+      clockBadge.className = 'ntc-current-badge';
+    }
+  }
+
+  if (tzLabel) {
+    tzLabel.innerText = `Zeitzone: ${tz}`;
+  }
+}
+
+/**
+ * Synchronisiert die Option B Preset-Karten mit dem Formular
+ */
+export function updatePresetCards() {
+  const currentKey = currentGitLab.schedulePreset || 'eco';
+  const cards = document.querySelectorAll('.notif-preset-card');
+  cards.forEach(card => {
+    const isSel = card.dataset.preset === currentKey;
+    card.classList.toggle('is-selected', isSel);
+    card.setAttribute('aria-selected', isSel ? 'true' : 'false');
+  });
+
+  const select = document.getElementById('notif-gitlab-schedule');
+  if (select && select.value !== currentKey) {
+    select.value = currentKey;
+  }
+}
+
+/**
  * UI State Refresh Helper
  */
 function updateUIElements() {
@@ -507,6 +595,10 @@ function updateUIElements() {
       syncStatusMsg.innerText = currentGitLab.lastSyncStatus || 'Noch nicht synchronisiert';
     }
   }
+
+  updateRuleCardDimming();
+  updateTimelineVisualizer();
+  updatePresetCards();
 }
 
 /**
@@ -737,6 +829,80 @@ export function initNotifications() {
       }
     });
   }
+
+  // Quick-Nav Pills Smooth Scroll
+  document.querySelectorAll('.notif-nav-pill[data-scroll-to]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = btn.dataset.scrollTo;
+      const targetEl = document.getElementById(targetId);
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+
+  // Preset Cards Sync & Selection
+  document.querySelectorAll('.notif-preset-card[data-preset]').forEach(card => {
+    const handleSelect = () => {
+      currentGitLab.schedulePreset = card.dataset.preset;
+      updatePresetCards();
+      saveNotificationState();
+    };
+    card.addEventListener('click', handleSelect);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleSelect();
+      }
+    });
+  });
+
+  const elScheduleSelect = document.getElementById('notif-gitlab-schedule');
+  if (elScheduleSelect) {
+    elScheduleSelect.addEventListener('change', () => {
+      currentGitLab.schedulePreset = elScheduleSelect.value;
+      updatePresetCards();
+      saveNotificationState();
+    });
+  }
+
+  // Token Visibility Eye Toggle
+  const tokenEyeBtn = document.getElementById('notif-token-toggle-eye');
+  const tokenField = document.getElementById('notif-gitlab-token');
+  if (tokenEyeBtn && tokenField) {
+    tokenEyeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isPass = tokenField.type === 'password';
+      tokenField.type = isPass ? 'text' : 'password';
+      tokenEyeBtn.innerText = isPass ? '🙈' : '👁️';
+      tokenEyeBtn.title = isPass ? 'Token verbergen' : 'Token anzeigen';
+      tokenEyeBtn.setAttribute('aria-label', isPass ? 'Token verbergen' : 'Token anzeigen');
+    });
+  }
+
+  // Realtime Auto-Save & Card Dimming
+  const formFieldIds = [
+    'notif-rule-rain', 'notif-rule-wind', 'notif-rule-wind-val',
+    'notif-rule-frost', 'notif-rule-briefing', 'notif-rule-briefing-time',
+    'notif-rule-severe', 'notif-gitlab-host', 'notif-gitlab-project', 'notif-gitlab-token'
+  ];
+  formFieldIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', () => {
+        readFormValues();
+        saveNotificationState();
+        updateRuleCardDimming();
+      });
+      if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'password' || el.type === 'url')) {
+        el.addEventListener('blur', () => {
+          readFormValues();
+          saveNotificationState();
+        });
+      }
+    }
+  });
 
   // Service Worker Messages (z. B. wenn eine Notification angeklickt wird)
   if ('serviceWorker' in navigator) {

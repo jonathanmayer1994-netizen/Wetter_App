@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=3.0.0">
+  <link rel="stylesheet" href="style.css?v=3.0.1">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -3042,6 +3042,13 @@
         <!-- iOS PWA / Standalone & Berechtigungs-Hinweis -->
         <div class="notif-callout" id="notif-support-hint" style="display:none;"></div>
 
+        <!-- Quick Navigation Pills -->
+        <div class="notif-quick-nav" role="navigation" aria-label="Abschnittsnavigation">
+          <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-rules">⚡ Alarmregeln</button>
+          <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-schedule">⏱️ Option B Zeitplan</button>
+          <button type="button" class="notif-nav-pill" data-scroll-to="notif-section-gitlab">🦊 GitLab CI Backend</button>
+        </div>
+
         <!-- Master Toggle Card -->
         <div class="notif-section-card notif-master-card">
           <div class="notif-master-left">
@@ -3055,7 +3062,7 @@
         </div>
 
         <!-- Kriterien / Alarm-Regeln Card -->
-        <div class="notif-section-card">
+        <div class="notif-section-card" id="notif-section-rules">
           <div class="notif-card-header">
             <span class="notif-card-icon">⚡</span>
             <span class="notif-card-title">Wetter-Alarmregeln (Was soll gemeldet werden?)</span>
@@ -3063,7 +3070,7 @@
           
           <div class="notif-rules-list">
             <!-- 1. Regenalarm -->
-            <div class="notif-rule-item">
+            <div class="notif-rule-item" id="notif-rule-item-rain">
               <div class="notif-rule-icon">🌧️</div>
               <div class="notif-rule-info">
                 <div class="notif-rule-title">Regenalarm (Nowcasting)</div>
@@ -3076,7 +3083,7 @@
             </div>
 
             <!-- 2. Sturm & Böen -->
-            <div class="notif-rule-item">
+            <div class="notif-rule-item" id="notif-rule-item-wind">
               <div class="notif-rule-icon">💨</div>
               <div class="notif-rule-info">
                 <div class="notif-rule-title">Sturm- &amp; Böenwarnung</div>
@@ -3097,7 +3104,7 @@
             </div>
 
             <!-- 3. Frost & Glätte -->
-            <div class="notif-rule-item">
+            <div class="notif-rule-item" id="notif-rule-item-frost">
               <div class="notif-rule-icon">❄️</div>
               <div class="notif-rule-info">
                 <div class="notif-rule-title">Frost- &amp; Glättewarnung</div>
@@ -3110,7 +3117,7 @@
             </div>
 
             <!-- 4. Morgen-Briefing -->
-            <div class="notif-rule-item">
+            <div class="notif-rule-item" id="notif-rule-item-briefing">
               <div class="notif-rule-icon">☀️</div>
               <div class="notif-rule-info">
                 <div class="notif-rule-title">Tägliches Morgen-Briefing</div>
@@ -3126,7 +3133,7 @@
             </div>
 
             <!-- 5. Akute Unwetter & DWD Gefahren -->
-            <div class="notif-rule-item">
+            <div class="notif-rule-item" id="notif-rule-item-severe">
               <div class="notif-rule-icon">⚡</div>
               <div class="notif-rule-info">
                 <div class="notif-rule-title">Akute Unwetter &amp; Hagel</div>
@@ -3140,8 +3147,84 @@
           </div>
         </div>
 
+        <!-- Option B: Zeitplan & Nachtruhe-Visualisierung Card -->
+        <div class="notif-section-card" id="notif-section-schedule">
+          <div class="notif-card-header">
+            <span class="notif-card-icon">⏱️</span>
+            <span class="notif-card-title">Option B Zeitplan &amp; 24h Ruhezeit-Fenster</span>
+          </div>
+
+          <!-- 24-Stunden Zeitstrahl Visualizer -->
+          <div class="notif-timeline-card">
+            <div class="ntc-header">
+              <div class="ntc-title">
+                <span>📊 24-Stunden-Tageszyklus</span>
+                <span class="ntc-current-badge" id="notif-live-clock-badge">📍 Jetzt: Aktiv</span>
+              </div>
+              <span class="ntc-tz" id="notif-live-tz-label">Zeitzone: Europe/Berlin</span>
+            </div>
+
+            <div class="notif-timeline-bar-wrapper">
+              <div class="notif-timeline-bar">
+                <div class="ntb-segment ntb-quiet" style="width: 25%;" title="00:00 - 06:00 Uhr: Nachtruhe (Pause)">
+                  <span class="ntb-seg-icon">🌙</span>
+                  <span class="ntb-seg-text">00–06h Ruhe</span>
+                </div>
+                <div class="ntb-segment ntb-active" style="width: 66.66%;" title="06:00 - 22:00 Uhr: Aktiv (16 Std. Fenster)">
+                  <span class="ntb-seg-icon">☀️</span>
+                  <span class="ntb-seg-text">06:00 – 22:00 Uhr Aktiv (16h Fenster)</span>
+                </div>
+                <div class="ntb-segment ntb-quiet" style="width: 8.34%;" title="22:00 - 24:00 Uhr: Nachtruhe (Pause)">
+                  <span class="ntb-seg-icon">🌙</span>
+                  <span class="ntb-seg-text">22–24h</span>
+                </div>
+              </div>
+              <div class="notif-timeline-indicator" id="notif-timeline-indicator" style="left: 36.8%;">
+                <div class="nti-pin"></div>
+              </div>
+            </div>
+
+            <div class="notif-timeline-legend">
+              <div class="ntl-item"><span class="ntl-dot dot-active"></span> 06:00–22:00 Uhr: Alarme aktiv</div>
+              <div class="ntl-item"><span class="ntl-dot dot-quiet"></span> 22:00–06:00 Uhr: Nachtruhe (0 Compute-Min.)</div>
+            </div>
+          </div>
+
+          <!-- Taktung Preset Cards -->
+          <div class="notif-presets-grid" id="notif-presets-grid">
+            <div class="notif-preset-card is-selected" data-preset="eco" role="button" tabindex="0">
+              <span class="npc-badge">⭐ Empfohlen</span>
+              <div class="npc-title">Option B: Eco</div>
+              <div class="npc-runs">12 Läufe/Tag • 360 Min./Mo.</div>
+              <div class="npc-runs" style="font-size:0.68rem; margin-top:2px;">100% Free-Tier Safe (&le; 400 Min.)</div>
+            </div>
+            <div class="notif-preset-card" data-preset="hourly" role="button" tabindex="0">
+              <span class="npc-badge">Stündlich</span>
+              <div class="npc-title">Option B: Stündlich</div>
+              <div class="npc-runs">16 Läufe/Tag • 480 Min./Mo.</div>
+              <div class="npc-runs" style="font-size:0.68rem; margin-top:2px;">Prüfung zur vollen Stunde</div>
+            </div>
+            <div class="notif-preset-card" data-preset="highfreq" role="button" tabindex="0">
+              <span class="npc-badge">High-Freq</span>
+              <div class="npc-title">Option B: 20-Minuten</div>
+              <div class="npc-runs">48 Läufe/Tag • Unbegrenzt</div>
+              <div class="npc-runs" style="font-size:0.68rem; margin-top:2px;">Ideal für eigenen Runner</div>
+            </div>
+          </div>
+
+          <!-- Form Select (synced with preset cards) -->
+          <div class="notif-field notif-field-full" style="margin-top: 4px;">
+            <label for="notif-gitlab-schedule" class="notif-field-label">Ausgewähltes Intervall:</label>
+            <select id="notif-gitlab-schedule" class="stsp-glass-input" style="cursor:pointer;" aria-label="Option B Zeitintervall">
+              <option value="eco" selected>Option B: Eco (06:00–22:00 Uhr — 12 Läufe/Tag = 360 Min/Monat, 100% Free-Tier Safe)</option>
+              <option value="hourly">Option B: Stündlich (06:00–22:00 Uhr — 16 Läufe/Tag = 480 Min/Monat)</option>
+              <option value="highfreq">Option B: Alle 20 Min tagsüber (06:00–22:00 Uhr — 48 Läufe/Tag, für eigenen Runner)</option>
+            </select>
+          </div>
+        </div>
+
         <!-- GitLab CI REST API Anbindung Card (Option 1) -->
-        <div class="notif-section-card">
+        <div class="notif-section-card" id="notif-section-gitlab">
           <div class="notif-card-header">
             <span class="notif-card-icon">🦊</span>
             <span class="notif-card-title">GitLab REST API Anbindung &amp; Scheduled Pipeline</span>
@@ -3161,15 +3244,11 @@
             </div>
             <div class="notif-field">
               <label for="notif-gitlab-token" class="notif-field-label">GitLab Access Token (mit api Scope):</label>
-              <input type="password" id="notif-gitlab-token" class="stsp-glass-input" placeholder="glpat-..." autocomplete="off">
-            </div>
-            <div class="notif-field notif-field-full">
-              <label for="notif-gitlab-schedule" class="notif-field-label">Option B Intervall (06:00–22:00 Uhr aktiv, 22:00–06:00 Uhr Pause):</label>
-              <select id="notif-gitlab-schedule" class="stsp-glass-input" style="cursor:pointer;" aria-label="Option B Zeitintervall">
-                <option value="eco" selected>Option B: Eco (06:00–22:00 Uhr — 12 Läufe/Tag = 360 Min/Monat, 100% Free-Tier Safe)</option>
-                <option value="hourly">Option B: Stündlich (06:00–22:00 Uhr — 16 Läufe/Tag = 480 Min/Monat)</option>
-                <option value="highfreq">Option B: Alle 20 Min tagsüber (06:00–22:00 Uhr — 48 Läufe/Tag, für eigenen Runner)</option>
-              </select>
+              <div class="notif-input-wrapper">
+                <input type="password" id="notif-gitlab-token" class="stsp-glass-input" placeholder="glpat-..." autocomplete="off">
+                <button type="button" id="notif-token-toggle-eye" class="notif-toggle-eye-btn" title="Token anzeigen/verbergen" aria-label="Token anzeigen">👁️</button>
+              </div>
+              <a href="https://gitlab.com/-/user_settings/personal_access_tokens?name=BestWeatherPush&amp;scopes=api" target="_blank" rel="noopener noreferrer" class="notif-help-link">🔑 GitLab Access Token erstellen (Direktlink mit 'api' Scope) ↗</a>
             </div>
           </div>
 
@@ -3234,11 +3313,11 @@
 
   
   <!-- App Core Module -->
-  <script type="module" src="app.js?v=3.0.0"></script>
+  <script type="module" src="app.js?v=3.0.1"></script>
 
   <!-- Autonome iOS-PWA & Service-Worker Update-Engine -->
   <script type="module">
-    import { initAppUpdater } from './core/appUpdater.js?v=3.0.0';
+    import { initAppUpdater } from './core/appUpdater.js?v=3.0.1';
     initAppUpdater();
   </script>
 </body>
