@@ -1,7 +1,10 @@
 # =============================================================================
-# BEST WEATHER — GitLab CI/CD Pipeline for Automated Web Push Notifications
+# BEST WEATHER — GitLab CI/CD Pipeline for Multi-Device Web Push Notifications
 # =============================================================================
-# Option B Architecture: Active 06:00–22:00, Quiet Hours 22:00–06:00
+# Privacy-First Multi-Device Architecture:
+# - Each device stores its own conflict-free CI variable: WEATHER_PUSH_DEV_<UUID_HEX>
+# - Strictly anonymous RFC 4122 UUID v4 (zero device/hardware/OS metadata)
+# - Active 06:00–22:00, Quiet Hours 22:00–06:00 per device timezone
 # Execution Duration: ~10 to 15 seconds on Alpine Linux
 
 stages:
@@ -33,7 +36,7 @@ weather_push_dispatch:
     - test -d node_modules/web-push || npm install --no-audit --no-fund --production web-push
 
   script:
-    - echo "⚡ Starte Best Weather Enterprise Push Dispatcher (Option B)..."
+    - echo "⚡ Starte Best Weather Multi-Device Anonymous UUID Push Dispatcher..."
     - node scripts/weather-push-dispatcher.mjs
 
   variables:

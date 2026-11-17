@@ -11,8 +11,60 @@ export const DEFAULT_VAPID_PUBLIC_KEY = 'BFXeGAET8G6YxsiL0HvXELcaDIoZyeIgPYokZuq
 const STORAGE_KEYS = {
   CONFIG: 'bw_push_config',
   GITLAB: 'bw_gitlab_config',
-  SUBSCRIPTION: 'bw_push_subscription'
+  SUBSCRIPTION: 'bw_push_subscription',
+  DEVICE_UUID: 'bw_push_device_uuid'
 };
+
+export const DEVICE_VAR_PREFIX = 'WEATHER_PUSH_DEV_';
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Erzeugt eine rein zufällige kryptographische UUID v4 (RFC 4122).
+ * Verwendet KEINERLEI Geräteinformationen (kein User-Agent, kein Modell, kein OS, kein Fingerprinting).
+ */
+export function generateAnonymousUuid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().toLowerCase();
+  }
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 Variant
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * Lädt oder erzeugt einmalig die stabile, rein anonyme Geräte-UUID für dieses Gerät.
+ */
+export function getOrCreateDeviceUuid() {
+  const existing = AlpineStorage.safeGetItem(STORAGE_KEYS.DEVICE_UUID, null);
+  if (typeof existing === 'string' && UUID_V4_REGEX.test(existing.trim())) {
+    return existing.trim().toLowerCase();
+  }
+  const freshUuid = generateAnonymousUuid();
+  AlpineStorage.safeSetItem(STORAGE_KEYS.DEVICE_UUID, freshUuid);
+  return freshUuid;
+}
+
+/**
+ * Leitet den konfliktfreien GitLab CI-Variablennamen ausschließlich aus der anonymen UUID ab.
+ * Format: WEATHER_PUSH_DEV_<32 HEX CHARS> (strictly ^[A-Z0-9_]+$, 0 Gerätedaten).
+ */
+export function getDeviceVariableKey(deviceUuid = getOrCreateDeviceUuid()) {
+  const cleanHex = String(deviceUuid || '').replace(/[^0-9a-f]/gi, '').toUpperCase();
+  if (cleanHex.length !== 32) {
+    const fallbackHex = getOrCreateDeviceUuid().replace(/-/g, '').toUpperCase();
+    return `${DEVICE_VAR_PREFIX}${fallbackHex}`;
+  }
+  return `${DEVICE_VAR_PREFIX}${cleanHex}`;
+}
 
 export const SCHEDULE_PRESETS = {
   eco: {
@@ -62,7 +114,6 @@ const DEFAULT_GITLAB = {
   projectId: '',
   token: '',
   schedulePreset: 'eco', // 'eco' | 'hourly' | 'highfreq'
-  variableKey: 'WEATHER_PUSH_CONFIG',
   lastSyncStatus: 'Bereit zur Synchronisation',
   lastSyncAt: 0
 };
@@ -188,7 +239,37 @@ export async function enablePushNotifications() {
 }
 
 /**
- * Deaktiviert Push Notifications
+ * Entfernt ausschließlich die eigene anonyme Geräte-Variable aus GitLab CI,
+ * ohne andere verknüpfte Geräte zu beeinflussen.
+ */
+export async function deleteDeviceFromGitLab() {
+  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const projectId = (currentGitLab.projectId || '').trim();
+  const token = (currentGitLab.token || '').trim();
+  if (!projectId || !token) return { skipped: true };
+
+  const deviceUuid = getOrCreateDeviceUuid();
+  const varKey = getDeviceVariableKey(deviceUuid);
+  const encodedId = encodeURIComponent(projectId);
+  const variableUrl = `${host}/api/v4/projects/${encodedId}/variables/${encodeURIComponent(varKey)}`;
+
+  const response = await fetch(variableUrl, {
+    method: 'DELETE',
+    headers: { 'PRIVATE-TOKEN': token }
+  });
+
+  if (response.status === 404) {
+    return { ok: true, alreadyRemoved: true, variableKey: varKey };
+  }
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`GitLab DELETE Fehler (${response.status}): ${errorText || response.statusText}`);
+  }
+  return { ok: true, variableKey: varKey };
+}
+
+/**
+ * Deaktiviert Push Notifications ausschließlich für dieses Gerät (anonyme UUID)
  */
 export async function disablePushNotifications() {
   try {
@@ -206,6 +287,11 @@ export async function disablePushNotifications() {
   AlpineStorage.safeRemoveItem(STORAGE_KEYS.SUBSCRIPTION);
   saveNotificationState();
   updateUIElements();
+
+  // Entferne nur die eigene Geräte-Variable auf GitLab (andere Geräte bleiben 100% unberührt)
+  if (currentGitLab.projectId && currentGitLab.token) {
+    deleteDeviceFromGitLab().catch(err => console.debug('Hintergrund-Cleanup Info:', err.message));
+  }
 }
 
 /**
@@ -246,46 +332,64 @@ export async function sendLocalTestPush() {
 }
 
 /**
- * Synchronisiert Einstellungen & Subscription via GitLab REST API (Option 1)
+ * Erzeugt das streng anonyme Per-Device Sync-Payload (Schema v2).
+ * Enthält ausschließlich die generierte Zufalls-UUID, Push-Subscription, Alarmregeln und Standort —
+ * keinerlei Geräteinformationen (kein User-Agent, kein Modell, kein OS, kein Fingerprinting).
  */
-export async function syncToGitLab() {
-  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
-  const projectId = (currentGitLab.projectId || '').trim();
-  const token = (currentGitLab.token || '').trim();
-  const varKey = (currentGitLab.variableKey || 'WEATHER_PUSH_CONFIG').trim();
+export function buildDeviceSyncPayload() {
+  const deviceUuid = getOrCreateDeviceUuid();
+  let timezone = 'Europe/Berlin';
+  try {
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin';
+  } catch {}
 
-  if (!projectId) {
-    throw new Error('Bitte gib deine GitLab Projekt-ID oder den Projektpfad ein.');
-  }
-
-  const locationPayload = {
-    name: state.currentLocation?.name || 'München',
-    lat: state.currentLocation?.lat || 48.137,
-    lon: state.currentLocation?.lon || 11.575,
-    elevation: state.currentLocation?.elevation || 520
-  };
-
-  const configPayload = {
+  return {
+    schemaVersion: 2,
+    deviceId: deviceUuid,
+    enabled: Boolean(currentConfig.enabled),
     subscription: currentSubscription,
     rules: {
-      windAlert: currentConfig.windAlert,
-      windThreshold: currentConfig.windThreshold,
-      frostAlert: currentConfig.frostAlert,
-      frostThreshold: currentConfig.frostThreshold,
-      briefingAlert: currentConfig.briefingAlert,
-      briefingTime: currentConfig.briefingTime,
-      severeAlert: currentConfig.severeAlert,
-      locationMode: currentConfig.locationMode,
+      windAlert: Boolean(currentConfig.windAlert),
+      windThreshold: Number(currentConfig.windThreshold) || 60,
+      frostAlert: Boolean(currentConfig.frostAlert),
+      frostThreshold: Number(currentConfig.frostThreshold) || 0,
+      briefingAlert: Boolean(currentConfig.briefingAlert),
+      briefingTime: currentConfig.briefingTime || '07:00',
+      severeAlert: Boolean(currentConfig.severeAlert),
+      locationMode: currentConfig.locationMode || 'gps',
       quietHoursStart: currentConfig.quietHoursStart ?? 22,
       quietHoursEnd: currentConfig.quietHoursEnd ?? 6,
       bypassQuietHoursOnSevere: currentConfig.bypassQuietHoursOnSevere ?? true
     },
     schedulePreset: currentGitLab.schedulePreset || 'eco',
-    location: locationPayload,
+    location: {
+      name: state.currentLocation?.name || 'München',
+      lat: state.currentLocation?.lat || 48.137,
+      lon: state.currentLocation?.lon || 11.575,
+      elevation: state.currentLocation?.elevation || 520,
+      timezone
+    },
     vapidPublicKey: DEFAULT_VAPID_PUBLIC_KEY,
     updatedAt: new Date().toISOString()
   };
+}
 
+/**
+ * Synchronisiert die individuellen Einstellungen & Subscription dieses Geräts
+ * in seine eigene, konfliktfreie GitLab CI-Variable (WEATHER_PUSH_DEV_<UUID_HEX>).
+ */
+export async function syncToGitLab() {
+  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const projectId = (currentGitLab.projectId || '').trim();
+  const token = (currentGitLab.token || '').trim();
+  const deviceUuid = getOrCreateDeviceUuid();
+  const varKey = getDeviceVariableKey(deviceUuid);
+
+  if (!projectId) {
+    throw new Error('Bitte gib deine GitLab Projekt-ID oder den Projektpfad ein.');
+  }
+
+  const configPayload = buildDeviceSyncPayload();
   const payloadString = JSON.stringify(configPayload);
 
   // Ohne Token bieten wir bequemen Direkt-Download / Clipboard Export
@@ -296,6 +400,8 @@ export async function syncToGitLab() {
     updateUIElements();
     return {
       mode: 'manual',
+      deviceId: deviceUuid,
+      variableKey: varKey,
       json: payloadString,
       message: 'Lokale Konfiguration erstellt. Trage deinen GitLab Access Token ein, um sie direkt über die REST API zu übertragen.'
     };
@@ -304,7 +410,7 @@ export async function syncToGitLab() {
   const encodedId = encodeURIComponent(projectId);
   const variableUrl = `${host}/api/v4/projects/${encodedId}/variables/${encodeURIComponent(varKey)}`;
 
-  // 1. Zuerst versuchen wir PUT (Aktualisieren der bestehenden Project Variable)
+  // 1. Zuerst versuchen wir PUT (Aktualisieren der eigenen Geräte-Variable)
   let response = await fetch(variableUrl, {
     method: 'PUT',
     headers: {
@@ -314,7 +420,7 @@ export async function syncToGitLab() {
     body: JSON.stringify({ value: payloadString })
   });
 
-  // 2. Falls Variable noch nicht existiert (404), neu anlegen per POST
+  // 2. Falls diese Geräte-Variable noch nicht existiert (404), neu anlegen per POST
   if (response.status === 404) {
     const createUrl = `${host}/api/v4/projects/${encodedId}/variables`;
     response = await fetch(createUrl, {
@@ -344,7 +450,13 @@ export async function syncToGitLab() {
   saveNotificationState();
   updateUIElements();
 
-  return { mode: 'api', result, message: 'Erfolgreich in GitLab Project Variable gespeichert!' };
+  return {
+    mode: 'api',
+    deviceId: deviceUuid,
+    variableKey: varKey,
+    result,
+    message: `Erfolgreich in individueller Geräte-Variable (${varKey}) gespeichert!`
+  };
 }
 
 /**
@@ -596,6 +708,13 @@ function updateUIElements() {
     } else {
       syncStatusMsg.innerText = currentGitLab.lastSyncStatus || 'Noch nicht synchronisiert';
     }
+  }
+
+  const uuidLabel = document.getElementById('notif-device-uuid-label');
+  if (uuidLabel) {
+    const deviceUuid = getOrCreateDeviceUuid();
+    uuidLabel.innerText = `${deviceUuid.slice(0, 8)}…`;
+    uuidLabel.title = `Anonyme Geräte-UUID: ${deviceUuid}`;
   }
 
   updateRuleCardDimming();
@@ -1072,6 +1191,10 @@ export function initNotifications() {
 window.openNotificationModal = openNotificationModal;
 window.closeNotificationModal = closeNotificationModal;
 window.hasUnsavedNotificationChanges = hasUnsavedChanges;
+window.getPushDeviceUuid = getOrCreateDeviceUuid;
+window.getPushDeviceVariableKey = () => getDeviceVariableKey(getOrCreateDeviceUuid());
+window.buildDeviceSyncPayload = buildDeviceSyncPayload;
+window.deleteDeviceFromGitLab = deleteDeviceFromGitLab;
 window.enablePushNotifications = enablePushNotifications;
 window.disablePushNotifications = disablePushNotifications;
 window.sendLocalTestPush = sendLocalTestPush;

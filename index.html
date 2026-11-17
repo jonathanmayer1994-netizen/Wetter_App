@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=3.0.3">
+  <link rel="stylesheet" href="style.css?v=3.0.4">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -3058,6 +3058,15 @@
             <input type="checkbox" id="notif-master-toggle">
             <span class="ios-slider"></span>
           </label>
+        </div>
+
+        <!-- Anonyme Geräte-UUID Info-Leiste (100% individuell pro Gerät, 0 Gerätedaten) -->
+        <div class="notif-device-privacy-bar" id="notif-device-privacy-bar" title="Jedes Gerät erhält eine lokal erzeugte Zufalls-UUID für komplett eigene Benachrichtigungsregeln. Es werden keinerlei Gerätedaten, Modellnamen oder User-Agent übertragen.">
+          <span class="ndp-icon" aria-hidden="true">🔒</span>
+          <div class="ndp-text">
+            <span>Geräte-ID: <code class="ndp-uuid" id="notif-device-uuid-label">--------</code></span>
+            <span class="ndp-badge">Anonym • eigene Regeln • keine Gerätedaten</span>
+          </div>
         </div>
 
         <!-- Kriterien / Alarm-Regeln Card -->

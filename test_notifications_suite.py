@@ -256,6 +256,39 @@ def run_tests():
         notif_btn.click()
         page.wait_for_timeout(250)
         assert_test("Saved changes persisted across reopen (Hourly & 08:30)", gl_schedule.input_value() == "hourly" and rule_briefing_time.input_value() == "08:30")
+
+        # 16. Privacy-First Per-Device Anonymous UUID Architecture (Option 1)
+        uuid_info = page.evaluate("""() => {
+            const uuid1 = window.getPushDeviceUuid();
+            const uuid2 = window.getPushDeviceUuid();
+            const varKey = window.getPushDeviceVariableKey();
+            const payload = window.buildDeviceSyncPayload();
+            const payloadJson = JSON.stringify(payload);
+            const forbidden = ['userAgent', 'deviceName', 'platform', 'model', 'Mozilla', 'iPhone', 'iPad', 'Macintosh', 'Safari', 'Chrome', 'WebKit', 'hardware'];
+            const leaked = forbidden.filter(k => payloadJson.includes(k));
+            return { uuid1, uuid2, varKey, schemaVersion: payload.schemaVersion, payloadDeviceId: payload.deviceId, leaked };
+        }""")
+        import re
+        uuid_regex = r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        assert_test("Device UUID is a valid RFC 4122 v4 UUID", bool(re.match(uuid_regex, uuid_info["uuid1"])))
+        assert_test("Device UUID is stable across repeated calls", uuid_info["uuid1"] == uuid_info["uuid2"])
+        assert_test("GitLab CI variable key strictly matches WEATHER_PUSH_DEV_<32_HEX>", bool(re.match(r"^WEATHER_PUSH_DEV_[0-9A-F]{32}$", uuid_info["varKey"])))
+        assert_test("Sync payload uses schemaVersion 2 with matching deviceId", uuid_info["schemaVersion"] == 2 and uuid_info["payloadDeviceId"] == uuid_info["uuid1"])
+        assert_test("Zero device/OS/browser metadata leaked into sync payload", len(uuid_info["leaked"]) == 0)
+        privacy_bar = page.locator("#notif-device-privacy-bar")
+        uuid_label_text = page.locator("#notif-device-uuid-label").inner_text()
+        assert_test("Anonymous UUID privacy bar is visible with short UUID prefix", privacy_bar.is_visible() and uuid_info["uuid1"][:8] in uuid_label_text)
+
+        # Simulate a second independent Apple device (fresh browser context) -> must get a distinct UUID & variable key
+        ctx2 = browser.new_context(service_workers="block", permissions=["notifications"])
+        page2 = ctx2.new_page()
+        page2.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
+        page2.wait_for_function("() => typeof window.getPushDeviceUuid === 'function'", timeout=10000)
+        dev2_uuid = page2.evaluate("() => window.getPushDeviceUuid()")
+        dev2_key = page2.evaluate("() => window.getPushDeviceVariableKey()")
+        assert_test("Second device generates a completely distinct UUID & GitLab variable key", dev2_uuid != uuid_info["uuid1"] and dev2_key != uuid_info["varKey"])
+        ctx2.close()
+
         close_btn.click()
         page.wait_for_timeout(200)
         assert_test("Closing after saved state needs no dialog", not modal.is_visible() and not unsaved_dialog.is_visible())
