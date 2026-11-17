@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Test Suite: Push Notifications & GitLab REST API Configuration
-Verifies UI controls, modal overlay, form fields, and event listeners.
+Test Suite: Push Notifications & GitLab REST API Configuration (Option B)
+Verifies UI controls, Option B schedule options, modal overlay, form fields, and event listeners.
 """
 
 import sys
@@ -35,15 +35,18 @@ def run_tests():
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        # Grant notification permission
+        # Block SW caching in test harness for reproducible live asset testing
         context = browser.new_context(
+            service_workers="block",
             permissions=["notifications", "geolocation"],
             geolocation={"latitude": 48.137, "longitude": 11.575}
         )
         page = context.new_page()
-        page.goto(f"http://127.0.0.1:{PORT}/index.html", wait_until="networkidle")
+        page.goto(f"http://127.0.0.1:{PORT}/index.html", wait_until="domcontentloaded")
+        page.wait_for_selector("#hero-location-name", timeout=10000)
+        page.wait_for_function("() => typeof window.openNotificationModal === 'function'", timeout=10000)
 
-        print("\n--- Push Notifications & GitLab Sync Suite ---")
+        print("\n--- Push Notifications & GitLab Sync Suite (Option B) ---")
 
         # 1. Header Button
         notif_btn = page.locator("#notif-settings-btn")
@@ -86,19 +89,24 @@ def run_tests():
         gl_host = page.locator("#notif-gitlab-host")
         gl_project = page.locator("#notif-gitlab-project")
         gl_token = page.locator("#notif-gitlab-token")
+        gl_schedule = page.locator("#notif-gitlab-schedule")
         quota_box = page.locator(".notif-quota-box")
 
         assert_test("GitLab Host input is present with default https://gitlab.com", gl_host.input_value() == "https://gitlab.com")
         assert_test("GitLab Project input is present", gl_project.is_visible())
         assert_test("GitLab Token password field is present", gl_token.count() == 1)
-        assert_test("20-Minuten-Limit & Runner Analyse Box is visible", quota_box.is_visible() and "2.160" in quota_box.inner_text())
+        assert_test("Option B Schedule select is present with 3 options", gl_schedule.locator("option").count() == 3)
+        assert_test("Option B Eco preset is selected by default", gl_schedule.input_value() == "eco")
+        assert_test("Option B Quota & Quiet Hours Box is visible", quota_box.is_visible() and "Option B" in quota_box.inner_text() and "360" in quota_box.inner_text())
 
         # 7. Action Buttons
         save_btn = page.locator("#notif-save-sync-btn")
+        sched_btn = page.locator("#notif-create-schedule-btn")
         test_btn = page.locator("#notif-test-btn")
         pipeline_btn = page.locator("#notif-trigger-pipeline-btn")
 
         assert_test("Save & Sync button is visible", save_btn.is_visible())
+        assert_test("Schedule Provisioning button is visible", sched_btn.is_visible())
         assert_test("Test-Push button is visible", test_btn.is_visible())
         assert_test("Trigger-Pipeline button is visible", pipeline_btn.is_visible())
 

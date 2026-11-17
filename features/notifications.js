@@ -14,6 +14,33 @@ const STORAGE_KEYS = {
   SUBSCRIPTION: 'bw_push_subscription'
 };
 
+export const SCHEDULE_PRESETS = {
+  eco: {
+    key: 'eco',
+    name: 'Option B: Eco (06:00–22:00 Uhr, 100% Free-Tier Safe)',
+    cron: '0 6,7,8,10,12,14,16,17,18,19,20,21 * * *',
+    runsPerDay: 12,
+    monthlyMinutes: 360,
+    description: '12 Läufe/Tag verteilt auf 06:00 bis 21:00 Uhr. 22:00–06:00 Uhr Pause. Garantiert <= 400 Min./Monat.'
+  },
+  hourly: {
+    key: 'hourly',
+    name: 'Option B: Stündlich (06:00–22:00 Uhr)',
+    cron: '0 6-21 * * *',
+    runsPerDay: 16,
+    monthlyMinutes: 480,
+    description: '16 Läufe/Tag stündlich von 06:00 bis 21:00 Uhr. 22:00–06:00 Uhr Pause.'
+  },
+  highfreq: {
+    key: 'highfreq',
+    name: 'Option B: Alle 20 Min tagsüber (06:00–22:00 Uhr)',
+    cron: '*/20 6-21 * * *',
+    runsPerDay: 48,
+    monthlyMinutes: 1440,
+    description: '48 Läufe/Tag von 06:00 bis 21:40 Uhr. Ideal für eigenen Runner.'
+  }
+};
+
 const DEFAULT_CONFIG = {
   enabled: false,
   rainAlert: true,
@@ -25,6 +52,9 @@ const DEFAULT_CONFIG = {
   briefingAlert: true,
   briefingTime: '07:00',
   severeAlert: true,
+  quietHoursStart: 22,
+  quietHoursEnd: 6,
+  bypassQuietHoursOnSevere: true,
   locationMode: 'gps', // 'gps' | 'fixed'
   lastSyncAt: 0
 };
@@ -33,6 +63,7 @@ const DEFAULT_GITLAB = {
   host: 'https://gitlab.com',
   projectId: '',
   token: '',
+  schedulePreset: 'eco', // 'eco' | 'hourly' | 'highfreq'
   variableKey: 'WEATHER_PUSH_CONFIG',
   lastSyncStatus: 'Bereit zur Synchronisation',
   lastSyncAt: 0
@@ -241,8 +272,12 @@ export async function syncToGitLab() {
       briefingAlert: currentConfig.briefingAlert,
       briefingTime: currentConfig.briefingTime,
       severeAlert: currentConfig.severeAlert,
-      locationMode: currentConfig.locationMode
+      locationMode: currentConfig.locationMode,
+      quietHoursStart: currentConfig.quietHoursStart ?? 22,
+      quietHoursEnd: currentConfig.quietHoursEnd ?? 6,
+      bypassQuietHoursOnSevere: currentConfig.bypassQuietHoursOnSevere ?? true
     },
+    schedulePreset: currentGitLab.schedulePreset || 'eco',
     location: locationPayload,
     vapidPublicKey: DEFAULT_VAPID_PUBLIC_KEY,
     updatedAt: new Date().toISOString()
@@ -341,6 +376,85 @@ export async function triggerGitLabPipeline() {
 }
 
 /**
+ * Erstellt oder aktualisiert den Pipeline Schedule via GitLab REST API (Option B)
+ */
+export async function createOrUpdateGitLabSchedule() {
+  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const projectId = (currentGitLab.projectId || '').trim();
+  const token = (currentGitLab.token || '').trim();
+  const presetKey = currentGitLab.schedulePreset || 'eco';
+  const preset = SCHEDULE_PRESETS[presetKey] || SCHEDULE_PRESETS.eco;
+
+  if (!projectId || !token) {
+    throw new Error('Projekt-ID und GitLab Access Token sind erforderlich, um einen Schedule anzulegen.');
+  }
+
+  const encodedId = encodeURIComponent(projectId);
+  const schedulesUrl = `${host}/api/v4/projects/${encodedId}/pipeline_schedules`;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin';
+
+  // 1. Vorhandene Pipeline-Schedules abfragen
+  const listRes = await fetch(schedulesUrl, {
+    headers: { 'PRIVATE-TOKEN': token }
+  });
+
+  if (!listRes.ok) {
+    const errText = await listRes.text().catch(() => '');
+    throw new Error(`Konnte Pipeline-Schedules nicht abrufen (${listRes.status}): ${errText || listRes.statusText}`);
+  }
+
+  const existingSchedules = await listRes.json().catch(() => []);
+  const existingSchedule = Array.isArray(existingSchedules)
+    ? existingSchedules.find(s => (s.description || '').toLowerCase().includes('best weather'))
+    : null;
+
+  const schedulePayload = {
+    description: `Best Weather Push Dispatcher (${presetKey.toUpperCase()})`,
+    ref: 'main',
+    cron: preset.cron,
+    cron_timezone: timezone,
+    active: true
+  };
+
+  let res;
+  if (existingSchedule && existingSchedule.id) {
+    // 2. Schedule existiert -> per PUT aktualisieren
+    const updateUrl = `${schedulesUrl}/${existingSchedule.id}`;
+    res = await fetch(updateUrl, {
+      method: 'PUT',
+      headers: {
+        'PRIVATE-TOKEN': token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(schedulePayload)
+    });
+  } else {
+    // 3. Neuer Schedule -> per POST anlegen
+    res = await fetch(schedulesUrl, {
+      method: 'POST',
+      headers: {
+        'PRIVATE-TOKEN': token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(schedulePayload)
+    });
+  }
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Fehler beim Speichern des Pipeline-Schedules (${res.status}): ${errText || res.statusText}`);
+  }
+
+  const data = await res.json().catch(() => ({}));
+  currentGitLab.lastSyncStatus = `Schedule aktiv: ${presetKey.toUpperCase()} (${timezone})`;
+  currentGitLab.lastSyncAt = Date.now();
+  saveNotificationState();
+  updateUIElements();
+
+  return { ok: true, schedule: data, preset, timezone };
+}
+
+/**
  * UI State Refresh Helper
  */
 function updateUIElements() {
@@ -415,6 +529,7 @@ export function openNotificationModal() {
   const elHost = document.getElementById('notif-gitlab-host');
   const elProject = document.getElementById('notif-gitlab-project');
   const elToken = document.getElementById('notif-gitlab-token');
+  const elSchedule = document.getElementById('notif-gitlab-schedule');
 
   if (elRain) elRain.checked = currentConfig.rainAlert;
   if (elWind) elWind.checked = currentConfig.windAlert;
@@ -427,6 +542,7 @@ export function openNotificationModal() {
   if (elHost) elHost.value = currentGitLab.host || 'https://gitlab.com';
   if (elProject) elProject.value = currentGitLab.projectId || '';
   if (elToken) elToken.value = currentGitLab.token || '';
+  if (elSchedule) elSchedule.value = currentGitLab.schedulePreset || 'eco';
 
   updateUIElements();
   modal.style.display = 'flex';
@@ -454,6 +570,7 @@ function readFormValues() {
   const elHost = document.getElementById('notif-gitlab-host');
   const elProject = document.getElementById('notif-gitlab-project');
   const elToken = document.getElementById('notif-gitlab-token');
+  const elSchedule = document.getElementById('notif-gitlab-schedule');
 
   if (elRain) currentConfig.rainAlert = elRain.checked;
   if (elWind) currentConfig.windAlert = elWind.checked;
@@ -466,6 +583,7 @@ function readFormValues() {
   if (elHost) currentGitLab.host = elHost.value.trim();
   if (elProject) currentGitLab.projectId = elProject.value.trim();
   if (elToken) currentGitLab.token = elToken.value.trim();
+  if (elSchedule) currentGitLab.schedulePreset = elSchedule.value;
 }
 
 /**
@@ -556,7 +674,6 @@ export function initNotifications() {
         const res = await syncToGitLab();
         saveSyncBtn.innerText = '✓ Gespeichert & Synchronisiert!';
         if (res.mode === 'manual') {
-          // Falls kein Token angegeben wurde, Option zum Kopieren
           navigator.clipboard?.writeText(res.json).catch(() => {});
           alert(res.message + '\n\nKonfigurations-JSON wurde in deine Zwischenablage kopiert!');
         }
@@ -568,6 +685,32 @@ export function initNotifications() {
         alert('GitLab Sync fehlgeschlagen: ' + err.message);
         saveSyncBtn.disabled = false;
         saveSyncBtn.innerText = '💾 Speichern & mit GitLab syncen';
+      }
+    });
+  }
+
+  // Schedule Provisioning Button (Option B)
+  const scheduleBtn = document.getElementById('notif-create-schedule-btn');
+  if (scheduleBtn) {
+    scheduleBtn.addEventListener('click', async () => {
+      readFormValues();
+      saveNotificationState();
+
+      scheduleBtn.disabled = true;
+      scheduleBtn.innerText = '⏳ Richte Schedule ein...';
+
+      try {
+        const result = await createOrUpdateGitLabSchedule();
+        scheduleBtn.innerText = '✓ Schedule aktiv!';
+        alert(`GitLab Pipeline-Schedule erfolgreich eingerichtet!\n\nIntervall: ${result.preset.name}\nCron: ${result.preset.cron}\nZeitzone: ${result.timezone}\n\nDer Job prüft tagsüber von 06:00 bis 22:00 Uhr die Wetterdaten und pausiert nachts automatisch (22:00-06:00 Uhr).`);
+        setTimeout(() => {
+          scheduleBtn.disabled = false;
+          scheduleBtn.innerText = '📅 Pipeline-Schedule einrichten';
+        }, 3000);
+      } catch (err) {
+        alert('Schedule-Einrichtung fehlgeschlagen: ' + err.message);
+        scheduleBtn.disabled = false;
+        scheduleBtn.innerText = '📅 Pipeline-Schedule einrichten';
       }
     });
   }
@@ -614,3 +757,5 @@ window.enablePushNotifications = enablePushNotifications;
 window.disablePushNotifications = disablePushNotifications;
 window.sendLocalTestPush = sendLocalTestPush;
 window.syncToGitLab = syncToGitLab;
+window.createOrUpdateGitLabSchedule = createOrUpdateGitLabSchedule;
+window.SCHEDULE_PRESETS = SCHEDULE_PRESETS;

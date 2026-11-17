@@ -1,5 +1,5 @@
 {
-  "version": "2.29.0",
-  "build": "20261116-2100",
-  "notes": "Native Web Push Notifications (iOS 16.4+ APNs & macOS Notification Center) with GitLab REST API Sync & Scheduled Dispatcher Pipeline"
+  "version": "2.30.0",
+  "build": "20261117-0900",
+  "notes": "Option B Backend Push Architecture: Timezone-aware quiet hours (22:00-06:00), 100% Free-Tier Eco-Schedule, stateful anti-spam cooldowns and automated GitLab Schedule provisioning"
 }

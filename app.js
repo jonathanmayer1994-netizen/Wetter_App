@@ -434,7 +434,7 @@ window.openNotificationModal = openNotificationModal;
 // =============================================================================
 // MAIN INITIALIZATION
 // =============================================================================
-document.addEventListener('DOMContentLoaded', () => {
+function startApp() {
   initScrollOptimizer();
   state.canvasEngine = new BackgroundCanvasEngine('weather-canvas');
   initSearchHandlers({ onLoadLocation: loadLocation, onRenderOverview: renderOverviewTab, onRenderAdaptiveTab2: renderAdaptiveTab2 });
@@ -485,4 +485,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if ('geolocation' in navigator) {
     triggerExactGps({ isStartup: true });
   }
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startApp);
+} else {
+  startApp();
+}

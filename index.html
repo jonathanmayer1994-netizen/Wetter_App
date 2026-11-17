@@ -3163,20 +3163,30 @@
               <label for="notif-gitlab-token" class="notif-field-label">GitLab Access Token (mit api Scope):</label>
               <input type="password" id="notif-gitlab-token" class="stsp-glass-input" placeholder="glpat-..." autocomplete="off">
             </div>
+            <div class="notif-field notif-field-full">
+              <label for="notif-gitlab-schedule" class="notif-field-label">Option B Intervall (06:00–22:00 Uhr aktiv, 22:00–06:00 Uhr Pause):</label>
+              <select id="notif-gitlab-schedule" class="stsp-glass-input" style="cursor:pointer;" aria-label="Option B Zeitintervall">
+                <option value="eco" selected>Option B: Eco (06:00–22:00 Uhr — 12 Läufe/Tag = 360 Min/Monat, 100% Free-Tier Safe)</option>
+                <option value="hourly">Option B: Stündlich (06:00–22:00 Uhr — 16 Läufe/Tag = 480 Min/Monat)</option>
+                <option value="highfreq">Option B: Alle 20 Min tagsüber (06:00–22:00 Uhr — 48 Läufe/Tag, für eigenen Runner)</option>
+              </select>
+            </div>
           </div>
 
           <!-- Limit & Runner Analyse Box -->
           <div class="notif-quota-box">
-            <div class="nqb-title">⏱️ 20-Minuten-Takt &amp; GitLab Compute-Limit Analyse</div>
+            <div class="nqb-title">⏱️ Option B Zeitanpassung (06:00–22:00 Uhr) &amp; GitLab Compute-Limit</div>
             <div class="nqb-text">
-              • <strong>20-Minuten-Takt 24/7</strong> = 72 Läufe/Tag = <strong>2.160 Min./Monat</strong>. Auf GitLab.com Shared Runners übersteigt dies das monatliche Freikontingent von 400 Min. nach ca. 5–6 Tagen.<br>
-              • <strong>Kostenlose Dauerlösung</strong>: Eigener GitLab Runner (Mac / Homeserver) &rarr; <strong>0 Compute-Minuten Verbrauch, 100% unbegrenzt &amp; dauerhaft kostenlos!</strong><br>
-              • <strong>Alternative für Shared Runners</strong>: Stündlicher Takt tagsüber (15 Läufe/Tag = 450 Min./Monat).
+              • <strong>Nachtruhe 22:00 bis 06:00 Uhr</strong>: 8 Stunden Pause spart täglich 33% Compute-Zeit und schützt vor nächtlichen Push-Tönen!<br>
+              • <strong>Eco-Takt (12 Läufe/Tag)</strong> = <strong>360 Min./Monat</strong> &rarr; Garantiert unter dem kostenlosen 400-Minuten-Limit auf GitLab.com!<br>
+              • <strong>Stündlich (16 Läufe/Tag)</strong> = 480 Min./Monat | <strong>20-Minuten-Takt</strong> = 48 Läufe/Tag (Ideal für eigenen kostenlosen Runner).<br>
+              • <strong>Intelligenter Cooldown</strong>: Regen- und Sturmwarnungen haben Cooldowns, um Spam bei Dauerregen zu verhindern.
             </div>
           </div>
 
           <div class="notif-actions-row">
             <button type="button" class="action-btn" id="notif-save-sync-btn">💾 Speichern &amp; mit GitLab syncen</button>
+            <button type="button" class="action-btn action-btn-secondary" id="notif-create-schedule-btn">📅 Pipeline-Schedule einrichten</button>
             <button type="button" class="action-btn action-btn-secondary" id="notif-test-btn">🧪 Test-Push senden</button>
             <button type="button" class="action-btn action-btn-secondary" id="notif-trigger-pipeline-btn">⚡ Pipeline jetzt starten</button>
           </div>
