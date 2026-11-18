@@ -1,0 +1,16 @@
+name = "best-weather-push"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Prüft alle 15 Minuten zuverlässig Wetter & Briefings für alle anonymen Geräte-UUIDs
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Nach `npx wrangler kv namespace create PUSH_KV` hier die erzeugte ID eintragen:
+[[kv_namespaces]]
+binding = "PUSH_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+VAPID_PUBLIC_KEY = "BFXeGAET8G6YxsiL0HvXELcaDIoZyeIgPYokZuqpueq3NFJs8xG7KsyvViif44MAxMkBI_OQ93OXewHGRhMSOmI"
+VAPID_SUBJECT = "mailto:push@best-weather.app"

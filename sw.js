@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.31.0';
-const CACHE_NAME = `best-weather-v2.31.0-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.32.0';
+const CACHE_NAME = `best-weather-v2.32.0-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
 const MAX_TILES = 600;
 
@@ -343,31 +343,50 @@ self.addEventListener('push', (event) => {
     payload = { title: 'Best Weather', body: 'Wetteraktualisierung verfügbar' };
   }
 
-  const title = payload.title || 'Best Weather';
-  const tag = payload.tag || 'best-weather-alert';
+  const title = String(payload.title || 'Best Weather');
+  const body = String(payload.body || 'Neue Wetterdaten verfügbar');
+  const tag = String(payload.tag || 'best-weather-alert');
+
+  // iOS 16.4–18 WebKit-sichere NotificationOptions (keine undefined-Properties, Feature-Detection für actions)
   const notificationOptions = {
-    body: payload.body || 'Neue Wetterdaten verfügbar',
+    body,
     icon: payload.icon || './icon-192.png',
     badge: payload.badge || './favicon.png',
-    image: payload.image || undefined,
-    tag: tag,
-    renotify: payload.renotify !== false,
-    requireInteraction: Boolean(payload.requireInteraction),
-    vibrate: payload.vibrate || [200, 100, 200],
+    tag,
     data: {
       url: payload.data?.url || './',
       tab: payload.data?.tab || 'tab-overview',
       timestamp: Date.now(),
       type: payload.data?.type || 'weather'
-    },
-    actions: payload.actions || [
-      { action: 'open', title: 'App öffnen' },
-      { action: 'dismiss', title: 'Schließen' }
-    ]
+    }
   };
 
+  if (payload.image) {
+    notificationOptions.image = payload.image;
+  }
+  if (payload.renotify !== false) {
+    notificationOptions.renotify = true;
+  }
+  if (payload.requireInteraction) {
+    notificationOptions.requireInteraction = true;
+  }
+  if (Array.isArray(payload.vibrate)) {
+    notificationOptions.vibrate = payload.vibrate;
+  }
+  // Nur auf Plattformen mit Action-Support setzen (vermeidet WebKit-Ablehnung auf iOS)
+  if (typeof Notification !== 'undefined' && 'actions' in Notification.prototype) {
+    notificationOptions.actions = payload.actions || [
+      { action: 'open', title: 'App öffnen' },
+      { action: 'dismiss', title: 'Schließen' }
+    ];
+  }
+
+  // Wichtig für Apple APNs / iOS: showNotification() MUSS bei jedem Push-Event zuverlässig auflösen,
+  // sonst widerruft iOS nach 3 fehlgeschlagenen Push-Events automatisch die Berechtigung!
   event.waitUntil(
-    self.registration.showNotification(title, notificationOptions)
+    self.registration.showNotification(title, notificationOptions).catch(() =>
+      self.registration.showNotification(title, { body, icon: './icon-192.png', data: notificationOptions.data })
+    )
   );
 });
 

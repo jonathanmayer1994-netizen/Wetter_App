@@ -16845,6 +16845,90 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
   color: #94a3b8;
 }
 
+/* Honest Backend Connection Status Banner */
+.notif-backend-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 13px;
+  font-size: 0.78rem;
+  line-height: 1.42;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.notif-backend-banner.is-warning {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.42);
+  color: #fde68a;
+}
+
+.notif-backend-banner.is-connected {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.38);
+  color: #a7f3d0;
+}
+
+.nbb-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.nbb-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.nbb-title {
+  font-weight: 700;
+  font-size: 0.82rem;
+  margin-bottom: 3px;
+}
+
+.nbb-desc {
+  font-size: 0.74rem;
+  opacity: 0.92;
+}
+
+.nfs-val.status-warning {
+  color: #fbbf24 !important;
+}
+
+.nfs-val.status-ok {
+  color: #34d399 !important;
+}
+
+.notif-schedule-select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+}
+
+/* Mobile Fix für Screenshot 1 & 2: Alarm-Regeln mit Dropdown/Uhrzeit sauber stapeln statt Text zu quetschen */
+@media (max-width: 520px) {
+  .notif-rule-item {
+    flex-wrap: wrap;
+    row-gap: 10px;
+    align-items: center;
+  }
+  .notif-rule-item:has(.notif-rule-control) .notif-rule-info {
+    flex: 1 1 calc(100% - 44px);
+    min-width: 0;
+  }
+  .notif-rule-item .notif-rule-control {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+}
+
 /* ==========================================================================
    UNIVERSAL iPHONE & MOBILE ZERO-CLIPPING GUARDRAILS (320px - 768px)
    Prevents CSS Grid intrinsic min-content blowouts & horizontal clipping

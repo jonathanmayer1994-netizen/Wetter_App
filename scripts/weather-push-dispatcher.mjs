@@ -434,12 +434,18 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
   const daily = weather.daily || {};
   const currentHour = timeInfo.hour;
 
-  // 1. REGEL: Morgen-Briefing (Exakt 1x täglich zur individuellen Wunsch-Stunde dieses Geräts)
+  // 1. REGEL: Morgen-Briefing (Exakt 1x täglich ab Wunschzeit mit 90-Minuten Cron-Jitter-Toleranzfenster)
   if (rules.briefingAlert) {
-    const targetHour = parseInt((rules.briefingTime || '07:00').split(':')[0], 10);
+    const [rawH, rawM] = String(rules.briefingTime || '07:00').split(':');
+    const targetHour = Number.isFinite(parseInt(rawH, 10)) ? parseInt(rawH, 10) : 7;
+    const targetMin = Number.isFinite(parseInt(rawM, 10)) ? parseInt(rawM, 10) : 0;
+    const targetTotalMin = targetHour * 60 + targetMin;
+    const currentTotalMin = currentHour * 60 + (timeInfo.minute || 0);
     const alreadySentToday = deviceState.lastBriefingDate === timeInfo.dateString;
 
-    if (currentHour === targetHour && !alreadySentToday) {
+    // Feuert zuverlässig sobald Wunschzeit erreicht ist (bis +90 Min. danach), damit Cloud-Cron-Jitter
+    // das 06:00-Briefing niemals verpasst — garantiert max. 1x pro Tag über lastBriefingDate.
+    if (currentTotalMin >= targetTotalMin && currentTotalMin <= (targetTotalMin + 90) && !alreadySentToday) {
       const code = daily.weather_code?.[0] ?? current.weather_code ?? 0;
       const desc = WMO_DESCRIPTIONS[code] || 'Mäßig bewölkt';
       const maxT = Math.round(daily.temperature_2m_max?.[0] ?? 15);
@@ -458,6 +464,7 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
   }
 
   // 2. REGEL: Akute Unwetter- / Extremwetterwarnung (WMO 95, 96, 99)
+  let hasSevereAlert = false;
   if (rules.severeAlert) {
     const curCode = current.weather_code;
     const nextCodes = (hourly.weather_code || []).slice(currentHour, currentHour + 3);
@@ -477,11 +484,12 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
         data: { url: './', tab: 'tab-map', type: 'severe' }
       });
       deviceState.lastSevereAlertAt = nowMs;
+      hasSevereAlert = true;
     }
   }
 
   // 3. REGEL: Sturm- & Böenwarnung (individueller Schwellenwert je Gerät)
-  if (rules.windAlert && alerts.length === 0) {
+  if (rules.windAlert && !hasSevereAlert) {
     const threshold = rules.windThreshold || 60;
     const nextGusts = (hourly.wind_gusts_10m || []).slice(currentHour, currentHour + 4);
     const maxGust = Math.round(Math.max(current.wind_gusts_10m || 0, ...nextGusts));
@@ -504,7 +512,7 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
   }
 
   // 4. REGEL: Frost- & Glättewarnung
-  if (rules.frostAlert && alerts.length === 0) {
+  if (rules.frostAlert && !hasSevereAlert) {
     const nextTemps = (hourly.temperature_2m || []).slice(currentHour, currentHour + 6);
     const minUpcomingTemp = Math.min(current.temperature_2m ?? 99, ...nextTemps);
 

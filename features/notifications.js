@@ -109,14 +109,25 @@ const DEFAULT_CONFIG = {
   lastSyncAt: 0
 };
 
+// Optional vorkonfigurierte Cloudflare Push-Worker URL (100% automatisch ohne Token im Browser)
+export const DEFAULT_PUSH_WORKER_URL = '';
+
 const DEFAULT_GITLAB = {
+  workerUrl: DEFAULT_PUSH_WORKER_URL,
   host: 'https://gitlab.com',
   projectId: '',
   token: '',
   schedulePreset: 'eco', // 'eco' | 'hourly' | 'highfreq'
-  lastSyncStatus: 'Bereit zur Synchronisation',
+  lastSyncStatus: 'Nur lokal gespeichert — kein Push-Server verbunden',
   lastSyncAt: 0
 };
+
+export function getActiveBackendMode() {
+  const workerUrl = (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '').trim();
+  if (workerUrl) return 'worker';
+  if ((currentGitLab.projectId || '').trim() && (currentGitLab.token || '').trim()) return 'gitlab';
+  return 'local-only';
+}
 
 let currentConfig = { ...DEFAULT_CONFIG };
 let currentGitLab = { ...DEFAULT_GITLAB };
@@ -230,12 +241,81 @@ export async function enablePushNotifications() {
   saveNotificationState();
   updateUIElements();
 
-  // Stille automatische Hintergrund-Synchronisation mit GitLab CI falls eingerichtet
-  if (currentGitLab.projectId && currentGitLab.token) {
-    syncToGitLab().catch(err => console.debug('Hintergrund-Sync Info:', err.message));
+  // Automatische Hintergrund-Synchronisation mit aktivem Push-Backend (Cloudflare Worker oder GitLab CI)
+  const mode = getActiveBackendMode();
+  if (mode === 'worker') {
+    syncToCloudWorker().catch(err => console.debug('Worker-Sync Info:', err.message));
+  } else if (mode === 'gitlab') {
+    syncToGitLab().catch(err => console.debug('GitLab-Sync Info:', err.message));
   }
 
   return currentSubscription;
+}
+
+/**
+ * Synchronisiert das anonyme Geräte-Profil (UUID v4) mit dem Cloudflare Push-Worker (0 Tokens im Browser!)
+ */
+export async function syncToCloudWorker() {
+  const workerUrl = (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '').trim().replace(/\/+$/, '');
+  if (!workerUrl) {
+    throw new Error('Keine Push-Worker URL konfiguriert.');
+  }
+
+  const deviceUuid = getOrCreateDeviceUuid();
+  const payload = buildDeviceSyncPayload();
+
+  const response = await fetch(`${workerUrl}/api/devices/${encodeURIComponent(deviceUuid)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Push-Worker Sync Fehler (${response.status}): ${errText || response.statusText}`);
+  }
+
+  const result = await response.json().catch(() => ({}));
+  currentGitLab.lastSyncStatus = 'Cloud-Push verbunden & synchronisiert';
+  currentGitLab.lastSyncAt = Date.now();
+  currentConfig.lastSyncAt = Date.now();
+  saveNotificationState();
+  updateUIElements();
+  return { mode: 'worker', deviceId: deviceUuid, result };
+}
+
+/**
+ * Entfernt ausschließlich dieses Gerät (UUID) vom Cloudflare Push-Worker
+ */
+export async function deleteDeviceFromCloudWorker() {
+  const workerUrl = (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '').trim().replace(/\/+$/, '');
+  if (!workerUrl) return { skipped: true };
+
+  const deviceUuid = getOrCreateDeviceUuid();
+  const response = await fetch(`${workerUrl}/api/devices/${encodeURIComponent(deviceUuid)}`, {
+    method: 'DELETE'
+  });
+  return { ok: response.ok || response.status === 404, deviceId: deviceUuid };
+}
+
+/**
+ * Sendet einen ECHTEN End-to-End Test-Push vom Cloudflare Edge Worker über Apple APNs an dieses iPhone/Mac!
+ */
+export async function sendRemoteTestPushViaWorker() {
+  const workerUrl = (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '').trim().replace(/\/+$/, '');
+  if (!workerUrl) {
+    throw new Error('Keine Push-Worker URL konfiguriert.');
+  }
+  await syncToCloudWorker();
+  const deviceUuid = getOrCreateDeviceUuid();
+  const response = await fetch(`${workerUrl}/api/devices/${encodeURIComponent(deviceUuid)}/test`, {
+    method: 'POST'
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || `Server-Push Fehler (HTTP ${response.status})`);
+  }
+  return await response.json().catch(() => ({ ok: true }));
 }
 
 /**
@@ -288,9 +368,12 @@ export async function disablePushNotifications() {
   saveNotificationState();
   updateUIElements();
 
-  // Entferne nur die eigene Geräte-Variable auf GitLab (andere Geräte bleiben 100% unberührt)
-  if (currentGitLab.projectId && currentGitLab.token) {
-    deleteDeviceFromGitLab().catch(err => console.debug('Hintergrund-Cleanup Info:', err.message));
+  // Entferne nur dieses Gerät im aktiven Push-Backend (andere Geräte bleiben 100% unberührt)
+  const mode = getActiveBackendMode();
+  if (mode === 'worker') {
+    deleteDeviceFromCloudWorker().catch(err => console.debug('Worker-Cleanup Info:', err.message));
+  } else if (mode === 'gitlab') {
+    deleteDeviceFromGitLab().catch(err => console.debug('GitLab-Cleanup Info:', err.message));
   }
 }
 
@@ -701,12 +784,50 @@ function updateUIElements() {
     }
   }
 
+  const backendMode = getActiveBackendMode();
+  const isBackendConnected = backendMode !== 'local-only';
+
   if (syncStatusMsg) {
-    if (currentGitLab.lastSyncAt > 0) {
+    if (!isBackendConnected) {
+      syncStatusMsg.innerText = 'Nur lokal gespeichert — kein Push-Server verbunden';
+      syncStatusMsg.classList.add('status-warning');
+      syncStatusMsg.classList.remove('status-ok');
+    } else if (currentGitLab.lastSyncAt > 0) {
       const timeStr = new Date(currentGitLab.lastSyncAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       syncStatusMsg.innerText = `${currentGitLab.lastSyncStatus} (${timeStr})`;
+      syncStatusMsg.classList.remove('status-warning');
+      syncStatusMsg.classList.add('status-ok');
     } else {
-      syncStatusMsg.innerText = currentGitLab.lastSyncStatus || 'Noch nicht synchronisiert';
+      syncStatusMsg.innerText = 'Push-Server konfiguriert — bitte sichern';
+      syncStatusMsg.classList.remove('status-warning', 'status-ok');
+    }
+  }
+
+  const backendBanner = document.getElementById('notif-backend-status-banner');
+  if (backendBanner) {
+    if (currentConfig.enabled && !isBackendConnected) {
+      backendBanner.style.display = 'flex';
+      backendBanner.className = 'notif-backend-banner is-warning';
+      backendBanner.innerHTML = `
+        <span class="nbb-icon" aria-hidden="true">⚠️</span>
+        <div class="nbb-content">
+          <div class="nbb-title">Kein Push-Server verbunden (nur lokal gespeichert)</div>
+          <div class="nbb-desc">iOS erlaubt keine lokalen Hintergrund-Crons. Verbinde einmalig unter <strong>Erweitert</strong> deine kostenlose Cloudflare Push-Worker URL (oder GitLab CI), damit Alarme &amp; Morgen-Briefings im Sperrbildschirm ankommen.</div>
+        </div>
+      `;
+    } else if (currentConfig.enabled && isBackendConnected && currentGitLab.lastSyncAt > 0) {
+      const providerLabel = backendMode === 'worker' ? 'Cloudflare Edge Push' : 'GitLab CI Push';
+      backendBanner.style.display = 'flex';
+      backendBanner.className = 'notif-backend-banner is-connected';
+      backendBanner.innerHTML = `
+        <span class="nbb-icon" aria-hidden="true">🟢</span>
+        <div class="nbb-content">
+          <div class="nbb-title">${providerLabel} aktiv &amp; synchronisiert</div>
+          <div class="nbb-desc">Hintergrund-Alarme &amp; Morgen-Briefing werden automatisch über Apple APNs zugestellt.</div>
+        </div>
+      `;
+    } else {
+      backendBanner.style.display = 'none';
     }
   }
 
@@ -733,6 +854,7 @@ function populateNotificationFormFromState() {
   const elBriefingTime = document.getElementById('notif-rule-briefing-time');
   const elSevere = document.getElementById('notif-rule-severe');
 
+  const elWorkerUrl = document.getElementById('notif-worker-url');
   const elHost = document.getElementById('notif-gitlab-host');
   const elProject = document.getElementById('notif-gitlab-project');
   const elToken = document.getElementById('notif-gitlab-token');
@@ -745,6 +867,7 @@ function populateNotificationFormFromState() {
   if (elBriefingTime) elBriefingTime.value = currentConfig.briefingTime || '07:00';
   if (elSevere) elSevere.checked = Boolean(currentConfig.severeAlert);
 
+  if (elWorkerUrl) elWorkerUrl.value = currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '';
   if (elHost) elHost.value = currentGitLab.host || 'https://gitlab.com';
   if (elProject) elProject.value = currentGitLab.projectId || '';
   if (elToken) elToken.value = currentGitLab.token || '';
@@ -762,6 +885,7 @@ function getFormSnapshot() {
   const elBriefingTime = document.getElementById('notif-rule-briefing-time');
   const elSevere = document.getElementById('notif-rule-severe');
 
+  const elWorkerUrl = document.getElementById('notif-worker-url');
   const elHost = document.getElementById('notif-gitlab-host');
   const elProject = document.getElementById('notif-gitlab-project');
   const elToken = document.getElementById('notif-gitlab-token');
@@ -774,6 +898,7 @@ function getFormSnapshot() {
     briefingAlert: elBriefing ? Boolean(elBriefing.checked) : Boolean(currentConfig.briefingAlert),
     briefingTime: elBriefingTime ? (elBriefingTime.value || '07:00') : (currentConfig.briefingTime || '07:00'),
     severeAlert: elSevere ? Boolean(elSevere.checked) : Boolean(currentConfig.severeAlert),
+    workerUrl: elWorkerUrl ? elWorkerUrl.value.trim() : (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || ''),
     host: elHost ? elHost.value.trim() : (currentGitLab.host || 'https://gitlab.com'),
     projectId: elProject ? elProject.value.trim() : (currentGitLab.projectId || ''),
     token: elToken ? elToken.value.trim() : (currentGitLab.token || ''),
@@ -826,7 +951,7 @@ function forceCloseNotificationModal() {
 }
 
 /**
- * Speichert alle Formularänderungen persistent (inkl. stiller GitLab-Sync)
+ * Speichert alle Formularänderungen persistent (Cloudflare Worker, GitLab CI, oder lokal mit ehrlichem Status)
  */
 async function persistNotificationForm() {
   readFormValues();
@@ -834,16 +959,21 @@ async function persistNotificationForm() {
   savedFormSnapshot = getFormSnapshot();
   updateUnsavedIndicator();
 
-  if (currentGitLab.projectId && currentGitLab.token) {
+  const mode = getActiveBackendMode();
+  if (mode === 'worker') {
+    await syncToCloudWorker();
+    return { synced: true, mode: 'worker' };
+  }
+  if (mode === 'gitlab') {
     await syncToGitLab();
-    return { synced: true };
+    return { synced: true, mode: 'gitlab' };
   }
 
-  currentGitLab.lastSyncStatus = 'Lokal aktiv & gesichert';
-  currentGitLab.lastSyncAt = Date.now();
+  currentGitLab.lastSyncStatus = 'Nur lokal gespeichert — kein Push-Server verbunden';
+  currentGitLab.lastSyncAt = 0;
   saveNotificationState();
   updateUIElements();
-  return { synced: false };
+  return { synced: false, mode: 'local-only' };
 }
 
 /**
@@ -894,6 +1024,7 @@ function readFormValues() {
   const elBriefingTime = document.getElementById('notif-rule-briefing-time');
   const elSevere = document.getElementById('notif-rule-severe');
 
+  const elWorkerUrl = document.getElementById('notif-worker-url');
   const elHost = document.getElementById('notif-gitlab-host');
   const elProject = document.getElementById('notif-gitlab-project');
   const elToken = document.getElementById('notif-gitlab-token');
@@ -906,6 +1037,7 @@ function readFormValues() {
   if (elBriefingTime) currentConfig.briefingTime = elBriefingTime.value || '07:00';
   if (elSevere) currentConfig.severeAlert = elSevere.checked;
 
+  if (elWorkerUrl) currentGitLab.workerUrl = elWorkerUrl.value.trim();
   if (elHost) currentGitLab.host = elHost.value.trim();
   if (elProject) currentGitLab.projectId = elProject.value.trim();
   if (elToken) currentGitLab.token = elToken.value.trim();
@@ -1009,15 +1141,21 @@ export function initNotifications() {
     });
   }
 
-  // Test Push Button
+  // Test Push Button (Nutzt echten Server->APNs E2E Test wenn Worker verbunden, sonst lokalen SW-Test)
   const testBtn = document.getElementById('notif-test-btn');
   if (testBtn) {
     testBtn.addEventListener('click', async () => {
       testBtn.disabled = true;
       testBtn.innerText = '⏳ Sende Test...';
       try {
-        await sendLocalTestPush();
-        testBtn.innerText = '✓ Gesendet!';
+        readFormValues();
+        if (getActiveBackendMode() === 'worker' && currentSubscription?.endpoint) {
+          await sendRemoteTestPushViaWorker();
+          testBtn.innerText = '✓ Server-Push gesendet!';
+        } else {
+          await sendLocalTestPush();
+          testBtn.innerText = '✓ Lokaler Test gesendet!';
+        }
         setTimeout(() => {
           testBtn.disabled = false;
           testBtn.innerText = '🧪 Test-Push senden';
@@ -1030,7 +1168,7 @@ export function initNotifications() {
     });
   }
 
-  // Save & Sync Button (Native & Lautlos für Endnutzer)
+  // Save & Sync Button (Ehrliches Feedback ob lokal oder Cloud-synchronisiert)
   const saveSyncBtn = document.getElementById('notif-save-sync-btn');
   if (saveSyncBtn) {
     saveSyncBtn.addEventListener('click', async () => {
@@ -1039,18 +1177,16 @@ export function initNotifications() {
 
       try {
         const res = await persistNotificationForm();
-        saveSyncBtn.innerText = res.synced ? '✓ Gesichert & Synchronisiert!' : '✓ Einstellungen gesichert!';
+        saveSyncBtn.innerText = res.synced ? '✓ Gesichert & Synchronisiert!' : '✓ Lokal gesichert (kein Server)';
         setTimeout(() => {
           saveSyncBtn.disabled = false;
           saveSyncBtn.innerText = '✓ Einstellungen sichern';
-        }, 2000);
+        }, 2500);
       } catch (err) {
         console.warn('Sync notice:', err.message);
+        alert('Sync-Fehler mit Push-Server: ' + err.message);
         saveSyncBtn.disabled = false;
-        saveSyncBtn.innerText = '✓ Einstellungen gesichert!';
-        setTimeout(() => {
-          saveSyncBtn.innerText = '✓ Einstellungen sichern';
-        }, 2000);
+        saveSyncBtn.innerText = '✓ Einstellungen sichern';
       }
     });
   }
@@ -1159,7 +1295,7 @@ export function initNotifications() {
   const formFieldIds = [
     'notif-rule-wind', 'notif-rule-wind-val',
     'notif-rule-frost', 'notif-rule-briefing', 'notif-rule-briefing-time',
-    'notif-rule-severe', 'notif-gitlab-host', 'notif-gitlab-project', 'notif-gitlab-token'
+    'notif-rule-severe', 'notif-worker-url', 'notif-gitlab-host', 'notif-gitlab-project', 'notif-gitlab-token'
   ];
   formFieldIds.forEach(id => {
     const el = document.getElementById(id);
@@ -1191,9 +1327,12 @@ export function initNotifications() {
 window.openNotificationModal = openNotificationModal;
 window.closeNotificationModal = closeNotificationModal;
 window.hasUnsavedNotificationChanges = hasUnsavedChanges;
+window.getActiveBackendMode = getActiveBackendMode;
 window.getPushDeviceUuid = getOrCreateDeviceUuid;
 window.getPushDeviceVariableKey = () => getDeviceVariableKey(getOrCreateDeviceUuid());
 window.buildDeviceSyncPayload = buildDeviceSyncPayload;
+window.syncToCloudWorker = syncToCloudWorker;
+window.sendRemoteTestPushViaWorker = sendRemoteTestPushViaWorker;
 window.deleteDeviceFromGitLab = deleteDeviceFromGitLab;
 window.enablePushNotifications = enablePushNotifications;
 window.disablePushNotifications = disablePushNotifications;
