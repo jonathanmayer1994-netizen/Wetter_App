@@ -1,5 +1,5 @@
 {
-  "version": "2.33.0",
-  "build": "20261118-1843",
-  "notes": "All-in-GitLab Multi-Device Push Architecture with OAuth 2.0 + PKCE (1-Tap Face ID), GitLab Pages deployment, atomic WEATHER_PUSH_STATE persistence, auto-provisioned schedules, and 15s E2E PUSH_TEST_DEVICE_ID test push"
+  "version": "2.33.1",
+  "build": "20261118-2037",
+  "notes": "OAuth 2.0 PKCE multi-redirect URI update with canonical trailing-slash resolution and auto-upgrade"
 }

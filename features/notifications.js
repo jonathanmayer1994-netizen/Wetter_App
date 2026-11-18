@@ -18,7 +18,7 @@ export const DEFAULT_VAPID_PUBLIC_KEY = 'BFXeGAET8G6YxsiL0HvXELcaDIoZyeIgPYokZuq
 // Öffentliche GitLab OAuth 2.0 PKCE Defaults (kein Secret — 100% sicher im Client-Code!)
 export const DEFAULT_GITLAB_OAUTH = {
   host: 'https://gitlab.com',
-  clientId: 'b0340e0fe4da7489c6eb92afa8d95351ae235bcc426ae2bad6a2739c4f5bfab5',
+  clientId: 'a38b251893806b338ec673aa00b56edb09057e77e0ff6b4394c82aa4e842922c',
   projectId: '89124873'
 };
 
@@ -168,7 +168,12 @@ export function urlBase64ToUint8Array(base64String) {
 // =============================================================================
 
 export function getOAuthRedirectUri() {
-  return `${window.location.origin}${window.location.pathname}`;
+  let path = window.location.pathname || '/';
+  path = path.replace(/\/index\.html$/i, '/');
+  if (!path.endsWith('/')) {
+    path = path + '/';
+  }
+  return `${window.location.origin}${path}`;
 }
 
 export function generatePkceVerifier() {
@@ -489,10 +494,10 @@ export function loadNotificationState() {
   const savedGitLab = AlpineStorage.safeGetItem(STORAGE_KEYS.GITLAB, null);
   if (savedGitLab) {
     currentGitLab = { ...DEFAULT_GITLAB, ...savedGitLab };
-    if (!currentGitLab.clientId && DEFAULT_GITLAB_OAUTH.clientId) {
+    if (DEFAULT_GITLAB_OAUTH.clientId) {
       currentGitLab.clientId = DEFAULT_GITLAB_OAUTH.clientId;
     }
-    if (!currentGitLab.projectId && DEFAULT_GITLAB_OAUTH.projectId) {
+    if (DEFAULT_GITLAB_OAUTH.projectId) {
       currentGitLab.projectId = DEFAULT_GITLAB_OAUTH.projectId;
     }
   }
