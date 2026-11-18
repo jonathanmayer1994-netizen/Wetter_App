@@ -18,8 +18,8 @@ export const DEFAULT_VAPID_PUBLIC_KEY = 'BFXeGAET8G6YxsiL0HvXELcaDIoZyeIgPYokZuq
 // Öffentliche GitLab OAuth 2.0 PKCE Defaults (kein Secret — 100% sicher im Client-Code!)
 export const DEFAULT_GITLAB_OAUTH = {
   host: 'https://gitlab.com',
-  clientId: '',
-  projectId: ''
+  clientId: '4b0d407189136ea65affd5719175eafd963493b032f055a7e2f5f0c9de59cf41',
+  projectId: '89124873'
 };
 
 const STORAGE_KEYS = {
