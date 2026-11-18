@@ -190,11 +190,36 @@ export function generateOAuthState() {
 }
 
 /**
+ * Ermittelt die effektive GitLab-Projekt-ID oder den Projektpfad.
+ * Priorität:
+ * 1. Vom Nutzer explizit im Formular/State eingetragen (currentGitLab.projectId)
+ * 2. DEFAULT_GITLAB_OAUTH.projectId (z. B. durch scripts/setup_gitlab.py vorkonfiguriert)
+ * 3. Vollautomatische Auto-Discovery auf GitLab Pages (https://<user>.gitlab.io/<repo>/)
+ */
+export function getEffectiveProjectId() {
+  const explicit = (currentGitLab.projectId || DEFAULT_GITLAB_OAUTH.projectId || '').trim();
+  if (explicit) return explicit;
+
+  if (typeof window !== 'undefined' && window.location) {
+    const hostname = (window.location.hostname || '').toLowerCase();
+    if (hostname.endsWith('.gitlab.io')) {
+      const namespace = hostname.replace(/\.gitlab\.io$/, '');
+      const pathParts = (window.location.pathname || '').replace(/^\/+|\/+$/g, '').split('/');
+      const repo = pathParts[0];
+      if (namespace && repo) {
+        return `${namespace}/${repo}`;
+      }
+    }
+  }
+  return '';
+}
+
+/**
  * Ermittelt den aktuellen GitLab-Authentifizierungsmodus:
  * 'oauth' (OAuth 2.0 PKCE), 'pat' (Fallback Access Token) oder 'disconnected'
  */
 export function getGitLabAuthMode() {
-  const projectId = (currentGitLab.projectId || '').trim();
+  const projectId = getEffectiveProjectId();
   if (!projectId) return 'disconnected';
   if (currentOAuth && currentOAuth.accessToken) return 'oauth';
   if ((currentGitLab.token || '').trim()) return 'pat';
@@ -213,7 +238,7 @@ export async function startGitLabOAuthLogin() {
   readFormValues();
   const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
   const clientId = (currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '').trim();
-  const projectId = (currentGitLab.projectId || DEFAULT_GITLAB_OAUTH.projectId || '').trim();
+  const projectId = getEffectiveProjectId();
 
   if (!projectId) {
     throw new Error('Bitte trage zuerst deine GitLab Projekt-ID oder deinen Projektpfad ein (z. B. benutzer/wetter_app).');
@@ -544,7 +569,7 @@ export async function enablePushNotifications() {
 export async function deleteDeviceFromGitLab() {
   if (getGitLabAuthMode() === 'disconnected') return { skipped: true };
 
-  const projectId = (currentGitLab.projectId || '').trim();
+  const projectId = getEffectiveProjectId();
   const deviceUuid = getOrCreateDeviceUuid();
   const varKey = getDeviceVariableKey(deviceUuid);
   const encodedId = encodeURIComponent(projectId);
@@ -696,7 +721,7 @@ async function upsertGitLabVariable(projectId, key, value, { protectedVar = fals
  * in seine eigene, konfliktfreie GitLab CI-Variable (WEATHER_PUSH_DEV_<UUID_HEX>).
  */
 export async function syncToGitLab() {
-  const projectId = (currentGitLab.projectId || '').trim();
+  const projectId = getEffectiveProjectId();
   const deviceUuid = getOrCreateDeviceUuid();
   const varKey = getDeviceVariableKey(deviceUuid);
 
@@ -773,7 +798,7 @@ export async function syncAndProvisionGitLab() {
  * Startet eine GitLab Pipeline via REST API (optional mit PUSH_TEST_DEVICE_ID für sofortigen E2E-Test)
  */
 export async function triggerGitLabPipeline(variables = []) {
-  const projectId = (currentGitLab.projectId || '').trim();
+  const projectId = getEffectiveProjectId();
   if (!projectId || getGitLabAuthMode() === 'disconnected') {
     throw new Error('Bitte zuerst mit GitLab verbinden, um eine Pipeline zu starten.');
   }
@@ -817,7 +842,7 @@ export async function triggerGitLabTestPush() {
  * Erstellt oder aktualisiert den Pipeline Schedule via GitLab REST API
  */
 export async function createOrUpdateGitLabSchedule() {
-  const projectId = (currentGitLab.projectId || '').trim();
+  const projectId = getEffectiveProjectId();
   const presetKey = currentGitLab.schedulePreset || 'eco';
   const preset = SCHEDULE_PRESETS[presetKey] || SCHEDULE_PRESETS.eco;
 
@@ -1067,7 +1092,7 @@ function updateUIElements() {
       if (quickBtn) {
         quickBtn.addEventListener('click', async () => {
           const clientId = (currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '').trim();
-          const projectId = (currentGitLab.projectId || DEFAULT_GITLAB_OAUTH.projectId || '').trim();
+          const projectId = getEffectiveProjectId();
           if (!clientId || !projectId) {
             const devAcc = document.getElementById('notif-section-gitlab');
             if (devAcc) {
@@ -1136,9 +1161,15 @@ function populateNotificationFormFromState() {
   if (elBriefingTime) elBriefingTime.value = currentConfig.briefingTime || '07:00';
   if (elSevere) elSevere.checked = Boolean(currentConfig.severeAlert);
 
+  const effectiveProject = getEffectiveProjectId();
   if (elHost) elHost.value = currentGitLab.host || 'https://gitlab.com';
   if (elClientId) elClientId.value = currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '';
-  if (elProject) elProject.value = currentGitLab.projectId || DEFAULT_GITLAB_OAUTH.projectId || '';
+  if (elProject) {
+    elProject.value = currentGitLab.projectId || DEFAULT_GITLAB_OAUTH.projectId || '';
+    if (!elProject.value && effectiveProject) {
+      elProject.placeholder = `${effectiveProject} (automatisch erkannt)`;
+    }
+  }
   if (elToken) elToken.value = currentGitLab.token || '';
   if (elSchedule) elSchedule.value = currentGitLab.schedulePreset || 'eco';
 }
@@ -1614,6 +1645,7 @@ export function initNotifications() {
 window.openNotificationModal = openNotificationModal;
 window.closeNotificationModal = closeNotificationModal;
 window.hasUnsavedNotificationChanges = hasUnsavedChanges;
+window.getEffectiveProjectId = getEffectiveProjectId;
 window.getGitLabAuthMode = getGitLabAuthMode;
 window.getActiveBackendMode = getActiveBackendMode;
 window.getPushDeviceUuid = getOrCreateDeviceUuid;

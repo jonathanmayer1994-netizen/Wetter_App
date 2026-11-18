@@ -109,7 +109,7 @@ def run_tests():
         for tab_attr, expected_pane_id in mbn_tabs:
             if not mobile_page.is_visible(f".mbn-btn[data-tab='{tab_attr}']"):
                 if mobile_page.is_visible("#map-mobile-close-btn"):
-                    mobile_page.click("#map-mobile-close-btn")
+                    mobile_page.click("#map-mobile-close-btn", force=True)
                     mobile_page.wait_for_timeout(200)
             mobile_page.eval_on_selector(f".mbn-btn[data-tab='{tab_attr}']", "el => el.click()")
             mobile_page.wait_for_timeout(200)
