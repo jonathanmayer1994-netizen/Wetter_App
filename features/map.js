@@ -123,6 +123,12 @@ export function initLeafletMap() {
   hillshadePane.style.zIndex = 205;
   hillshadePane.style.pointerEvents = 'none';
 
+  // 2b. MeteoSwiss 3D Top-Relief Pane ÜBER Wetter-Canvas (z-index 420 mit multiply-Blend)
+  const topReliefPane = state.map.instance.getPane('topReliefPane') || state.map.instance.createPane('topReliefPane');
+  topReliefPane.style.zIndex = 420;
+  topReliefPane.style.pointerEvents = 'none';
+  topReliefPane.style.mixBlendMode = 'multiply';
+
   const labelsPane = state.map.instance.createPane('labelsOverlayPane');
   labelsPane.style.zIndex = 450;
   labelsPane.style.pointerEvents = 'none';
@@ -650,6 +656,10 @@ export function setMapBaseLayer(baseKey) {
     state.map.instance.removeLayer(state.map.hillshadeTileLayer);
     state.map.hillshadeTileLayer = null;
   }
+  if (state.map.topReliefLayer) {
+    state.map.instance.removeLayer(state.map.topReliefLayer);
+    state.map.topReliefLayer = null;
+  }
   if (state.map.satelliteLabelsLayer) {
     state.map.instance.removeLayer(state.map.satelliteLabelsLayer);
     state.map.satelliteLabelsLayer = null;
@@ -716,18 +726,40 @@ export function setMapBaseLayer(baseKey) {
     state.map.hillshadeTileLayer = hsLayer;
   }
 
-  // 4. Kristallklare Ortsnamen & Landesgrenzen ÜBER dem Wetter-Canvas
+  // 3c. MeteoSwiss 3D Top-Relief Shading ÜBER dem Wetter-Canvas (z-index 420 mit multiply-Blend)
+  // Lässt Alpengrate, Berggipfel und Täler physisch durch die Radar- & Schneefelder schimmern
+  if (conf.topReliefUrl) {
+    const trPane = state.map.instance.getPane('topReliefPane') ? 'topReliefPane' : 'overlayPane';
+    const topReliefLayer = L.tileLayer(conf.topReliefUrl, {
+      pane: trPane,
+      opacity: resolvedKey === 'osm-dark' ? 0.46 : 0.38,
+      maxNativeZoom: 16,
+      maxZoom: conf.options.maxZoom || 20,
+      crossOrigin: true,
+      keepBuffer: 6,
+      className: 'ms-top-relief-tile'
+    });
+    topReliefLayer.addTo(state.map.instance);
+    state.map.topReliefLayer = topReliefLayer;
+  }
+
+  // 4. Kristallklare Ortsnamen & Landesgrenzen ÜBER dem Wetter-Canvas & Top-Relief
   if (conf.labelsUrl) {
     const lblPane = state.map.instance.getPane('labelsOverlayPane') ? 'labelsOverlayPane' : 'overlayPane';
-    const labelsLayer = L.tileLayer(conf.labelsUrl, {
+    const labelsOptions = {
       pane: lblPane,
       zIndex: 455,
-      opacity: resolvedKey === 'osm-dark' ? 0.96 : 0.95,
-      maxNativeZoom: resolvedKey === 'osm-dark' ? 16 : 18,
+      opacity: 0.98,
+      subdomains: ['a', 'b', 'c', 'd'],
+      maxNativeZoom: resolvedKey === 'osm-dark' ? 19 : 18,
       maxZoom: conf.options.maxZoom || 20,
       crossOrigin: true,
       className: 'ms-labels-tile'
-    });
+    };
+    if (conf.labelsUrl.includes('{r}')) {
+      labelsOptions.r = isRetina ? '@2x' : '';
+    }
+    const labelsLayer = L.tileLayer(conf.labelsUrl, labelsOptions);
     if (conf.labelsFallbackUrl) {
       labelsLayer.on('tileerror', function(err) {
         if (err.tile && !err.tile._fallbackTried) {
@@ -3232,92 +3264,92 @@ const WeatherCanvasEngine = {
   },
 
   _traceColors: {
-    dark:  [104, 212, 246, 92], // Transparentes Cyan (Untergrund bleibt klar lesbar, null Violett/Grau!)
-    light: [56,  189, 248, 84]
+    dark:  [104, 212, 246, 72], // Transparentes Cyan (MeteoSwiss: Untergrund bleibt klar lesbar)
+    light: [56,  189, 248, 70]
   },
   _phaseTraceDark: {
-    1: [[104, 212, 246, 92]], // Regen-Spur: Sehr helles Blau / transparentes Cyan
-    2: [[76,  208, 192, 94]], // Mix-Spur: Blau-Grün transparent
-    3: [[176, 236, 255, 98]]  // Schnee-Spur: Helles Cyan-Weiß transparent
+    1: [[104, 212, 246, 72]], // Regen-Spur: Sehr helles Blau / transparentes Cyan (~28% Alpha)
+    2: [[76,  208, 192, 74]], // Mix-Spur: Blau-Grün transparent (~29% Alpha)
+    3: [[176, 236, 255, 76]]  // Schnee-Spur: Helles Cyan-Weiß transparent (~30% Alpha)
   },
   _phaseTraceLight: {
-    1: [[56,  189, 248, 84]], // Regen-Spur auf hellem Topo
-    2: [[34,  178, 166, 86]], // Mix-Spur auf hellem Topo
-    3: [[108, 204, 246, 92]]  // Schnee-Spur auf hellem Topo (Gletscherschutz)
+    1: [[56,  189, 248, 70]], // Regen-Spur auf hellem Topo
+    2: [[34,  178, 166, 72]], // Mix-Spur auf hellem Topo
+    3: [[108, 204, 246, 74]]  // Schnee-Spur auf hellem Topo (Gletscherschutz)
   },
   _rgbaTmp2: [0, 0, 0, 0],
   _traceTmp: [0, 0, 0, 0],
 
-  // MeteoSwiss Aktiv-Paletten für Tier 2..10 (Index 0..8)
+  // MeteoSwiss Aktiv-Paletten für Tier 2..10 (Index 0..8) - Transparenz kalibriert (50% bis 81% Alpha)
   _precipPalettesDark: {
-    1: [ // REGEN (Exakte Spezifikation mit optimaler Relief-Durchsicht)
-      [64,  156, 255, 158], // Tier 2 (0.2–0.5): Helles Blau (#409cff)
-      [28,  92,  240, 184], // Tier 3 (0.5–1.0): Mittleres Blau (#1c5cf0)
-      [14,  42,  204, 202], // Tier 4 (1.0–2.5): Dunkelblau (#0e2acc)
-      [20,  174, 58,  214], // Tier 5 (2.5–5.0): Grün (#14ae3a)
-      [162, 230, 28,  222], // Tier 6 (5.0–7.5): Gelb-Grün (#a2e61c)
-      [250, 210, 20,  232], // Tier 7 (7.5–10): Gelb (#fad214)
-      [249, 115, 22,  240], // Tier 8 (10–20): Orange (#f97316)
-      [224, 34,  34,  246], // Tier 9 (20–35): Rot (#e02222)
-      [158, 14,  26,  250]  // Tier 10 (>= 35): Dunkelrot (#9e0e1a)
+    1: [ // REGEN (MeteoSwiss Kalibrierung: Topographie & Täler bleiben klar erkennbar)
+      [64,  156, 255, 128], // Tier 2 (0.2–0.5): Helles Blau (#409cff, ~50% Alpha)
+      [28,  92,  240, 140], // Tier 3 (0.5–1.0): Mittleres Blau (#1c5cf0, ~55% Alpha)
+      [14,  42,  204, 152], // Tier 4 (1.0–2.5): Dunkelblau (#0e2acc, ~60% Alpha)
+      [20,  174, 58,  164], // Tier 5 (2.5–5.0): Grün (#14ae3a, ~64% Alpha)
+      [162, 230, 28,  176], // Tier 6 (5.0–7.5): Gelb-Grün (#a2e61c, ~69% Alpha)
+      [250, 210, 20,  186], // Tier 7 (7.5–10): Gelb (#fad214, ~73% Alpha)
+      [249, 115, 22,  194], // Tier 8 (10–20): Orange (#f97316, ~76% Alpha)
+      [224, 34,  34,  202], // Tier 9 (20–35): Rot (#e02222, ~79% Alpha)
+      [158, 14,  26,  208]  // Tier 10 (>= 35): Dunkelrot (#9e0e1a, ~81% Alpha)
     ],
     2: [ // SCHNEEREGEN / MIX (Übergangsfarben zwischen Blau und Grün)
-      [34,  178, 198, 162], // Tier 2: Blau-Türkis
-      [20,  188, 172, 186], // Tier 3: Sattes Blau-Grün
-      [16,  196, 146, 204], // Tier 4: Smaragd-Blaugrün
-      [24,  206, 122, 216], // Tier 5: Kräftiges Meergrün
-      [68,  222, 148, 224], // Tier 6: Helles Mintgrün
-      [112, 234, 174, 232], // Tier 7
-      [152, 242, 198, 240], // Tier 8
-      [184, 248, 218, 245], // Tier 9
-      [208, 252, 234, 250]  // Tier 10
+      [34,  178, 198, 130], // Tier 2: Blau-Türkis
+      [20,  188, 172, 142], // Tier 3: Sattes Blau-Grün
+      [16,  196, 146, 154], // Tier 4: Smaragd-Blaugrün
+      [24,  206, 122, 166], // Tier 5: Kräftiges Meergrün
+      [68,  222, 148, 178], // Tier 6: Helles Mintgrün
+      [112, 234, 174, 188], // Tier 7
+      [152, 242, 198, 196], // Tier 8
+      [184, 248, 218, 202], // Tier 9
+      [208, 252, 234, 208]  // Tier 10
     ],
     3: [ // SCHNEE (Helles Blau-Weiß bis leichtes Cyan)
-      [132, 218, 252, 160], // Tier 2: Leichtes Cyan (#84dafb)
-      [164, 230, 255, 186], // Tier 3: Eis-Cyan (#a4e6ff)
-      [194, 240, 255, 206], // Tier 4: Helles Eisblau (#c2f0ff)
-      [218, 246, 255, 218], // Tier 5: Blau-Weiß (#daf6ff)
-      [232, 250, 255, 228], // Tier 6: Kristall-Blauweiß (#e8faff)
-      [240, 252, 255, 234], // Tier 7
-      [246, 253, 255, 240], // Tier 8
-      [250, 254, 255, 246], // Tier 9
-      [254, 255, 255, 250]  // Tier 10
+      [132, 218, 252, 132], // Tier 2: Leichtes Cyan (#84dafb)
+      [164, 230, 255, 144], // Tier 3: Eis-Cyan (#a4e6ff)
+      [194, 240, 255, 156], // Tier 4: Helles Eisblau (#c2f0ff)
+      [218, 246, 255, 168], // Tier 5: Blau-Weiß (#daf6ff)
+      [232, 250, 255, 178], // Tier 6: Kristall-Blauweiß (#e8faff)
+      [240, 252, 255, 188], // Tier 7
+      [246, 253, 255, 196], // Tier 8
+      [250, 254, 255, 202], // Tier 9
+      [254, 255, 255, 208]  // Tier 10
     ]
   },
 
   _precipPalettesLight: {
     1: [ // REGEN (auf hellem Topo/Standard kontraststark & relieflesbar)
-      [59,  142, 246, 162], // Tier 2 (0.2–0.5): Helles Blau
-      [24,  86,  232, 186], // Tier 3 (0.5–1.0): Mittleres Blau
-      [12,  38,  196, 204], // Tier 4 (1.0–2.5): Dunkelblau
-      [16,  162, 50,  216], // Tier 5 (2.5–5.0): Grün
-      [150, 218, 22,  224], // Tier 6 (5.0–7.5): Gelb-Grün
-      [245, 196, 14,  234], // Tier 7 (7.5–10): Gelb
-      [244, 106, 16,  242], // Tier 8 (10–20): Orange
-      [216, 30,  30,  246], // Tier 9 (20–35): Rot
-      [146, 12,  24,  250]  // Tier 10 (>= 35): Dunkelrot
+      [59,  142, 246, 130], // Tier 2 (0.2–0.5): Helles Blau
+      [24,  86,  232, 142], // Tier 3 (0.5–1.0): Mittleres Blau
+      [12,  38,  196, 154], // Tier 4 (1.0–2.5): Dunkelblau
+      [16,  162, 50,  166], // Tier 5 (2.5–5.0): Grün
+      [150, 218, 22,  178], // Tier 6 (5.0–7.5): Gelb-Grün
+      [245, 196, 14,  188], // Tier 7 (7.5–10): Gelb
+      [244, 106, 16,  196], // Tier 8 (10–20): Orange
+      [216, 30,  30,  202], // Tier 9 (20–35): Rot
+      [146, 12,  24,  208]  // Tier 10 (>= 35): Dunkelrot
     ],
     2: [ // SCHNEEREGEN / MIX (Blau-Grün mit Topo-Sättigung)
-      [22,  162, 186, 166], // Tier 2
-      [14,  172, 158, 190], // Tier 3
-      [12,  178, 132, 208], // Tier 4
-      [18,  188, 110, 220], // Tier 5
-      [44,  204, 132, 228], // Tier 6
-      [84,  218, 158, 236], // Tier 7
-      [122, 228, 182, 242], // Tier 8
-      [154, 236, 202, 246], // Tier 9
-      [180, 244, 218, 250]  // Tier 10
+      [22,  162, 186, 132], // Tier 2
+      [14,  172, 158, 144], // Tier 3
+      [12,  178, 132, 156], // Tier 4
+      [18,  188, 110, 168], // Tier 5
+      [44,  204, 132, 178], // Tier 6
+      [84,  218, 158, 188], // Tier 7
+      [122, 228, 182, 196], // Tier 8
+      [154, 236, 202, 202], // Tier 9
+      [180, 244, 218, 208]  // Tier 10
     ],
     3: [ // SCHNEE (Leichtes Cyan -> Blau-Weiß mit Kontrastschutz über hellen Gipfeln)
-      [74,  182, 238, 174], // Tier 2
-      [108, 200, 248, 194], // Tier 3
-      [140, 216, 252, 210], // Tier 4
-      [172, 230, 255, 222], // Tier 5
-      [196, 238, 255, 230], // Tier 6
-      [214, 244, 255, 236], // Tier 7
-      [226, 248, 255, 242], // Tier 8
-      [236, 251, 255, 246], // Tier 9
-      [244, 253, 255, 250]  // Tier 10
+      [74,  182, 238, 136], // Tier 2
+      [108, 200, 248, 148], // Tier 3
+      [140, 216, 252, 158], // Tier 4
+      [172, 230, 255, 168], // Tier 5
+      [196, 238, 255, 178], // Tier 6
+      [214, 244, 255, 188], // Tier 7
+      [226, 248, 255, 196], // Tier 8
+      [236, 251, 255, 202], // Tier 9
+      [244, 253, 255, 208]  // Tier 10
     ]
   },
 

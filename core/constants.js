@@ -141,12 +141,16 @@ export const BASE_LAYERS = {
     name: 'Topo (OSM Alpinrelief)',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    hillshadeUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
+    topReliefUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
     options: {
       subdomains: ['a', 'b', 'c'],
       maxNativeZoom: 17,
       maxZoom: 20,
       attribution: '© OpenStreetMap, SRTM | Kartendarstellung: © OpenTopoMap (CC-BY-SA)'
     },
+    labelsUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+    labelsFallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
     isDark: false
   },
   'osm-dark': {
@@ -154,13 +158,14 @@ export const BASE_LAYERS = {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
     fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}',
     hillshadeUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}',
+    topReliefUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
     options: {
       maxNativeZoom: 16,
       maxZoom: 20,
       attribution: '© Esri, HERE, Garmin, © OpenStreetMap'
     },
-    labelsUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    labelsFallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+    labelsUrl: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+    labelsFallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
     isDark: true
   },
   'satellite': {

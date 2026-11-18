@@ -39,6 +39,7 @@ export const state = {
     radarTileLayer: null,
     baseTileLayer: null,
     hillshadeTileLayer: null,
+    topReliefLayer: null,
     satelliteLabelsLayer: null,
     precipPhaseEnabled: true,
     showStratusOverlay: true,

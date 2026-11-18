@@ -1,5 +1,5 @@
 {
-  "version": "2.33.1",
-  "build": "20261118-2037",
-  "notes": "OAuth 2.0 PKCE multi-redirect URI update with canonical trailing-slash resolution and auto-upgrade"
+  "version": "2.33.2",
+  "build": "20261118-2115",
+  "notes": "MeteoSwiss translucent radar palette, 3D relief blending and high-contrast top-layer town labels"
 }
