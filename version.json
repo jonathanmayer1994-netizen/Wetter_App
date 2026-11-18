@@ -1,5 +1,5 @@
 {
-  "version": "2.32.0",
-  "build": "20261118-1803",
-  "notes": "Add turnkey zero-dependency Cloudflare Edge Push Worker (RFC 8291 + VAPID ES256), honest backend sync status banner, iOS 16.4-18 WebKit-safe sw.js push handler, 90-min briefing jitter window, and mobile notification rule layout fixes"
+  "version": "2.33.0",
+  "build": "20261118-1843",
+  "notes": "All-in-GitLab Multi-Device Push Architecture with OAuth 2.0 + PKCE (1-Tap Face ID), GitLab Pages deployment, atomic WEATHER_PUSH_STATE persistence, auto-provisioned schedules, and 15s E2E PUSH_TEST_DEVICE_ID test push"
 }

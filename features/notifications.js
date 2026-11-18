@@ -1,6 +1,13 @@
 /**
- * BEST WEATHER — Push Notifications & GitLab REST API Dispatcher Module
- * Enterprise Web Push Engine for iOS 16.4+ (APNs) and macOS Notification Center.
+ * BEST WEATHER — All-in-GitLab Push Notifications & OAuth 2.0 PKCE Engine
+ * Enterprise Web Push Engine for iOS 16.4+ (APNs Lock Screen) & macOS Notification Center.
+ *
+ * Privacy-First Multi-Device Architecture:
+ * - Each Apple device is identified EXCLUSIVELY by a locally generated anonymous RFC 4122 UUID v4
+ *   stored in its own conflict-free GitLab CI variable: WEATHER_PUSH_DEV_<UUID_HEX>
+ * - Zero device metadata (no User-Agent, no model, no OS, no hardware fingerprinting)
+ * - GitLab OAuth 2.0 + PKCE (RFC 7636) for 1-Tap Face ID / Touch ID sign-in with automatic token refresh
+ * - Automatic GitLab Pipeline Schedule provisioning & 15-second E2E Server->APNs test push
  */
 
 import { AlpineStorage } from '../storage.js';
@@ -8,15 +15,94 @@ import { state } from '../core/state.js';
 
 export const DEFAULT_VAPID_PUBLIC_KEY = 'BFXeGAET8G6YxsiL0HvXELcaDIoZyeIgPYokZuqpueq3NFJs8xG7KsyvViif44MAxMkBI_OQ93OXewHGRhMSOmI';
 
+// Öffentliche GitLab OAuth 2.0 PKCE Defaults (kein Secret — 100% sicher im Client-Code!)
+export const DEFAULT_GITLAB_OAUTH = {
+  host: 'https://gitlab.com',
+  clientId: '',
+  projectId: ''
+};
+
 const STORAGE_KEYS = {
   CONFIG: 'bw_push_config',
   GITLAB: 'bw_gitlab_config',
+  OAUTH: 'bw_gitlab_oauth',
+  OAUTH_PKCE: 'bw_gitlab_oauth_pkce',
   SUBSCRIPTION: 'bw_push_subscription',
   DEVICE_UUID: 'bw_push_device_uuid'
 };
 
 export const DEVICE_VAR_PREFIX = 'WEATHER_PUSH_DEV_';
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const SCHEDULE_PRESETS = {
+  eco: {
+    key: 'eco',
+    name: 'Eco (06:00–22:00 Uhr, 100% Free-Tier Safe)',
+    cron: '0 6,7,8,10,12,14,16,17,18,19,20,21 * * *',
+    runsPerDay: 12,
+    monthlyMinutes: 120,
+    description: '12 Läufe/Tag verteilt auf 06:00 bis 21:00 Uhr. 22:00–06:00 Uhr Pause (~120 Compute-Min./Monat).'
+  },
+  hourly: {
+    key: 'hourly',
+    name: 'Stündlich (06:00–22:00 Uhr)',
+    cron: '0 6-21 * * *',
+    runsPerDay: 16,
+    monthlyMinutes: 160,
+    description: '16 Läufe/Tag stündlich von 06:00 bis 21:00 Uhr. 22:00–06:00 Uhr Pause (~160 Compute-Min./Monat, 100% Free-Tier Safe).'
+  },
+  highfreq: {
+    key: 'highfreq',
+    name: 'Alle 20 Min tagsüber (06:00–22:00 Uhr)',
+    cron: '*/20 6-21 * * *',
+    runsPerDay: 48,
+    monthlyMinutes: 480,
+    description: '48 Läufe/Tag von 06:00 bis 21:40 Uhr. Ideal für eigenen Runner.'
+  }
+};
+
+const DEFAULT_CONFIG = {
+  enabled: false,
+  windAlert: true,
+  windThreshold: 60, // km/h
+  frostAlert: true,
+  frostThreshold: 0, // °C
+  briefingAlert: true,
+  briefingTime: '07:00',
+  severeAlert: true,
+  quietHoursStart: 22,
+  quietHoursEnd: 6,
+  bypassQuietHoursOnSevere: true,
+  locationMode: 'gps',
+  lastSyncAt: 0
+};
+
+const DEFAULT_GITLAB = {
+  host: DEFAULT_GITLAB_OAUTH.host,
+  clientId: DEFAULT_GITLAB_OAUTH.clientId,
+  projectId: DEFAULT_GITLAB_OAUTH.projectId,
+  token: '', // Optionaler Fallback Personal Access Token (glpat-...)
+  schedulePreset: 'eco',
+  lastSyncStatus: 'Nicht mit GitLab verbunden',
+  lastSyncAt: 0
+};
+
+let currentConfig = { ...DEFAULT_CONFIG };
+let currentGitLab = { ...DEFAULT_GITLAB };
+let currentOAuth = null; // { accessToken, refreshToken, expiresAt, tokenType, scope, connectedAt }
+let currentSubscription = null;
+let savedFormSnapshot = null;
+
+// =============================================================================
+// CRYPTO & ANONYMOUS UUID v4 IDENTITY (ZERO DEVICE METADATA)
+// =============================================================================
+
+function base64UrlEncode(bytes) {
+  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let bin = '';
+  for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+  return window.btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 /**
  * Erzeugt eine rein zufällige kryptographische UUID v4 (RFC 4122).
@@ -34,8 +120,8 @@ export function generateAnonymousUuid() {
       bytes[i] = Math.floor(Math.random() * 256);
     }
   }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
-  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 Variant
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
@@ -66,77 +152,6 @@ export function getDeviceVariableKey(deviceUuid = getOrCreateDeviceUuid()) {
   return `${DEVICE_VAR_PREFIX}${cleanHex}`;
 }
 
-export const SCHEDULE_PRESETS = {
-  eco: {
-    key: 'eco',
-    name: 'Eco (06:00–22:00 Uhr, 100% Free-Tier Safe)',
-    cron: '0 6,7,8,10,12,14,16,17,18,19,20,21 * * *',
-    runsPerDay: 12,
-    monthlyMinutes: 360,
-    description: '12 Läufe/Tag verteilt auf 06:00 bis 21:00 Uhr. 22:00–06:00 Uhr Pause. Garantiert <= 400 Min./Monat.'
-  },
-  hourly: {
-    key: 'hourly',
-    name: 'Stündlich (06:00–22:00 Uhr)',
-    cron: '0 6-21 * * *',
-    runsPerDay: 16,
-    monthlyMinutes: 480,
-    description: '16 Läufe/Tag stündlich von 06:00 bis 21:00 Uhr. 22:00–06:00 Uhr Pause.'
-  },
-  highfreq: {
-    key: 'highfreq',
-    name: 'Alle 20 Min tagsüber (06:00–22:00 Uhr)',
-    cron: '*/20 6-21 * * *',
-    runsPerDay: 48,
-    monthlyMinutes: 1440,
-    description: '48 Läufe/Tag von 06:00 bis 21:40 Uhr. Ideal für eigenen Runner.'
-  }
-};
-
-const DEFAULT_CONFIG = {
-  enabled: false,
-  windAlert: true,
-  windThreshold: 60, // km/h
-  frostAlert: true,
-  frostThreshold: 0, // °C
-  briefingAlert: true,
-  briefingTime: '07:00',
-  severeAlert: true,
-  quietHoursStart: 22,
-  quietHoursEnd: 6,
-  bypassQuietHoursOnSevere: true,
-  locationMode: 'gps', // 'gps' | 'fixed'
-  lastSyncAt: 0
-};
-
-// Optional vorkonfigurierte Cloudflare Push-Worker URL (100% automatisch ohne Token im Browser)
-export const DEFAULT_PUSH_WORKER_URL = '';
-
-const DEFAULT_GITLAB = {
-  workerUrl: DEFAULT_PUSH_WORKER_URL,
-  host: 'https://gitlab.com',
-  projectId: '',
-  token: '',
-  schedulePreset: 'eco', // 'eco' | 'hourly' | 'highfreq'
-  lastSyncStatus: 'Nur lokal gespeichert — kein Push-Server verbunden',
-  lastSyncAt: 0
-};
-
-export function getActiveBackendMode() {
-  const workerUrl = (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '').trim();
-  if (workerUrl) return 'worker';
-  if ((currentGitLab.projectId || '').trim() && (currentGitLab.token || '').trim()) return 'gitlab';
-  return 'local-only';
-}
-
-let currentConfig = { ...DEFAULT_CONFIG };
-let currentGitLab = { ...DEFAULT_GITLAB };
-let currentSubscription = null;
-let savedFormSnapshot = null;
-
-/**
- * Standard Web Push Helper: Konvertiert URL-safe Base64 String in Uint8Array
- */
 export function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -148,9 +163,280 @@ export function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+// =============================================================================
+// GITLAB OAUTH 2.0 + PKCE (RFC 7636 — 1-TAP FACE ID / TOUCH ID LOGIN)
+// =============================================================================
+
+export function getOAuthRedirectUri() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
+export function generatePkceVerifier() {
+  const bytes = new Uint8Array(48);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+}
+
+export async function computePkceChallenge(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
+export function generateOAuthState() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+}
+
 /**
- * Prüft Umgebungs-Support für Push Notifications
+ * Ermittelt den aktuellen GitLab-Authentifizierungsmodus:
+ * 'oauth' (OAuth 2.0 PKCE), 'pat' (Fallback Access Token) oder 'disconnected'
  */
+export function getGitLabAuthMode() {
+  const projectId = (currentGitLab.projectId || '').trim();
+  if (!projectId) return 'disconnected';
+  if (currentOAuth && currentOAuth.accessToken) return 'oauth';
+  if ((currentGitLab.token || '').trim()) return 'pat';
+  return 'disconnected';
+}
+
+export function getActiveBackendMode() {
+  const authMode = getGitLabAuthMode();
+  return authMode === 'disconnected' ? 'local-only' : `gitlab-${authMode}`;
+}
+
+/**
+ * Startet den offiziellen GitLab OAuth 2.0 + PKCE Flow (1-Tipp Anmeldung via Face ID / Touch ID)
+ */
+export async function startGitLabOAuthLogin() {
+  readFormValues();
+  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const clientId = (currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '').trim();
+  const projectId = (currentGitLab.projectId || DEFAULT_GITLAB_OAUTH.projectId || '').trim();
+
+  if (!projectId) {
+    throw new Error('Bitte trage zuerst deine GitLab Projekt-ID oder deinen Projektpfad ein (z. B. benutzer/wetter_app).');
+  }
+  if (!clientId) {
+    throw new Error('Bitte trage zuerst deine öffentliche GitLab OAuth Application ID (Client ID) ein.');
+  }
+
+  saveNotificationState();
+
+  const verifier = generatePkceVerifier();
+  const challenge = await computePkceChallenge(verifier);
+  const oauthState = generateOAuthState();
+  const redirectUri = getOAuthRedirectUri();
+
+  AlpineStorage.safeSetItem(STORAGE_KEYS.OAUTH_PKCE, {
+    verifier,
+    state: oauthState,
+    redirectUri,
+    host,
+    clientId,
+    projectId,
+    createdAt: Date.now()
+  });
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'api',
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    state: oauthState
+  });
+
+  window.location.assign(`${host}/oauth/authorize?${params.toString()}`);
+}
+
+/**
+ * Verarbeitet automatisch den GitLab OAuth 2.0 + PKCE Redirect Callback beim App-Start
+ */
+export async function handleGitLabOAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const returnedState = params.get('state');
+  const oauthError = params.get('error');
+
+  if (!code && !oauthError) return { handled: false };
+
+  const cleanUrl = getOAuthRedirectUri();
+  const cleanupUrl = () => {
+    try {
+      window.history.replaceState({}, document.title, cleanUrl);
+    } catch {}
+  };
+
+  if (oauthError) {
+    AlpineStorage.safeRemoveItem(STORAGE_KEYS.OAUTH_PKCE);
+    cleanupUrl();
+    const desc = params.get('error_description') || oauthError;
+    console.warn('GitLab OAuth abgebrochen/Fehler:', desc);
+    return { handled: true, error: desc };
+  }
+
+  const pkce = AlpineStorage.safeGetItem(STORAGE_KEYS.OAUTH_PKCE, null);
+  AlpineStorage.safeRemoveItem(STORAGE_KEYS.OAUTH_PKCE);
+  cleanupUrl();
+
+  if (!pkce || !pkce.verifier || !pkce.state || pkce.state !== returnedState) {
+    console.error('GitLab OAuth PKCE State-Prüfung fehlgeschlagen (CSRF-Schutz).');
+    return { handled: true, error: 'Ungültiger OAuth-Sicherheitsstatus. Bitte erneut anmelden.' };
+  }
+
+  if (Date.now() - (pkce.createdAt || 0) > 15 * 60 * 1000) {
+    return { handled: true, error: 'OAuth-Anmeldung abgelaufen (>15 Min.). Bitte erneut anmelden.' };
+  }
+
+  const tokenUrl = `${pkce.host}/oauth/token`;
+  const body = new URLSearchParams({
+    client_id: pkce.clientId,
+    code,
+    grant_type: 'authorization_code',
+    redirect_uri: pkce.redirectUri,
+    code_verifier: pkce.verifier
+  });
+
+  const res = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString()
+  });
+
+  if (!res.ok) {
+    const errTxt = await res.text().catch(() => '');
+    throw new Error(`GitLab OAuth Token-Austausch fehlgeschlagen (${res.status}): ${errTxt || res.statusText}`);
+  }
+
+  const tokenData = await res.json();
+  currentOAuth = {
+    accessToken: tokenData.access_token,
+    refreshToken: tokenData.refresh_token || null,
+    expiresAt: Date.now() + ((Number(tokenData.expires_in) || 7200) * 1000),
+    tokenType: tokenData.token_type || 'Bearer',
+    scope: tokenData.scope || 'api',
+    connectedAt: Date.now()
+  };
+
+  currentGitLab.host = pkce.host;
+  currentGitLab.clientId = pkce.clientId;
+  currentGitLab.projectId = pkce.projectId;
+  currentGitLab.lastSyncStatus = 'Mit GitLab verbunden (OAuth PKCE)';
+  currentGitLab.lastSyncAt = Date.now();
+  saveNotificationState();
+  updateUIElements();
+
+  // Vollautomatischer Erst-Sync + Schedule-Einrichtung direkt nach OAuth Login!
+  try {
+    await syncAndProvisionGitLab();
+  } catch (err) {
+    console.warn('Auto-Sync nach OAuth Info:', err.message);
+  }
+
+  return { handled: true, ok: true };
+}
+
+/**
+ * Erneuert ein ablaufendes GitLab OAuth Access Token lautlos über das Refresh Token
+ */
+export async function refreshGitLabOAuthToken() {
+  if (!currentOAuth || !currentOAuth.refreshToken) {
+    throw new Error('GitLab-Sitzung abgelaufen. Bitte kurz erneut mit GitLab verbinden.');
+  }
+
+  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const clientId = (currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '').trim();
+  if (!clientId) {
+    throw new Error('GitLab OAuth Client ID fehlt für Token-Erneuerung.');
+  }
+
+  const body = new URLSearchParams({
+    client_id: clientId,
+    refresh_token: currentOAuth.refreshToken,
+    grant_type: 'refresh_token',
+    redirect_uri: getOAuthRedirectUri()
+  });
+
+  const res = await fetch(`${host}/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString()
+  });
+
+  if (!res.ok) {
+    disconnectGitLabOAuth();
+    throw new Error(`GitLab OAuth Refresh fehlgeschlagen (${res.status}). Bitte erneut verbinden.`);
+  }
+
+  const tokenData = await res.json();
+  currentOAuth = {
+    accessToken: tokenData.access_token,
+    refreshToken: tokenData.refresh_token || currentOAuth.refreshToken,
+    expiresAt: Date.now() + ((Number(tokenData.expires_in) || 7200) * 1000),
+    tokenType: tokenData.token_type || 'Bearer',
+    scope: tokenData.scope || currentOAuth.scope || 'api',
+    connectedAt: currentOAuth.connectedAt || Date.now()
+  };
+  saveNotificationState();
+  return currentOAuth;
+}
+
+/**
+ * Trennt die GitLab OAuth-Verbindung lokal auf diesem Gerät
+ */
+export function disconnectGitLabOAuth() {
+  currentOAuth = null;
+  AlpineStorage.safeRemoveItem(STORAGE_KEYS.OAUTH);
+  currentGitLab.lastSyncStatus = 'GitLab-Verbindung getrennt';
+  currentGitLab.lastSyncAt = 0;
+  saveNotificationState();
+  updateUIElements();
+}
+
+/**
+ * Zentraler GitLab REST API Client mit automatischem OAuth PKCE Refresh & PAT-Fallback
+ */
+async function gitlabApiFetch(apiPath, options = {}, allowRetry = true) {
+  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const authMode = getGitLabAuthMode();
+
+  if (authMode === 'disconnected') {
+    throw new Error('Nicht mit GitLab verbunden. Bitte zuerst per „Mit GitLab verbinden“ anmelden.');
+  }
+
+  const headers = { ...(options.headers || {}) };
+
+  if (authMode === 'oauth') {
+    // Proaktiver Auto-Refresh 2 Minuten vor Ablauf
+    if (currentOAuth.expiresAt && Date.now() >= (currentOAuth.expiresAt - 120_000) && currentOAuth.refreshToken) {
+      await refreshGitLabOAuthToken();
+    }
+    headers['Authorization'] = `Bearer ${currentOAuth.accessToken}`;
+  } else {
+    headers['PRIVATE-TOKEN'] = (currentGitLab.token || '').trim();
+  }
+
+  const response = await fetch(`${host}/api/v4${apiPath}`, {
+    ...options,
+    headers
+  });
+
+  // Bei abgelaufenem OAuth Token einmalig automatisch refreshen & wiederholen
+  if (response.status === 401 && authMode === 'oauth' && allowRetry && currentOAuth?.refreshToken) {
+    await refreshGitLabOAuthToken();
+    return gitlabApiFetch(apiPath, options, false);
+  }
+
+  return response;
+}
+
+// =============================================================================
+// PUSH SUPPORT & PERSISTENCE
+// =============================================================================
+
 export function checkPushSupport() {
   const hasSW = 'serviceWorker' in navigator;
   const hasPush = 'PushManager' in window;
@@ -169,9 +455,6 @@ export function checkPushSupport() {
   };
 }
 
-/**
- * Lädt persistierte Einstellungen
- */
 export function loadNotificationState() {
   const savedConfig = AlpineStorage.safeGetItem(STORAGE_KEYS.CONFIG, null);
   if (savedConfig) {
@@ -181,30 +464,36 @@ export function loadNotificationState() {
   const savedGitLab = AlpineStorage.safeGetItem(STORAGE_KEYS.GITLAB, null);
   if (savedGitLab) {
     currentGitLab = { ...DEFAULT_GITLAB, ...savedGitLab };
+    if (!currentGitLab.clientId && DEFAULT_GITLAB_OAUTH.clientId) {
+      currentGitLab.clientId = DEFAULT_GITLAB_OAUTH.clientId;
+    }
+    if (!currentGitLab.projectId && DEFAULT_GITLAB_OAUTH.projectId) {
+      currentGitLab.projectId = DEFAULT_GITLAB_OAUTH.projectId;
+    }
   }
+
+  const savedOAuth = AlpineStorage.safeGetItem(STORAGE_KEYS.OAUTH, null);
+  currentOAuth = (savedOAuth && savedOAuth.accessToken) ? savedOAuth : null;
 
   const savedSub = AlpineStorage.safeGetItem(STORAGE_KEYS.SUBSCRIPTION, null);
   if (savedSub) {
     currentSubscription = savedSub;
   }
 
-  return { config: currentConfig, gitlab: currentGitLab, subscription: currentSubscription };
+  return { config: currentConfig, gitlab: currentGitLab, oauth: currentOAuth, subscription: currentSubscription };
 }
 
-/**
- * Speichert Einstellungen lokal
- */
 export function saveNotificationState() {
   AlpineStorage.safeSetItem(STORAGE_KEYS.CONFIG, currentConfig);
   AlpineStorage.safeSetItem(STORAGE_KEYS.GITLAB, currentGitLab);
+  if (currentOAuth) {
+    AlpineStorage.safeSetItem(STORAGE_KEYS.OAUTH, currentOAuth);
+  }
   if (currentSubscription) {
     AlpineStorage.safeSetItem(STORAGE_KEYS.SUBSCRIPTION, currentSubscription);
   }
 }
 
-/**
- * Fordert System-Berechtigung an & registriert Push Subscription
- */
 export async function enablePushNotifications() {
   const support = checkPushSupport();
   if (!support.supported) {
@@ -241,81 +530,11 @@ export async function enablePushNotifications() {
   saveNotificationState();
   updateUIElements();
 
-  // Automatische Hintergrund-Synchronisation mit aktivem Push-Backend (Cloudflare Worker oder GitLab CI)
-  const mode = getActiveBackendMode();
-  if (mode === 'worker') {
-    syncToCloudWorker().catch(err => console.debug('Worker-Sync Info:', err.message));
-  } else if (mode === 'gitlab') {
-    syncToGitLab().catch(err => console.debug('GitLab-Sync Info:', err.message));
+  if (getGitLabAuthMode() !== 'disconnected') {
+    syncAndProvisionGitLab().catch(err => console.debug('GitLab Auto-Sync Info:', err.message));
   }
 
   return currentSubscription;
-}
-
-/**
- * Synchronisiert das anonyme Geräte-Profil (UUID v4) mit dem Cloudflare Push-Worker (0 Tokens im Browser!)
- */
-export async function syncToCloudWorker() {
-  const workerUrl = (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '').trim().replace(/\/+$/, '');
-  if (!workerUrl) {
-    throw new Error('Keine Push-Worker URL konfiguriert.');
-  }
-
-  const deviceUuid = getOrCreateDeviceUuid();
-  const payload = buildDeviceSyncPayload();
-
-  const response = await fetch(`${workerUrl}/api/devices/${encodeURIComponent(deviceUuid)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`Push-Worker Sync Fehler (${response.status}): ${errText || response.statusText}`);
-  }
-
-  const result = await response.json().catch(() => ({}));
-  currentGitLab.lastSyncStatus = 'Cloud-Push verbunden & synchronisiert';
-  currentGitLab.lastSyncAt = Date.now();
-  currentConfig.lastSyncAt = Date.now();
-  saveNotificationState();
-  updateUIElements();
-  return { mode: 'worker', deviceId: deviceUuid, result };
-}
-
-/**
- * Entfernt ausschließlich dieses Gerät (UUID) vom Cloudflare Push-Worker
- */
-export async function deleteDeviceFromCloudWorker() {
-  const workerUrl = (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '').trim().replace(/\/+$/, '');
-  if (!workerUrl) return { skipped: true };
-
-  const deviceUuid = getOrCreateDeviceUuid();
-  const response = await fetch(`${workerUrl}/api/devices/${encodeURIComponent(deviceUuid)}`, {
-    method: 'DELETE'
-  });
-  return { ok: response.ok || response.status === 404, deviceId: deviceUuid };
-}
-
-/**
- * Sendet einen ECHTEN End-to-End Test-Push vom Cloudflare Edge Worker über Apple APNs an dieses iPhone/Mac!
- */
-export async function sendRemoteTestPushViaWorker() {
-  const workerUrl = (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '').trim().replace(/\/+$/, '');
-  if (!workerUrl) {
-    throw new Error('Keine Push-Worker URL konfiguriert.');
-  }
-  await syncToCloudWorker();
-  const deviceUuid = getOrCreateDeviceUuid();
-  const response = await fetch(`${workerUrl}/api/devices/${encodeURIComponent(deviceUuid)}/test`, {
-    method: 'POST'
-  });
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || `Server-Push Fehler (HTTP ${response.status})`);
-  }
-  return await response.json().catch(() => ({ ok: true }));
 }
 
 /**
@@ -323,19 +542,15 @@ export async function sendRemoteTestPushViaWorker() {
  * ohne andere verknüpfte Geräte zu beeinflussen.
  */
 export async function deleteDeviceFromGitLab() {
-  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
-  const projectId = (currentGitLab.projectId || '').trim();
-  const token = (currentGitLab.token || '').trim();
-  if (!projectId || !token) return { skipped: true };
+  if (getGitLabAuthMode() === 'disconnected') return { skipped: true };
 
+  const projectId = (currentGitLab.projectId || '').trim();
   const deviceUuid = getOrCreateDeviceUuid();
   const varKey = getDeviceVariableKey(deviceUuid);
   const encodedId = encodeURIComponent(projectId);
-  const variableUrl = `${host}/api/v4/projects/${encodedId}/variables/${encodeURIComponent(varKey)}`;
 
-  const response = await fetch(variableUrl, {
-    method: 'DELETE',
-    headers: { 'PRIVATE-TOKEN': token }
+  const response = await gitlabApiFetch(`/projects/${encodedId}/variables/${encodeURIComponent(varKey)}`, {
+    method: 'DELETE'
   });
 
   if (response.status === 404) {
@@ -348,9 +563,6 @@ export async function deleteDeviceFromGitLab() {
   return { ok: true, variableKey: varKey };
 }
 
-/**
- * Deaktiviert Push Notifications ausschließlich für dieses Gerät (anonyme UUID)
- */
 export async function disablePushNotifications() {
   try {
     const reg = await navigator.serviceWorker.ready;
@@ -368,18 +580,11 @@ export async function disablePushNotifications() {
   saveNotificationState();
   updateUIElements();
 
-  // Entferne nur dieses Gerät im aktiven Push-Backend (andere Geräte bleiben 100% unberührt)
-  const mode = getActiveBackendMode();
-  if (mode === 'worker') {
-    deleteDeviceFromCloudWorker().catch(err => console.debug('Worker-Cleanup Info:', err.message));
-  } else if (mode === 'gitlab') {
-    deleteDeviceFromGitLab().catch(err => console.debug('GitLab-Cleanup Info:', err.message));
+  if (getGitLabAuthMode() !== 'disconnected') {
+    deleteDeviceFromGitLab().catch(err => console.debug('GitLab Cleanup Info:', err.message));
   }
 }
 
-/**
- * Sendet sofortigen lokalen Test-Push auf Mac / iOS
- */
 export async function sendLocalTestPush() {
   const support = checkPushSupport();
   if (!support.hasNotification) {
@@ -393,17 +598,16 @@ export async function sendLocalTestPush() {
 
   const reg = await navigator.serviceWorker.ready;
   const locName = state.currentLocation?.name || 'München';
-  const currentTemp = state.weatherData?.current?.temperature_2m !== undefined 
-    ? `${Math.round(state.weatherData.current.temperature_2m)}°C` 
+  const currentTemp = state.weatherData?.current?.temperature_2m !== undefined
+    ? `${Math.round(state.weatherData.current.temperature_2m)}°C`
     : '12°C';
 
   await reg.showNotification(`🔔 Best Weather — Push-Test erfolgreich!`, {
-    body: `Standort: ${locName} (${currentTemp}). Benachrichtigungen für Mac Sperrbildschirm & iOS Mitteilungszentrale sind aktiv.`,
+    body: `Standort: ${locName} (${currentTemp}). Lokale System-Benachrichtigung funktioniert.`,
     icon: './icon-192.png',
     badge: './favicon.png',
     tag: 'best-weather-test-alert',
     renotify: true,
-    vibrate: [200, 100, 200],
     data: {
       url: './',
       tab: 'tab-overview',
@@ -413,6 +617,10 @@ export async function sendLocalTestPush() {
 
   return true;
 }
+
+// =============================================================================
+// ANONYMOUS PER-DEVICE GITLAB SYNC, AUTO-SCHEDULE & 15s E2E SERVER TEST-PUSH
+// =============================================================================
 
 /**
  * Erzeugt das streng anonyme Per-Device Sync-Payload (Schema v2).
@@ -458,13 +666,37 @@ export function buildDeviceSyncPayload() {
 }
 
 /**
+ * Hilfsfunktion: Upsert einer GitLab CI Project Variable (PUT -> POST bei 404)
+ */
+async function upsertGitLabVariable(projectId, key, value, { protectedVar = false, masked = false } = {}) {
+  const encodedId = encodeURIComponent(projectId);
+  let response = await gitlabApiFetch(`/projects/${encodedId}/variables/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value, protected: protectedVar, masked })
+  });
+
+  if (response.status === 404) {
+    response = await gitlabApiFetch(`/projects/${encodedId}/variables`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value, protected: protectedVar, masked })
+    });
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`GitLab Variable ${key} Fehler (${response.status}): ${errorText || response.statusText}`);
+  }
+  return await response.json().catch(() => ({}));
+}
+
+/**
  * Synchronisiert die individuellen Einstellungen & Subscription dieses Geräts
  * in seine eigene, konfliktfreie GitLab CI-Variable (WEATHER_PUSH_DEV_<UUID_HEX>).
  */
 export async function syncToGitLab() {
-  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
   const projectId = (currentGitLab.projectId || '').trim();
-  const token = (currentGitLab.token || '').trim();
   const deviceUuid = getOrCreateDeviceUuid();
   const varKey = getDeviceVariableKey(deviceUuid);
 
@@ -475,10 +707,9 @@ export async function syncToGitLab() {
   const configPayload = buildDeviceSyncPayload();
   const payloadString = JSON.stringify(configPayload);
 
-  // Ohne Token bieten wir bequemen Direkt-Download / Clipboard Export
-  if (!token) {
-    currentGitLab.lastSyncStatus = 'Konfiguration lokal bereitgestellt (Kein GitLab Token angegeben)';
-    currentGitLab.lastSyncAt = Date.now();
+  if (getGitLabAuthMode() === 'disconnected') {
+    currentGitLab.lastSyncStatus = 'Nicht mit GitLab verbunden (nur lokal)';
+    currentGitLab.lastSyncAt = 0;
     saveNotificationState();
     updateUIElements();
     return {
@@ -486,48 +717,26 @@ export async function syncToGitLab() {
       deviceId: deviceUuid,
       variableKey: varKey,
       json: payloadString,
-      message: 'Lokale Konfiguration erstellt. Trage deinen GitLab Access Token ein, um sie direkt über die REST API zu übertragen.'
+      message: 'Bitte verbinde dich mit GitLab (OAuth), um Cloud-Push zu aktivieren.'
     };
   }
 
-  const encodedId = encodeURIComponent(projectId);
-  const variableUrl = `${host}/api/v4/projects/${encodedId}/variables/${encodeURIComponent(varKey)}`;
-
-  // 1. Zuerst versuchen wir PUT (Aktualisieren der eigenen Geräte-Variable)
-  let response = await fetch(variableUrl, {
-    method: 'PUT',
-    headers: {
-      'PRIVATE-TOKEN': token,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ value: payloadString })
+  const result = await upsertGitLabVariable(projectId, varKey, payloadString, {
+    protectedVar: false,
+    masked: false
   });
 
-  // 2. Falls diese Geräte-Variable noch nicht existiert (404), neu anlegen per POST
-  if (response.status === 404) {
-    const createUrl = `${host}/api/v4/projects/${encodedId}/variables`;
-    response = await fetch(createUrl, {
-      method: 'POST',
-      headers: {
-        'PRIVATE-TOKEN': token,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        key: varKey,
-        value: payloadString,
-        protected: false,
-        masked: false
-      })
-    });
+  // Falls PAT vorhanden: sichere ihn optional maskiert als PUSH_STATE_API_TOKEN für runner-übergreifende State-Persistenz
+  if (getGitLabAuthMode() === 'pat' && (currentGitLab.token || '').trim().length >= 8) {
+    upsertGitLabVariable(projectId, 'PUSH_STATE_API_TOKEN', currentGitLab.token.trim(), {
+      protectedVar: false,
+      masked: true
+    }).catch(() => {});
   }
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`GitLab REST API Fehler (${response.status}): ${errorText || response.statusText}`);
-  }
-
-  const result = await response.json().catch(() => ({}));
-  currentGitLab.lastSyncStatus = 'Erfolgreich mit GitLab synchronisiert';
+  currentGitLab.lastSyncStatus = getGitLabAuthMode() === 'oauth'
+    ? 'GitLab OAuth aktiv & synchronisiert'
+    : 'GitLab CI aktiv & synchronisiert';
   currentGitLab.lastSyncAt = Date.now();
   currentConfig.lastSyncAt = Date.now();
   saveNotificationState();
@@ -543,25 +752,42 @@ export async function syncToGitLab() {
 }
 
 /**
- * Triggert eine GitLab Pipeline manuell via REST API
+ * Vollautomatische Komplett-Synchronisation:
+ * 1. Speichert eigene anonyme Geräte-UUID-Variable (WEATHER_PUSH_DEV_<UUID_HEX>)
+ * 2. Legt/aktualisiert automatisch den aktiven GitLab Pipeline-Schedule
  */
-export async function triggerGitLabPipeline() {
-  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
-  const projectId = (currentGitLab.projectId || '').trim();
-  const token = (currentGitLab.token || '').trim();
+export async function syncAndProvisionGitLab() {
+  const syncRes = await syncToGitLab();
+  if (syncRes.mode !== 'api') return { synced: false, syncRes };
 
-  if (!projectId || !token) {
-    throw new Error('Projekt-ID und GitLab Access Token sind erforderlich, um eine Pipeline zu starten.');
+  let scheduleRes = null;
+  try {
+    scheduleRes = await createOrUpdateGitLabSchedule();
+  } catch (err) {
+    console.warn('Auto-Schedule Hinweis:', err.message);
+  }
+  return { synced: true, syncRes, scheduleRes };
+}
+
+/**
+ * Startet eine GitLab Pipeline via REST API (optional mit PUSH_TEST_DEVICE_ID für sofortigen E2E-Test)
+ */
+export async function triggerGitLabPipeline(variables = []) {
+  const projectId = (currentGitLab.projectId || '').trim();
+  if (!projectId || getGitLabAuthMode() === 'disconnected') {
+    throw new Error('Bitte zuerst mit GitLab verbinden, um eine Pipeline zu starten.');
   }
 
   const encodedId = encodeURIComponent(projectId);
-  const pipelineUrl = `${host}/api/v4/projects/${encodedId}/pipeline?ref=main`;
+  const body = { ref: 'main' };
+  if (Array.isArray(variables) && variables.length > 0) {
+    body.variables = variables;
+  }
 
-  const response = await fetch(pipelineUrl, {
+  const response = await gitlabApiFetch(`/projects/${encodedId}/pipeline`, {
     method: 'POST',
-    headers: {
-      'PRIVATE-TOKEN': token
-    }
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
   });
 
   if (!response.ok) {
@@ -569,33 +795,40 @@ export async function triggerGitLabPipeline() {
     throw new Error(`Pipeline-Start fehlgeschlagen (${response.status}): ${err || response.statusText}`);
   }
 
-  const data = await response.json();
-  return data;
+  return await response.json();
+}
+
+/**
+ * Echter 15-Sekunden End-to-End Test-Push direkt aus GitLab CI -> Apple APNs -> dieses Gerät!
+ */
+export async function triggerGitLabTestPush() {
+  if (!currentSubscription?.endpoint) {
+    throw new Error('Bitte aktiviere zuerst oben den Schalter „Push-Mitteilungen erlauben“.');
+  }
+  const deviceUuid = getOrCreateDeviceUuid();
+  await syncToGitLab();
+  const pipeline = await triggerGitLabPipeline([
+    { key: 'PUSH_TEST_DEVICE_ID', value: deviceUuid }
+  ]);
+  return { ok: true, pipelineId: pipeline.id, webUrl: pipeline.web_url, deviceId: deviceUuid };
 }
 
 /**
  * Erstellt oder aktualisiert den Pipeline Schedule via GitLab REST API
  */
 export async function createOrUpdateGitLabSchedule() {
-  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
   const projectId = (currentGitLab.projectId || '').trim();
-  const token = (currentGitLab.token || '').trim();
   const presetKey = currentGitLab.schedulePreset || 'eco';
   const preset = SCHEDULE_PRESETS[presetKey] || SCHEDULE_PRESETS.eco;
 
-  if (!projectId || !token) {
-    throw new Error('Projekt-ID und GitLab Access Token sind erforderlich, um einen Schedule anzulegen.');
+  if (!projectId || getGitLabAuthMode() === 'disconnected') {
+    throw new Error('Bitte zuerst mit GitLab verbinden, um den Zeitplan einzurichten.');
   }
 
   const encodedId = encodeURIComponent(projectId);
-  const schedulesUrl = `${host}/api/v4/projects/${encodedId}/pipeline_schedules`;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin';
 
-  // 1. Vorhandene Pipeline-Schedules abfragen
-  const listRes = await fetch(schedulesUrl, {
-    headers: { 'PRIVATE-TOKEN': token }
-  });
-
+  const listRes = await gitlabApiFetch(`/projects/${encodedId}/pipeline_schedules`);
   if (!listRes.ok) {
     const errText = await listRes.text().catch(() => '');
     throw new Error(`Konnte Pipeline-Schedules nicht abrufen (${listRes.status}): ${errText || listRes.statusText}`);
@@ -616,24 +849,15 @@ export async function createOrUpdateGitLabSchedule() {
 
   let res;
   if (existingSchedule && existingSchedule.id) {
-    // 2. Schedule existiert -> per PUT aktualisieren
-    const updateUrl = `${schedulesUrl}/${existingSchedule.id}`;
-    res = await fetch(updateUrl, {
+    res = await gitlabApiFetch(`/projects/${encodedId}/pipeline_schedules/${existingSchedule.id}`, {
       method: 'PUT',
-      headers: {
-        'PRIVATE-TOKEN': token,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(schedulePayload)
     });
   } else {
-    // 3. Neuer Schedule -> per POST anlegen
-    res = await fetch(schedulesUrl, {
+    res = await gitlabApiFetch(`/projects/${encodedId}/pipeline_schedules`, {
       method: 'POST',
-      headers: {
-        'PRIVATE-TOKEN': token,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(schedulePayload)
     });
   }
@@ -644,7 +868,7 @@ export async function createOrUpdateGitLabSchedule() {
   }
 
   const data = await res.json().catch(() => ({}));
-  currentGitLab.lastSyncStatus = `Schedule aktiv: ${presetKey.toUpperCase()} (${timezone})`;
+  currentGitLab.lastSyncStatus = `GitLab aktiv • Zeitplan ${presetKey.toUpperCase()}`;
   currentGitLab.lastSyncAt = Date.now();
   saveNotificationState();
   updateUIElements();
@@ -652,17 +876,18 @@ export async function createOrUpdateGitLabSchedule() {
   return { ok: true, schedule: data, preset, timezone };
 }
 
-/**
- * Aktualisiert die visuelle Dimmung der Regel-Karten basierend auf deren Schalter
- */
+// =============================================================================
+// UI RENDERING, SNAPSHOTS & UNSAVED CHANGES DIALOG
+// =============================================================================
+
 export function updateRuleCardDimming() {
-  const mapping = [
-    { inputId: 'notif-rule-wind', itemId: 'notif-rule-item-wind' },
-    { inputId: 'notif-rule-frost', itemId: 'notif-rule-item-frost' },
-    { inputId: 'notif-rule-briefing', itemId: 'notif-rule-item-briefing' },
-    { inputId: 'notif-rule-severe', itemId: 'notif-rule-item-severe' },
+  const pairs = [
+    ['notif-rule-wind', 'notif-rule-item-wind'],
+    ['notif-rule-frost', 'notif-rule-item-frost'],
+    ['notif-rule-briefing', 'notif-rule-item-briefing'],
+    ['notif-rule-severe', 'notif-rule-item-severe']
   ];
-  for (const { inputId, itemId } of mapping) {
+  for (const [inputId, itemId] of pairs) {
     const input = document.getElementById(inputId);
     const item = document.getElementById(itemId);
     if (input && item) {
@@ -671,9 +896,6 @@ export function updateRuleCardDimming() {
   }
 }
 
-/**
- * Aktualisiert den interaktiven 24-Stunden Zeitstrahl mit Nadel und Zeitzone
- */
 export function updateTimelineVisualizer() {
   const clockBadge = document.getElementById('notif-live-clock-badge');
   const tzLabel = document.getElementById('notif-live-tz-label');
@@ -694,6 +916,7 @@ export function updateTimelineVisualizer() {
     });
     const parts = formatter.formatToParts(now);
     hour = parseInt(parts.find(p => p.type === 'hour')?.value ?? String(hour), 10);
+    if (hour === 24) hour = 0;
     minute = parseInt(parts.find(p => p.type === 'minute')?.value ?? String(minute), 10);
   } catch {}
 
@@ -702,9 +925,7 @@ export function updateTimelineVisualizer() {
   const totalMinutes = hour * 60 + minute;
   const percent = Math.min(100, Math.max(0, (totalMinutes / 1440) * 100));
 
-  if (indicator) {
-    indicator.style.left = `${percent.toFixed(2)}%`;
-  }
+  if (indicator) indicator.style.left = `${percent.toFixed(2)}%`;
 
   if (clockBadge) {
     if (isQuiet) {
@@ -716,14 +937,9 @@ export function updateTimelineVisualizer() {
     }
   }
 
-  if (tzLabel) {
-    tzLabel.innerText = `Zeitzone: ${tz}`;
-  }
+  if (tzLabel) tzLabel.innerText = `Zeitzone: ${tz}`;
 }
 
-/**
- * Synchronisiert die Preset-Karten mit dem Formular
- */
 export function updatePresetCards(selectedPreset) {
   const select = document.getElementById('notif-gitlab-schedule');
   const currentKey = selectedPreset || (select ? select.value : null) || currentGitLab.schedulePreset || 'eco';
@@ -739,9 +955,6 @@ export function updatePresetCards(selectedPreset) {
   }
 }
 
-/**
- * UI State Refresh Helper
- */
 function updateUIElements() {
   const statusBadge = document.getElementById('notif-status-badge');
   const masterToggle = document.getElementById('notif-master-toggle');
@@ -750,14 +963,19 @@ function updateUIElements() {
   const headerBtn = document.getElementById('notif-settings-btn');
 
   const support = checkPushSupport();
+  const authMode = getGitLabAuthMode();
+  const isConnected = authMode !== 'disconnected';
 
   if (masterToggle) {
     masterToggle.checked = Boolean(currentConfig.enabled);
   }
 
   if (statusBadge) {
-    if (currentConfig.enabled) {
-      statusBadge.innerText = 'Aktiv';
+    if (currentConfig.enabled && isConnected) {
+      statusBadge.innerText = 'Aktiv • Cloud';
+      statusBadge.className = 'notif-status-badge badge-active';
+    } else if (currentConfig.enabled) {
+      statusBadge.innerText = 'Lokal';
       statusBadge.className = 'notif-status-badge badge-active';
     } else {
       statusBadge.innerText = 'Inaktiv';
@@ -767,9 +985,9 @@ function updateUIElements() {
 
   if (headerBtn) {
     headerBtn.classList.toggle('active-notif', Boolean(currentConfig.enabled));
-    headerBtn.title = currentConfig.enabled 
-      ? 'Benachrichtigungen aktiv (Push konfiguriert)' 
-      : 'Push-Benachrichtigungen & GitLab-Sync konfigurieren';
+    headerBtn.title = currentConfig.enabled
+      ? 'Benachrichtigungen aktiv'
+      : 'Push-Benachrichtigungen & GitLab konfigurieren';
   }
 
   if (supportHint) {
@@ -784,12 +1002,9 @@ function updateUIElements() {
     }
   }
 
-  const backendMode = getActiveBackendMode();
-  const isBackendConnected = backendMode !== 'local-only';
-
   if (syncStatusMsg) {
-    if (!isBackendConnected) {
-      syncStatusMsg.innerText = 'Nur lokal gespeichert — kein Push-Server verbunden';
+    if (!isConnected) {
+      syncStatusMsg.innerText = 'Nur lokal gespeichert — bitte mit GitLab verbinden';
       syncStatusMsg.classList.add('status-warning');
       syncStatusMsg.classList.remove('status-ok');
     } else if (currentGitLab.lastSyncAt > 0) {
@@ -798,36 +1013,93 @@ function updateUIElements() {
       syncStatusMsg.classList.remove('status-warning');
       syncStatusMsg.classList.add('status-ok');
     } else {
-      syncStatusMsg.innerText = 'Push-Server konfiguriert — bitte sichern';
-      syncStatusMsg.classList.remove('status-warning', 'status-ok');
+      syncStatusMsg.innerText = 'Mit GitLab verbunden — bitte Einstellungen sichern';
+      syncStatusMsg.classList.remove('status-warning');
+      syncStatusMsg.classList.add('status-ok');
     }
   }
 
+  // OAuth Connect / Disconnect UI controls
+  const oauthConnectBtn = document.getElementById('notif-gitlab-oauth-btn');
+  const oauthDisconnectBtn = document.getElementById('notif-gitlab-disconnect-btn');
+  const oauthStatusEl = document.getElementById('notif-oauth-status-badge');
+  const redirectUriCode = document.getElementById('notif-oauth-redirect-uri');
+
+  if (redirectUriCode) {
+    redirectUriCode.innerText = getOAuthRedirectUri();
+  }
+  if (oauthStatusEl) {
+    if (authMode === 'oauth') {
+      oauthStatusEl.innerText = '🟢 OAuth 2.0 PKCE verbunden (Auto-Refresh aktiv)';
+      oauthStatusEl.className = 'notif-oauth-status is-connected';
+    } else if (authMode === 'pat') {
+      oauthStatusEl.innerText = '🟢 Mit GitLab Access Token verbunden';
+      oauthStatusEl.className = 'notif-oauth-status is-connected';
+    } else {
+      oauthStatusEl.innerText = '⚪ Noch nicht mit GitLab verbunden';
+      oauthStatusEl.className = 'notif-oauth-status';
+    }
+  }
+  if (oauthConnectBtn) {
+    oauthConnectBtn.style.display = authMode === 'oauth' ? 'none' : 'inline-flex';
+  }
+  if (oauthDisconnectBtn) {
+    oauthDisconnectBtn.style.display = authMode === 'oauth' ? 'inline-flex' : 'none';
+  }
+
+  // Ehrliches Backend-Verbindungs-Banner
   const backendBanner = document.getElementById('notif-backend-status-banner');
   if (backendBanner) {
-    if (currentConfig.enabled && !isBackendConnected) {
+    if (!isConnected) {
       backendBanner.style.display = 'flex';
       backendBanner.className = 'notif-backend-banner is-warning';
       backendBanner.innerHTML = `
-        <span class="nbb-icon" aria-hidden="true">⚠️</span>
+        <span class="nbb-icon" aria-hidden="true">🦊</span>
         <div class="nbb-content">
-          <div class="nbb-title">Kein Push-Server verbunden (nur lokal gespeichert)</div>
-          <div class="nbb-desc">iOS erlaubt keine lokalen Hintergrund-Crons. Verbinde einmalig unter <strong>Erweitert</strong> deine kostenlose Cloudflare Push-Worker URL (oder GitLab CI), damit Alarme &amp; Morgen-Briefings im Sperrbildschirm ankommen.</div>
+          <div class="nbb-title">GitLab Cloud-Push noch nicht verbunden</div>
+          <div class="nbb-desc">Verbinde dieses Gerät mit 1 Tipp per <strong>GitLab OAuth (Face ID / Touch ID)</strong>, damit Alarme &amp; Morgen-Briefing zuverlässig im Sperrbildschirm ankommen.</div>
+          <div class="nbb-actions">
+            <button type="button" class="action-btn action-btn-primary nbb-connect-btn" id="nbb-quick-oauth-btn">🦊 Mit GitLab verbinden</button>
+          </div>
         </div>
       `;
-    } else if (currentConfig.enabled && isBackendConnected && currentGitLab.lastSyncAt > 0) {
-      const providerLabel = backendMode === 'worker' ? 'Cloudflare Edge Push' : 'GitLab CI Push';
+      const quickBtn = document.getElementById('nbb-quick-oauth-btn');
+      if (quickBtn) {
+        quickBtn.addEventListener('click', async () => {
+          const clientId = (currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '').trim();
+          const projectId = (currentGitLab.projectId || DEFAULT_GITLAB_OAUTH.projectId || '').trim();
+          if (!clientId || !projectId) {
+            const devAcc = document.getElementById('notif-section-gitlab');
+            if (devAcc) {
+              devAcc.open = true;
+              devAcc.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            const projField = document.getElementById('notif-gitlab-project');
+            if (projField && !projectId) projField.focus();
+            else {
+              const cidField = document.getElementById('notif-gitlab-client-id');
+              if (cidField) cidField.focus();
+            }
+            return;
+          }
+          try {
+            await startGitLabOAuthLogin();
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      }
+    } else {
+      const modeText = authMode === 'oauth' ? 'GitLab OAuth 2.0 PKCE' : 'GitLab REST API';
       backendBanner.style.display = 'flex';
       backendBanner.className = 'notif-backend-banner is-connected';
       backendBanner.innerHTML = `
         <span class="nbb-icon" aria-hidden="true">🟢</span>
         <div class="nbb-content">
-          <div class="nbb-title">${providerLabel} aktiv &amp; synchronisiert</div>
-          <div class="nbb-desc">Hintergrund-Alarme &amp; Morgen-Briefing werden automatisch über Apple APNs zugestellt.</div>
+          <div class="nbb-title">${modeText} verbunden &amp; aktiv</div>
+          <div class="nbb-desc">Dieses Gerät synchronisiert automatisch unter seiner eigenen anonymen UUID inkl. aktivem GitLab Zeitplan.</div>
         </div>
       `;
-    } else {
-      backendBanner.style.display = 'none';
     }
   }
 
@@ -843,9 +1115,6 @@ function updateUIElements() {
   updatePresetCards();
 }
 
-/**
- * Befüllt die Formularfelder aus dem aktuell persistierten Zustand
- */
 function populateNotificationFormFromState() {
   const elWind = document.getElementById('notif-rule-wind');
   const elWindVal = document.getElementById('notif-rule-wind-val');
@@ -854,8 +1123,8 @@ function populateNotificationFormFromState() {
   const elBriefingTime = document.getElementById('notif-rule-briefing-time');
   const elSevere = document.getElementById('notif-rule-severe');
 
-  const elWorkerUrl = document.getElementById('notif-worker-url');
   const elHost = document.getElementById('notif-gitlab-host');
+  const elClientId = document.getElementById('notif-gitlab-client-id');
   const elProject = document.getElementById('notif-gitlab-project');
   const elToken = document.getElementById('notif-gitlab-token');
   const elSchedule = document.getElementById('notif-gitlab-schedule');
@@ -867,16 +1136,13 @@ function populateNotificationFormFromState() {
   if (elBriefingTime) elBriefingTime.value = currentConfig.briefingTime || '07:00';
   if (elSevere) elSevere.checked = Boolean(currentConfig.severeAlert);
 
-  if (elWorkerUrl) elWorkerUrl.value = currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || '';
   if (elHost) elHost.value = currentGitLab.host || 'https://gitlab.com';
-  if (elProject) elProject.value = currentGitLab.projectId || '';
+  if (elClientId) elClientId.value = currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '';
+  if (elProject) elProject.value = currentGitLab.projectId || DEFAULT_GITLAB_OAUTH.projectId || '';
   if (elToken) elToken.value = currentGitLab.token || '';
   if (elSchedule) elSchedule.value = currentGitLab.schedulePreset || 'eco';
 }
 
-/**
- * Erzeugt einen normalisierten Snapshot der aktuellen Formularwerte
- */
 function getFormSnapshot() {
   const elWind = document.getElementById('notif-rule-wind');
   const elWindVal = document.getElementById('notif-rule-wind-val');
@@ -885,8 +1151,8 @@ function getFormSnapshot() {
   const elBriefingTime = document.getElementById('notif-rule-briefing-time');
   const elSevere = document.getElementById('notif-rule-severe');
 
-  const elWorkerUrl = document.getElementById('notif-worker-url');
   const elHost = document.getElementById('notif-gitlab-host');
+  const elClientId = document.getElementById('notif-gitlab-client-id');
   const elProject = document.getElementById('notif-gitlab-project');
   const elToken = document.getElementById('notif-gitlab-token');
   const elSchedule = document.getElementById('notif-gitlab-schedule');
@@ -898,34 +1164,25 @@ function getFormSnapshot() {
     briefingAlert: elBriefing ? Boolean(elBriefing.checked) : Boolean(currentConfig.briefingAlert),
     briefingTime: elBriefingTime ? (elBriefingTime.value || '07:00') : (currentConfig.briefingTime || '07:00'),
     severeAlert: elSevere ? Boolean(elSevere.checked) : Boolean(currentConfig.severeAlert),
-    workerUrl: elWorkerUrl ? elWorkerUrl.value.trim() : (currentGitLab.workerUrl || DEFAULT_PUSH_WORKER_URL || ''),
     host: elHost ? elHost.value.trim() : (currentGitLab.host || 'https://gitlab.com'),
+    clientId: elClientId ? elClientId.value.trim() : (currentGitLab.clientId || ''),
     projectId: elProject ? elProject.value.trim() : (currentGitLab.projectId || ''),
     token: elToken ? elToken.value.trim() : (currentGitLab.token || ''),
     schedulePreset: elSchedule ? elSchedule.value : (currentGitLab.schedulePreset || 'eco')
   });
 }
 
-/**
- * Prüft ob ungespeicherte Änderungen im Formular vorliegen
- */
 export function hasUnsavedChanges() {
   if (savedFormSnapshot === null) return false;
   return getFormSnapshot() !== savedFormSnapshot;
 }
 
-/**
- * Markiert den Speichern-Button visuell bei ungespeicherten Änderungen
- */
 function updateUnsavedIndicator() {
   const saveBtn = document.getElementById('notif-save-sync-btn');
   if (!saveBtn) return;
   saveBtn.classList.toggle('has-unsaved', hasUnsavedChanges());
 }
 
-/**
- * Öffnet / schließt den Unsaved-Changes-Bestätigungsdialog
- */
 function openUnsavedChangesDialog() {
   const dialog = document.getElementById('notif-unsaved-dialog');
   if (!dialog) {
@@ -951,7 +1208,7 @@ function forceCloseNotificationModal() {
 }
 
 /**
- * Speichert alle Formularänderungen persistent (Cloudflare Worker, GitLab CI, oder lokal mit ehrlichem Status)
+ * Speichert alle Formularänderungen persistent + auto-provisioniert GitLab Device-Variable & Schedule
  */
 async function persistNotificationForm() {
   readFormValues();
@@ -959,26 +1216,18 @@ async function persistNotificationForm() {
   savedFormSnapshot = getFormSnapshot();
   updateUnsavedIndicator();
 
-  const mode = getActiveBackendMode();
-  if (mode === 'worker') {
-    await syncToCloudWorker();
-    return { synced: true, mode: 'worker' };
-  }
-  if (mode === 'gitlab') {
-    await syncToGitLab();
-    return { synced: true, mode: 'gitlab' };
+  if (getGitLabAuthMode() !== 'disconnected') {
+    const res = await syncAndProvisionGitLab();
+    return { synced: res.synced, mode: getGitLabAuthMode() };
   }
 
-  currentGitLab.lastSyncStatus = 'Nur lokal gespeichert — kein Push-Server verbunden';
+  currentGitLab.lastSyncStatus = 'Nur lokal gespeichert — bitte mit GitLab verbinden';
   currentGitLab.lastSyncAt = 0;
   saveNotificationState();
   updateUIElements();
   return { synced: false, mode: 'local-only' };
 }
 
-/**
- * Verwirft ungespeicherte Formularänderungen und stellt den gespeicherten Zustand wieder her
- */
 function discardNotificationChanges() {
   loadNotificationState();
   populateNotificationFormFromState();
@@ -987,9 +1236,6 @@ function discardNotificationChanges() {
   updateUnsavedIndicator();
 }
 
-/**
- * Modal Öffnen & Schließen
- */
 export function openNotificationModal() {
   loadNotificationState();
   const modal = document.getElementById('notif-modal-overlay');
@@ -1013,9 +1259,6 @@ export function closeNotificationModal(force = false) {
   openUnsavedChangesDialog();
 }
 
-/**
- * Liest die Formulardaten aus
- */
 function readFormValues() {
   const elWind = document.getElementById('notif-rule-wind');
   const elWindVal = document.getElementById('notif-rule-wind-val');
@@ -1024,8 +1267,8 @@ function readFormValues() {
   const elBriefingTime = document.getElementById('notif-rule-briefing-time');
   const elSevere = document.getElementById('notif-rule-severe');
 
-  const elWorkerUrl = document.getElementById('notif-worker-url');
   const elHost = document.getElementById('notif-gitlab-host');
+  const elClientId = document.getElementById('notif-gitlab-client-id');
   const elProject = document.getElementById('notif-gitlab-project');
   const elToken = document.getElementById('notif-gitlab-token');
   const elSchedule = document.getElementById('notif-gitlab-schedule');
@@ -1037,26 +1280,39 @@ function readFormValues() {
   if (elBriefingTime) currentConfig.briefingTime = elBriefingTime.value || '07:00';
   if (elSevere) currentConfig.severeAlert = elSevere.checked;
 
-  if (elWorkerUrl) currentGitLab.workerUrl = elWorkerUrl.value.trim();
   if (elHost) currentGitLab.host = elHost.value.trim();
+  if (elClientId) currentGitLab.clientId = elClientId.value.trim();
   if (elProject) currentGitLab.projectId = elProject.value.trim();
   if (elToken) currentGitLab.token = elToken.value.trim();
   if (elSchedule) currentGitLab.schedulePreset = elSchedule.value;
 }
 
-/**
- * Initialisiert Event Listener für Notification Module
- */
+// =============================================================================
+// INITIALIZATION & EVENT LISTENERS
+// =============================================================================
+
 export function initNotifications() {
   loadNotificationState();
   updateUIElements();
 
+  // Prüfe automatisch, ob gerade ein GitLab OAuth 2.0 PKCE Callback (?code=...&state=...) eingetroffen ist
+  handleGitLabOAuthCallback()
+    .then(res => {
+      if (res && res.handled && res.ok) {
+        openNotificationModal();
+      } else if (res && res.handled && res.error) {
+        alert('GitLab-Anmeldung: ' + res.error);
+      }
+    })
+    .catch(err => {
+      console.error('OAuth Callback Fehler:', err);
+      alert('GitLab OAuth-Fehler: ' + err.message);
+    });
+
   // Header Icon Button
   const headerBtn = document.getElementById('notif-settings-btn');
   if (headerBtn) {
-    headerBtn.addEventListener('click', () => {
-      openNotificationModal();
-    });
+    headerBtn.addEventListener('click', () => openNotificationModal());
   }
 
   // Modal Close Buttons & Unsaved Changes Guard
@@ -1107,9 +1363,7 @@ export function initNotifications() {
   }
 
   if (unsavedCancelBtn) {
-    unsavedCancelBtn.addEventListener('click', () => {
-      closeUnsavedChangesDialog();
-    });
+    unsavedCancelBtn.addEventListener('click', () => closeUnsavedChangesDialog());
   }
 
   window.addEventListener('keydown', (e) => {
@@ -1141,7 +1395,40 @@ export function initNotifications() {
     });
   }
 
-  // Test Push Button (Nutzt echten Server->APNs E2E Test wenn Worker verbunden, sonst lokalen SW-Test)
+  // OAuth Connect / Disconnect / Copy Redirect URI Buttons
+  const oauthConnectBtn = document.getElementById('notif-gitlab-oauth-btn');
+  if (oauthConnectBtn) {
+    oauthConnectBtn.addEventListener('click', async () => {
+      try {
+        await startGitLabOAuthLogin();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
+
+  const oauthDisconnectBtn = document.getElementById('notif-gitlab-disconnect-btn');
+  if (oauthDisconnectBtn) {
+    oauthDisconnectBtn.addEventListener('click', () => {
+      disconnectGitLabOAuth();
+    });
+  }
+
+  const copyRedirectBtn = document.getElementById('notif-copy-redirect-btn');
+  if (copyRedirectBtn) {
+    copyRedirectBtn.addEventListener('click', async () => {
+      const uri = getOAuthRedirectUri();
+      try {
+        await navigator.clipboard.writeText(uri);
+        copyRedirectBtn.innerText = '✓ Kopiert';
+        setTimeout(() => { copyRedirectBtn.innerText = '📋 Kopieren'; }, 1800);
+      } catch {
+        prompt('Redirect URI kopieren:', uri);
+      }
+    });
+  }
+
+  // Test Push Button (Echter 15s GitLab -> Apple APNs E2E Test wenn verbunden, sonst lokaler Test)
   const testBtn = document.getElementById('notif-test-btn');
   if (testBtn) {
     testBtn.addEventListener('click', async () => {
@@ -1149,9 +1436,9 @@ export function initNotifications() {
       testBtn.innerText = '⏳ Sende Test...';
       try {
         readFormValues();
-        if (getActiveBackendMode() === 'worker' && currentSubscription?.endpoint) {
-          await sendRemoteTestPushViaWorker();
-          testBtn.innerText = '✓ Server-Push gesendet!';
+        if (getGitLabAuthMode() !== 'disconnected' && currentSubscription?.endpoint) {
+          const res = await triggerGitLabTestPush();
+          testBtn.innerText = `✓ GitLab Push #${res.pipelineId || ''} (~15s)`;
         } else {
           await sendLocalTestPush();
           testBtn.innerText = '✓ Lokaler Test gesendet!';
@@ -1159,7 +1446,7 @@ export function initNotifications() {
         setTimeout(() => {
           testBtn.disabled = false;
           testBtn.innerText = '🧪 Test-Push senden';
-        }, 2500);
+        }, 3000);
       } catch (err) {
         alert('Test-Push fehlgeschlagen: ' + err.message);
         testBtn.disabled = false;
@@ -1168,7 +1455,7 @@ export function initNotifications() {
     });
   }
 
-  // Save & Sync Button (Ehrliches Feedback ob lokal oder Cloud-synchronisiert)
+  // Save & Auto-Provision Button
   const saveSyncBtn = document.getElementById('notif-save-sync-btn');
   if (saveSyncBtn) {
     saveSyncBtn.addEventListener('click', async () => {
@@ -1177,14 +1464,14 @@ export function initNotifications() {
 
       try {
         const res = await persistNotificationForm();
-        saveSyncBtn.innerText = res.synced ? '✓ Gesichert & Synchronisiert!' : '✓ Lokal gesichert (kein Server)';
+        saveSyncBtn.innerText = res.synced ? '✓ Gesichert & mit GitLab synchronisiert!' : '✓ Lokal gesichert (GitLab nicht verbunden)';
         setTimeout(() => {
           saveSyncBtn.disabled = false;
           saveSyncBtn.innerText = '✓ Einstellungen sichern';
         }, 2500);
       } catch (err) {
-        console.warn('Sync notice:', err.message);
-        alert('Sync-Fehler mit Push-Server: ' + err.message);
+        console.warn('GitLab Sync Fehler:', err.message);
+        alert('GitLab Sync-Fehler: ' + err.message);
         saveSyncBtn.disabled = false;
         saveSyncBtn.innerText = '✓ Einstellungen sichern';
       }
@@ -1206,7 +1493,7 @@ export function initNotifications() {
       try {
         const result = await createOrUpdateGitLabSchedule();
         scheduleBtn.innerText = '✓ Schedule aktiv!';
-        alert(`GitLab Pipeline-Schedule erfolgreich eingerichtet!\n\nIntervall: ${result.preset.name}\nCron: ${result.preset.cron}\nZeitzone: ${result.timezone}\n\nDer Job prüft tagsüber von 06:00 bis 22:00 Uhr die Wetterdaten und pausiert nachts automatisch (22:00-06:00 Uhr).`);
+        alert(`GitLab Pipeline-Schedule aktiv!\n\nIntervall: ${result.preset.name}\nCron: ${result.preset.cron}\nZeitzone: ${result.timezone}`);
         setTimeout(() => {
           scheduleBtn.disabled = false;
           scheduleBtn.innerText = '📅 Pipeline-Schedule einrichten';
@@ -1295,7 +1582,7 @@ export function initNotifications() {
   const formFieldIds = [
     'notif-rule-wind', 'notif-rule-wind-val',
     'notif-rule-frost', 'notif-rule-briefing', 'notif-rule-briefing-time',
-    'notif-rule-severe', 'notif-worker-url', 'notif-gitlab-host', 'notif-gitlab-project', 'notif-gitlab-token'
+    'notif-rule-severe', 'notif-gitlab-host', 'notif-gitlab-client-id', 'notif-gitlab-project', 'notif-gitlab-token'
   ];
   formFieldIds.forEach(id => {
     const el = document.getElementById(id);
@@ -1311,7 +1598,7 @@ export function initNotifications() {
     }
   });
 
-  // Service Worker Messages (z. B. wenn eine Notification angeklickt wird)
+  // Service Worker Messages
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data?.type === 'NOTIFICATION_OPENED' && event.data?.tab) {
@@ -1323,20 +1610,26 @@ export function initNotifications() {
   }
 }
 
-// Global Bindings für Tests und Integration
+// Global Bindings für Tests & Integration
 window.openNotificationModal = openNotificationModal;
 window.closeNotificationModal = closeNotificationModal;
 window.hasUnsavedNotificationChanges = hasUnsavedChanges;
+window.getGitLabAuthMode = getGitLabAuthMode;
 window.getActiveBackendMode = getActiveBackendMode;
 window.getPushDeviceUuid = getOrCreateDeviceUuid;
 window.getPushDeviceVariableKey = () => getDeviceVariableKey(getOrCreateDeviceUuid());
 window.buildDeviceSyncPayload = buildDeviceSyncPayload;
-window.syncToCloudWorker = syncToCloudWorker;
-window.sendRemoteTestPushViaWorker = sendRemoteTestPushViaWorker;
+window.startGitLabOAuthLogin = startGitLabOAuthLogin;
+window.disconnectGitLabOAuth = disconnectGitLabOAuth;
+window.computePkceChallenge = computePkceChallenge;
+window.generatePkceVerifier = generatePkceVerifier;
+window.getOAuthRedirectUri = getOAuthRedirectUri;
 window.deleteDeviceFromGitLab = deleteDeviceFromGitLab;
+window.triggerGitLabTestPush = triggerGitLabTestPush;
 window.enablePushNotifications = enablePushNotifications;
 window.disablePushNotifications = disablePushNotifications;
 window.sendLocalTestPush = sendLocalTestPush;
 window.syncToGitLab = syncToGitLab;
+window.syncAndProvisionGitLab = syncAndProvisionGitLab;
 window.createOrUpdateGitLabSchedule = createOrUpdateGitLabSchedule;
 window.SCHEDULE_PRESETS = SCHEDULE_PRESETS;

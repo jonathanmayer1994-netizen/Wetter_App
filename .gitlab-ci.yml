@@ -1,43 +1,53 @@
 # =============================================================================
-# BEST WEATHER — GitLab CI/CD Pipeline for Multi-Device Web Push Notifications
+# BEST WEATHER — All-in-GitLab CI/CD Pipeline (Pages Hosting + Web Push Engine)
 # =============================================================================
-# Privacy-First Multi-Device Architecture:
-# - Each device stores its own conflict-free CI variable: WEATHER_PUSH_DEV_<UUID_HEX>
-# - Strictly anonymous RFC 4122 UUID v4 (zero device/hardware/OS metadata)
-# - Active 06:00–22:00, Quiet Hours 22:00–06:00 per device timezone
-# Execution Duration: ~10 to 15 seconds on Alpine Linux
+# 1. `pages` runs ONLY on `git push` to default branch -> deploys PWA to GitLab Pages
+# 2. `weather_push_dispatch` runs ONLY on `schedule` / `api` / `web` / `trigger`
+#    -> evaluates all anonymous UUID devices (WEATHER_PUSH_DEV_<UUID_HEX>)
+#    -> persists state to WEATHER_PUSH_STATE (+ cache fallback)
+#    -> supports instant E2E test push via PUSH_TEST_DEVICE_ID
+# =============================================================================
 
 stages:
+  - deploy
   - notify
 
-# Caching für Node-Module und Anti-Spam State File
-cache:
-  key:
-    files:
-      - package.json
-  paths:
-    - node_modules/
-    - .dispatcher-state.json
+# 1. GITLAB PAGES DEPLOYMENT (nur bei Code-Push auf main — 0 Minuten bei Push-Crons!)
+pages:
+  stage: deploy
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+    - mkdir -p public
+    - cp -r index.html manifest.json sw.js app.js style.css microEngine.js storage.js httpClient.js gpx.worker.js physics.worker.js version.json core features css public/
+    - cp -f apple-touch-icon.png favicon.png icon-192.png icon-512.png logo.png public/ 2>/dev/null || true
+    - echo "✓ Best Weather PWA erfolgreich für GitLab Pages gepackt."
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week
 
-# Scheduled Push Dispatcher Job
+# 2. MULTI-DEVICE PUSH DISPATCHER (nur bei Schedule / API / Web / Trigger)
 weather_push_dispatch:
   stage: notify
   image: node:20-alpine
+  cache:
+    key:
+      files:
+        - package.json
+    paths:
+      - node_modules/
+      - .dispatcher-state.json
   rules:
-    # 1. Automatischer Start durch Pipeline-Schedules (Option B)
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    # 2. Manueller Test-Start über das GitLab Web-UI
     - if: '$CI_PIPELINE_SOURCE == "web"'
-    # 3. Auslösung über die GitLab REST API (Trigger-Token oder Personal Access Token)
     - if: '$CI_PIPELINE_SOURCE == "trigger"'
     - if: '$CI_PIPELINE_SOURCE == "api"'
-
   before_script:
     - test -d node_modules/web-push || npm install --no-audit --no-fund --production web-push
-
   script:
-    - echo "⚡ Starte Best Weather Multi-Device Anonymous UUID Push Dispatcher..."
+    - echo "⚡ Starte Best Weather All-in-GitLab Multi-Device Push Dispatcher..."
     - node scripts/weather-push-dispatcher.mjs
-
   variables:
     NODE_ENV: "production"

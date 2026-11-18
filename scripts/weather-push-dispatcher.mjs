@@ -175,16 +175,80 @@ export function pruneStaleDeviceStates(globalState, activeDeviceIds, nowMs = Dat
 }
 
 /**
- * Speichert den Multi-Device Dispatcher-State für nachfolgende Pipeline-Läufe
+ * Speichert den Multi-Device Dispatcher-State lokal (.dispatcher-state.json Cache)
  */
 export function saveState(state, stateFilePath = STATE_FILE_PATH) {
   try {
-    state.version = '2.31.0';
+    state.version = '2.33.0';
     state.lastRunAt = new Date().toISOString();
     fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2), 'utf8');
-    console.log(`💾 Multi-Device Dispatcher-State persistiert (${Object.keys(state.devices || {}).length} Gerät(e)).`);
+    console.log(`💾 Multi-Device Dispatcher-State lokal gecacht (${Object.keys(state.devices || {}).length} Gerät(e)).`);
   } catch (err) {
     console.warn('⚠️ Konnte State nicht auf Dateisystem schreiben:', err.message);
+  }
+}
+
+/**
+ * Persistiert den Multi-Device Cooldown-State atomar in die GitLab CI-Variable WEATHER_PUSH_STATE,
+ * sodass Cooldowns & Morgen-Briefings über alle GitLab Shared Runners 100% erhalten bleiben.
+ */
+export async function persistStateToGitLab(state, env = process.env, fetchImpl = fetch) {
+  const apiBase = (env.CI_API_V4_URL || '').trim().replace(/\/+$/, '');
+  const projectId = (env.CI_PROJECT_ID || '').trim();
+  const token = (env.PUSH_STATE_API_TOKEN || '').trim();
+
+  if (!apiBase || !projectId || !token) {
+    return { persisted: false, reason: 'no-api-token' };
+  }
+
+  const compactJson = JSON.stringify({
+    version: '2.33.0',
+    lastRunAt: state.lastRunAt || new Date().toISOString(),
+    devices: state.devices || {}
+  });
+
+  const encodedProject = encodeURIComponent(projectId);
+  const varKey = 'WEATHER_PUSH_STATE';
+  const putUrl = `${apiBase}/projects/${encodedProject}/variables/${varKey}`;
+
+  try {
+    let res = await fetchImpl(putUrl, {
+      method: 'PUT',
+      headers: {
+        'PRIVATE-TOKEN': token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ value: compactJson })
+    });
+
+    if (res.status === 404) {
+      const postUrl = `${apiBase}/projects/${encodedProject}/variables`;
+      res = await fetchImpl(postUrl, {
+        method: 'POST',
+        headers: {
+          'PRIVATE-TOKEN': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          key: varKey,
+          value: compactJson,
+          protected: false,
+          masked: false
+        })
+      });
+    }
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.warn(`⚠️ GitLab State-Sync (${res.status}): ${txt || res.statusText}`);
+      return { persisted: false, status: res.status };
+    }
+
+    console.log('☁️ Multi-Device State atomar in GitLab CI-Variable $WEATHER_PUSH_STATE gesichert.');
+    return { persisted: true };
+  } catch (err) {
+    console.warn('⚠️ GitLab State-Sync fehlgeschlagen (Cache-Fallback aktiv):', err.message);
+    return { persisted: false, error: err.message };
   }
 }
 
@@ -682,21 +746,69 @@ export async function processAllDevices(devices, globalState, deps = {}) {
 }
 
 /**
+ * Sendet einen sofortigen E2E-Test-Push direkt aus GitLab CI an eine einzelne anonyme Geräte-UUID
+ * (ausgelöst über Pipeline-Variable PUSH_TEST_DEVICE_ID). Überspringt Ruhezeit & Cooldowns.
+ */
+export async function dispatchTestPushForDevice(devices, targetDeviceId, deps = {}) {
+  const pushSender = deps.dispatchPushNotification || dispatchPushNotification;
+  const normalizedTarget = String(targetDeviceId || '').trim().toLowerCase();
+  const device = devices.find(d => d.deviceId === normalizedTarget);
+
+  if (!device) {
+    console.error(`❌ Test-Push: Keine Geräte-Variable für UUID ${shortDeviceId(normalizedTarget)}… gefunden.`);
+    return { ok: false, reason: 'device-not-found' };
+  }
+  if (!device.subscription || !device.subscription.endpoint) {
+    console.error(`❌ Test-Push: Gerät ${shortDeviceId(normalizedTarget)}… hat keine aktive Web-Push-Subscription.`);
+    return { ok: false, reason: 'no-subscription' };
+  }
+
+  const vapidKeys = {
+    publicKey: device.vapidPublicKey || DEFAULT_VAPID_PUBLIC_KEY,
+    privateKey: DEFAULT_VAPID_PRIVATE_KEY
+  };
+
+  const locName = device.location?.name || 'deinen Standort';
+  const payload = {
+    type: 'test',
+    title: '🔔 Best Weather — GitLab Cloud-Push aktiv!',
+    body: `Echter Server-Push direkt aus GitLab CI über Apple APNs für ${locName} (ID ${shortDeviceId(device.deviceId)}…) zugestellt.`,
+    tag: `best-weather-e2e-${Date.now()}`,
+    data: { url: './', tab: 'tab-overview', type: 'test' }
+  };
+
+  const res = await pushSender(device.subscription, payload, vapidKeys);
+  console.log(`✅ [E2E TEST] GitLab -> APNs Push an UUID ${shortDeviceId(device.deviceId)}… erfolgreich zugestellt (Status: ${res?.statusCode || 'OK'})!`);
+  return { ok: true, deviceId: device.deviceId, statusCode: res?.statusCode || 201 };
+}
+
+/**
  * Main CLI Entrypoint
  */
 async function main() {
   const startTime = Date.now();
   console.log('=============================================================================');
-  console.log('⚡ BEST WEATHER — Multi-Device Anonymous UUID Push Dispatcher (v2.31.0)');
+  console.log('⚡ BEST WEATHER — All-in-GitLab Multi-Device Push Dispatcher (v2.33.0)');
   console.log(`⏰ System-Start (UTC): ${new Date().toISOString()}`);
   console.log('=============================================================================');
 
   const devices = loadDeviceConfigs(process.env);
   const state = loadState();
 
+  // E2E Test-Push Modus (sofortiger Server -> Apple APNs Test für 1 Gerät)
+  if (process.env.PUSH_TEST_DEVICE_ID) {
+    console.log(`🧪 E2E Test-Push-Modus aktiv für UUID ${shortDeviceId(process.env.PUSH_TEST_DEVICE_ID)}…`);
+    const testRes = await dispatchTestPushForDevice(devices, process.env.PUSH_TEST_DEVICE_ID);
+    if (!testRes.ok) {
+      process.exit(1);
+    }
+    console.log(`🏁 E2E Test-Push abgeschlossen in ${Date.now() - startTime}ms.`);
+    return;
+  }
+
   if (devices.length === 0) {
     console.log('ℹ️ Keine registrierten Geräte-Variablen ($WEATHER_PUSH_DEV_*) gefunden.');
-    console.log('   Öffne die App auf einem Gerät -> 🔔 Einstellungen -> Push aktivieren & sichern.');
+    console.log('   Öffne die App auf einem Gerät -> 🔔 Einstellungen -> Mit GitLab verbinden & Push aktivieren.');
     saveState(state);
     return;
   }
@@ -705,6 +817,7 @@ async function main() {
 
   const summary = await processAllDevices(devices, state);
   saveState(state);
+  await persistStateToGitLab(state, process.env);
 
   console.log('-----------------------------------------------------------------------------');
   console.log(`📊 Zusammenfassung: ${summary.totalDevices} Gerät(e) | ${summary.weatherFetches} Open-Meteo Abruf(e) | ${summary.alertsTriggered} Alarm(e) | ${summary.pushesSent} Push(es) gesendet | ${summary.skippedQuietHours} Ruhezeit | ${summary.pushesFailed} Fehler`);

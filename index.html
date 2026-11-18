@@ -26,7 +26,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=3.0.5">
+  <link rel="stylesheet" href="style.css?v=3.0.6">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -3233,34 +3233,51 @@
           </div>
         </div>
 
-        <!-- Optionaler Entwickler-Bereich (Eingeklappt, für normale Nutzer unsichtbar) -->
+        <!-- GitLab OAuth 2.0 PKCE & CI Backend Einstellungen -->
         <details class="notif-dev-accordion" id="notif-section-gitlab">
-          <summary class="notif-dev-summary">⚙️ Erweitert: Push-Server (Cloudflare Worker / GitLab CI)</summary>
+          <summary class="notif-dev-summary">🦊 GitLab Konto &amp; OAuth 2.0 PKCE Verbindung</summary>
           <div class="notif-dev-content">
             <p class="notif-card-desc">
-              Empfohlen: <strong>Cloudflare Worker URL</strong> (100% kostenlos, kein Token auf dem iPhone, alle 15 Min. Cron). Alternativ GitLab CI REST API.
+              <strong>100% in deinem GitLab-Account (OAuth 2.0 PKCE):</strong> Lege einmalig eine GitLab OAuth-App (<code>Confidential: Aus</code>, Scope: <code>api</code>) an. Danach meldet sich jedes Apple-Gerät per 1 Tipp mit Face ID / Touch ID an — ohne Token-Kopieren!
             </p>
+
+            <!-- OAuth Connect / Status Row -->
+            <div class="notif-oauth-box">
+              <div class="notif-oauth-status" id="notif-oauth-status-badge">⚪ Noch nicht mit GitLab verbunden</div>
+              <div class="notif-oauth-btns">
+                <button type="button" class="action-btn action-btn-primary" id="notif-gitlab-oauth-btn">🦊 Mit GitLab verbinden (OAuth PKCE)</button>
+                <button type="button" class="action-btn action-btn-secondary" id="notif-gitlab-disconnect-btn" style="display:none;">🔌 Trennen</button>
+              </div>
+              <div class="notif-redirect-row">
+                <span class="nrr-label">Redirect URI für deine GitLab OAuth-App:</span>
+                <div class="nrr-copy-line">
+                  <code id="notif-oauth-redirect-uri" class="nrr-code">https://…</code>
+                  <button type="button" id="notif-copy-redirect-btn" class="nrr-copy-btn">📋 Kopieren</button>
+                </div>
+                <a href="https://gitlab.com/-/user_settings/applications" target="_blank" rel="noopener noreferrer" class="notif-help-link">🦊 GitLab OAuth-App erstellen (Confidential: Aus, Scope: api) ↗</a>
+              </div>
+            </div>
 
           <div class="notif-form-grid">
             <div class="notif-field">
-              <label for="notif-worker-url" class="notif-field-label">⚡ Cloud Push-Worker URL (Empfohlen, kein Token nötig):</label>
-              <input type="url" id="notif-worker-url" class="stsp-glass-input" placeholder="https://best-weather-push.dein-name.workers.dev">
-            </div>
-            <div class="notif-field">
-              <label for="notif-gitlab-host" class="notif-field-label">GitLab Host URL (Alternativ):</label>
+              <label for="notif-gitlab-host" class="notif-field-label">GitLab Host URL:</label>
               <input type="url" id="notif-gitlab-host" class="stsp-glass-input" value="https://gitlab.com" placeholder="https://gitlab.com">
             </div>
             <div class="notif-field">
               <label for="notif-gitlab-project" class="notif-field-label">Projekt-ID oder Pfad:</label>
-              <input type="text" id="notif-gitlab-project" class="stsp-glass-input" placeholder="z. B. 12345678 oder user/wetter_app">
+              <input type="text" id="notif-gitlab-project" class="stsp-glass-input" placeholder="z. B. 12345678 oder benutzer/wetter_app">
             </div>
             <div class="notif-field">
-              <label for="notif-gitlab-token" class="notif-field-label">GitLab Access Token (mit api Scope):</label>
+              <label for="notif-gitlab-client-id" class="notif-field-label">GitLab OAuth Application ID (Client ID — öffentlich, kein Secret):</label>
+              <input type="text" id="notif-gitlab-client-id" class="stsp-glass-input" placeholder="z. B. 8f2a9c4e1b…">
+            </div>
+            <div class="notif-field">
+              <label for="notif-gitlab-token" class="notif-field-label">Optionaler Fallback: Personal Access Token (glpat-...):</label>
               <div class="notif-input-wrapper">
-                <input type="password" id="notif-gitlab-token" class="stsp-glass-input" placeholder="glpat-..." autocomplete="off">
+                <input type="password" id="notif-gitlab-token" class="stsp-glass-input" placeholder="glpat-... (nur nötig ohne OAuth)" autocomplete="off">
                 <button type="button" id="notif-token-toggle-eye" class="notif-toggle-eye-btn" title="Token anzeigen/verbergen" aria-label="Token anzeigen">👁️</button>
               </div>
-              <a href="https://gitlab.com/-/user_settings/personal_access_tokens?name=BestWeatherPush&amp;scopes=api" target="_blank" rel="noopener noreferrer" class="notif-help-link">🔑 GitLab Access Token erstellen (Direktlink mit 'api' Scope) ↗</a>
+              <a href="https://gitlab.com/-/user_settings/personal_access_tokens?name=BestWeatherPush&amp;scopes=api" target="_blank" rel="noopener noreferrer" class="notif-help-link">🔑 Alternativ: GitLab Access Token erstellen (Scope: api) ↗</a>
             </div>
           </div>
 
@@ -3269,9 +3286,9 @@
             <div class="nqb-title">⏱️ Zeitplan &amp; GitLab Compute-Limit</div>
             <div class="nqb-text">
               • <strong>Nachtruhe 22:00 bis 06:00 Uhr</strong>: 8 Stunden Pause spart täglich 33% Compute-Zeit und schützt vor nächtlichen Push-Tönen!<br>
-              • <strong>Eco-Takt (12 Läufe/Tag)</strong> = <strong>360 Min./Monat</strong> &rarr; Garantiert unter dem kostenlosen 400-Minuten-Limit auf GitLab.com!<br>
-              • <strong>Stündlich (16 Läufe/Tag)</strong> = 480 Min./Monat | <strong>20-Minuten-Takt</strong> = 48 Läufe/Tag (Ideal für eigenen kostenlosen Runner).<br>
-              • <strong>Intelligenter Cooldown</strong>: Sturm- und Unwetterwarnungen besitzen automatische Cooldowns, um wiederholten Spam zu verhindern.
+              • <strong>Eco-Takt (12 Läufe/Tag)</strong> = <strong>~120 Min./Monat</strong> (max. 360 Min. konservativ) &rarr; Garantiert unter dem kostenlosen 400-Minuten-Limit auf GitLab.com!<br>
+              • <strong>Stündlich (16 Läufe/Tag)</strong> = ~160 Min./Monat (Free-Tier Safe) | <strong>20-Minuten-Takt</strong> = 48 Läufe/Tag.<br>
+              • <strong>Multi-Device &amp; State-Persistenz</strong>: Jedes Apple-Gerät hat seine eigene anonyme UUID-Variable (<code>WEATHER_PUSH_DEV_*</code>) + isolierten Cooldown-State.
             </div>
           </div>
 

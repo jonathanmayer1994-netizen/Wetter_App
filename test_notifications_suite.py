@@ -157,7 +157,7 @@ def run_tests():
         gl_project = page.locator("#notif-gitlab-project")
         gl_token = page.locator("#notif-gitlab-token")
         eye_btn = page.locator("#notif-token-toggle-eye")
-        help_link = page.locator(".notif-help-link")
+        help_link = page.locator(".notif-help-link").first
         quota_box = page.locator(".notif-quota-box")
 
         assert_test("GitLab Host input is present with default https://gitlab.com", gl_host.input_value() == "https://gitlab.com")
@@ -288,6 +288,23 @@ def run_tests():
         dev2_key = page2.evaluate("() => window.getPushDeviceVariableKey()")
         assert_test("Second device generates a completely distinct UUID & GitLab variable key", dev2_uuid != uuid_info["uuid1"] and dev2_key != uuid_info["varKey"])
         ctx2.close()
+
+        # 17. All-in-GitLab OAuth 2.0 + PKCE Engine & Clean UI Verification
+        assert_test("Cloudflare worker input cleanly removed from All-in-GitLab UI", page.locator("#notif-worker-url").count() == 0)
+        dev_drawer.evaluate("el => el.open = true")
+        page.wait_for_timeout(100)
+        assert_test("GitLab OAuth 2.0 PKCE connect button is visible", page.locator("#notif-gitlab-oauth-btn").is_visible())
+        assert_test("GitLab OAuth Client ID input is visible", page.locator("#notif-gitlab-client-id").is_visible())
+        assert_test("GitLab OAuth Redirect URI display & copy button present", page.locator("#notif-oauth-redirect-uri").is_visible() and page.locator("#notif-copy-redirect-btn").is_visible())
+
+        pkce_check = page.evaluate("""async () => {
+            const v = window.generatePkceVerifier();
+            const c1 = await window.computePkceChallenge(v);
+            const c2 = await window.computePkceChallenge(v);
+            const redirect = window.getOAuthRedirectUri();
+            return { vLen: v.length, cLen: c1.length, deterministic: c1 === c2, hasNoPadding: !v.includes('=') && !c1.includes('='), redirectValid: redirect.startsWith('http') };
+        }""")
+        assert_test("PKCE verifier & S256 challenge follow RFC 7636 (base64url, deterministic 43-char SHA-256)", pkce_check["vLen"] >= 64 and pkce_check["cLen"] == 43 and pkce_check["deterministic"] and pkce_check["hasNoPadding"] and pkce_check["redirectValid"])
 
         close_btn.click()
         page.wait_for_timeout(200)
