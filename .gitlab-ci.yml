@@ -12,12 +12,14 @@ stages:
   - deploy
   - notify
 
-# 1. GITLAB PAGES DEPLOYMENT (nur bei Code-Push auf main — 0 Minuten bei Push-Crons!)
+# 1. GITLAB PAGES DEPLOYMENT
 pages:
   stage: deploy
   image: alpine:3.20
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
     - mkdir -p public
     - cp -r index.html manifest.json sw.js app.js style.css microEngine.js storage.js httpClient.js gpx.worker.js physics.worker.js version.json core features css public/
