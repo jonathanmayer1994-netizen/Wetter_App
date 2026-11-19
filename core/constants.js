@@ -149,8 +149,8 @@ export const BASE_LAYERS = {
       maxZoom: 20,
       attribution: '© OpenStreetMap, SRTM | Kartendarstellung: © OpenTopoMap (CC-BY-SA)'
     },
-    labelsUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
-    labelsFallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    labelsUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    labelsFallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
     isDark: false
   },
   'osm-dark': {
@@ -164,7 +164,7 @@ export const BASE_LAYERS = {
       maxZoom: 20,
       attribution: '© Esri, HERE, Garmin, © OpenStreetMap'
     },
-    labelsUrl: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+    labelsUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
     labelsFallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
     isDark: true
   },

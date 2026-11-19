@@ -9,9 +9,9 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.33.3';
-const CACHE_NAME = `best-weather-v2.33.3-${DEPLOY_TOKEN}`;
-const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.33.4';
+const CACHE_NAME = `best-weather-v2.33.4-${DEPLOY_TOKEN}`;
+const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
 let activeBustToken = DEPLOY_TOKEN;
@@ -210,7 +210,6 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const isMapTile =
-    url.hostname.includes('cartocdn.com') ||
     url.hostname.includes('opentopomap.org') ||
     url.hostname.includes('arcgisonline.com') ||
     (url.hostname.includes('rainviewer.com') && !url.pathname.endsWith('.json'));
