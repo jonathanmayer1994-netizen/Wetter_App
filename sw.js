@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.33.2';
-const CACHE_NAME = `best-weather-v2.33.2-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.33.3';
+const CACHE_NAME = `best-weather-v2.33.3-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.1';
 const MAX_TILES = 600;
 
@@ -347,11 +347,21 @@ self.addEventListener('push', (event) => {
   const body = String(payload.body || 'Neue Wetterdaten verfügbar');
   const tag = String(payload.tag || 'best-weather-alert');
 
-  // iOS 16.4–18 WebKit-sichere NotificationOptions (keine undefined-Properties, Feature-Detection für actions)
+  // Absolute HTTPS-URLs für Icon und Badge auflösen (wichtig für iOS WebKit Background Service Worker)
+  const baseUrl = self.registration?.scope || self.location?.origin || '';
+  const iconUrl = payload.icon
+    ? (payload.icon.startsWith('http') ? payload.icon : (baseUrl ? new URL(payload.icon, baseUrl).href : payload.icon))
+    : (baseUrl ? new URL('icon-192.png', baseUrl).href : './icon-192.png');
+  const badgeUrl = payload.badge
+    ? (payload.badge.startsWith('http') ? payload.badge : (baseUrl ? new URL(payload.badge, baseUrl).href : payload.badge))
+    : (baseUrl ? new URL('favicon.png', baseUrl).href : './favicon.png');
+
+  // 100% iOS WebKit- & APNs-kompatible NotificationOptions
+  // WICHTIG: Keine actions auf iOS! (iOS WebKit unterstützt keine Web Clip Action-Buttons und verwirft Notifications sonst!)
   const notificationOptions = {
     body,
-    icon: payload.icon || './icon-192.png',
-    badge: payload.badge || './favicon.png',
+    icon: iconUrl,
+    badge: badgeUrl,
     tag,
     data: {
       url: payload.data?.url || './',
@@ -361,32 +371,23 @@ self.addEventListener('push', (event) => {
     }
   };
 
-  if (payload.image) {
-    notificationOptions.image = payload.image;
-  }
-  if (payload.renotify !== false) {
-    notificationOptions.renotify = true;
-  }
-  if (payload.requireInteraction) {
-    notificationOptions.requireInteraction = true;
-  }
-  if (Array.isArray(payload.vibrate)) {
-    notificationOptions.vibrate = payload.vibrate;
-  }
-  // Nur auf Plattformen mit Action-Support setzen (vermeidet WebKit-Ablehnung auf iOS)
-  if (typeof Notification !== 'undefined' && 'actions' in Notification.prototype) {
-    notificationOptions.actions = payload.actions || [
-      { action: 'open', title: 'App öffnen' },
-      { action: 'dismiss', title: 'Schließen' }
-    ];
+  // Actions NUR hinzufügen, wenn die Plattform dies nach W3C-Standard unterstützt (Notification.maxActions > 0)
+  // Auf iOS WebKit ist Notification.maxActions === 0!
+  if (typeof Notification !== 'undefined' && Notification.maxActions && Notification.maxActions > 0) {
+    if (Array.isArray(payload.actions) && payload.actions.length > 0) {
+      notificationOptions.actions = payload.actions.slice(0, Notification.maxActions);
+    }
   }
 
-  // Wichtig für Apple APNs / iOS: showNotification() MUSS bei jedem Push-Event zuverlässig auflösen,
-  // sonst widerruft iOS nach 3 fehlgeschlagenen Push-Events automatisch die Berechtigung!
+  // Wichtig für Apple APNs / iOS: showNotification() MUSS zuverlässig auflösen
   event.waitUntil(
-    self.registration.showNotification(title, notificationOptions).catch(() =>
-      self.registration.showNotification(title, { body, icon: './icon-192.png', data: notificationOptions.data })
-    )
+    self.registration.showNotification(title, notificationOptions).catch((err) => {
+      console.warn('showNotification mit primären Optionen fehlgeschlagen, starte ultra-minimalen Fallback:', err);
+      return self.registration.showNotification(title, {
+        body,
+        data: notificationOptions.data
+      });
+    })
   );
 });
 

@@ -620,7 +620,15 @@ async function dispatchPushNotification(subscription, payload, vapidKeys) {
     vapidKeys.privateKey
   );
 
-  const res = await webpush.sendNotification(subscription, JSON.stringify(payload));
+  // RFC 8030 / Apple APNs Spezifikation:
+  // - urgency: 'high' setzt apns-priority: 10 (weckt das iPhone sofort auf, auch im Standby)
+  // - TTL: 86400 (24h Gültigkeit für Wetterwarnungen & Briefings)
+  const pushOptions = {
+    TTL: 86400,
+    urgency: 'high'
+  };
+
+  const res = await webpush.sendNotification(subscription, JSON.stringify(payload), pushOptions);
   return { ok: true, statusCode: res.statusCode };
 }
 

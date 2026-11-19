@@ -632,12 +632,15 @@ export async function sendLocalTestPush() {
     ? `${Math.round(state.weatherData.current.temperature_2m)}°C`
     : '12°C';
 
-  await reg.showNotification(`🔔 Best Weather — Push-Test erfolgreich!`, {
-    body: `Standort: ${locName} (${currentTemp}). Lokale System-Benachrichtigung funktioniert.`,
-    icon: './icon-192.png',
-    badge: './favicon.png',
+  const baseUrl = reg?.scope || (typeof window !== 'undefined' ? window.location.origin : '');
+  const iconUrl = baseUrl ? new URL('icon-192.png', baseUrl).href : './icon-192.png';
+  const badgeUrl = baseUrl ? new URL('favicon.png', baseUrl).href : './favicon.png';
+
+  await reg.showNotification(`🔔 Best Weather — Banner-Test`, {
+    body: `Standort: ${locName} (${currentTemp}). Lokale iOS-Mitteilung erfolgreich dargestellt.`,
+    icon: iconUrl,
+    badge: badgeUrl,
     tag: 'best-weather-test-alert',
-    renotify: true,
     data: {
       url: './',
       tab: 'tab-overview',
@@ -1461,6 +1464,26 @@ export function initNotifications() {
       } catch {
         prompt('Redirect URI kopieren:', uri);
       }
+    });
+  }
+
+  // Local Banner Test Button (Sofortige lokale iOS-Banner-Überprüfung)
+  const localTestBtn = document.getElementById('notif-local-test-btn');
+  if (localTestBtn) {
+    localTestBtn.addEventListener('click', async () => {
+      localTestBtn.disabled = true;
+      localTestBtn.innerText = '⏳ Prüfe...';
+      try {
+        await sendLocalTestPush();
+        localTestBtn.innerText = '✓ Banner ausgelöst!';
+      } catch (err) {
+        alert('Lokaler Banner-Test fehlgeschlagen: ' + err.message);
+        localTestBtn.innerText = '📱 Banner-Test';
+      }
+      setTimeout(() => {
+        localTestBtn.disabled = false;
+        localTestBtn.innerText = '📱 Banner-Test';
+      }, 3000);
     });
   }
 

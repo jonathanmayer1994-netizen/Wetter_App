@@ -1,5 +1,5 @@
 {
-  "version": "2.33.2",
-  "build": "20261118-2115",
-  "notes": "MeteoSwiss translucent radar palette, 3D relief blending and high-contrast top-layer town labels"
+  "version": "2.33.3",
+  "build": "20261119-1225",
+  "notes": "iOS WebKit APNs push hardening: remove actions on iOS, absolute icon/badge URL resolution, urgency high RFC 8030"
 }
