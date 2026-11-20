@@ -1,5 +1,5 @@
 {
-  "version": "2.33.4",
-  "build": "20261119-1415",
-  "notes": "Replace CartoDB tiles with official ArcGIS Reference layers (clean labels, no API key watermark) and bump tile cache"
+  "version": "2.34.0",
+  "build": "20261120-0850",
+  "notes": "Notification Center & 24h history feed with IndexedDB persistence, unread badge, and separated settings tab"
 }

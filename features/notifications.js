@@ -12,6 +12,16 @@
 
 import { AlpineStorage } from '../storage.js';
 import { state } from '../core/state.js';
+import {
+  saveNotification,
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  clearAllNotifications,
+  getUnreadNotificationCount,
+  formatNotifRelativeTime,
+  getNotifTypeMeta
+} from './notification-store.js';
 
 export const DEFAULT_VAPID_PUBLIC_KEY = 'BFXeGAET8G6YxsiL0HvXELcaDIoZyeIgPYokZuqpueq3NFJs8xG7KsyvViif44MAxMkBI_OQ93OXewHGRhMSOmI';
 
@@ -636,16 +646,31 @@ export async function sendLocalTestPush() {
   const iconUrl = baseUrl ? new URL('icon-192.png', baseUrl).href : './icon-192.png';
   const badgeUrl = baseUrl ? new URL('favicon.png', baseUrl).href : './favicon.png';
 
-  await reg.showNotification(`🔔 Best Weather — Banner-Test`, {
+  const notifEntry = {
+    title: `🔔 Best Weather — Banner-Test`,
     body: `Standort: ${locName} (${currentTemp}). Lokale iOS-Mitteilung erfolgreich dargestellt.`,
     icon: iconUrl,
     badge: badgeUrl,
     tag: 'best-weather-test-alert',
+    type: 'test',
     data: {
       url: './',
       tab: 'tab-overview',
       timestamp: Date.now()
     }
+  };
+
+  try {
+    await saveNotification(notifEntry);
+    renderNotificationFeed();
+  } catch (_) {}
+
+  await reg.showNotification(notifEntry.title, {
+    body: notifEntry.body,
+    icon: iconUrl,
+    badge: badgeUrl,
+    tag: notifEntry.tag,
+    data: notifEntry.data
   });
 
   return true;
@@ -1275,7 +1300,149 @@ function discardNotificationChanges() {
   updateUnsavedIndicator();
 }
 
-export function openNotificationModal() {
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Aktualisiert den blauen Ungelesen-Punkt an der Glocke im App-Header
+ */
+export async function updateHeaderUnreadBadge() {
+  const dot = document.getElementById('notif-unread-dot');
+  if (!dot) return;
+  try {
+    const count = await getUnreadNotificationCount();
+    if (count > 0) {
+      dot.style.display = 'block';
+    } else {
+      dot.style.display = 'none';
+    }
+  } catch (_) {
+    dot.style.display = 'none';
+  }
+}
+
+/**
+ * Rendert die 24h-Mitteilungs-Historie in #notif-feed-list
+ */
+export async function renderNotificationFeed(highlightId = null) {
+  const listEl = document.getElementById('notif-feed-list');
+  const emptyEl = document.getElementById('notif-feed-empty');
+  const tabCounter = document.getElementById('notif-tab-counter');
+  if (!listEl) return;
+
+  const notifications = await getNotifications();
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  if (tabCounter) {
+    if (unreadCount > 0) {
+      tabCounter.innerText = String(unreadCount);
+      tabCounter.style.display = 'inline-block';
+    } else {
+      tabCounter.style.display = 'none';
+    }
+  }
+
+  await updateHeaderUnreadBadge();
+
+  if (notifications.length === 0) {
+    listEl.innerHTML = '';
+    listEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+
+  if (emptyEl) emptyEl.style.display = 'none';
+  listEl.style.display = 'flex';
+
+  listEl.innerHTML = notifications.map(notif => {
+    const meta = getNotifTypeMeta(notif.type, notif.tag);
+    const timeStr = formatNotifRelativeTime(notif.timestamp);
+    const unreadClass = notif.read ? '' : 'is-unread';
+    const highlightClass = notif.id === highlightId ? 'is-highlighted' : '';
+
+    return `
+      <article class="notif-feed-card ${unreadClass} ${highlightClass}" data-notif-id="${notif.id}">
+        <div class="notif-feed-card-header">
+          <span class="notif-feed-badge ${meta.className}">
+            <span aria-hidden="true">${meta.icon}</span> ${meta.label}
+          </span>
+          <time class="notif-feed-time">${timeStr}</time>
+        </div>
+        <div class="notif-feed-title">${escapeHtml(notif.title)}</div>
+        <div class="notif-feed-body">${escapeHtml(notif.body)}</div>
+      </article>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('.notif-feed-card').forEach(card => {
+    card.addEventListener('click', async () => {
+      const id = card.getAttribute('data-notif-id');
+      if (id) {
+        await markNotificationAsRead(id);
+        card.classList.remove('is-unread');
+        await updateHeaderUnreadBadge();
+        const unreadsLeft = await getUnreadNotificationCount();
+        if (tabCounter) {
+          if (unreadsLeft > 0) {
+            tabCounter.innerText = String(unreadsLeft);
+            tabCounter.style.display = 'inline-block';
+          } else {
+            tabCounter.style.display = 'none';
+          }
+        }
+      }
+    });
+  });
+}
+
+let currentActiveView = 'feed';
+
+/**
+ * Wechselt zwischen 'feed' (24h Mitteilungszentrale) und 'settings' (Alarm- & Taktungsregeln)
+ */
+export function switchNotificationView(targetView = 'feed') {
+  currentActiveView = targetView;
+  const tabFeedBtn = document.getElementById('notif-tab-feed-btn');
+  const tabSettingsBtn = document.getElementById('notif-tab-settings-btn');
+  const viewFeed = document.getElementById('notif-view-feed');
+  const viewSettings = document.getElementById('notif-view-settings');
+  const subtitle = document.getElementById('notif-modal-subtitle');
+
+  if (targetView === 'settings') {
+    if (tabFeedBtn) {
+      tabFeedBtn.classList.remove('is-active');
+      tabFeedBtn.setAttribute('aria-selected', 'false');
+    }
+    if (tabSettingsBtn) {
+      tabSettingsBtn.classList.add('is-active');
+      tabSettingsBtn.setAttribute('aria-selected', 'true');
+    }
+    if (viewFeed) viewFeed.classList.add('is-hidden');
+    if (viewSettings) viewSettings.classList.remove('is-hidden');
+    if (subtitle) subtitle.innerText = 'Echte Web Push-Mitteilungen für iOS (Sperrbildschirm) & macOS';
+  } else {
+    if (tabSettingsBtn) {
+      tabSettingsBtn.classList.remove('is-active');
+      tabSettingsBtn.setAttribute('aria-selected', 'false');
+    }
+    if (tabFeedBtn) {
+      tabFeedBtn.classList.add('is-active');
+      tabFeedBtn.setAttribute('aria-selected', 'true');
+    }
+    if (viewSettings) viewSettings.classList.add('is-hidden');
+    if (viewFeed) viewFeed.classList.remove('is-hidden');
+    if (subtitle) subtitle.innerText = 'Mitteilungszentrale & 24h-Wetterhistorie';
+    renderNotificationFeed();
+  }
+}
+
+export function openNotificationModal(targetView = null) {
   loadNotificationState();
   const modal = document.getElementById('notif-modal-overlay');
   if (!modal) return;
@@ -1285,6 +1452,9 @@ export function openNotificationModal() {
   updateUIElements();
   savedFormSnapshot = getFormSnapshot();
   updateUnsavedIndicator();
+
+  const viewToOpen = targetView || currentActiveView || 'feed';
+  switchNotificationView(viewToOpen);
 
   modal.style.display = 'flex';
   document.body.classList.add('modal-open');
@@ -1657,21 +1827,84 @@ export function initNotifications() {
     }
   });
 
-  // Service Worker Messages
+  // View Switcher & Toolbar Actions
+  const tabFeedBtn = document.getElementById('notif-tab-feed-btn');
+  const tabSettingsBtn = document.getElementById('notif-tab-settings-btn');
+  const gearBtn = document.getElementById('notif-gear-btn');
+  const emptySettingsLink = document.getElementById('nfe-settings-link');
+  const markReadBtn = document.getElementById('notif-feed-mark-read-btn');
+  const clearFeedBtn = document.getElementById('notif-feed-clear-btn');
+
+  if (tabFeedBtn) tabFeedBtn.addEventListener('click', () => switchNotificationView('feed'));
+  if (tabSettingsBtn) tabSettingsBtn.addEventListener('click', () => switchNotificationView('settings'));
+  if (gearBtn) gearBtn.addEventListener('click', () => switchNotificationView('settings'));
+  if (emptySettingsLink) emptySettingsLink.addEventListener('click', () => switchNotificationView('settings'));
+
+  if (markReadBtn) {
+    markReadBtn.addEventListener('click', async () => {
+      await markAllNotificationsAsRead();
+      await renderNotificationFeed();
+    });
+  }
+
+  if (clearFeedBtn) {
+    clearFeedBtn.addEventListener('click', async () => {
+      if (confirm('Möchtest du alle Mitteilungen der letzten 24 Stunden wirklich löschen?')) {
+        await clearAllNotifications();
+        await renderNotificationFeed();
+      }
+    });
+  }
+
+  // Deep-Link Prüfung auf ?openNotif=1 (z. B. nach Klick auf ein iOS Push-Banner)
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('openNotif')) {
+      const targetNotifId = urlParams.get('notifId');
+      urlParams.delete('openNotif');
+      urlParams.delete('notifId');
+      const newQuery = urlParams.toString();
+      const newUrl = window.location.pathname + (newQuery ? '?' + newQuery : '') + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+      setTimeout(() => {
+        openNotificationModal('feed');
+        if (targetNotifId) {
+          markNotificationAsRead(targetNotifId);
+          renderNotificationFeed(targetNotifId);
+        }
+      }, 350);
+    }
+  } catch (_) {}
+
+  // Service Worker Messages (App bereits im Hintergrund oder Vordergrund geöffnet)
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'NOTIFICATION_OPENED' && event.data?.tab) {
-        if (window.switchTab) {
-          window.switchTab(event.data.tab);
+      if (event.data?.type === 'NOTIFICATION_OPENED') {
+        openNotificationModal('feed');
+        if (event.data.notifId) {
+          markNotificationAsRead(event.data.notifId);
+          renderNotificationFeed(event.data.notifId);
         }
       }
     });
   }
+
+  // Globales Event bei neuer Nachricht
+  if (typeof window !== 'undefined') {
+    window.addEventListener('best-weather:notif-updated', () => {
+      renderNotificationFeed();
+      updateHeaderUnreadBadge();
+    });
+  }
+
+  updateHeaderUnreadBadge();
 }
 
 // Global Bindings für Tests & Integration
 window.openNotificationModal = openNotificationModal;
 window.closeNotificationModal = closeNotificationModal;
+window.switchNotificationView = switchNotificationView;
+window.renderNotificationFeed = renderNotificationFeed;
 window.hasUnsavedNotificationChanges = hasUnsavedChanges;
 window.getEffectiveProjectId = getEffectiveProjectId;
 window.getGitLabAuthMode = getGitLabAuthMode;

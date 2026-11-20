@@ -80,6 +80,20 @@ def run_tests():
         badge = page.locator("#notif-status-badge")
         assert_test("Status badge is rendered", badge.is_visible())
 
+        # 3b. 24h Notification Feed & Segmented Control
+        tab_feed = page.locator("#notif-tab-feed-btn")
+        tab_settings = page.locator("#notif-tab-settings-btn")
+        assert_test("Segmented tab 'Mitteilungen' is visible", tab_feed.is_visible())
+        assert_test("Segmented tab 'Einstellungen' is visible", tab_settings.is_visible())
+        assert_test("24h Notification Feed pane is active by default", page.locator("#notif-view-feed").is_visible())
+        assert_test("Empty state is visible when no notifications exist", page.locator("#notif-feed-empty").is_visible())
+        assert_test("Gear button is rendered in header", page.locator("#notif-gear-btn").is_visible())
+
+        # Switch to Settings Tab to configure and verify rules
+        tab_settings.click()
+        page.wait_for_timeout(100)
+        assert_test("Settings pane is visible after selecting Einstellungen", page.locator("#notif-view-settings").is_visible())
+
         # 4. Quick-Nav Pills (Clean 2-pill layout for end users)
         nav_pills = page.locator(".notif-nav-pill")
         assert_test("Quick-Nav contains 2 section pills", nav_pills.count() == 2)
@@ -309,6 +323,43 @@ def run_tests():
         close_btn.click()
         page.wait_for_timeout(200)
         assert_test("Closing after saved state needs no dialog", not modal.is_visible() and not unsaved_dialog.is_visible())
+
+        # 18. Notification Feed Live Ingestion, Badges & 24h Retention
+        notif_btn.click()
+        page.wait_for_timeout(200)
+        tab_feed.click()
+        page.wait_for_timeout(100)
+        assert_test("Clicking Mitteilungen tab switches back to feed view", page.locator("#notif-view-feed").is_visible())
+
+        feed_test_result = page.evaluate("""async () => {
+            const { saveNotification, getNotifications, clearAllNotifications } = await import('./features/notification-store.js');
+            await clearAllNotifications();
+            await saveNotification({
+                id: 'test-briefing-1',
+                title: 'Morgen-Briefing für Kempten',
+                body: 'Heute bis zu 14°C, nachmittags sonnig. Kein Regen erwartet.',
+                type: 'briefing',
+                tag: 'best-weather-briefing'
+            });
+            const list = await getNotifications();
+            return { count: list.length, title: list[0]?.title, type: list[0]?.type };
+        }""")
+        assert_test("Saved notification is in IndexedDB store", feed_test_result["count"] == 1 and "Briefing" in feed_test_result["title"])
+
+        page.evaluate("() => window.renderNotificationFeed()")
+        page.wait_for_timeout(150)
+        feed_cards = page.locator(".notif-feed-card")
+        assert_test("Feed list renders notification card", feed_cards.count() == 1)
+        assert_test("Card has unread highlight indicator", "is-unread" in (feed_cards.first.get_attribute("class") or ""))
+        assert_test("Card renders type badge for briefing", page.locator(".nfc-type-briefing").is_visible())
+
+        # Clicking card marks it as read
+        feed_cards.first.click()
+        page.wait_for_timeout(150)
+        assert_test("Clicking card marks notification as read", "is-unread" not in (feed_cards.first.get_attribute("class") or ""))
+
+        close_btn.click()
+        page.wait_for_timeout(150)
 
         browser.close()
 

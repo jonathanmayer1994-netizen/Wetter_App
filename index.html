@@ -158,7 +158,10 @@
 
           <div class="header-action-group">
             <button id="gps-btn" class="nav-icon-btn" style="display:none;" title="Exakten GPS-Standort abfragen">📍</button>
-            <button id="notif-settings-btn" class="nav-icon-btn notif-btn" title="Push-Benachrichtigungen & GitLab-Sync" aria-label="Benachrichtigungseinstellungen">🔔</button>
+            <button id="notif-settings-btn" class="nav-icon-btn notif-btn" title="Mitteilungszentrale & Push-Benachrichtigungen" aria-label="Mitteilungszentrale öffnen">
+              <span class="notif-bell-icon">🔔</span>
+              <span class="notif-unread-dot" id="notif-unread-dot" style="display:none;" aria-label="Ungelesene Mitteilungen"></span>
+            </button>
             <button id="fav-toggle-btn" class="nav-icon-btn fav-btn" title="Zu Favoriten hinzufügen">☆</button>
             <button id="unit-toggle-btn" class="nav-icon-btn unit-btn" title="Einheit wechseln">°C</button>
           </div>
@@ -3033,12 +3036,49 @@
             <h2 class="modal-day-title" id="notif-modal-title">Push-Benachrichtigungen</h2>
             <span class="notif-status-badge badge-inactive" id="notif-status-badge">Inaktiv</span>
           </div>
-          <span class="modal-condition">Echte Web Push-Mitteilungen für iOS (Sperrbildschirm) &amp; macOS Mitteilungszentrale</span>
+          <span class="modal-condition" id="notif-modal-subtitle">Mitteilungszentrale &amp; 24h-Wetterhistorie</span>
         </div>
-        <button id="notif-modal-close" class="close-modal-btn" title="Schließen (Esc)" aria-label="Benachrichtigungseinstellungen schließen">✕</button>
+        <div class="notif-header-actions">
+          <button type="button" class="notif-gear-btn" id="notif-gear-btn" title="Benachrichtigungseinstellungen" aria-label="Einstellungen">⚙️</button>
+          <button id="notif-modal-close" class="close-modal-btn" title="Schließen (Esc)" aria-label="Schließen">✕</button>
+        </div>
+      </div>
+
+      <!-- Segmented Control: [ 📬 Mitteilungen (24h) | ⚙️ Einstellungen ] -->
+      <div class="notif-view-segmented" role="tablist" aria-label="Bereich wählen">
+        <button type="button" class="notif-segment-btn is-active" id="notif-tab-feed-btn" role="tab" aria-selected="true" aria-controls="notif-view-feed">
+          <span class="notif-tab-icon">📬</span> Mitteilungen
+          <span class="notif-tab-counter" id="notif-tab-counter" style="display:none;">0</span>
+        </button>
+        <button type="button" class="notif-segment-btn" id="notif-tab-settings-btn" role="tab" aria-selected="false" aria-controls="notif-view-settings">
+          <span class="notif-tab-icon">⚙️</span> Einstellungen
+        </button>
       </div>
 
       <div class="notif-modal-body">
+        <!-- PANE 1: 24h Mitteilungszentrale (Feed) -->
+        <div class="notif-view-pane" id="notif-view-feed" role="tabpanel" aria-labelledby="notif-tab-feed-btn">
+          <div class="notif-feed-toolbar">
+            <div class="notif-feed-summary" id="notif-feed-summary">Letzte 24 Stunden</div>
+            <div class="notif-feed-toolbar-actions">
+              <button type="button" class="notif-text-action-btn" id="notif-feed-mark-read-btn">✓ Als gelesen markieren</button>
+              <button type="button" class="notif-text-action-btn" id="notif-feed-clear-btn">🗑️ Leeren</button>
+            </div>
+          </div>
+
+          <div class="notif-feed-list" id="notif-feed-list"></div>
+
+          <div class="notif-feed-empty" id="notif-feed-empty" style="display:none;">
+            <div class="nfe-icon">☀️</div>
+            <div class="nfe-title">Alles ruhig an deinen Wetterstationen</div>
+            <div class="nfe-desc">In den letzten 24 Stunden sind keine neuen Wetterwarnungen oder Morgen-Briefings eingetroffen.</div>
+            <div class="nfe-hint">Sobald neue Berichte eintreffen, kannst du sie hier jederzeit in voller Länge nachlesen.</div>
+            <button type="button" class="action-btn action-btn-secondary nfe-settings-link" id="nfe-settings-link">⚙️ Benachrichtigungsregeln anpassen</button>
+          </div>
+        </div>
+
+        <!-- PANE 2: Einstellungen (Alarmregeln, Zeitplan, GitLab Sync) -->
+        <div class="notif-view-pane is-hidden" id="notif-view-settings" role="tabpanel" aria-labelledby="notif-tab-settings-btn">
         <!-- iOS PWA / Standalone & Berechtigungs-Hinweis -->
         <div class="notif-callout" id="notif-support-hint" style="display:none;"></div>
 
@@ -3299,7 +3339,8 @@
             </div>
           </div>
         </details>
-      </div>
+        </div> <!-- /notif-view-settings -->
+      </div> <!-- /notif-modal-body -->
 
       <div class="modal-footer-actions">
         <button type="button" class="action-btn action-btn-secondary" id="notif-modal-close-action">✕ Schließen</button>

@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.33.4';
-const CACHE_NAME = `best-weather-v2.33.4-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.34.0';
+const CACHE_NAME = `best-weather-v2.34.0-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
@@ -62,6 +62,7 @@ const STATIC_ASSETS = [
   './features/bentoSheets.js',
   './features/pullToRefresh.js',
   './features/notifications.js',
+  './features/notification-store.js',
   './manifest.json',
   './logo.png',
   './apple-touch-icon.png',
@@ -342,9 +343,94 @@ self.addEventListener('push', (event) => {
     payload = { title: 'Best Weather', body: 'Wetteraktualisierung verfügbar' };
   }
 
+// =============================================================================
+// NATIVE PUSH NOTIFICATION STORAGE (IndexedDB 24h Retention in Service Worker)
+// =============================================================================
+const NOTIF_IDB_NAME = 'best-weather-db';
+const NOTIF_IDB_STORE = 'notifications';
+const NOTIF_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+function saveNotifToIndexedDB(record) {
+  if (typeof indexedDB === 'undefined') return Promise.resolve();
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(NOTIF_IDB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(NOTIF_IDB_STORE)) {
+          const store = db.createObjectStore(NOTIF_IDB_STORE, { keyPath: 'id' });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+          store.createIndex('read', 'read', { unique: false });
+        }
+      };
+      req.onsuccess = (e) => {
+        const db = e.target.result;
+        try {
+          const tx = db.transaction([NOTIF_IDB_STORE], 'readwrite');
+          const store = tx.objectStore(NOTIF_IDB_STORE);
+          store.put(record);
+
+          // 24h Pruning alter Meldungen
+          const index = store.index('timestamp');
+          const cutoff = Date.now() - NOTIF_RETENTION_MS;
+          const range = IDBKeyRange.upperBound(cutoff);
+          const curReq = index.openCursor(range);
+          curReq.onsuccess = (ev) => {
+            const cursor = ev.target.result;
+            if (cursor) {
+              cursor.delete();
+              cursor.continue();
+            }
+          };
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch (_) {
+          resolve();
+        }
+      };
+      req.onerror = () => resolve();
+    } catch (_) {
+      resolve();
+    }
+  });
+}
+
+function markNotifReadInIndexedDB(id) {
+  if (!id || typeof indexedDB === 'undefined') return Promise.resolve();
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(NOTIF_IDB_NAME, 1);
+      req.onsuccess = (e) => {
+        const db = e.target.result;
+        try {
+          const tx = db.transaction([NOTIF_IDB_STORE], 'readwrite');
+          const store = tx.objectStore(NOTIF_IDB_STORE);
+          const getReq = store.get(id);
+          getReq.onsuccess = () => {
+            const item = getReq.result;
+            if (item) {
+              item.read = true;
+              store.put(item);
+            }
+          };
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch (_) {
+          resolve();
+        }
+      };
+      req.onerror = () => resolve();
+    } catch (_) {
+      resolve();
+    }
+  });
+}
+
   const title = String(payload.title || 'Best Weather');
   const body = String(payload.body || 'Neue Wetterdaten verfügbar');
   const tag = String(payload.tag || 'best-weather-alert');
+  const notifId = payload.id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const notifType = payload.type || payload.data?.type || (tag.includes('briefing') ? 'briefing' : tag.includes('storm') ? 'storm' : tag.includes('frost') ? 'frost' : tag.includes('extreme') ? 'extreme' : 'alert');
 
   // Absolute HTTPS-URLs für Icon und Badge auflösen (wichtig für iOS WebKit Background Service Worker)
   const baseUrl = self.registration?.scope || self.location?.origin || '';
@@ -355,6 +441,24 @@ self.addEventListener('push', (event) => {
     ? (payload.badge.startsWith('http') ? payload.badge : (baseUrl ? new URL(payload.badge, baseUrl).href : payload.badge))
     : (baseUrl ? new URL('favicon.png', baseUrl).href : './favicon.png');
 
+  const notifRecord = {
+    id: notifId,
+    title,
+    body,
+    icon: iconUrl,
+    badge: badgeUrl,
+    tag,
+    type: notifType,
+    data: {
+      url: payload.data?.url || './',
+      tab: payload.data?.tab || 'tab-overview',
+      id: notifId,
+      ...payload.data
+    },
+    timestamp: Date.now(),
+    read: false
+  };
+
   // 100% iOS WebKit- & APNs-kompatible NotificationOptions
   // WICHTIG: Keine actions auf iOS! (iOS WebKit unterstützt keine Web Clip Action-Buttons und verwirft Notifications sonst!)
   const notificationOptions = {
@@ -362,12 +466,7 @@ self.addEventListener('push', (event) => {
     icon: iconUrl,
     badge: badgeUrl,
     tag,
-    data: {
-      url: payload.data?.url || './',
-      tab: payload.data?.tab || 'tab-overview',
-      timestamp: Date.now(),
-      type: payload.data?.type || 'weather'
-    }
+    data: notifRecord.data
   };
 
   // Actions NUR hinzufügen, wenn die Plattform dies nach W3C-Standard unterstützt (Notification.maxActions > 0)
@@ -380,13 +479,16 @@ self.addEventListener('push', (event) => {
 
   // Wichtig für Apple APNs / iOS: showNotification() MUSS zuverlässig auflösen
   event.waitUntil(
-    self.registration.showNotification(title, notificationOptions).catch((err) => {
-      console.warn('showNotification mit primären Optionen fehlgeschlagen, starte ultra-minimalen Fallback:', err);
-      return self.registration.showNotification(title, {
-        body,
-        data: notificationOptions.data
-      });
-    })
+    Promise.all([
+      saveNotifToIndexedDB(notifRecord),
+      self.registration.showNotification(title, notificationOptions).catch((err) => {
+        console.warn('showNotification mit primären Optionen fehlgeschlagen, starte ultra-minimalen Fallback:', err);
+        return self.registration.showNotification(title, {
+          body,
+          data: notificationOptions.data
+        });
+      })
+    ])
   );
 });
 
@@ -398,8 +500,13 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   const notifData = event.notification.data || {};
+  const notifId = notifData.id || '';
   const targetTab = notifData.tab || 'tab-overview';
   const targetUrl = notifData.url || './';
+
+  if (notifId) {
+    markNotifReadInIndexedDB(notifId);
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
@@ -409,14 +516,15 @@ self.addEventListener('notificationclick', (event) => {
           client.postMessage({
             type: 'NOTIFICATION_OPENED',
             tab: targetTab,
+            notifId: notifId,
             data: notifData
           });
           return client.focus();
         }
       }
-      // Wenn noch kein Fenster offen ist, neu öffnen
+      // Wenn noch kein Fenster offen ist, neu öffnen mit Deep-Link Query Param
       if (clients.openWindow) {
-        const fullUrl = targetTab ? `${targetUrl}?tab=${targetTab}` : targetUrl;
+        const fullUrl = `${targetUrl}?openNotif=1${notifId ? `&notifId=${encodeURIComponent(notifId)}` : ''}`;
         return clients.openWindow(fullUrl);
       }
     })
