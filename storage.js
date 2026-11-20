@@ -5,7 +5,7 @@
  */
 
 const DB_NAME = 'BestWeatherAlpineDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise = null;
 let debouncedTourTimer = null;
@@ -36,6 +36,9 @@ function getDB() {
       }
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('device_favorites')) {
+        db.createObjectStore('device_favorites', { keyPath: 'deviceId' });
       }
     };
 
@@ -388,6 +391,93 @@ export const AlpineStorage = {
       });
     } catch (_) {
       return defaultVal;
+    }
+  },
+
+  /**
+   * Liefert die stabile, anonyme Geräte-UUID (RFC 4122 v4).
+   * Doppelwandig in LocalStorage & IndexedDB (meta) gesichert – übersteht PWA-Updates & Cache-Busting.
+   */
+  getDeviceUuid() {
+    const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    let uuid = this.safeGetItem('bw_push_device_uuid', null);
+    if (!uuid || !UUID_V4_REGEX.test(uuid)) {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        uuid = crypto.randomUUID();
+      } else {
+        uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+      }
+      this.safeSetItem('bw_push_device_uuid', uuid);
+      this.setMeta('bw_push_device_uuid', uuid).catch(() => {});
+    }
+    return uuid;
+  },
+
+  /**
+   * Liefert den geräte-spezifischen LocalStorage-Key für Favoriten
+   */
+  getDeviceFavoritesKey(deviceId = null) {
+    const id = deviceId || this.getDeviceUuid();
+    return `bw_favs_${id}`;
+  },
+
+  /**
+   * Speichert Favoriten atomar in LocalStorage UND IndexedDB für dieses spezifische Gerät.
+   * Überlebt PWA-Neuladen, Service Worker Updates und Cache-Invalidierungen auf iOS.
+   */
+  async saveDeviceFavorites(deviceId, favorites) {
+    const id = deviceId || this.getDeviceUuid();
+    const list = Array.isArray(favorites) ? favorites : [];
+
+    // 1. In gerätespezifischem LocalStorage sichern
+    this.safeSetItem(this.getDeviceFavoritesKey(id), list);
+    // 2. Rückwärtskompatibilität: globalen Key ebenfalls aktualisieren
+    this.safeSetItem('best_weather_favorites_v4', list);
+
+    // 3. Dauerhaft in IndexedDB (device_favorites) sichern
+    try {
+      const db = await getDB();
+      return await new Promise((resolve) => {
+        const tx = db.transaction('device_favorites', 'readwrite');
+        tx.objectStore('device_favorites').put({
+          deviceId: id,
+          favorites: list,
+          updatedAt: Date.now()
+        });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch (_) {
+      return false;
+    }
+  },
+
+  /**
+   * Liest Favoriten aus IndexedDB für dieses spezifische Gerät (Notfall-Wiederherstellung)
+   */
+  async getDeviceFavorites(deviceId = null) {
+    const id = deviceId || this.getDeviceUuid();
+    try {
+      const db = await getDB();
+      return await new Promise((resolve) => {
+        const tx = db.transaction('device_favorites', 'readonly');
+        const req = tx.objectStore('device_favorites').get(id);
+        req.onsuccess = () => {
+          const res = req.result;
+          if (res && Array.isArray(res.favorites)) {
+            resolve(res.favorites);
+          } else {
+            resolve(null);
+          }
+        };
+        req.onerror = () => resolve(null);
+      });
+    } catch (_) {
+      return null;
     }
   }
 };

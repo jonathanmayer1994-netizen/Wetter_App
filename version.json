@@ -1,5 +1,5 @@
 {
-  "version": "2.34.1",
-  "build": "20261120-0910",
-  "notes": "Clean Notification Center header: headline Benachrichtigungen, remove gear icon and subtitle, prominent well-aligned close X"
+  "version": "2.35.0",
+  "build": "20261120-1000",
+  "notes": "Device-scoped favorites persistence with dual-layer storage (IndexedDB + LocalStorage), migration, and push-safe resilience"
 }

@@ -19,6 +19,20 @@ export function initFavoritesHandlers({ onSelectLocation, onSwitchTab }) {
   onSwitchTabCallback = onSwitchTab;
 }
 
+/**
+ * Persistiert Favoriten atomar in der 3-Stufen-Kaskade:
+ * 1. Runtime-State (state.favorites)
+ * 2. Gerätespezifischer LocalStorage (bw_favs_UUID + Fallback-Key)
+ * 3. Beständiges IndexedDB (device_favorites in BestWeatherAlpineDB)
+ */
+export function persistFavorites(favorites) {
+  const deviceUuid = AlpineStorage.getDeviceUuid();
+  const deviceKey = AlpineStorage.getDeviceFavoritesKey(deviceUuid);
+  AlpineStorage.safeSetItem(deviceKey, favorites);
+  AlpineStorage.safeSetItem(STORAGE_KEY, favorites);
+  AlpineStorage.saveDeviceFavorites(deviceUuid, favorites).catch(() => {});
+}
+
 export function setupFavorites(options = {}) {
   if (options.onSelectLocation) onSelectLocationCallback = options.onSelectLocation;
   if (options.onSwitchTab) onSwitchTabCallback = options.onSwitchTab;
@@ -37,6 +51,20 @@ export function setupFavorites(options = {}) {
       else if (window.switchTab) window.switchTab('tab-overview');
     });
   }
+
+  // Auto-Recovery: Falls LocalStorage nach PWA-Update / Cache-Bust leer ist, aus IndexedDB wiederherstellen
+  (async () => {
+    if (!state.favorites || state.favorites.length === 0) {
+      const deviceUuid = AlpineStorage.getDeviceUuid();
+      const idbFavs = await AlpineStorage.getDeviceFavorites(deviceUuid);
+      if (Array.isArray(idbFavs) && idbFavs.length > 0) {
+        state.favorites = idbFavs;
+        persistFavorites(state.favorites);
+        updateFavStarUI();
+        renderFavoritesTab();
+      }
+    }
+  })();
 
   // Google Sheets Cloud Sync Modal & Actions
   const configBtn = document.getElementById('cloud-sync-config-btn');
@@ -117,7 +145,7 @@ export function toggleFavoriteLocation(loc) {
     state.favorites.push(changedFav);
   }
 
-  AlpineStorage.safeSetItem(STORAGE_KEY, state.favorites);
+  persistFavorites(state.favorites);
   updateFavStarUI();
   renderFavoritesTab();
 
@@ -165,7 +193,7 @@ export function renderFavoritesTab() {
       <div class="empty-favorites-box">
         <span class="empty-fav-icon">⭐</span>
         <div class="empty-fav-title">Keine Favoriten gespeichert</div>
-        <p class="empty-fav-desc">Deine Liste zeigt ausschließlich die Orte an, die in deinem Google Sheet gespeichert sind. Suche oben nach einem Ort und tippe auf das Stern-Symbol (★), um ihn hinzuzufügen.</p>
+        <p class="empty-fav-desc">Deine Favoriten werden auf diesem Gerät gespeichert. Suche oben nach einem Ort oder Berg und tippe auf das Stern-Symbol (★), um ihn hinzuzufügen.</p>
       </div>
     `;
     return;
@@ -197,7 +225,7 @@ export function renderFavoritesTab() {
     card.querySelector('.fav-del-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       const removed = state.favorites.splice(i, 1)[0];
-      AlpineStorage.safeSetItem(STORAGE_KEY, state.favorites);
+      persistFavorites(state.favorites);
       renderFavoritesTab();
       updateFavStarUI();
       if (removed && GoogleSheetsSync.isConnected()) {

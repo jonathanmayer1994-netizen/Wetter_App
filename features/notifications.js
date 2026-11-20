@@ -718,6 +718,14 @@ export function buildDeviceSyncPayload() {
       elevation: state.currentLocation?.elevation || 520,
       timezone
     },
+    favorites: (state.favorites || []).map(f => ({
+      name: f.name,
+      lat: f.lat,
+      lon: f.lon,
+      elevation: f.elevation || 500,
+      country: f.country || '',
+      isMountain: Boolean(f.isMountain)
+    })),
     vapidPublicKey: DEFAULT_VAPID_PUBLIC_KEY,
     updatedAt: new Date().toISOString()
   };

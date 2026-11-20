@@ -18,7 +18,7 @@ import { setupWallSelector, setupAltitudeSlider, setupMountainControls, setupMou
 import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard, updateWeatherOverlay, enterMobileMapFullscreen, exitMobileMapFullscreen, ensureFreshMapRadar } from './features/map.js';
 import { setupGPXInspector, setupSportsTab, initSportsTour } from './features/sports.js';
 import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers, triggerExactGps } from './features/search.js';
-import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandlers } from './features/favorites.js';
+import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandlers, toggleFavoriteLocation, persistFavorites } from './features/favorites.js';
 import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/networks.js';
 import { ActualEngine } from './core/actualEngine.js';
 import { renderVerificationDashboard, setupVerificationUI, initVerificationHandlers } from './features/verificationUI.js';
@@ -430,6 +430,9 @@ window.openDayDetailModal = openDayDetailModal;
 window.convertTemp = convertTemp;
 window.updatePointWeatherCard = updatePointWeatherCard;
 window.openNotificationModal = openNotificationModal;
+window.AlpineStorage = AlpineStorage;
+window.toggleFavoriteLocation = toggleFavoriteLocation;
+window.persistFavorites = persistFavorites;
 
 // =============================================================================
 // MAIN INITIALIZATION

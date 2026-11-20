@@ -116,36 +116,38 @@ export const state = {
   }
 };
 
-// Initialize favorites from storage or cloud (Startet leer, synchronisiert aus Google Sheets)
-const STORAGE_KEY = 'best_weather_favorites_v4';
+// Initialize favorites from device-scoped storage (Isoliert pro Gerät, update-sicher)
 state.favorites = [];
 try {
-  const saved = AlpineStorage.safeGetItem(STORAGE_KEY, []);
-  if (Array.isArray(saved) && saved.length > 0) {
-    // Migration: Entferne veraltete Dummy-Presets falls vorhanden
-    const isOldSeed = (
-      saved.length === 5 &&
-      saved.some(f => f.name === 'München') &&
-      saved.some(f => f.name === 'Zugspitze') &&
-      saved.some(f => f.name === 'Matterhorn')
-    );
-    if (!isOldSeed) {
-      state.favorites = saved.map(fav => {
-        const lower = fav.name.toLowerCase();
-        if (OFFICIAL_KNOWN_ELEVATIONS[lower]) {
-          return {
-            ...fav,
-            elevation: OFFICIAL_KNOWN_ELEVATIONS[lower].elevation,
-            isMountain: OFFICIAL_KNOWN_ELEVATIONS[lower].isMountain,
-            country: fav.country || OFFICIAL_KNOWN_ELEVATIONS[lower].country
-          };
-        }
-        return fav;
-      });
-    } else {
-      state.favorites = [];
-      AlpineStorage.safeSetItem(STORAGE_KEY, []);
+  const deviceUuid = AlpineStorage.getDeviceUuid();
+  const deviceKey = AlpineStorage.getDeviceFavoritesKey(deviceUuid);
+  let saved = AlpineStorage.safeGetItem(deviceKey, null);
+
+  // Migration: Wenn noch kein gerätespezifischer Key existiert, aus Legacy-Key migrieren
+  if (!Array.isArray(saved) || saved.length === 0) {
+    const legacy = AlpineStorage.safeGetItem('best_weather_favorites_v4', null);
+    if (Array.isArray(legacy) && legacy.length > 0) {
+      saved = legacy;
+      AlpineStorage.safeSetItem(deviceKey, saved);
+      AlpineStorage.saveDeviceFavorites(deviceUuid, saved).catch(() => {});
     }
+  }
+
+  if (Array.isArray(saved) && saved.length > 0) {
+    state.favorites = saved.map(fav => {
+      const lower = (fav.name || '').toLowerCase();
+      if (OFFICIAL_KNOWN_ELEVATIONS[lower]) {
+        return {
+          ...fav,
+          elevation: OFFICIAL_KNOWN_ELEVATIONS[lower].elevation,
+          isMountain: OFFICIAL_KNOWN_ELEVATIONS[lower].isMountain,
+          country: fav.country || OFFICIAL_KNOWN_ELEVATIONS[lower].country
+        };
+      }
+      return fav;
+    });
+  } else {
+    state.favorites = [];
   }
 } catch (e) {
   state.favorites = [];

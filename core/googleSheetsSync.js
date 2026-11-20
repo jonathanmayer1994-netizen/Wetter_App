@@ -311,9 +311,18 @@ export const GoogleSheetsSync = {
     });
 
     if (mapped.length > 0) {
-      // Synchronisiere exakt mit der Google Sheet Datenbank
-      state.favorites = mapped;
+      // Sicheres Merge: Lokale Favoriten des Geräts behalten, neue aus Sheet ergänzen
+      const current = Array.isArray(state.favorites) ? [...state.favorites] : [];
+      mapped.forEach(incoming => {
+        if (!current.some(c => c.name.toLowerCase() === incoming.name.toLowerCase())) {
+          current.push(incoming);
+        }
+      });
+      state.favorites = current;
+      const deviceUuid = AlpineStorage.getDeviceUuid();
+      AlpineStorage.safeSetItem(AlpineStorage.getDeviceFavoritesKey(deviceUuid), state.favorites);
       AlpineStorage.safeSetItem('best_weather_favorites_v4', state.favorites);
+      AlpineStorage.saveDeviceFavorites(deviceUuid, state.favorites).catch(() => {});
       updateFavStarUI();
       renderFavoritesTab();
     }

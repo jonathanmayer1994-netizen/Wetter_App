@@ -502,7 +502,7 @@ self.addEventListener('notificationclick', (event) => {
   const notifData = event.notification.data || {};
   const notifId = notifData.id || '';
   const targetTab = notifData.tab || 'tab-overview';
-  const targetUrl = notifData.url || './';
+  const targetUrl = notifData.url || './index.html';
 
   if (notifId) {
     markNotifReadInIndexedDB(notifId);
@@ -510,7 +510,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Prüfen, ob bereits ein Best Weather Tab/Fenster offen ist
+      // Prüfen, ob bereits ein Best Weather Tab/PWA-Fenster offen ist
       for (const client of windowClients) {
         if ('focus' in client) {
           client.postMessage({
@@ -522,7 +522,7 @@ self.addEventListener('notificationclick', (event) => {
           return client.focus();
         }
       }
-      // Wenn noch kein Fenster offen ist, neu öffnen mit Deep-Link Query Param
+      // Wenn noch kein Fenster offen ist, Standalone-PWA mit Deep-Link Query Param öffnen
       if (clients.openWindow) {
         const fullUrl = `${targetUrl}?openNotif=1${notifId ? `&notifId=${encodeURIComponent(notifId)}` : ''}`;
         return clients.openWindow(fullUrl);
