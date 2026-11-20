@@ -41,6 +41,7 @@ def run_suite():
             page = ctx.new_page()
             page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
             page.wait_for_selector("#hero-location-name", timeout=10000)
+            page.wait_for_function("() => typeof window.AlpineStorage !== 'undefined' && typeof window.AlpineStorage.getDeviceFavoritesKey === 'function'", timeout=10000)
 
             print("\n--- TEST SUITE: Device-Scoped Favorites & Dual-Layer Persistence ---")
 
@@ -79,6 +80,7 @@ def run_suite():
             page2 = ctx2.new_page()
             page2.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
             page2.wait_for_selector("#hero-location-name", timeout=10000)
+            page2.wait_for_function("() => typeof window.AlpineStorage !== 'undefined' && typeof window.AlpineStorage.getDeviceUuid === 'function'", timeout=10000)
 
             uuid2 = page2.evaluate("() => window.AlpineStorage.getDeviceUuid()")
             assert_test("Second device generates a distinct UUID", uuid2 != uuid)

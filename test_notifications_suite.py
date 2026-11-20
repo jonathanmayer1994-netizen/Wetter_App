@@ -289,9 +289,12 @@ def run_tests():
         assert_test("GitLab CI variable key strictly matches WEATHER_PUSH_DEV_<32_HEX>", bool(re.match(r"^WEATHER_PUSH_DEV_[0-9A-F]{32}$", uuid_info["varKey"])))
         assert_test("Sync payload uses schemaVersion 2 with matching deviceId", uuid_info["schemaVersion"] == 2 and uuid_info["payloadDeviceId"] == uuid_info["uuid1"])
         assert_test("Zero device/OS/browser metadata leaked into sync payload", len(uuid_info["leaked"]) == 0)
+        tech_acc = page.locator("#notif-tech-accordion")
+        assert_test("Technical information accordion is collapsed by default", not tech_acc.evaluate("el => el.open"))
+        tech_acc.evaluate("el => el.open = true")
         privacy_bar = page.locator("#notif-device-privacy-bar")
         uuid_label_text = page.locator("#notif-device-uuid-label").inner_text()
-        assert_test("Anonymous UUID privacy bar is visible with short UUID prefix", privacy_bar.is_visible() and uuid_info["uuid1"][:8] in uuid_label_text)
+        assert_test("Anonymous UUID privacy bar is visible with short UUID prefix when expanded", privacy_bar.is_visible() and uuid_info["uuid1"][:8] in uuid_label_text)
 
         # Simulate a second independent Apple device (fresh browser context) -> must get a distinct UUID & variable key
         ctx2 = browser.new_context(service_workers="block", permissions=["notifications"])

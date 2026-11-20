@@ -1,5 +1,5 @@
 {
-  "version": "2.36.0",
-  "build": "20261120-1045",
-  "notes": "Rename to Täglicher Bericht with intelligent alpine synthesis (elevation-aware snow line, sunshine daylight distribution, and hazard highlights)"
+  "version": "2.36.1",
+  "build": "20261120-1052",
+  "notes": "Move technical device identity and backend connection banners to collapsed bottom accordion for a clean, distraction-free notification settings UI"
 }

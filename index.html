@@ -3096,18 +3096,6 @@
           </label>
         </div>
 
-        <!-- Anonyme Geräte-UUID Info-Leiste (100% individuell pro Gerät, 0 Gerätedaten) -->
-        <div class="notif-device-privacy-bar" id="notif-device-privacy-bar" title="Jedes Gerät erhält eine lokal erzeugte Zufalls-UUID für komplett eigene Benachrichtigungsregeln. Es werden keinerlei Gerätedaten, Modellnamen oder User-Agent übertragen.">
-          <span class="ndp-icon" aria-hidden="true">🔒</span>
-          <div class="ndp-text">
-            <span>Geräte-ID: <code class="ndp-uuid" id="notif-device-uuid-label">--------</code></span>
-            <span class="ndp-badge">Anonym • eigene Regeln • keine Gerätedaten</span>
-          </div>
-        </div>
-
-        <!-- Ehrlicher Backend-Verbindungsstatus (warnt transparent wenn kein Push-Server aktiv ist) -->
-        <div class="notif-backend-banner" id="notif-backend-status-banner" style="display:none;" role="status"></div>
-
         <!-- Kriterien / Alarm-Regeln Card -->
         <div class="notif-section-card" id="notif-section-rules">
           <div class="notif-card-header">
@@ -3269,6 +3257,24 @@
             <span class="nfs-val" id="notif-sync-status-msg">Bereit zur Nutzung</span>
           </div>
         </div>
+
+        <!-- Technische System-Informationen (Geräte-ID & Backend-Status) -->
+        <details class="notif-dev-accordion" id="notif-tech-accordion">
+          <summary class="notif-dev-summary">🔒 Geräte-ID &amp; Systemstatus</summary>
+          <div class="notif-dev-content">
+            <!-- Anonyme Geräte-UUID Info-Leiste (100% individuell pro Gerät, 0 Gerätedaten) -->
+            <div class="notif-device-privacy-bar" id="notif-device-privacy-bar" title="Jedes Gerät erhält eine lokal erzeugte Zufalls-UUID für komplett eigene Benachrichtigungsregeln. Es werden keinerlei Gerätedaten, Modellnamen oder User-Agent übertragen.">
+              <span class="ndp-icon" aria-hidden="true">🔒</span>
+              <div class="ndp-text">
+                <span>Geräte-ID: <code class="ndp-uuid" id="notif-device-uuid-label">--------</code></span>
+                <span class="ndp-badge">Anonym • eigene Regeln • keine Gerätedaten</span>
+              </div>
+            </div>
+
+            <!-- Ehrlicher Backend-Verbindungsstatus (warnt transparent wenn kein Push-Server aktiv ist) -->
+            <div class="notif-backend-banner" id="notif-backend-status-banner" style="display:none;" role="status"></div>
+          </div>
+        </details>
 
         <!-- GitLab OAuth 2.0 PKCE & CI Backend Einstellungen -->
         <details class="notif-dev-accordion" id="notif-section-gitlab">
