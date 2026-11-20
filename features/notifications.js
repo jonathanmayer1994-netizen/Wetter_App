@@ -1123,7 +1123,7 @@ function updateUIElements() {
         <span class="nbb-icon" aria-hidden="true">🦊</span>
         <div class="nbb-content">
           <div class="nbb-title">GitLab Cloud-Push noch nicht verbunden</div>
-          <div class="nbb-desc">Verbinde dieses Gerät mit 1 Tipp per <strong>GitLab OAuth (Face ID / Touch ID)</strong>, damit Alarme &amp; Morgen-Briefing zuverlässig im Sperrbildschirm ankommen.</div>
+          <div class="nbb-desc">Verbinde dieses Gerät mit 1 Tipp per <strong>GitLab OAuth (Face ID / Touch ID)</strong>, damit Alarme &amp; Täglicher Bericht zuverlässig im Sperrbildschirm ankommen.</div>
           <div class="nbb-actions">
             <button type="button" class="action-btn action-btn-primary nbb-connect-btn" id="nbb-quick-oauth-btn">🦊 Mit GitLab verbinden</button>
           </div>

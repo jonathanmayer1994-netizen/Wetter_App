@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { buildDailyReport, WMO_DESCRIPTIONS } from '../core/dailyReportEngine.js';
 
 // Standard VAPID Fallback Keys
 const DEFAULT_VAPID_PUBLIC_KEY = 'BFXeGAET8G6YxsiL0HvXELcaDIoZyeIgPYokZuqpueq3NFJs8xG7KsyvViif44MAxMkBI_OQ93OXewHGRhMSOmI';
@@ -22,38 +23,6 @@ const STATE_FILE_PATH = path.resolve('.dispatcher-state.json');
 
 export const DEVICE_VAR_PREFIX = 'WEATHER_PUSH_DEV_';
 const STALE_DEVICE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 Tage
-
-// WMO Weather Codes Übersetzung
-const WMO_DESCRIPTIONS = {
-  0: 'Klarer Himmel',
-  1: 'Überwiegend klar',
-  2: 'Teilweise bewölkt',
-  3: 'Bedeckt',
-  45: 'Nebel',
-  48: 'Raureifnebel',
-  51: 'Leichter Nieselregen',
-  53: 'Mäßiger Nieselregen',
-  55: 'Dichter Nieselregen',
-  56: 'Gefrierender Nieselregen',
-  57: 'Dichter gefrierender Nieselregen',
-  61: 'Leichter Regen',
-  63: 'Mäßiger Regen',
-  65: 'Starker Regen',
-  66: 'Leichter gefrierender Regen',
-  67: 'Starker gefrierender Regen',
-  71: 'Leichter Schneefall',
-  73: 'Mäßiger Schneefall',
-  75: 'Starker Schneefall',
-  77: 'Schneegriesel',
-  80: 'Leichte Regenschauer',
-  81: 'Mäßige Regenschauer',
-  82: 'Heftige Regenschauer',
-  85: 'Leichte Schneeschauer',
-  86: 'Starke Schneeschauer',
-  95: 'Gewitter',
-  96: 'Gewitter mit leichtem Hagel',
-  99: 'Schweres Unwetter mit Hagel'
-};
 
 /**
  * Kurze, anonyme Darstellung einer UUID für Logs (z. B. "9a7c4e12")
@@ -480,7 +449,9 @@ async function fetchWithRetry(url, options = {}, maxRetries = 3) {
  */
 async function fetchWeatherData(lat, lon, preferredTz) {
   const tzParam = encodeURIComponent(preferredTz || 'auto');
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunrise,sunset&timezone=${tzParam}&forecast_days=2`;
+  const hourlyParams = 'temperature_2m,precipitation_probability,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_gusts_10m,cloud_cover,freezing_level_height,sunshine_duration,uv_index';
+  const dailyParams = 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunrise,sunset,sunshine_duration,uv_index_max,snowfall_sum';
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_gusts_10m&hourly=${hourlyParams}&daily=${dailyParams}&timezone=${tzParam}&forecast_days=2`;
 
   return await fetchWithRetry(url);
 }
@@ -510,19 +481,8 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
     // Feuert zuverlässig sobald Wunschzeit erreicht ist (bis +90 Min. danach), damit Cloud-Cron-Jitter
     // das 06:00-Briefing niemals verpasst — garantiert max. 1x pro Tag über lastBriefingDate.
     if (currentTotalMin >= targetTotalMin && currentTotalMin <= (targetTotalMin + 90) && !alreadySentToday) {
-      const code = daily.weather_code?.[0] ?? current.weather_code ?? 0;
-      const desc = WMO_DESCRIPTIONS[code] || 'Mäßig bewölkt';
-      const maxT = Math.round(daily.temperature_2m_max?.[0] ?? 15);
-      const minT = Math.round(daily.temperature_2m_min?.[0] ?? 5);
-      const pop = daily.precipitation_probability_max?.[0] ?? 0;
-
-      alerts.push({
-        type: 'briefing',
-        title: `☀️ Guten Morgen aus ${locName}`,
-        body: `Heute: ${desc} • ${minT}° bis ${maxT}° • Regenrisiko ${pop}%`,
-        tag: `briefing-${timeInfo.dateString}`,
-        data: { url: './', tab: 'tab-overview', type: 'briefing' }
-      });
+      const dailyReportAlert = buildDailyReport(deviceConfig, weather, timeInfo);
+      alerts.push(dailyReportAlert);
       deviceState.lastBriefingDate = timeInfo.dateString;
     }
   }

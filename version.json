@@ -1,5 +1,5 @@
 {
-  "version": "2.35.0",
-  "build": "20261120-1000",
-  "notes": "Device-scoped favorites persistence with dual-layer storage (IndexedDB + LocalStorage), migration, and push-safe resilience"
+  "version": "2.36.0",
+  "build": "20261120-1045",
+  "notes": "Rename to Täglicher Bericht with intelligent alpine synthesis (elevation-aware snow line, sunshine daylight distribution, and hazard highlights)"
 }

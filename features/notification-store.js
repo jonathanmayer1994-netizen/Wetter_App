@@ -247,8 +247,8 @@ export function formatNotifRelativeTime(timestamp) {
  */
 export function getNotifTypeMeta(type = '', tag = '') {
   const norm = String(type || tag).toLowerCase();
-  if (norm.includes('briefing') || norm.includes('morgen')) {
-    return { label: 'Morgen-Briefing', icon: '☀️', className: 'nfc-type-briefing' };
+  if (norm.includes('briefing') || norm.includes('morgen') || norm.includes('bericht') || norm.includes('daily')) {
+    return { label: 'Täglicher Bericht', icon: '📊', className: 'nfc-type-briefing' };
   }
   if (norm.includes('storm') || norm.includes('sturm') || norm.includes('wind')) {
     return { label: 'Sturmwarnung', icon: '💨', className: 'nfc-type-storm' };

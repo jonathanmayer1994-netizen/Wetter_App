@@ -127,8 +127,8 @@ def run_tests():
 
         assert_test("Wind threshold dropdown has options", rule_wind_val.locator("option").count() >= 4)
         assert_test("Frostwarnung checkbox present and checked", rule_frost.is_checked())
-        assert_test("Morgen-Briefing checkbox present and checked", rule_briefing.is_checked())
-        assert_test("Morgen-Briefing time input has default value '07:00'", rule_briefing_time.input_value() == "07:00")
+        assert_test("Täglicher Bericht checkbox present and checked", rule_briefing.is_checked())
+        assert_test("Täglicher Bericht time input has default value '07:00'", rule_briefing_time.input_value() == "07:00")
         assert_test("Extremwetter checkbox present and checked", rule_severe.is_checked())
 
         # 7. Option B 24h Timeline Visualizer
@@ -336,15 +336,15 @@ def run_tests():
             await clearAllNotifications();
             await saveNotification({
                 id: 'test-briefing-1',
-                title: 'Morgen-Briefing für Kempten',
-                body: 'Heute bis zu 14°C, nachmittags sonnig. Kein Regen erwartet.',
+                title: '📊 Täglicher Bericht — Kempten',
+                body: 'Heiter • 5° bis 15°C • ☀️ 6h Sonne (ab Mittag freundlich) • Trocken (15% Regenrisiko)',
                 type: 'briefing',
                 tag: 'best-weather-briefing'
             });
             const list = await getNotifications();
             return { count: list.length, title: list[0]?.title, type: list[0]?.type };
         }""")
-        assert_test("Saved notification is in IndexedDB store", feed_test_result["count"] == 1 and "Briefing" in feed_test_result["title"])
+        assert_test("Saved notification is in IndexedDB store", feed_test_result["count"] == 1 and "Täglicher Bericht" in feed_test_result["title"])
 
         page.evaluate("() => window.renderNotificationFeed()")
         page.wait_for_timeout(150)
