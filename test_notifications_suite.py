@@ -76,7 +76,7 @@ def run_tests():
 
         # 3. Check Modal Header & Badge
         title = page.locator("#notif-modal-title").inner_text()
-        assert_test("Modal title contains 'Push-Benachrichtigungen'", "Push-Benachrichtigungen" in title)
+        assert_test("Modal title contains 'Benachrichtigungen'", "Benachrichtigungen" in title)
         badge = page.locator("#notif-status-badge")
         assert_test("Status badge is rendered", badge.is_visible())
 
@@ -87,7 +87,7 @@ def run_tests():
         assert_test("Segmented tab 'Einstellungen' is visible", tab_settings.is_visible())
         assert_test("24h Notification Feed pane is active by default", page.locator("#notif-view-feed").is_visible())
         assert_test("Empty state is visible when no notifications exist", page.locator("#notif-feed-empty").is_visible())
-        assert_test("Gear button is rendered in header", page.locator("#notif-gear-btn").is_visible())
+        assert_test("Close button is visible and properly positioned", page.locator("#notif-modal-close").is_visible())
 
         # Switch to Settings Tab to configure and verify rules
         tab_settings.click()

@@ -1412,7 +1412,6 @@ export function switchNotificationView(targetView = 'feed') {
   const tabSettingsBtn = document.getElementById('notif-tab-settings-btn');
   const viewFeed = document.getElementById('notif-view-feed');
   const viewSettings = document.getElementById('notif-view-settings');
-  const subtitle = document.getElementById('notif-modal-subtitle');
 
   if (targetView === 'settings') {
     if (tabFeedBtn) {
@@ -1425,7 +1424,6 @@ export function switchNotificationView(targetView = 'feed') {
     }
     if (viewFeed) viewFeed.classList.add('is-hidden');
     if (viewSettings) viewSettings.classList.remove('is-hidden');
-    if (subtitle) subtitle.innerText = 'Echte Web Push-Mitteilungen für iOS (Sperrbildschirm) & macOS';
   } else {
     if (tabSettingsBtn) {
       tabSettingsBtn.classList.remove('is-active');
@@ -1437,7 +1435,6 @@ export function switchNotificationView(targetView = 'feed') {
     }
     if (viewSettings) viewSettings.classList.add('is-hidden');
     if (viewFeed) viewFeed.classList.remove('is-hidden');
-    if (subtitle) subtitle.innerText = 'Mitteilungszentrale & 24h-Wetterhistorie';
     renderNotificationFeed();
   }
 }
@@ -1830,14 +1827,12 @@ export function initNotifications() {
   // View Switcher & Toolbar Actions
   const tabFeedBtn = document.getElementById('notif-tab-feed-btn');
   const tabSettingsBtn = document.getElementById('notif-tab-settings-btn');
-  const gearBtn = document.getElementById('notif-gear-btn');
   const emptySettingsLink = document.getElementById('nfe-settings-link');
   const markReadBtn = document.getElementById('notif-feed-mark-read-btn');
   const clearFeedBtn = document.getElementById('notif-feed-clear-btn');
 
   if (tabFeedBtn) tabFeedBtn.addEventListener('click', () => switchNotificationView('feed'));
   if (tabSettingsBtn) tabSettingsBtn.addEventListener('click', () => switchNotificationView('settings'));
-  if (gearBtn) gearBtn.addEventListener('click', () => switchNotificationView('settings'));
   if (emptySettingsLink) emptySettingsLink.addEventListener('click', () => switchNotificationView('settings'));
 
   if (markReadBtn) {

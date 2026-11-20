@@ -235,7 +235,9 @@ def run_tests():
         report("Expert details container is hidden by default", container_hidden_initial)
         
         # Click toggle button
-        page.click("#expert-mode-toggle-btn")
+        page.wait_for_timeout(500)
+        page.locator("#expert-mode-toggle-btn").scroll_into_view_if_needed()
+        page.locator("#expert-mode-toggle-btn").click()
         page.wait_for_timeout(200)
         container_hidden_after_click = page.eval_on_selector(
             "#expert-details-container", "el => el.classList.contains('is-hidden')"

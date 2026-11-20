@@ -1,5 +1,5 @@
 {
-  "version": "2.34.0",
-  "build": "20261120-0850",
-  "notes": "Notification Center & 24h history feed with IndexedDB persistence, unread badge, and separated settings tab"
+  "version": "2.34.1",
+  "build": "20261120-0910",
+  "notes": "Clean Notification Center header: headline Benachrichtigungen, remove gear icon and subtitle, prominent well-aligned close X"
 }
