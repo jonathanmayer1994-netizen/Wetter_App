@@ -469,18 +469,23 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
   const daily = weather.daily || {};
   const currentHour = timeInfo.hour;
 
-  // 1. REGEL: Morgen-Briefing (Exakt 1x täglich ab Wunschzeit mit 90-Minuten Cron-Jitter-Toleranzfenster)
+  // 1. REGEL: Täglicher Bericht (Morgen-Briefing)
+  // Bei Apple APNs wird der Bericht ab 05:00 Uhr morgens (bzw. ab Wunschzeit) im APNs Store-and-Forward
+  // Puffer hinterlegt. Dadurch liegt er bereits bei Apple bereit, egal wann der Nutzer morgens aufsteht
+  // und den Flugmodus ausschaltet.
   if (rules.briefingAlert) {
-    const [rawH, rawM] = String(rules.briefingTime || '07:00').split(':');
-    const targetHour = Number.isFinite(parseInt(rawH, 10)) ? parseInt(rawH, 10) : 7;
+    const [rawH, rawM] = String(rules.briefingTime || '06:00').split(':');
+    const targetHour = Number.isFinite(parseInt(rawH, 10)) ? parseInt(rawH, 10) : 6;
     const targetMin = Number.isFinite(parseInt(rawM, 10)) ? parseInt(rawM, 10) : 0;
     const targetTotalMin = targetHour * 60 + targetMin;
     const currentTotalMin = currentHour * 60 + (timeInfo.minute || 0);
     const alreadySentToday = deviceState.lastBriefingDate === timeInfo.dateString;
 
-    // Feuert zuverlässig sobald Wunschzeit erreicht ist (bis +90 Min. danach), damit Cloud-Cron-Jitter
-    // das 06:00-Briefing niemals verpasst — garantiert max. 1x pro Tag über lastBriefingDate.
-    if (currentTotalMin >= targetTotalMin && currentTotalMin <= (targetTotalMin + 90) && !alreadySentToday) {
+    // Für Apple APNs Pushes (Store-and-Forward): Bereitstellung ab 05:00 Uhr morgens (300 Min)
+    const isAppleSub = Boolean(deviceConfig.subscription?.endpoint?.includes('push.apple.com'));
+    const earliestDepositMin = isAppleSub ? Math.min(targetTotalMin, 5 * 60) : targetTotalMin;
+
+    if (currentTotalMin >= earliestDepositMin && !alreadySentToday) {
       const dailyReportAlert = buildDailyReport(deviceConfig, weather, timeInfo);
       alerts.push(dailyReportAlert);
       deviceState.lastBriefingDate = timeInfo.dateString;
@@ -512,8 +517,8 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
     }
   }
 
-  // 3. REGEL: Sturm- & Böenwarnung (individueller Schwellenwert je Gerät)
-  if (rules.windAlert && !hasSevereAlert) {
+  // 3. REGEL: Sturm- & Böenwarnung (individueller Schwellenwert je Gerät, nachts stumm)
+  if (rules.windAlert && !hasSevereAlert && !timeInfo.isQuietHours) {
     const threshold = rules.windThreshold || 60;
     const nextGusts = (hourly.wind_gusts_10m || []).slice(currentHour, currentHour + 4);
     const maxGust = Math.round(Math.max(current.wind_gusts_10m || 0, ...nextGusts));
@@ -535,8 +540,8 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
     }
   }
 
-  // 4. REGEL: Frost- & Glättewarnung
-  if (rules.frostAlert && !hasSevereAlert) {
+  // 4. REGEL: Frost- & Glättewarnung (nachts stumm)
+  if (rules.frostAlert && !hasSevereAlert && !timeInfo.isQuietHours) {
     const nextTemps = (hourly.temperature_2m || []).slice(currentHour, currentHour + 6);
     const minUpcomingTemp = Math.min(current.temperature_2m ?? 99, ...nextTemps);
 
@@ -580,12 +585,26 @@ async function dispatchPushNotification(subscription, payload, vapidKeys) {
     vapidKeys.privateKey
   );
 
-  // RFC 8030 / Apple APNs Spezifikation:
-  // - urgency: 'high' setzt apns-priority: 10 (weckt das iPhone sofort auf, auch im Standby)
-  // - TTL: 86400 (24h Gültigkeit für Wetterwarnungen & Briefings)
+  const isApple = Boolean(subscription.endpoint && subscription.endpoint.includes('push.apple.com'));
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expirationSec = nowSec + 86400; // 24 Stunden Haltezeit im APNs Store-and-Forward Puffer
+
+  // Apple APNs Spezifikation für Web Push:
+  // - apns-push-type: 'alert' (Zwingend für Benachrichtigungen mit Anzeige im Sperrbildschirm / Notification Center)
+  // - apns-priority: '10' (Sofortige Zustellung, weckt das iPhone auf sobald Internet da ist)
+  // - apns-expiration: Epoch-Zeitstempel (Hält die Nachricht in der Warteschlange, wenn iPhone im Flugmodus ist)
+  // - TTL: 86400 (RFC 8030 Web Push Time-To-Live in Sekunden)
+  // - urgency: 'high'
   const pushOptions = {
     TTL: 86400,
-    urgency: 'high'
+    urgency: 'high',
+    headers: {
+      ...(isApple ? {
+        'apns-push-type': 'alert',
+        'apns-priority': '10',
+        'apns-expiration': String(expirationSec)
+      } : {})
+    }
   };
 
   const res = await webpush.sendNotification(subscription, JSON.stringify(payload), pushOptions);
@@ -662,13 +681,19 @@ export async function processAllDevices(devices, globalState, deps = {}) {
       const curCode = weatherData.current?.weather_code;
       const isExtremeEmergency = curCode === 99 || (weatherData.current?.wind_gusts_10m || 0) >= 105;
       const allowEmergencyBypass = Boolean(device.rules?.bypassQuietHoursOnSevere);
+      // Erlaube Vorbereitung des Täglichen Berichts ab 05:00 Uhr morgens für den APNs Store-and-Forward Puffer
+      const isMorningBriefingDeposit = (timeInfo.hour >= 5 && device.rules?.briefingAlert && devState.lastBriefingDate !== timeInfo.dateString);
 
-      if (!(isExtremeEmergency && allowEmergencyBypass)) {
+      if (!(isExtremeEmergency && allowEmergencyBypass) && !isMorningBriefingDeposit) {
         summary.skippedQuietHours++;
         console.log(`🌙 [UUID ${idTag}…] Ruhezeit aktiv (${timeInfo.formattedTime} Uhr ${timeInfo.tz}) — übersprungen.`);
         continue;
       }
-      console.log(`🚨 [UUID ${idTag}…] EXTREM-UNWETTER! Ruhezeit für Gefahrenalarm umgangen.`);
+      if (isExtremeEmergency && allowEmergencyBypass) {
+        console.log(`🚨 [UUID ${idTag}…] EXTREM-UNWETTER! Ruhezeit für Gefahrenalarm umgangen.`);
+      } else if (isMorningBriefingDeposit) {
+        console.log(`🌅 [UUID ${idTag}…] Vorbereitung Tagesbericht ab 05:00 Uhr im APNs Store-and-Forward Puffer (${timeInfo.formattedTime} Uhr).`);
+      }
     }
 
     summary.evaluatedDevices++;

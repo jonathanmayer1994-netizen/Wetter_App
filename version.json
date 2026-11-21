@@ -1,5 +1,5 @@
 {
-  "version": "2.36.2",
-  "build": "20261121-1125",
-  "notes": "Smart sunshine & snow timing synthesis in daily forecast and anti-truncation layout adjustments for mobile"
+  "version": "2.36.3",
+  "build": "20261121-1226",
+  "notes": "Apple APNs Store-and-Forward alert headers, 05:00 morning pre-deposit, and robust SW offline-reconnect delivery"
 }

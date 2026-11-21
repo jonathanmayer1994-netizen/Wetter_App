@@ -47,27 +47,27 @@ const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 export const SCHEDULE_PRESETS = {
   eco: {
     key: 'eco',
-    name: 'Eco (06:00–22:00 Uhr, 100% Free-Tier Safe)',
-    cron: '0 6,7,8,10,12,14,16,17,18,19,20,21 * * *',
-    runsPerDay: 12,
-    monthlyMinutes: 120,
-    description: '12 Läufe/Tag verteilt auf 06:00 bis 21:00 Uhr. 22:00–06:00 Uhr Pause (~120 Compute-Min./Monat).'
+    name: 'Eco (05:00–22:00 Uhr, 100% Free-Tier Safe)',
+    cron: '0 5,7,8,10,12,14,16,17,18,19,20,21 * * *',
+    runsPerDay: 13,
+    monthlyMinutes: 130,
+    description: '13 Läufe/Tag verteilt auf 05:00 bis 21:00 Uhr. 22:00–05:00 Uhr Pause (~130 Compute-Min./Monat).'
   },
   hourly: {
     key: 'hourly',
-    name: 'Stündlich (06:00–22:00 Uhr)',
-    cron: '0 6-21 * * *',
-    runsPerDay: 16,
-    monthlyMinutes: 160,
-    description: '16 Läufe/Tag stündlich von 06:00 bis 21:00 Uhr. 22:00–06:00 Uhr Pause (~160 Compute-Min./Monat, 100% Free-Tier Safe).'
+    name: 'Stündlich (05:00–22:00 Uhr)',
+    cron: '0 5-21 * * *',
+    runsPerDay: 17,
+    monthlyMinutes: 170,
+    description: '17 Läufe/Tag stündlich von 05:00 bis 21:00 Uhr. 22:00–05:00 Uhr Pause (~170 Compute-Min./Monat, 100% Free-Tier Safe).'
   },
   highfreq: {
     key: 'highfreq',
-    name: 'Alle 20 Min tagsüber (06:00–22:00 Uhr)',
-    cron: '*/20 6-21 * * *',
-    runsPerDay: 48,
-    monthlyMinutes: 480,
-    description: '48 Läufe/Tag von 06:00 bis 21:40 Uhr. Ideal für eigenen Runner.'
+    name: 'Alle 20 Min tagsüber (05:00–22:00 Uhr)',
+    cron: '*/20 5-21 * * *',
+    runsPerDay: 51,
+    monthlyMinutes: 510,
+    description: '51 Läufe/Tag von 05:00 bis 21:40 Uhr. Ideal für eigenen Runner.'
   }
 };
 

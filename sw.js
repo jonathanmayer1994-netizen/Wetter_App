@@ -432,21 +432,25 @@ function markNotifReadInIndexedDB(id) {
   const notifId = payload.id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const notifType = payload.type || payload.data?.type || (tag.includes('briefing') ? 'briefing' : tag.includes('storm') ? 'storm' : tag.includes('frost') ? 'frost' : tag.includes('extreme') ? 'extreme' : 'alert');
 
-  // Absolute HTTPS-URLs für Icon und Badge auflösen (wichtig für iOS WebKit Background Service Worker)
+  // Prüfe Plattform: iOS WebKit nutzt für Web-Clip-PWA-Benachrichtigungen automatisch das Homescreen-Icon.
+  // Das Übergeben von externen/relativen Bild-URLs während des Reconnect-Fensters aus dem Flugmodus
+  // kann dazu führen, dass WebKit die Anzeige abbricht, wenn der Netzwerk-Stack noch initialisiert.
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
   const baseUrl = self.registration?.scope || self.location?.origin || '';
-  const iconUrl = payload.icon
+  const iconUrl = (!isIOS && payload.icon)
     ? (payload.icon.startsWith('http') ? payload.icon : (baseUrl ? new URL(payload.icon, baseUrl).href : payload.icon))
-    : (baseUrl ? new URL('icon-192.png', baseUrl).href : './icon-192.png');
-  const badgeUrl = payload.badge
+    : (!isIOS ? (baseUrl ? new URL('icon-192.png', baseUrl).href : './icon-192.png') : undefined);
+  const badgeUrl = (!isIOS && payload.badge)
     ? (payload.badge.startsWith('http') ? payload.badge : (baseUrl ? new URL(payload.badge, baseUrl).href : payload.badge))
-    : (baseUrl ? new URL('favicon.png', baseUrl).href : './favicon.png');
+    : (!isIOS ? (baseUrl ? new URL('favicon.png', baseUrl).href : './favicon.png') : undefined);
 
   const notifRecord = {
     id: notifId,
     title,
     body,
-    icon: iconUrl,
-    badge: badgeUrl,
+    icon: iconUrl || './icon-192.png',
+    badge: badgeUrl || './favicon.png',
     tag,
     type: notifType,
     data: {
@@ -459,15 +463,16 @@ function markNotifReadInIndexedDB(id) {
     read: false
   };
 
-  // 100% iOS WebKit- & APNs-kompatible NotificationOptions
+  // 100% robuste iOS WebKit- & APNs-kompatible NotificationOptions
   // WICHTIG: Keine actions auf iOS! (iOS WebKit unterstützt keine Web Clip Action-Buttons und verwirft Notifications sonst!)
   const notificationOptions = {
     body,
-    icon: iconUrl,
-    badge: badgeUrl,
     tag,
     data: notifRecord.data
   };
+
+  if (iconUrl) notificationOptions.icon = iconUrl;
+  if (badgeUrl) notificationOptions.badge = badgeUrl;
 
   // Actions NUR hinzufügen, wenn die Plattform dies nach W3C-Standard unterstützt (Notification.maxActions > 0)
   // Auf iOS WebKit ist Notification.maxActions === 0!
@@ -477,18 +482,31 @@ function markNotifReadInIndexedDB(id) {
     }
   }
 
-  // Wichtig für Apple APNs / iOS: showNotification() MUSS zuverlässig auflösen
+  // Wichtig für Apple APNs / iOS: showNotification() MUSS zuverlässig und sofort auflösen,
+  // unabhängig von IndexedDB-Locks beim Reconnect
   event.waitUntil(
-    Promise.all([
-      saveNotifToIndexedDB(notifRecord),
-      self.registration.showNotification(title, notificationOptions).catch((err) => {
+    (async () => {
+      // 1. ZUERST sofortige Anzeige im Sperrbildschirm & Notification Center
+      try {
+        await self.registration.showNotification(title, notificationOptions);
+      } catch (err) {
         console.warn('showNotification mit primären Optionen fehlgeschlagen, starte ultra-minimalen Fallback:', err);
-        return self.registration.showNotification(title, {
-          body,
-          data: notificationOptions.data
-        });
-      })
-    ])
+        try {
+          await self.registration.showNotification(title, {
+            body,
+            tag,
+            data: notificationOptions.data
+          });
+        } catch (_) {}
+      }
+
+      // 2. Parallel in IndexedDB für In-App Feed speichern (ohne showNotification zu blockieren)
+      try {
+        await saveNotifToIndexedDB(notifRecord);
+      } catch (err) {
+        console.warn('saveNotifToIndexedDB failed:', err);
+      }
+    })()
   );
 });
 
