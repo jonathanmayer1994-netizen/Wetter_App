@@ -1,5 +1,5 @@
 {
-  "version": "2.36.1",
-  "build": "20261120-1052",
-  "notes": "Move technical device identity and backend connection banners to collapsed bottom accordion for a clean, distraction-free notification settings UI"
+  "version": "2.36.2",
+  "build": "20261121-1125",
+  "notes": "Smart sunshine & snow timing synthesis in daily forecast and anti-truncation layout adjustments for mobile"
 }

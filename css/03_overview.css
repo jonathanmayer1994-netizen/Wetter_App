@@ -556,7 +556,7 @@
    ========================================================================== */
 .daily-table-header {
   display: grid;
-  grid-template-columns: 100px 135px 95px minmax(0, 1fr) 85px 22px;
+  grid-template-columns: 95px minmax(145px, 175px) 90px minmax(0, 1fr) 85px 22px;
   align-items: center;
   gap: 8px;
   padding: 8px 12px 10px 12px;
@@ -655,7 +655,7 @@
 
 .daily-interactive-row {
   display: grid;
-  grid-template-columns: 100px 135px 95px minmax(0, 1fr) 85px 22px;
+  grid-template-columns: 95px minmax(145px, 175px) 90px minmax(0, 1fr) 85px 22px;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;

@@ -272,7 +272,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
@@ -294,7 +294,7 @@
     grid-column: auto;
     grid-row: auto;
     flex-shrink: 0;
-    min-width: 58px;
+    min-width: 50px;
   }
 
   .daily-day-label .day-full {
@@ -319,25 +319,25 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     overflow: hidden;
   }
 
   .daily-icon-box {
-    font-size: 19px;
-    width: 30px;
-    height: 30px;
+    font-size: 18px;
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
     flex-shrink: 0;
   }
 
   .daily-cond-text {
-    font-size: 13.5px;
+    font-size: clamp(11.5px, 3.1vw, 13px);
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: -0.2px;
+    letter-spacing: -0.3px;
   }
 
   .daily-temp-cell {
@@ -380,7 +380,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    width: 16px;
+    width: 14px;
   }
 
   .daily-expand-chevron {
@@ -493,6 +493,30 @@
     .daily-interactive-row {
       padding: 9px 9px;
     }
+
+    .daily-row-mobile-top {
+      gap: 4px;
+    }
+
+    .daily-date-cell {
+      min-width: 46px;
+    }
+
+    .daily-condition-cell {
+      gap: 4px;
+    }
+
+    .daily-icon-box {
+      width: 25px;
+      height: 25px;
+      font-size: 16px;
+    }
+
+    .daily-cond-text {
+      font-size: 11.5px;
+      letter-spacing: -0.4px;
+    }
+
     .daily-row-mobile-bottom {
       gap: 4px;
     }

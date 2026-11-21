@@ -22,14 +22,14 @@ export const WMO_DESCRIPTIONS = {
   65: 'Starker Regen',
   66: 'Leichter gefrierender Regen',
   67: 'Starker gefrierender Regen',
-  71: 'Leichter Schneefall',
+  71: 'Leichter Schnee',
   73: 'Mäßiger Schneefall',
   75: 'Starker Schneefall',
   77: 'Schneegriesel',
-  80: 'Leichte Regenschauer',
+  80: 'Regenschauer',
   81: 'Mäßige Regenschauer',
   82: 'Heftige Regenschauer',
-  85: 'Leichte Schneeschauer',
+  85: 'Schneeschauer',
   86: 'Starke Schneeschauer',
   95: 'Gewitter',
   96: 'Gewitter mit leichtem Hagel',
@@ -54,13 +54,26 @@ export function buildDailyReport(deviceConfig, weather, timeInfo = {}) {
 
   // 1. Basis: WMO Beschreibung & Temperaturspanne
   const code = daily.weather_code?.[0] ?? current.weather_code ?? 0;
-  const desc = WMO_DESCRIPTIONS[code] || 'Mäßig bewölkt';
+  let desc = WMO_DESCRIPTIONS[code] || 'Mäßig bewölkt';
   const maxT = Math.round(daily.temperature_2m_max?.[0] ?? 15);
   const minT = Math.round(daily.temperature_2m_min?.[0] ?? 5);
 
   // 2. Sonnenstunden & Verteilung über den Tag
   const rawSunSec = Number(daily.sunshine_duration?.[0] || 0);
   const sunHours = Math.round((rawSunSec / 3600) * 10) / 10;
+
+  // Harmonisiere Beschreibung wenn trotz Schnee/Regen der Tag überwiegend sonnig ist
+  const isPrecipCode = [71, 73, 75, 77, 85, 86, 51, 53, 55, 61, 63, 65, 80, 81].includes(code);
+  if (sunHours >= 5.0 && isPrecipCode) {
+    const isSnow = [71, 73, 75, 77, 85, 86].includes(code) || (daily.snowfall_sum?.[0] || 0) > 0;
+    const hourlyP = hourly.precipitation || [];
+    const daytimeP = hourlyP.slice(7, 17).reduce((a, b) => a + b, 0);
+    if (daytimeP < 0.6) {
+      desc = isSnow ? 'Sonnig, nachts Schnee' : 'Sonnig, nachts Regen';
+    } else {
+      desc = isSnow ? 'Sonne & Schnee' : 'Sonne & Schauer';
+    }
+  }
 
   let sunPhrase = '';
   const clouds = hourly.cloud_cover || [];

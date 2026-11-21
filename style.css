@@ -1177,7 +1177,7 @@ body {
    ========================================================================== */
 .daily-table-header {
   display: grid;
-  grid-template-columns: 100px 135px 95px minmax(0, 1fr) 85px 22px;
+  grid-template-columns: 95px minmax(145px, 175px) 90px minmax(0, 1fr) 85px 22px;
   align-items: center;
   gap: 8px;
   padding: 8px 12px 10px 12px;
@@ -1276,7 +1276,7 @@ body {
 
 .daily-interactive-row {
   display: grid;
-  grid-template-columns: 100px 135px 95px minmax(0, 1fr) 85px 22px;
+  grid-template-columns: 95px minmax(145px, 175px) 90px minmax(0, 1fr) 85px 22px;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -9011,13 +9011,13 @@ body.is-scrolling .radar-floating-controls {
    ========================================================================== */
 @media (max-width: 1024px) {
   .daily-table-header {
-    grid-template-columns: 95px 125px 90px minmax(0, 1fr) 80px 22px;
+    grid-template-columns: 90px minmax(135px, 160px) 85px minmax(0, 1fr) 80px 22px;
     gap: 8px;
     padding: 8px 12px 10px 12px;
   }
 
   .daily-interactive-row {
-    grid-template-columns: 95px 125px 90px minmax(0, 1fr) 80px 22px;
+    grid-template-columns: 90px minmax(135px, 160px) 85px minmax(0, 1fr) 80px 22px;
     gap: 8px;
     padding: 10px 12px;
   }
@@ -9372,7 +9372,7 @@ body.is-scrolling .radar-floating-controls {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
@@ -9394,7 +9394,7 @@ body.is-scrolling .radar-floating-controls {
     grid-column: auto;
     grid-row: auto;
     flex-shrink: 0;
-    min-width: 58px;
+    min-width: 50px;
   }
 
   .daily-day-label .day-full {
@@ -9419,25 +9419,25 @@ body.is-scrolling .radar-floating-controls {
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     overflow: hidden;
   }
 
   .daily-icon-box {
-    font-size: 19px;
-    width: 30px;
-    height: 30px;
+    font-size: 18px;
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
     flex-shrink: 0;
   }
 
   .daily-cond-text {
-    font-size: 13.5px;
+    font-size: clamp(11.5px, 3.1vw, 13px);
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: -0.2px;
+    letter-spacing: -0.3px;
   }
 
   .daily-temp-cell {
@@ -9480,7 +9480,7 @@ body.is-scrolling .radar-floating-controls {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    width: 16px;
+    width: 14px;
   }
 
   .daily-expand-chevron {
@@ -9593,6 +9593,29 @@ body.is-scrolling .radar-floating-controls {
   @media (max-width: 360px) {
     .daily-interactive-row {
       padding: 9px 9px;
+    }
+
+    .daily-row-mobile-top {
+      gap: 4px;
+    }
+
+    .daily-date-cell {
+      min-width: 46px;
+    }
+
+    .daily-condition-cell {
+      gap: 4px;
+    }
+
+    .daily-icon-box {
+      width: 25px;
+      height: 25px;
+      font-size: 16px;
+    }
+
+    .daily-cond-text {
+      font-size: 11.5px;
+      letter-spacing: -0.4px;
     }
 
     .daily-row-mobile-bottom {

@@ -409,7 +409,7 @@ export function renderOverviewTab() {
     if (precipType === 'Schnee') {
       if (curPrecip >= 2.5 || cur.weather_code === 75 || cur.weather_code === 86) conditionLabel = 'Starker Schneefall';
       else if (curPrecip >= 0.6 || cur.weather_code === 73) conditionLabel = 'Schneefall';
-      else conditionLabel = 'Leichter Schneefall';
+      else conditionLabel = 'Leichter Schnee';
     } else if (precipType === 'Schneeregen') {
       conditionLabel = 'Schneeregen';
     } else {
