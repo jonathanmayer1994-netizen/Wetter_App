@@ -13,14 +13,20 @@ Verifies:
 """
 
 import sys
-import subprocess
+import threading
+import http.server
+import socketserver
 import time
 from playwright.sync_api import sync_playwright
 
 def run_suite():
-    port = 52910
-    server = subprocess.Popen(["python3", "-m", "http.server", str(port)])
-    time.sleep(1)
+    class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, format, *args): pass
+
+    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), QuietHandler)
+    port = httpd.server_address[1]
+    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    server_thread.start()
 
     passed = 0
     failed = 0
@@ -142,7 +148,7 @@ def run_suite():
             browser.close()
 
     finally:
-        server.terminate()
+        httpd.shutdown()
 
     print(f"\n==========================================")
     print(f"DEVICE FAVORITES SUITE: {passed}/{passed + failed} PASSED")
