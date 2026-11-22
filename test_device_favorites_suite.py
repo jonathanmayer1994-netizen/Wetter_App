@@ -22,8 +22,23 @@ from playwright.sync_api import sync_playwright
 def run_suite():
     class QuietHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args): pass
+        def end_headers(self):
+            self.send_header('Connection', 'close')
+            self.send_header('Cache-Control', 'no-cache')
+            super().end_headers()
+        def copyfile(self, source, outputfile):
+            try:
+                super().copyfile(source, outputfile)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
-    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), QuietHandler)
+    class TestHTTPServer(http.server.ThreadingHTTPServer):
+        request_queue_size = 128
+        allow_reuse_address = True
+        daemon_threads = True
+        def handle_error(self, request, client_address): pass
+
+    httpd = TestHTTPServer(('127.0.0.1', 0), QuietHandler)
     port = httpd.server_address[1]
     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     server_thread.start()

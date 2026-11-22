@@ -1,5 +1,5 @@
 {
-  "version": "2.36.3",
-  "build": "20261121-1226",
-  "notes": "Apple APNs Store-and-Forward alert headers, 05:00 morning pre-deposit, and robust SW offline-reconnect delivery"
+  "version": "2.36.4",
+  "build": "20261122-0858",
+  "notes": "Fix Glatteis hazard action button to navigate directly to 24h detail modal and hide action button when no action exists"
 }

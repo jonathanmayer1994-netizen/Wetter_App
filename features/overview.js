@@ -607,7 +607,7 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
         action: () => {
           switchTab('tab-mountain');
           setTimeout(() => {
-            const card = document.getElementById('avalanche-report-card');
+            const card = document.getElementById('avalanche-danger-card') || document.getElementById('avalanche-report-card');
             if (card) card.scrollIntoView({ behavior: 'smooth' });
           }, 100);
         }
@@ -644,9 +644,14 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
         icon: '🧊',
         badge: 'GLATTEISWARNUNG',
         msg: 'Gefrierende Nässe / Glatteisbildung auf Fahrbahnen, Brücken und Bergsteigen.',
-        actionText: 'Alpin-Details ➔',
+        actionText: '24h-Details ➔',
         action: () => {
-          switchTab(state.currentLocation.isMountain ? 'tab-mountain' : 'tab-overview');
+          if (daily && hourly && typeof openDayDetailModal === 'function') {
+            openDayDetailModal(todayIdx, daily, hourly);
+          } else {
+            const hList = document.getElementById('hourly-forecast-list') || document.getElementById('bento-grid');
+            if (hList) hList.scrollIntoView({ behavior: 'smooth' });
+          }
         }
       };
     }
@@ -658,12 +663,28 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
     if (badgeElem) badgeElem.innerText = hazard.badge;
     if (msgElem) msgElem.innerText = hazard.msg;
     if (actionBtn) {
-      actionBtn.innerText = hazard.actionText;
-      actionBtn.onclick = hazard.action;
+      if (hazard.action && hazard.actionText) {
+        actionBtn.innerText = hazard.actionText;
+        actionBtn.onclick = (e) => {
+          e.stopPropagation();
+          hazard.action();
+        };
+        actionBtn.style.display = 'inline-flex';
+        alertBox.style.cursor = 'pointer';
+        alertBox.onclick = () => {
+          hazard.action();
+        };
+      } else {
+        actionBtn.style.display = 'none';
+        actionBtn.onclick = null;
+        alertBox.style.cursor = 'default';
+        alertBox.onclick = null;
+      }
     }
     alertBox.style.display = 'flex';
   } else {
     alertBox.style.display = 'none';
+    alertBox.onclick = null;
   }
 }
 

@@ -284,6 +284,26 @@ def run_tests():
         }""")
         page.wait_for_timeout(200)
         report("Hazard alert banner becomes visible when acute condition triggers", page.is_visible("#hero-hazard-alert"))
+
+        # Test Glatteis hazard navigation & 24h detail modal
+        page.evaluate("""async () => {
+            const cur = { ...window.state.weatherData.current, temperature_2m: 0.1, precipitation: 0.8, weather_code: 66 };
+            const hourly = window.state.weatherData.hourly;
+            const daily = window.state.weatherData.daily;
+            const microData = window.state.microData;
+            const m = await import('./features/overview.js');
+            m.updateHeroHazardAlert(cur, daily, hourly, microData);
+        }""")
+        page.wait_for_timeout(200)
+        btn_text = page.inner_text("#hha-action-btn")
+        report("Glatteis hazard displays '24h-Details ➔' action button", "24h-Details" in btn_text)
+        
+        page.click("#hha-action-btn")
+        page.wait_for_timeout(300)
+        report("Clicking hazard action button opens day-detail-modal", page.is_visible("#day-detail-modal"))
+        page.click("#close-modal-btn")
+        page.wait_for_timeout(200)
+        report("Closing day-detail-modal returns to overview cleanly", not page.is_visible("#day-detail-modal"))
         
         page.close()
 
