@@ -176,8 +176,28 @@
   max-width: 100%;
 }
 
+.card-title-text,
+.card-title > span:not(.card-icon) {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .card-icon {
   font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  text-align: center;
+  user-select: none;
 }
 
 .card-tag {

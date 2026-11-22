@@ -30,30 +30,53 @@
   }
 
   .bento-compact-card .card-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
     flex-wrap: nowrap !important;
-    gap: 4px !important;
+    gap: 6px !important;
     min-width: 0 !important;
   }
 
   .bento-compact-card .card-title {
-    font-size: 10.5px !important;
-    gap: 4px !important;
+    font-size: 11px !important;
+    gap: 5px !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: hidden !important;
+  }
+
+  .bento-compact-card .card-icon {
+    font-size: 14px !important;
+    width: 17px !important;
+    min-width: 17px !important;
+    max-width: 17px !important;
+    height: 17px !important;
+    flex-shrink: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .bento-compact-card .card-title-text,
+  .bento-compact-card .card-title > span:not(.card-icon) {
+    flex: 1 1 auto !important;
     min-width: 0 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
-  }
-
-  .bento-compact-card .card-title > span:not(.card-icon) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
+    letter-spacing: 0.3px !important;
   }
 
   .bento-compact-card .bento-open-pill {
     font-size: 9.5px !important;
-    padding: 1px 5px !important;
+    padding: 2px 6px !important;
+    border-radius: 6px !important;
     flex-shrink: 0 !important;
     white-space: nowrap !important;
   }
