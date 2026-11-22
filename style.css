@@ -1238,6 +1238,8 @@ body {
   justify-content: center;
   padding: 8px 0 2px 0;
   width: 100%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .daily-expand-toggle-btn {
@@ -1258,6 +1260,14 @@ body {
   transition: all 0.2s ease;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.daily-expand-toggle-btn * {
+  pointer-events: none;
 }
 
 .daily-expand-toggle-btn:hover {
@@ -15754,19 +15764,19 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
   order: 4;
 }
 
-#verification-dashboard-section {
+#bento-grid {
   order: 5;
 }
 
-#bento-grid {
+.expert-mode-toggle-bar {
   order: 6;
 }
 
-.expert-mode-toggle-bar {
+#expert-details-container {
   order: 7;
 }
 
-#expert-details-container {
+#verification-dashboard-section {
   order: 8;
 }
 

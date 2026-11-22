@@ -447,10 +447,10 @@
 .hero-card { order: 2; }
 .hourly-card { order: 3; }
 .daily-card { order: 4; }
-#verification-dashboard-section { order: 5; }
-#bento-grid { order: 6; }
-.expert-mode-toggle-bar { order: 7; }
-#expert-details-container { order: 8; }
+#bento-grid { order: 5; }
+.expert-mode-toggle-bar { order: 6; }
+#expert-details-container { order: 7; }
+#verification-dashboard-section { order: 8; }
 
 /* --- Desktop Layout (>= 1024px: 14" & 16" Retina MacBook Pro / Desktop Displays) --- */
 @media (min-width: 1024px) {

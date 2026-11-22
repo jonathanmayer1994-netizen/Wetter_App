@@ -1676,8 +1676,9 @@ export function render10DayForecast(daily, hourly) {
     });
 
     const isExtended = visibleIdx >= 3;
+    const isInitiallyCollapsed = isExtended && !state.daily10DayExpanded;
     const wrapper = document.createElement('div');
-    wrapper.className = `daily-item-wrapper ${isExtended ? 'daily-extended-item is-collapsed' : ''}`;
+    wrapper.className = `daily-item-wrapper ${isExtended ? (isInitiallyCollapsed ? 'daily-extended-item is-collapsed' : 'daily-extended-item') : ''}`;
     wrapper.id = `daily-item-${i}`;
 
     wrapper.innerHTML = `
@@ -1903,37 +1904,46 @@ export function render10DayForecast(daily, hourly) {
 
   // 3-Tage-Fokus: "Ganze 10 Tage anzeigen" Toggle Button
   if (count > 3) {
+    const isExpanded = Boolean(state.daily10DayExpanded);
     const expandBtnWrapper = document.createElement('div');
     expandBtnWrapper.className = 'daily-expand-bar';
     expandBtnWrapper.innerHTML = `
-      <button type="button" class="daily-expand-toggle-btn" id="daily-expand-toggle-btn" aria-expanded="false">
+      <button type="button" class="daily-expand-toggle-btn ${isExpanded ? 'active' : ''}" id="daily-expand-toggle-btn" aria-expanded="${isExpanded ? 'true' : 'false'}">
         <span class="det-icon">📅</span>
-        <span class="det-text">Ganze 10 Tage anzeigen (noch ${count - 3} Tage)</span>
+        <span class="det-text">${isExpanded ? 'Weniger Tage anzeigen' : `Ganze 10 Tage anzeigen (noch ${count - 3} Tage)`}</span>
         <span class="det-arrow">▾</span>
       </button>
     `;
 
     const toggleBtn = expandBtnWrapper.querySelector('#daily-expand-toggle-btn');
-    toggleBtn.addEventListener('click', () => {
-      const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
-      const newExpanded = !isExpanded;
-      toggleBtn.setAttribute('aria-expanded', newExpanded ? 'true' : 'false');
+    const handleToggle = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const willExpand = !state.daily10DayExpanded;
+      state.daily10DayExpanded = willExpand;
 
-      const extendedItems = container.querySelectorAll('.daily-extended-item');
+      const activeBtn = document.getElementById('daily-expand-toggle-btn') || toggleBtn;
+      if (activeBtn) {
+        activeBtn.setAttribute('aria-expanded', willExpand ? 'true' : 'false');
+        activeBtn.classList.toggle('active', willExpand);
+        const detText = activeBtn.querySelector('.det-text');
+        if (detText) {
+          detText.innerText = willExpand ? 'Weniger Tage anzeigen' : `Ganze 10 Tage anzeigen (noch ${count - 3} Tage)`;
+        }
+      }
+
+      const extendedItems = document.querySelectorAll('#daily-forecast-list .daily-extended-item');
       extendedItems.forEach(el => {
-        el.classList.toggle('is-collapsed', !newExpanded);
+        el.classList.toggle('is-collapsed', !willExpand);
       });
+    };
 
-      const detText = toggleBtn.querySelector('.det-text');
-      const detArrow = toggleBtn.querySelector('.det-arrow');
-      if (newExpanded) {
-        if (detText) detText.innerText = 'Weniger Tage anzeigen';
-        if (detArrow) detArrow.innerText = '▴';
-        toggleBtn.classList.add('active');
-      } else {
-        if (detText) detText.innerText = `Ganze 10 Tage anzeigen (noch ${count - 3} Tage)`;
-        if (detArrow) detArrow.innerText = '▾';
-        toggleBtn.classList.remove('active');
+    toggleBtn.addEventListener('click', handleToggle);
+    expandBtnWrapper.addEventListener('click', (e) => {
+      if (e.target !== toggleBtn && !toggleBtn.contains(e.target)) {
+        handleToggle(e);
       }
     });
 

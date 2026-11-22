@@ -30,6 +30,7 @@ export const state = {
   selectedAltitudeHour: 0,
   favorites: [],
   overviewHourlyMode: 'highres',
+  daily10DayExpanded: false,
   map: {
     instance: null,
     marker: null,

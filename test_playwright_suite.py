@@ -117,7 +117,33 @@ def run_tests():
             report(f"Mobile bottom nav '{tab_attr}' activates #{expected_pane_id}", is_active)
             if tab_attr == "tab-map":
                 report("Mobile map entered full screen and close button is visible", mobile_page.is_visible("#map-mobile-close-btn"))
-            
+
+        # Mobile sequence & Prognose vs. Realität placement test
+        order_verif = mobile_page.evaluate('() => parseInt(window.getComputedStyle(document.querySelector("#verification-dashboard-section")).order, 10)')
+        order_bento = mobile_page.evaluate('() => parseInt(window.getComputedStyle(document.querySelector("#bento-grid")).order, 10)')
+        report("Prognose vs. Realität section is placed below Bento Grid in mobile UI order", order_verif > order_bento)
+
+        # 10-Day Forecast Expand Toggle & State Persistence Test
+        has_expand_btn = mobile_page.is_visible("#daily-expand-toggle-btn")
+        report("10-day expand toggle button is visible", has_expand_btn)
+        if has_expand_btn:
+            init_collapsed = mobile_page.evaluate('() => document.querySelectorAll("#daily-forecast-list .daily-extended-item.is-collapsed").length')
+            mobile_page.click("#daily-expand-toggle-btn")
+            mobile_page.wait_for_timeout(200)
+            after_expand_collapsed = mobile_page.evaluate('() => document.querySelectorAll("#daily-forecast-list .daily-extended-item.is-collapsed").length')
+            report("Clicking 'Ganze 10 Tage anzeigen' reveals all extended daily cards", after_expand_collapsed == 0 and init_collapsed > 0)
+
+            # Background re-render test (e.g. live fetch / pull-to-refresh)
+            mobile_page.evaluate('() => window.renderOverviewTab && window.renderOverviewTab()')
+            mobile_page.wait_for_timeout(200)
+            persisted_collapsed = mobile_page.evaluate('() => document.querySelectorAll("#daily-forecast-list .daily-extended-item.is-collapsed").length')
+            report("10-day expanded state persists across background re-render without collapsing", persisted_collapsed == 0)
+
+            mobile_page.click("#daily-expand-toggle-btn")
+            mobile_page.wait_for_timeout(200)
+            recollapsed = mobile_page.evaluate('() => document.querySelectorAll("#daily-forecast-list .daily-extended-item.is-collapsed").length')
+            report("Clicking 'Weniger Tage anzeigen' collapses back cleanly to 3-day view", recollapsed == init_collapsed)
+
         mobile_page.close()
 
         # =====================================================================
