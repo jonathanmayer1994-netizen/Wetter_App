@@ -1,5 +1,5 @@
 {
-  "version": "2.36.5",
-  "build": "20261122-0925",
-  "notes": "Move Prognose vs Realität section to bottom of UI and harden 10-day forecast expand toggle with state persistence"
+  "version": "2.36.6",
+  "build": "20261122-1000",
+  "notes": "Active morning window queue-refreshing, APNs collapse-id, and robust offline reconnect push delivery"
 }

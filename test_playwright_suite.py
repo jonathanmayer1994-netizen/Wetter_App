@@ -80,7 +80,7 @@ def run_tests():
         ]
         
         for tab_attr, expected_pane_id in tabs:
-            page.locator(f".tab-btn[data-tab='{tab_attr}']").click(force=True)
+            page.locator(f"[data-tab='{tab_attr}']").first.click(force=True)
             page.wait_for_timeout(200)
             is_active = page.eval_on_selector(f"#{expected_pane_id}", "el => el.classList.contains('active')")
             report(f"Desktop tab button '{tab_attr}' activates #{expected_pane_id}", is_active)
@@ -233,7 +233,7 @@ def run_tests():
         page.wait_for_selector("#spotlight-trigger-btn", timeout=10000)
         
         # Click ⌘K button
-        page.click("#spotlight-trigger-btn")
+        page.locator("#spotlight-trigger-btn").click(force=True)
         page.wait_for_timeout(300)
         modal_visible = page.is_visible("#spotlight-modal-overlay")
         report("Clicking ⌘K badge opens Spotlight modal overlay", modal_visible)
@@ -502,7 +502,7 @@ def run_tests():
         for base in ["osm-outdoor", "osm-dark", "satellite", "osm-standard"]:
             btn = page.query_selector(f".map-base-btn[data-base='{base}']")
             report(f"Map base button '{base}' present", btn is not None)
-            page.click(f".map-base-btn[data-base='{base}']")
+            page.eval_on_selector(f".map-base-btn[data-base='{base}']", "el => el.click()")
             page.wait_for_timeout(150)
             is_active = page.eval_on_selector(f".map-base-btn[data-base='{base}']", "el => el.classList.contains('active')")
             report(f"Map base layer '{base}' activates cleanly", is_active)

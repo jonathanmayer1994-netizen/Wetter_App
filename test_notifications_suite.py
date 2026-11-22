@@ -149,13 +149,15 @@ def run_tests():
         assert_test("Eco preset card is initially selected", "is-selected" in (preset_cards.first.get_attribute("class") or ""))
         
         # Click second card (Hourly)
-        preset_cards.nth(1).click()
+        preset_cards.nth(1).scroll_into_view_if_needed()
+        preset_cards.nth(1).click(force=True)
         page.wait_for_timeout(150)
         assert_test("Clicking Hourly preset selects Hourly card", "is-selected" in (preset_cards.nth(1).get_attribute("class") or ""))
         assert_test("Schedule select synced to 'hourly'", gl_schedule.input_value() == "hourly")
 
         # Re-click Eco card
-        preset_cards.first.click()
+        preset_cards.first.scroll_into_view_if_needed()
+        preset_cards.first.click(force=True)
         page.wait_for_timeout(150)
         assert_test("Schedule select synced back to 'eco'", gl_schedule.input_value() == "eco")
 

@@ -470,25 +470,45 @@ export function evaluateAlertRules(deviceConfig, weather, deviceState, timeInfo,
   const currentHour = timeInfo.hour;
 
   // 1. REGEL: Täglicher Bericht (Morgen-Briefing)
-  // Bei Apple APNs wird der Bericht ab 05:00 Uhr morgens (bzw. ab Wunschzeit) im APNs Store-and-Forward
-  // Puffer hinterlegt. Dadurch liegt er bereits bei Apple bereit, egal wann der Nutzer morgens aufsteht
-  // und den Flugmodus ausschaltet.
+  // Apple APNs Store-and-Forward Puffer & Aktives Morgen-Zustellungsfenster:
+  // Nutzer schalten nachts oft den Flugmodus ein und wachen zu unregelmäßigen Zeiten auf (05:00 - 09:30).
+  // APNs verwirft Web-Push-Nachrichten in der Offline-Queue häufig nach 30-60 Minuten Inaktivität.
+  // Lösung: Während des gesamten Morgenfensters (ab 05:00 Uhr bzw. Wunschzeit bis 10:00 Uhr)
+  // wird der Tagesbericht bei jedem Runner-Lauf (im Mindestabstand von 45 Min.) mit identischem
+  // Collapse-Key ('bw-briefing') und Tag ('briefing-YYYY-MM-DD') aktualisiert.
+  // - Ist das iPhone noch im Flugmodus: APNs aktualisiert die Queue mit der frischen Nachricht (nie abgelaufen!).
+  // - Sobald das iPhone online geht: Die Nachricht wird sofort zugestellt & bleibt im Notification Center.
+  // - Ist das iPhone schon online: Die Notification wird dank collapse-id lautlos in-place aktualisiert (kein Doppel-Spam).
   if (rules.briefingAlert) {
     const [rawH, rawM] = String(rules.briefingTime || '06:00').split(':');
     const targetHour = Number.isFinite(parseInt(rawH, 10)) ? parseInt(rawH, 10) : 6;
     const targetMin = Number.isFinite(parseInt(rawM, 10)) ? parseInt(rawM, 10) : 0;
     const targetTotalMin = targetHour * 60 + targetMin;
     const currentTotalMin = currentHour * 60 + (timeInfo.minute || 0);
-    const alreadySentToday = deviceState.lastBriefingDate === timeInfo.dateString;
 
-    // Für Apple APNs Pushes (Store-and-Forward): Bereitstellung ab 05:00 Uhr morgens (300 Min)
     const isAppleSub = Boolean(deviceConfig.subscription?.endpoint?.includes('push.apple.com'));
     const earliestDepositMin = isAppleSub ? Math.min(targetTotalMin, 5 * 60) : targetTotalMin;
+    const latestDepositMin = Math.max(targetTotalMin + 180, 10 * 60); // Morgenfenster bis mind. 10:00 Uhr
 
-    if (currentTotalMin >= earliestDepositMin && !alreadySentToday) {
+    const inMorningWindow = currentTotalMin >= earliestDepositMin && currentTotalMin < latestDepositMin;
+    const lastBriefingAt = deviceState.lastBriefingAt || 0;
+    const minIntervalMs = 45 * 60 * 1000; // Mindestens 45 Minuten Pause zwischen Queue-Refreshes
+    const intervalPassed = (nowMs - lastBriefingAt) >= minIntervalMs;
+    const alreadySentToday = deviceState.lastBriefingDate === timeInfo.dateString;
+
+    if (inMorningWindow && intervalPassed) {
       const dailyReportAlert = buildDailyReport(deviceConfig, weather, timeInfo);
       alerts.push(dailyReportAlert);
       deviceState.lastBriefingDate = timeInfo.dateString;
+      deviceState.lastBriefingAt = nowMs;
+      deviceState.lastBriefingCount = (deviceState.lastBriefingCount || 0) + 1;
+    } else if (!inMorningWindow && !alreadySentToday && currentTotalMin < 11 * 60 && intervalPassed) {
+      // Fallback für verspätete Cron-Läufe bis 11:00 Uhr falls morgens kein Lauf stattfand
+      const dailyReportAlert = buildDailyReport(deviceConfig, weather, timeInfo);
+      alerts.push(dailyReportAlert);
+      deviceState.lastBriefingDate = timeInfo.dateString;
+      deviceState.lastBriefingAt = nowMs;
+      deviceState.lastBriefingCount = (deviceState.lastBriefingCount || 0) + 1;
     }
   }
 
@@ -589,19 +609,27 @@ async function dispatchPushNotification(subscription, payload, vapidKeys) {
   const nowSec = Math.floor(Date.now() / 1000);
   const expirationSec = nowSec + 86400; // 24 Stunden Haltezeit im APNs Store-and-Forward Puffer
 
+  const isBriefing = payload.type === 'briefing' || payload.tag?.includes('briefing');
+  const collapseKey = isBriefing ? 'bw-briefing' : (payload.tag ? String(payload.tag).slice(0, 32) : 'bw-alert');
+
   // Apple APNs Spezifikation für Web Push:
   // - apns-push-type: 'alert' (Zwingend für Benachrichtigungen mit Anzeige im Sperrbildschirm / Notification Center)
   // - apns-priority: '10' (Sofortige Zustellung, weckt das iPhone auf sobald Internet da ist)
+  // - apns-collapse-id: 'bw-briefing' (Aktualisiert offline im APNs Puffer & online lautlos im Notification Center)
   // - apns-expiration: Epoch-Zeitstempel (Hält die Nachricht in der Warteschlange, wenn iPhone im Flugmodus ist)
   // - TTL: 86400 (RFC 8030 Web Push Time-To-Live in Sekunden)
+  // - Topic: 'bw-briefing' (RFC 8030 standard collapse topic)
   // - urgency: 'high'
   const pushOptions = {
     TTL: 86400,
     urgency: 'high',
+    topic: collapseKey,
     headers: {
+      Topic: collapseKey,
       ...(isApple ? {
         'apns-push-type': 'alert',
         'apns-priority': '10',
+        'apns-collapse-id': collapseKey,
         'apns-expiration': String(expirationSec)
       } : {})
     }
@@ -681,8 +709,15 @@ export async function processAllDevices(devices, globalState, deps = {}) {
       const curCode = weatherData.current?.weather_code;
       const isExtremeEmergency = curCode === 99 || (weatherData.current?.wind_gusts_10m || 0) >= 105;
       const allowEmergencyBypass = Boolean(device.rules?.bypassQuietHoursOnSevere);
-      // Erlaube Vorbereitung des Täglichen Berichts ab 05:00 Uhr morgens für den APNs Store-and-Forward Puffer
-      const isMorningBriefingDeposit = (timeInfo.hour >= 5 && device.rules?.briefingAlert && devState.lastBriefingDate !== timeInfo.dateString);
+
+      // Erlaube Vorbereitung/Refresh des Täglichen Berichts ab 05:00 Uhr morgens für den APNs Store-and-Forward Puffer
+      const [rawH, rawM] = String(device.rules?.briefingTime || '06:00').split(':');
+      const targetTotalMin = (parseInt(rawH, 10) || 6) * 60 + (parseInt(rawM, 10) || 0);
+      const currentTotalMin = timeInfo.hour * 60 + (timeInfo.minute || 0);
+      const earliestDepositMin = Math.min(targetTotalMin, 5 * 60);
+      const isMorningWindow = currentTotalMin >= earliestDepositMin && currentTotalMin < 10 * 60;
+      const minIntervalPassed = (nowMs - (devState.lastBriefingAt || 0)) >= 45 * 60 * 1000;
+      const isMorningBriefingDeposit = Boolean(device.rules?.briefingAlert && isMorningWindow && minIntervalPassed);
 
       if (!(isExtremeEmergency && allowEmergencyBypass) && !isMorningBriefingDeposit) {
         summary.skippedQuietHours++;
@@ -692,7 +727,7 @@ export async function processAllDevices(devices, globalState, deps = {}) {
       if (isExtremeEmergency && allowEmergencyBypass) {
         console.log(`🚨 [UUID ${idTag}…] EXTREM-UNWETTER! Ruhezeit für Gefahrenalarm umgangen.`);
       } else if (isMorningBriefingDeposit) {
-        console.log(`🌅 [UUID ${idTag}…] Vorbereitung Tagesbericht ab 05:00 Uhr im APNs Store-and-Forward Puffer (${timeInfo.formattedTime} Uhr).`);
+        console.log(`🌅 [UUID ${idTag}…] Vorbereitung/Refresh Tagesbericht im APNs Store-and-Forward Puffer (${timeInfo.formattedTime} Uhr, Refresh #${(devState.lastBriefingCount || 0) + 1}).`);
       }
     }
 

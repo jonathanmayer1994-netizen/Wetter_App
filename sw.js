@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.34.0';
-const CACHE_NAME = `best-weather-v2.34.0-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.36.6';
+const CACHE_NAME = `best-weather-v2.36.6-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
@@ -324,26 +324,6 @@ self.addEventListener('fetch', (event) => {
 });
 
 // =============================================================================
-// NATIVE WEB PUSH NOTIFICATIONS (iOS 16.4+ APNs & macOS Notification Center)
-// =============================================================================
-
-self.addEventListener('push', (event) => {
-  let payload = {};
-  if (event.data) {
-    try {
-      payload = event.data.json();
-    } catch (_) {
-      try {
-        payload = { title: 'Best Weather', body: event.data.text() };
-      } catch (_) {
-        payload = { title: 'Best Weather', body: 'Neue Wetteraktualisierung' };
-      }
-    }
-  } else {
-    payload = { title: 'Best Weather', body: 'Wetteraktualisierung verfügbar' };
-  }
-
-// =============================================================================
 // NATIVE PUSH NOTIFICATION STORAGE (IndexedDB 24h Retention in Service Worker)
 // =============================================================================
 const NOTIF_IDB_NAME = 'best-weather-db';
@@ -426,6 +406,26 @@ function markNotifReadInIndexedDB(id) {
   });
 }
 
+// =============================================================================
+// NATIVE WEB PUSH NOTIFICATIONS (iOS 16.4+ APNs & macOS Notification Center)
+// =============================================================================
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (_) {
+      try {
+        payload = { title: 'Best Weather', body: event.data.text() };
+      } catch (_) {
+        payload = { title: 'Best Weather', body: 'Neue Wetteraktualisierung' };
+      }
+    }
+  } else {
+    payload = { title: 'Best Weather', body: 'Wetteraktualisierung verfügbar' };
+  }
+
   const title = String(payload.title || 'Best Weather');
   const body = String(payload.body || 'Neue Wetterdaten verfügbar');
   const tag = String(payload.tag || 'best-weather-alert');
@@ -464,10 +464,12 @@ function markNotifReadInIndexedDB(id) {
   };
 
   // 100% robuste iOS WebKit- & APNs-kompatible NotificationOptions
-  // WICHTIG: Keine actions auf iOS! (iOS WebKit unterstützt keine Web Clip Action-Buttons und verwirft Notifications sonst!)
+  // - renotify: false verhindert störende Tonwiederholungen bei In-Place-Updates im Sperrbildschirm/Notification Center
+  // - Keine actions auf iOS! (iOS WebKit unterstützt keine Web Clip Action-Buttons)
   const notificationOptions = {
     body,
     tag,
+    renotify: false,
     data: notifRecord.data
   };
 
@@ -495,6 +497,7 @@ function markNotifReadInIndexedDB(id) {
           await self.registration.showNotification(title, {
             body,
             tag,
+            renotify: false,
             data: notificationOptions.data
           });
         } catch (_) {}
