@@ -1,5 +1,5 @@
 {
-  "version": "2.36.7",
-  "build": "20261122-2035",
-  "notes": "Fix bento card icon overlap and text layout, fix LUFTDRUCK typo, lock icon advance width"
+  "version": "2.36.8",
+  "build": "20261123-2015",
+  "notes": "Fix iOS Notification Center 24h retention with unique tags, renotify display wake, and background subscription self-healing"
 }

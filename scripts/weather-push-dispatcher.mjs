@@ -612,13 +612,12 @@ async function dispatchPushNotification(subscription, payload, vapidKeys) {
   const isBriefing = payload.type === 'briefing' || payload.tag?.includes('briefing');
   const collapseKey = isBriefing ? 'bw-briefing' : (payload.tag ? String(payload.tag).slice(0, 32) : 'bw-alert');
 
-  // Apple APNs Spezifikation für Web Push:
+  // Apple APNs Spezifikation für Web Push & 24h Notification Center Vorhaltung:
   // - apns-push-type: 'alert' (Zwingend für Benachrichtigungen mit Anzeige im Sperrbildschirm / Notification Center)
   // - apns-priority: '10' (Sofortige Zustellung, weckt das iPhone auf sobald Internet da ist)
-  // - apns-collapse-id: 'bw-briefing' (Aktualisiert offline im APNs Puffer & online lautlos im Notification Center)
-  // - apns-expiration: Epoch-Zeitstempel (Hält die Nachricht in der Warteschlange, wenn iPhone im Flugmodus ist)
-  // - TTL: 86400 (RFC 8030 Web Push Time-To-Live in Sekunden)
-  // - Topic: 'bw-briefing' (RFC 8030 standard collapse topic)
+  // - apns-expiration: Epoch-Zeitstempel (Hält die Nachricht 24h in der Warteschlange, wenn iPhone im Flugmodus ist)
+  // - KEIN starres apns-collapse-id! (Damit das iOS Notification Center JEDE Meldung mind. 24h gestapelt vorhält)
+  // - TTL: 86400 (RFC 8030 Web Push Time-To-Live: 24 Stunden)
   // - urgency: 'high'
   const pushOptions = {
     TTL: 86400,
@@ -629,7 +628,6 @@ async function dispatchPushNotification(subscription, payload, vapidKeys) {
       ...(isApple ? {
         'apns-push-type': 'alert',
         'apns-priority': '10',
-        'apns-collapse-id': collapseKey,
         'apns-expiration': String(expirationSec)
       } : {})
     }

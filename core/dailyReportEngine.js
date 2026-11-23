@@ -157,11 +157,13 @@ export function buildDailyReport(deviceConfig, weather, timeInfo = {}) {
     line2 += ` • ${highlights.join(' • ')}`;
   }
 
+  const notifId = `briefing_${dateString}_${Date.now().toString(36)}`;
   return {
+    id: notifId,
     type: 'briefing',
     title: `📊 Täglicher Bericht — ${locName}`,
     body: `${line1}\n${line2}`,
     tag: `briefing-${dateString}`,
-    data: { url: './', tab: 'tab-overview', type: 'briefing' }
+    data: { url: './', tab: 'tab-overview', type: 'briefing', id: notifId }
   };
 }

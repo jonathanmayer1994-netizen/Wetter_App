@@ -578,6 +578,63 @@ export async function enablePushNotifications() {
 }
 
 /**
+ * Intelligente Subscription-Selbstheilung & Token-Drift-Erkennung:
+ * Prüft beim App-Start und beim Reconnect in den Vordergrund, ob die im Browser hinterlegte
+ * Push-Subscription noch gültig ist und mit GitLab übereinstimmt.
+ * Heilt verlorene oder nach iOS-Updates rotierte Subscriptions vollautomatisch im Hintergrund.
+ */
+export async function selfHealPushSubscription() {
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker || typeof Notification === 'undefined') {
+    return { ok: false, reason: 'unsupported' };
+  }
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (!reg || !reg.pushManager) return { ok: false, reason: 'no-push-manager' };
+
+    let sub = await reg.pushManager.getSubscription();
+
+    // Wenn Benachrichtigungen im System erlaubt sind und die App Push aktiviert hatte, aber die Subscription
+    // z. B. nach iOS-Cache-Bereinigung oder PWA-Update verloren ging:
+    if (!sub && Notification.permission === 'granted' && currentConfig.enabled) {
+      console.log('🔄 [Push Self-Healing] Stelle verlorene iOS Push-Subscription wieder her...');
+      const keyArray = urlBase64ToUint8Array(DEFAULT_VAPID_PUBLIC_KEY);
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: keyArray
+      });
+    }
+
+    if (sub) {
+      const freshSubJson = sub.toJSON();
+      const currentEndpoint = currentSubscription?.endpoint || '';
+      const freshEndpoint = freshSubJson?.endpoint || '';
+
+      const endpointChanged = currentEndpoint !== freshEndpoint;
+      const keysChanged = JSON.stringify(currentSubscription?.keys || {}) !== JSON.stringify(freshSubJson?.keys || {});
+
+      if (endpointChanged || keysChanged || !currentConfig.enabled) {
+        console.log('🔄 [Push Self-Healing] Subscription-Drift erkannt — aktualisiere lokalen State & GitLab...');
+        currentSubscription = freshSubJson;
+        currentConfig.enabled = true;
+        saveNotificationState();
+        updateUIElements();
+
+        if (getGitLabAuthMode() !== 'disconnected') {
+          await syncToGitLab();
+          console.log('✓ [Push Self-Healing] Neue iOS Push-Subscription erfolgreich mit GitLab synchronisiert.');
+        }
+      }
+      return { ok: true, healed: endpointChanged || keysChanged };
+    }
+  } catch (err) {
+    console.warn('⚠️ [Push Self-Healing] Prüfung fehlgeschlagen:', err.message);
+    return { ok: false, error: err.message };
+  }
+  return { ok: true, upToDate: true };
+}
+
+/**
  * Entfernt ausschließlich die eigene anonyme Geräte-Variable aus GitLab CI,
  * ohne andere verknüpfte Geräte zu beeinflussen.
  */
@@ -1509,6 +1566,16 @@ export function initNotifications() {
   loadNotificationState();
   updateUIElements();
 
+  // Automatische Subscription-Selbstheilung bei App-Start & Reconnect in den Vordergrund
+  selfHealPushSubscription().catch(err => console.debug('Self-Heal Notice:', err.message));
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        selfHealPushSubscription().catch(err => console.debug('Self-Heal Notice:', err.message));
+      }
+    });
+  }
+
   // Prüfe automatisch, ob gerade ein GitLab OAuth 2.0 PKCE Callback (?code=...&state=...) eingetroffen ist
   handleGitLabOAuthCallback()
     .then(res => {
@@ -1928,4 +1995,5 @@ window.sendLocalTestPush = sendLocalTestPush;
 window.syncToGitLab = syncToGitLab;
 window.syncAndProvisionGitLab = syncAndProvisionGitLab;
 window.createOrUpdateGitLabSchedule = createOrUpdateGitLabSchedule;
+window.selfHealPushSubscription = selfHealPushSubscription;
 window.SCHEDULE_PRESETS = SCHEDULE_PRESETS;

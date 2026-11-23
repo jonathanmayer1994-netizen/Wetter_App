@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.36.7';
-const CACHE_NAME = `best-weather-v2.36.7-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.36.8';
+const CACHE_NAME = `best-weather-v2.36.8-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
@@ -463,13 +463,14 @@ self.addEventListener('push', (event) => {
     read: false
   };
 
-  // 100% robuste iOS WebKit- & APNs-kompatible NotificationOptions
-  // - renotify: false verhindert störende Tonwiederholungen bei In-Place-Updates im Sperrbildschirm/Notification Center
-  // - Keine actions auf iOS! (iOS WebKit unterstützt keine Web Clip Action-Buttons)
+  // 100% robuste iOS WebKit- & APNs-kompatible NotificationOptions:
+  // - tag: notifId garantiert, dass iOS Notification Center JEDE Meldung mind. 24h vorhält und NIE überschreibt
+  // - renotify: true weckt das Display und signalisiert aktiv
+  // - Keine actions auf iOS (iOS WebKit unterstützt keine Web Clip Action-Buttons)
   const notificationOptions = {
     body,
-    tag,
-    renotify: false,
+    tag: notifId,
+    renotify: true,
     data: notifRecord.data
   };
 
@@ -496,8 +497,8 @@ self.addEventListener('push', (event) => {
         try {
           await self.registration.showNotification(title, {
             body,
-            tag,
-            renotify: false,
+            tag: notifId,
+            renotify: true,
             data: notificationOptions.data
           });
         } catch (_) {}
