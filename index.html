@@ -1910,6 +1910,24 @@
                     <span class="ms-tick ms-tick-48h">+48h</span>
                   </div>
                   <div class="radar-slider-track-wrap ms-axis-track-wrap">
+                    <!-- Dynamic Floating Scrubber HUD: Apple-Grade Glass Capsule (schwebt ruckelfrei 65px über dem Berührungspunkt) -->
+                    <div id="radar-floating-scrubber-hud" class="radar-floating-scrubber-hud" aria-hidden="true">
+                      <div class="rfh-inner">
+                        <div class="rfh-row-time">
+                          <span class="rfh-time-label" id="rfh-time-label">Heute, 14:45</span>
+                          <span class="rfh-rel-badge" id="rfh-rel-badge">Live</span>
+                        </div>
+                        <div class="rfh-row-weather" id="rfh-row-weather">
+                          <span class="rfh-weather-icon" id="rfh-weather-icon">☀️</span>
+                          <span class="rfh-weather-temp" id="rfh-weather-temp">--°C</span>
+                          <span class="rfh-weather-sep">·</span>
+                          <span class="rfh-weather-precip" id="rfh-weather-precip">0 mm/h</span>
+                          <span class="rfh-weather-sep">·</span>
+                          <span class="rfh-weather-wind" id="rfh-weather-wind">0 km/h</span>
+                        </div>
+                      </div>
+                      <div class="rfh-arrow" id="rfh-arrow" aria-hidden="true"></div>
+                    </div>
                     <div class="ms-axis-bars" aria-hidden="true">
                       <span class="ms-bar-measured" id="ms-bar-measured"></span>
                       <span class="ms-dot-now" id="ms-dot-now"></span>

@@ -168,10 +168,10 @@ def run_mobile_tests():
             vertical_gap = radar_box["y"] - (pwc_box["y"] + pwc_box["height"])
             report(f"Zero collision between Point Weather Card and Radar Dock (gap: {vertical_gap:.1f}px >= 6px)", vertical_gap >= 6.0)
 
-        # Verify MeteoSwiss left Play button IS visible and redundant jump/step buttons are removed
+        # Verify MeteoSwiss left Play button & Speed button ARE visible and redundant jump/step buttons are removed
         report("MeteoSwiss Play button is visible", page.is_visible("#radar-play-btn"))
         report("Prev/Next buttons cleanly removed", page.query_selector("#radar-prev-btn") is None and page.query_selector("#radar-next-btn") is None)
-        report("Speed button cleanly removed", page.query_selector("#radar-speed-btn") is None)
+        report("MeteoSwiss Speed button is present", page.is_visible("#radar-speed-btn"))
         report("Quick jump pills row cleanly removed", page.query_selector(".radar-jump-pills-wrap") is None)
 
         # Verify complete date and time display without truncation

@@ -4612,7 +4612,7 @@ export function renderActiveWeatherOverlayForFrame(frame, overlay, renderOpts = 
     }
   }
 
-  const fullDateTimeText = relStr ? `${dayStr}, ${timeStr} (${relStr})` : `${dayStr}, ${timeStr} Uhr`;
+  const fullDateTimeText = relStr ? `${dayStr}, ${timeStr} Uhr (${relStr})` : `${dayStr}, ${timeStr} Uhr`;
 
   const modeChip = document.getElementById('radar-mode-chip');
   const timeDisplay = document.getElementById('radar-time-display');
@@ -5289,6 +5289,7 @@ export async function loadUnifiedRadarEngine(force = false) {
           quickSlider.value = livePos;
         }
         showUnifiedRadarFrame(livePos);
+        startPredictive3RingPreload(quickFrames);
       } else {
         realignRadarTimelineTimestamps(Date.now());
       }
@@ -5487,6 +5488,7 @@ export async function loadUnifiedRadarEngine(force = false) {
 
       // Feature 4A: Preload sichtbare 512px 2/0_1.png Radar-Tiles & DEM-Höhengitter
       preloadRadarFrames(unifiedFrames, state.map.radarHost);
+      startPredictive3RingPreload(unifiedFrames, state.map.radarHost);
       if (state.map.instance) {
         ViewportDemStore.scheduleFetchForMap(state.map.instance);
         ViewportForecastGridStore.scheduleFetchForMap(state.map.instance);
@@ -5515,6 +5517,55 @@ export function preloadRadarFrames(frames, host) {
     if (f.type === 'past' && p && !seen.has(p)) {
       seen.add(p);
       RainViewerRadarStore.requestVisibleTiles(p, host, rvZoom, b.getSouth(), b.getNorth(), b.getWest(), b.getEast());
+    }
+  });
+}
+
+/**
+ * SÄULE 3: Predictive 3-Ring Lazy Loading Engine
+ * Pre-populates frame weather summaries and loads radar tiles cooperatively
+ * so that scrubbing across -2h..+48h has 0ms network latency and zero main-thread hitching.
+ */
+export function startPredictive3RingPreload(frames, host) {
+  if (!frames || frames.length === 0) return;
+
+  const liveIdx = state.map?.liveRadarIndex !== undefined ? state.map.liveRadarIndex : 4;
+
+  // Ring 1: Express Near-Buffer (-2h to +6h: liveIdx - 8 to liveIdx + 24)
+  // Microtask: Sofortige Berechnung der Nahbereichs-Zusammenfassungen für 0ms Latenz
+  setTimeout(() => {
+    if (state.activeTab && state.activeTab !== 'tab-map' && document.hidden) return;
+    const r1Start = Math.max(0, liveIdx - 8);
+    const r1End = Math.min(frames.length - 1, liveIdx + 24);
+    for (let i = r1Start; i <= r1End; i++) {
+      if (frames[i]) getFrameWeatherSummary(frames[i]);
+    }
+    if (host && state.map?.instance) {
+      preloadRadarFrames(frames.slice(r1Start, liveIdx + 1), host);
+    }
+  }, 10);
+
+  // Ring 2: Mid-Range Buffer (+6h to +24h)
+  const runIdle = (typeof window !== 'undefined' && window.requestIdleCallback)
+    ? window.requestIdleCallback
+    : (cb) => setTimeout(cb, 100);
+
+  runIdle(() => {
+    if (state.activeTab && state.activeTab !== 'tab-map' && document.hidden) return;
+    const r2Start = Math.min(frames.length - 1, liveIdx + 25);
+    const r2End = Math.min(frames.length - 1, liveIdx + 96);
+    for (let i = r2Start; i <= r2End; i++) {
+      if (frames[i]) getFrameWeatherSummary(frames[i]);
+    }
+  });
+
+  // Ring 3: Long-Range Buffer (+24h to +48h)
+  runIdle(() => {
+    if (state.activeTab && state.activeTab !== 'tab-map' && document.hidden) return;
+    const r3Start = Math.min(frames.length - 1, liveIdx + 97);
+    const r3End = frames.length - 1;
+    for (let i = r3Start; i <= r3End; i++) {
+      if (frames[i]) getFrameWeatherSummary(frames[i]);
     }
   });
 }
@@ -5667,7 +5718,7 @@ export function getActiveInterpolatedRadarSpec() {
   return getInterpolatedRadarSpec(floatIdx);
 }
 
-export function updateMeteoSwissTimelineUI(frame, idx, total) {
+export function updateMeteoSwissTimelineUI(frame, idx, total, renderOpts = {}) {
   const frames = state.map && state.map.unifiedRadarFrames ? state.map.unifiedRadarFrames : [];
   const count = total || frames.length || 1;
   const maxIdx = Math.max(1, count - 1);
@@ -5710,25 +5761,30 @@ export function updateMeteoSwissTimelineUI(frame, idx, total) {
     cKind.classList.toggle('is-live', isMeasured);
   }
 
-  const needle = document.getElementById('ms-scrubber-needle');
-  if (needle) needle.style.left = `${pct.toFixed(2)}%`;
-
-  const barMeasured = document.getElementById('ms-bar-measured');
-  if (barMeasured) barMeasured.style.width = `${livePct.toFixed(2)}%`;
-
-  const dotNow = document.getElementById('ms-dot-now');
-  if (dotNow) dotNow.style.left = `${livePct.toFixed(2)}%`;
-
-  const tickNow = document.querySelector('.ms-tick-now');
-  if (tickNow) tickNow.style.left = `${livePct.toFixed(2)}%`;
-
-  const barForecast = document.getElementById('ms-bar-forecast');
-  if (barForecast) {
-    barForecast.style.left = `${livePct.toFixed(2)}%`;
-    barForecast.style.width = `${Math.max(0, 100 - livePct).toFixed(2)}%`;
+  if (!renderOpts.skipNeedleUpdate) {
+    const needle = document.getElementById('ms-scrubber-needle');
+    if (needle) needle.style.left = `${pct.toFixed(2)}%`;
   }
 
-  positionMeteoSwissAxisTicks(frames, liveIdx);
+  if (state.map._lastRenderedLivePct !== livePct) {
+    state.map._lastRenderedLivePct = livePct;
+    const barMeasured = document.getElementById('ms-bar-measured');
+    if (barMeasured) barMeasured.style.width = `${livePct.toFixed(2)}%`;
+
+    const dotNow = document.getElementById('ms-dot-now');
+    if (dotNow) dotNow.style.left = `${livePct.toFixed(2)}%`;
+
+    const tickNow = document.querySelector('.ms-tick-now');
+    if (tickNow) tickNow.style.left = `${livePct.toFixed(2)}%`;
+
+    const barForecast = document.getElementById('ms-bar-forecast');
+    if (barForecast) {
+      barForecast.style.left = `${livePct.toFixed(2)}%`;
+      barForecast.style.width = `${Math.max(0, 100 - livePct).toFixed(2)}%`;
+    }
+
+    positionMeteoSwissAxisTicks(frames, liveIdx);
+  }
 }
 
 /**
@@ -5788,13 +5844,13 @@ export function showUnifiedRadarFrame(idx, renderOpts = {}) {
   state.map.radarIndex = spec.nearestIdx;
 
   const slider = document.getElementById('radar-time-slider');
-  if (slider) {
+  if (slider && !renderOpts.skipSliderUpdate) {
     if (slider.step !== 'any') slider.step = 'any';
     slider.value = spec.floatIdx;
   }
 
   updateJumpButtonsActive(spec.nearestIdx);
-  updateMeteoSwissTimelineUI(spec.frame, spec.floatIdx, frames.length);
+  updateMeteoSwissTimelineUI(spec.frame, spec.floatIdx, frames.length, renderOpts);
   updateMapSolarTransition(spec.frame.timestampMs);
 
   // Rendere das aktuell gewählte Wetter-Overlay exakt für diesen stufenlosen Zeitschritt
@@ -5812,35 +5868,270 @@ export function showUnifiedRadarFrame(idx, renderOpts = {}) {
 }
 
 /**
+ * Cached weather summary for HUD snapshot (O(1) memory lookup)
+ */
+export function getFrameWeatherSummary(frame) {
+  if (!frame) return null;
+  if (frame._cachedSummary) return frame._cachedSummary;
+
+  const t = new Date(frame.timestampMs || Date.now());
+  const now = new Date();
+  const isToday = t.toDateString() === now.toDateString();
+  const tmrw = new Date(now.getTime() + 86400000);
+  const isTomorrow = t.toDateString() === tmrw.toDateString();
+  const dayStr = isToday ? 'Heute' : (isTomorrow ? 'Morgen' : t.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }));
+  const timeStr = t.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+  const rawMo = frame.minuteOffset !== undefined ? Number(frame.minuteOffset) : undefined;
+  const dispMin = rawMo !== undefined ? Math.round(rawMo) : undefined;
+  const isLive = !!(frame.isLive || dispMin === 0);
+
+  let relStr = 'Live';
+  if (isLive) {
+    relStr = 'Live';
+  } else if (dispMin !== undefined) {
+    if (dispMin < 0) {
+      relStr = `vor ${Math.abs(dispMin)}m`;
+    } else if (dispMin < 60) {
+      relStr = `+${dispMin}m`;
+    } else if (dispMin % 60 === 0) {
+      relStr = `+${dispMin / 60}h`;
+    } else {
+      relStr = `+${Math.floor(dispMin / 60)}h ${dispMin % 60}m`;
+    }
+  } else if (frame.hoursFromNow) {
+    relStr = `+${Math.round(frame.hoursFromNow)}h`;
+  }
+
+  const locWeather = getLocationWeatherForFrame(frame);
+  const codeInfo = (typeof WMO_CODES !== 'undefined' && locWeather && WMO_CODES[locWeather.weatherCode])
+    ? WMO_CODES[locWeather.weatherCode]
+    : { label: 'Heiter', icon: '☀️' };
+
+  let precipText = '0 mm/h';
+  if (locWeather && locWeather.precip >= 0.04) {
+    if (locWeather.precipPhase === 'snow' || (locWeather.snow && locWeather.snow >= 0.02)) {
+      precipText = `❄️ ${locWeather.precip.toFixed(1)} mm/h`;
+    } else if (locWeather.precipPhase === 'sleet') {
+      precipText = `🌨️ ${locWeather.precip.toFixed(1)} mm/h`;
+    } else {
+      precipText = `🌧️ ${locWeather.precip.toFixed(1)} mm/h`;
+    }
+  }
+
+  const tempText = locWeather ? `${locWeather.temp > 0 ? '+' : ''}${locWeather.temp.toFixed(1)}°` : '--°';
+  const windText = locWeather ? `${locWeather.windSpeed} km/h` : '0 km/h';
+
+  const summary = {
+    dayStr,
+    timeStr,
+    relStr,
+    isLive,
+    tempText,
+    icon: codeInfo.icon || '☀️',
+    label: codeInfo.label || 'Klar',
+    precipText,
+    windText
+  };
+  frame._cachedSummary = summary;
+  return summary;
+}
+
+// Zero-allocation DOM reference cache for 120 FPS timeline scrubbing
+let _hudRefs = null;
+function getHudRefs() {
+  if (!_hudRefs || !_hudRefs.hud || !document.body.contains(_hudRefs.hud)) {
+    const hud = document.getElementById('radar-floating-scrubber-hud');
+    const needle = document.getElementById('ms-scrubber-needle');
+    const slider = document.getElementById('radar-time-slider');
+    _hudRefs = {
+      hud,
+      needle,
+      slider,
+      arrow: document.getElementById('rfh-arrow'),
+      timeLabel: document.getElementById('rfh-time-label'),
+      relBadge: document.getElementById('rfh-rel-badge'),
+      weatherIcon: document.getElementById('rfh-weather-icon'),
+      weatherTemp: document.getElementById('rfh-weather-temp'),
+      weatherPrecip: document.getElementById('rfh-weather-precip'),
+      weatherWind: document.getElementById('rfh-weather-wind'),
+      trackWrap: slider ? slider.parentElement : null
+    };
+  }
+  return _hudRefs;
+}
+
+let _lastHapticMilestone = null;
+let _lastHapticIdx = null;
+
+/**
+ * Phase A: Instant 120 FPS needle and HUD positioning with edge clamping & arrow alignment
+ */
+export function updateScrubberHud(val, frames) {
+  const refs = getHudRefs();
+  if (!refs.hud || !frames || frames.length === 0) return;
+
+  const count = frames.length;
+  const maxIdx = Math.max(1, count - 1);
+  const clampedVal = Math.max(0, Math.min(maxIdx, val));
+  const pct = (clampedVal / maxIdx) * 100;
+  const nearestIdx = Math.round(clampedVal);
+  const frame = frames[nearestIdx];
+
+  // 1. Instant 120 FPS Needle Position Update
+  if (refs.needle) {
+    refs.needle.style.left = `${pct.toFixed(2)}%`;
+  }
+
+  // 2. Weather Summary Snapshot (Cached / Memoized O(1))
+  const summary = getFrameWeatherSummary(frame);
+  if (summary) {
+    if (refs.timeLabel) refs.timeLabel.textContent = `${summary.dayStr}, ${summary.timeStr}`;
+    if (refs.relBadge) {
+      refs.relBadge.textContent = summary.relStr;
+      refs.relBadge.classList.toggle('is-live', summary.isLive);
+    }
+    if (refs.weatherIcon) refs.weatherIcon.textContent = summary.icon;
+    if (refs.weatherTemp) refs.weatherTemp.textContent = summary.tempText;
+    if (refs.weatherPrecip) refs.weatherPrecip.textContent = summary.precipText;
+    if (refs.weatherWind) refs.weatherWind.textContent = summary.windText;
+  }
+
+  // 3. Apple-Grade Horizontal Clamping & Arrow Alignment
+  const trackWrap = refs.trackWrap || (refs.slider ? refs.slider.parentElement : null);
+  const trackWidth = trackWrap ? trackWrap.clientWidth : 320;
+  const needlePx = (pct / 100) * trackWidth;
+  const hudWidth = refs.hud.offsetWidth || 195;
+
+  const minX = 0;
+  const maxX = Math.max(0, trackWidth - hudWidth);
+  const clampedHudX = Math.max(minX, Math.min(maxX, needlePx - (hudWidth / 2)));
+  const arrowX = Math.max(12, Math.min(hudWidth - 12, needlePx - clampedHudX));
+
+  refs.hud.style.transform = `translate3d(${clampedHudX.toFixed(1)}px, 0, 0)`;
+  if (refs.arrow) {
+    refs.arrow.style.transform = `translate3d(${arrowX.toFixed(1)}px, 0, 0) translateX(-50%)`;
+  }
+
+  // 4. Subtle Taptic Feedback at Milestone Crossings (Jetzt, +24h, Day Boundary)
+  const liveIdx = state.map?.liveRadarIndex !== undefined ? state.map.liveRadarIndex : 4;
+  if (_lastHapticIdx !== nearestIdx) {
+    let milestone = null;
+    if (nearestIdx === liveIdx) {
+      milestone = 'now';
+    } else if (frame && frame.minuteOffset && Math.abs(frame.minuteOffset - 1440) < 20) {
+      milestone = '24h';
+    } else if (frame && frame.minuteOffset && Math.abs(frame.minuteOffset - 2880) < 20) {
+      milestone = '48h';
+    }
+
+    if (milestone && milestone !== _lastHapticMilestone) {
+      _lastHapticMilestone = milestone;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(8); } catch (_) {}
+      }
+    } else if (!milestone) {
+      _lastHapticMilestone = null;
+    }
+    _lastHapticIdx = nearestIdx;
+  }
+}
+
+export function showScrubberHud(val) {
+  const refs = getHudRefs();
+  if (!refs.hud) return;
+  refs.hud.classList.add('is-active');
+  if (refs.needle) refs.needle.classList.add('is-active');
+  const frames = state.map?.unifiedRadarFrames;
+  if (frames && frames.length) {
+    updateScrubberHud(val !== undefined ? val : (parseFloat(refs.slider?.value) || 0), frames);
+  }
+}
+
+export function hideScrubberHud() {
+  const refs = getHudRefs();
+  if (refs.hud) {
+    refs.hud.classList.remove('is-active');
+  }
+  if (refs.needle) {
+    refs.needle.classList.remove('is-active');
+  }
+  _lastHapticMilestone = null;
+}
+
+let _scrubRafId = null;
+let _pendingScrubVal = null;
+
+function scheduleScrubbedFrameRender(val) {
+  _pendingScrubVal = val;
+  if (_scrubRafId) return; // a frame is already queued for next vsync
+  _scrubRafId = requestAnimationFrame(() => {
+    _scrubRafId = null;
+    const target = _pendingScrubVal;
+    if (Number.isFinite(target)) {
+      showUnifiedRadarFrame(target, { isScrubOrPlay: true, skipNeedleUpdate: true, skipSliderUpdate: true });
+    }
+  });
+}
+
+/**
  * Richtet alle Transport- & Schnellsprung-Buttons für das 24h-Radar ein
  */
 export function setupUnifiedRadarControls() {
   const slider = document.getElementById('radar-time-slider');
   if (slider) {
     slider.step = 'any';
-    slider.addEventListener('input', (e) => {
+
+    const onStartScrub = () => {
       stopRadarAnimation();
-      const val = parseFloat(e.target.value);
+      const val = parseFloat(slider.value);
+      showScrubberHud(val);
+    };
+
+    const onMoveScrub = (e) => {
+      stopRadarAnimation();
+      const val = parseFloat(slider.value);
+      if (Number.isFinite(val)) {
+        const frames = state.map?.unifiedRadarFrames;
+        if (frames && frames.length) {
+          const nearest = Math.max(0, Math.min(frames.length - 1, Math.round(val)));
+          state.map._currentScrubbedMinuteOffset = frames[nearest]?.minuteOffset;
+          updateScrubberHud(val, frames);
+        }
+        scheduleScrubbedFrameRender(val);
+      }
+    };
+
+    const onEndScrub = () => {
+      hideScrubberHud();
+      const val = parseFloat(slider.value);
       if (Number.isFinite(val)) {
         const frames = state.map?.unifiedRadarFrames;
         if (frames && frames.length) {
           const nearest = Math.max(0, Math.min(frames.length - 1, Math.round(val)));
           state.map._currentScrubbedMinuteOffset = frames[nearest]?.minuteOffset;
         }
-        showUnifiedRadarFrame(val, { isScrubOrPlay: true });
+        showUnifiedRadarFrame(val, { isScrubOrPlay: false, skipNeedleUpdate: false });
       }
-    });
-    slider.addEventListener('change', (e) => {
-      const val = parseFloat(e.target.value);
-      if (Number.isFinite(val)) {
-        const frames = state.map?.unifiedRadarFrames;
-        if (frames && frames.length) {
-          const nearest = Math.max(0, Math.min(frames.length - 1, Math.round(val)));
-          state.map._currentScrubbedMinuteOffset = frames[nearest]?.minuteOffset;
+    };
+
+    slider.addEventListener('pointerdown', onStartScrub, { passive: true });
+    slider.addEventListener('touchstart', onStartScrub, { passive: true });
+    slider.addEventListener('input', onMoveScrub);
+    slider.addEventListener('pointerup', onEndScrub, { passive: true });
+    slider.addEventListener('touchend', onEndScrub, { passive: true });
+    slider.addEventListener('pointercancel', onEndScrub, { passive: true });
+    slider.addEventListener('touchcancel', onEndScrub, { passive: true });
+    slider.addEventListener('change', onEndScrub);
+
+    if (typeof window !== 'undefined' && !window._msAxisResizeBound) {
+      window._msAxisResizeBound = true;
+      window.addEventListener('resize', () => {
+        if (state.map?.unifiedRadarFrames) {
+          positionMeteoSwissAxisTicks(state.map.unifiedRadarFrames);
         }
-        showUnifiedRadarFrame(val, { isScrubOrPlay: false });
-      }
-    });
+      }, { passive: true });
+    }
   }
 
   const toggleBtn = document.getElementById('radar-player-toggle-btn');

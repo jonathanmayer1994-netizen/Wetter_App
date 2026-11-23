@@ -1,5 +1,5 @@
 {
-  "version": "2.36.8",
-  "build": "20261123-2015",
-  "notes": "Fix iOS Notification Center 24h retention with unique tags, renotify display wake, and background subscription self-healing"
+  "version": "2.36.9",
+  "build": "20261123-2055",
+  "notes": "Apple-grade 120 FPS map timeline scrubber with floating HUD, 48px touch hitbox, and 3-ring predictive cache"
 }

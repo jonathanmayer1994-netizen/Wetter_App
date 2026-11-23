@@ -2196,20 +2196,157 @@
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.85), 0 0 2px rgba(0, 0, 0, 0.8);
   pointer-events: none;
   z-index: 3;
+  will-change: left, transform;
+  transition: width 0.12s ease, box-shadow 0.12s ease;
 }
 
+.ms-scrubber-needle.is-active,
+#radar-time-slider:active ~ .ms-scrubber-needle {
+  width: 3.5px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 1), 0 0 20px rgba(56, 189, 248, 0.9);
+}
+
+/* =============================================================================
+ * DYNAMIC FLOATING SCRUBBER HUD: Apple-grade 65px Floating Glass Capsule
+ * ============================================================================= */
+.radar-floating-scrubber-hud {
+  position: absolute;
+  bottom: 68px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(0, 6px, 0) scale(0.92);
+  transform-origin: bottom center;
+  transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.15s;
+  will-change: transform, opacity;
+  white-space: nowrap;
+}
+
+.radar-floating-scrubber-hud.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.radar-floating-scrubber-hud .rfh-inner {
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  border-radius: 12px;
+  padding: 6px 12px 6px 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 16px rgba(56, 189, 248, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 175px;
+  text-align: center;
+}
+
+.radar-floating-scrubber-hud .rfh-arrow {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgba(15, 23, 42, 0.94);
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+  will-change: transform;
+}
+
+.rfh-row-time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.rfh-time-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.2px;
+}
+
+.rfh-rel-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.rfh-rel-badge.is-live {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+.rfh-row-weather {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4.5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.rfh-weather-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.rfh-weather-temp {
+  font-weight: 700;
+  color: #ffffff;
+  font-family: var(--font-mono, monospace);
+}
+
+.rfh-weather-sep {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 10px;
+}
+
+.rfh-weather-precip {
+  color: #7dd3fc;
+}
+
+.rfh-weather-wind {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+/* 48px Ergonomic Touch Target (Apple Guideline compliant) */
 #radar-time-slider {
   position: absolute;
-  inset: 0;
+  top: -13px;
+  left: 0;
+  right: 0;
   width: 100%;
-  height: 100%;
+  height: 48px;
   opacity: 0;
   margin: 0;
   cursor: pointer;
-  z-index: 4;
-  touch-action: pan-x;
+  z-index: 10;
+  touch-action: none;
   -webkit-appearance: none;
   appearance: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .radar-timeline-markers,
