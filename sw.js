@@ -504,11 +504,15 @@ self.addEventListener('push', (event) => {
         } catch (_) {}
       }
 
-      // 2. Parallel in IndexedDB für In-App Feed speichern (ohne showNotification zu blockieren)
+      // 2. Parallel in IndexedDB für In-App Feed speichern & iOS App Badge setzen
       try {
         await saveNotifToIndexedDB(notifRecord);
       } catch (err) {
         console.warn('saveNotifToIndexedDB failed:', err);
+      }
+
+      if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
+        navigator.setAppBadge().catch(() => {});
       }
     })()
   );
@@ -528,6 +532,10 @@ self.addEventListener('notificationclick', (event) => {
 
   if (notifId) {
     markNotifReadInIndexedDB(notifId);
+  }
+
+  if (typeof navigator !== 'undefined' && 'clearAppBadge' in navigator) {
+    navigator.clearAppBadge().catch(() => {});
   }
 
   event.waitUntil(

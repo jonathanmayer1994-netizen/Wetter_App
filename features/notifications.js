@@ -1379,16 +1379,20 @@ function escapeHtml(str) {
  */
 export async function updateHeaderUnreadBadge() {
   const dot = document.getElementById('notif-unread-dot');
-  if (!dot) return;
   try {
     const count = await getUnreadNotificationCount();
-    if (count > 0) {
-      dot.style.display = 'block';
-    } else {
-      dot.style.display = 'none';
+    if (dot) {
+      dot.style.display = count > 0 ? 'block' : 'none';
+    }
+    if (typeof navigator !== 'undefined') {
+      if (count > 0 && 'setAppBadge' in navigator) {
+        navigator.setAppBadge(count).catch(() => {});
+      } else if (count === 0 && 'clearAppBadge' in navigator) {
+        navigator.clearAppBadge().catch(() => {});
+      }
     }
   } catch (_) {
-    dot.style.display = 'none';
+    if (dot) dot.style.display = 'none';
   }
 }
 
