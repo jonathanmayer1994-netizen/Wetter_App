@@ -1,5 +1,5 @@
 {
-  "version": "2.37.4",
-  "build": "20261124-1335",
-  "notes": "Strict 1x Daily Report guarantee: eliminate hourly briefing push loop, deduplicate shared endpoints, preserve read status, collapse feed spam"
+  "version": "2.37.5",
+  "build": "20261124-1355",
+  "notes": "Remove Command+K badge from search bar for clean, unclipped placeholder layout and pure Apple GPS icon"
 }

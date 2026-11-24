@@ -74,21 +74,25 @@ def run_startup_telemetry_tests():
         }""")
         report("Header brand is ultra-clean (no Stadt/Flachland & no 5G pill)", header_clean)
 
-        # Test: Search Bar Placeholder & Pure Symbol GPS button
+        # Test: Search Bar Placeholder & Pure Symbol GPS button & No ⌘K
         search_ui = page.evaluate("""() => {
             const input = document.getElementById('location-search-input');
             const gpsBtn = document.getElementById('quick-gps-btn');
+            const searchBox = document.querySelector('.search-input-box');
             const hasSvg = !!gpsBtn && !!gpsBtn.querySelector('.sig-svg');
             const hasText = !!gpsBtn && !!gpsBtn.querySelector('.sig-text');
+            const hasCmdK = !!searchBox && (searchBox.innerText.includes('⌘K') || searchBox.innerHTML.includes('⌘K'));
             return {
                 placeholder: input ? input.placeholder : '',
                 hasSvg: hasSvg,
                 hasText: hasText,
+                hasCmdK: hasCmdK,
                 btnWidth: gpsBtn ? gpsBtn.offsetWidth : 0
             };
         }""")
         report("Search bar placeholder is readable and clean ('Ort oder Berg suchen')", search_ui["placeholder"] == "Ort oder Berg suchen")
         report("GPS button is a pure icon symbol (SVG present, no text label)", search_ui["hasSvg"] and not search_ui["hasText"])
+        report("Command K badge (⌘K) is cleanly removed from search bar", not search_ui["hasCmdK"])
 
         # Capture Screenshot of Redesigned Top Bar & Search Bar
         artifact_path = "/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_redesigned_top_bar.png"

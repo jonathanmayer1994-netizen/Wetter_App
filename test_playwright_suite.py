@@ -230,13 +230,11 @@ def run_tests():
         print("\n--- SUITE 5: Apple Spotlight Search Modal (⌘K) ---")
         page = browser.new_page(viewport={"width": 1280, "height": 850})
         page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
-        page.wait_for_selector("#spotlight-trigger-btn", timeout=10000)
-        
-        # Click ⌘K button
-        page.locator("#spotlight-trigger-btn").click(force=True)
+        # Open Spotlight via ⌘K keyboard shortcut
+        page.keyboard.press("Meta+k")
         page.wait_for_timeout(300)
         modal_visible = page.is_visible("#spotlight-modal-overlay")
-        report("Clicking ⌘K badge opens Spotlight modal overlay", modal_visible)
+        report("Pressing ⌘K shortcut opens Spotlight modal overlay", modal_visible)
         
         # Press Escape to close
         page.keyboard.press("Escape")
@@ -650,7 +648,7 @@ def run_tests():
         page.click("#fav-toggle-btn")
         report("Header favorite toggle button updates state cleanly", True)
 
-        page.click("#spotlight-trigger-btn")
+        page.keyboard.press("Meta+k")
         page.wait_for_timeout(100)
         spot_open = page.is_visible("#spotlight-modal-overlay")
         page.keyboard.press("Escape")
