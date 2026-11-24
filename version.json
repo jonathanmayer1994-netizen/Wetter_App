@@ -1,5 +1,5 @@
 {
-  "version": "2.37.1",
-  "build": "20261124-1305",
-  "notes": "Redesigned clean top bar, hidden telemetry in notification settings, removed Stadt/Flachland badge"
+  "version": "2.37.2",
+  "build": "20261124-1315",
+  "notes": "Redesigned search bar with readable placeholder 'Ort oder Berg suchen' and pure Apple-grade GPS symbol button"
 }

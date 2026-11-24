@@ -214,7 +214,7 @@ export function updateLocationHeaderUI() {
   }
   const searchInput = document.getElementById('location-search-input');
   if (searchInput) {
-    searchInput.placeholder = `${loc.name} · Suchen...`;
+    searchInput.placeholder = 'Ort oder Berg suchen';
   }
 
   const badge = document.getElementById('location-type-badge');

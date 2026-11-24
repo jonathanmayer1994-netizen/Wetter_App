@@ -289,7 +289,8 @@ export async function triggerExactGps(options = {}) {
     }
   } else {
     if (quickGpsBtn) {
-      quickGpsBtn.style.opacity = '0.6';
+      quickGpsBtn.style.opacity = '0.7';
+      quickGpsBtn.classList.add('is-locating');
       const txt = quickGpsBtn.querySelector('.hgp-text, .sig-text');
       if (txt) txt.innerText = 'Ermittle... 🛰️';
     }
@@ -307,6 +308,7 @@ export async function triggerExactGps(options = {}) {
 
       if (quickGpsBtn) {
         quickGpsBtn.style.opacity = '1';
+        quickGpsBtn.classList.remove('is-locating');
         const txt = quickGpsBtn.querySelector('.hgp-text, .sig-text');
         if (txt) txt.innerText = 'Standort';
       }
@@ -366,6 +368,7 @@ export async function triggerExactGps(options = {}) {
       }
       if (quickGpsBtn) {
         quickGpsBtn.style.opacity = '1';
+        quickGpsBtn.classList.remove('is-locating');
         const txt = quickGpsBtn.querySelector('.hgp-text, .sig-text');
         if (txt) txt.innerText = 'Standort';
       }

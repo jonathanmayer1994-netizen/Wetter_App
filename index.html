@@ -69,7 +69,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=3.1.1">
+  <link rel="stylesheet" href="style.css?v=3.1.2">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -187,14 +187,15 @@
               <input 
                 type="text" 
                 id="location-search-input" 
-                placeholder="Ort, Gipfel oder Koordinaten suchen..." 
+                placeholder="Ort oder Berg suchen" 
                 autocomplete="off"
                 spellcheck="false"
               >
               <!-- Integrierter 1-Klick GPS-Standort Button direkt in der Suche -->
               <button id="quick-gps-btn" class="search-inline-gps-btn" type="button" title="Mein genauer GPS-Standort (1-Klick)" aria-label="Aktuellen GPS-Standort ermitteln">
-                <span class="sig-icon">📍</span>
-                <span class="sig-text">Standort</span>
+                <svg class="sig-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="3 11 22 2 13 21 11 13 3 11" fill="currentColor"/>
+                </svg>
               </button>
               <button id="spotlight-trigger-btn" class="stp-kbd" type="button" title="Globale Schnellsuche öffnen (⌘K)" aria-label="Schnellsuche ⌘K" style="cursor:pointer; border:1px solid rgba(255,255,255,0.2);">⌘K</button>
               <button type="button" id="clear-search-btn" class="clear-btn" style="display:none;" title="Suche löschen" aria-label="Suche löschen">✕</button>

@@ -557,9 +557,11 @@
   }
 
   .desktop-header-dock .search-inline-gps-btn {
-    height: 26px !important;
-    padding: 0 8px !important;
-    font-size: 11px !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
   }
 
   .desktop-header-dock .header-action-group {
