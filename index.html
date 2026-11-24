@@ -1624,17 +1624,27 @@
                 <span class="sehb-label" id="skitour-eaws-label">ERHEBLICH</span>
               </div>
               <div class="skitour-eaws-meta">
-                <div class="skitour-eaws-title" id="skitour-eaws-title">Stufe 3 (Erheblich) • Vormittags Stufe 2, nachmittags Stufe 3</div>
+                <div class="skitour-eaws-title-row">
+                  <div class="skitour-eaws-title" id="skitour-eaws-title">Stufe 3 (Erheblich) • Vormittags Stufe 2, nachmittags Stufe 3</div>
+                  <span class="st-prov-badge prov-forecast" id="st-eaws-prov-badge">🔵 PROGNOSE</span>
+                </div>
                 <div class="skitour-eaws-sub" id="skitour-eaws-elev">Gefahr vor allem über <strong>2.000 m</strong> • Kernproblem: <strong>Triebschnee</strong></div>
                 <div class="skitour-pattern-badge" id="skitour-pattern-badge">⚠️ GM 4: Kalt auf Warm / Triebschnee</div>
               </div>
             </div>
 
-            <!-- Datenquellen- & Offizieller-LLB-Transparenzbanner -->
+            <!-- Datenquellen- & Provenienz-Transparenzbanner -->
             <div class="skitour-source-banner" id="skitour-source-banner">
               <span class="ssb-src-icon" id="skitour-source-icon">📡</span>
               <div class="ssb-src-text">
-                <strong id="skitour-source-label">Datenquellen werden geladen...</strong>
+                <div class="ssb-src-head">
+                  <strong id="skitour-source-label">Datenquellen werden geladen...</strong>
+                  <div class="st-prov-legend" id="skitour-provenance-legend">
+                    <span class="st-prov-badge prov-real">🟢 ECHT / OFFIZIELL</span>
+                    <span class="st-prov-badge prov-forecast">🔵 PROGNOSE / MODELL</span>
+                    <span class="st-prov-badge prov-estimate">🟠 SCHÄTZWERT</span>
+                  </div>
+                </div>
                 <p id="skitour-official-text" style="display: none;"></p>
               </div>
             </div>
@@ -1665,7 +1675,10 @@
                 </div>
               </div>
               <div class="skitour-rose-details">
-                <div class="srd-title">Expositions-Diagnose:</div>
+                <div class="srd-title-row">
+                  <div class="srd-title">Expositions-Diagnose:</div>
+                  <span class="st-prov-badge prov-forecast" id="st-rose-prov-badge">🔵 PROGNOSE (Lee-Modell)</span>
+                </div>
                 <div class="srd-sector-card" id="skitour-sector-card">
                   <strong id="skitour-sector-name">Nord- &amp; Nordosthänge</strong>
                   <p id="skitour-sector-desc">Hauptgefahr durch frische Triebschneeansammlungen hinter Geländekanten. Steilhänge &gt; 30° meiden.</p>
@@ -1683,6 +1696,7 @@
                 <div class="sfc-title">
                   <span>☀️</span>
                   <strong>Firn-Fenster &amp; Harschdeckel-Rechner</strong>
+                  <span class="st-prov-badge prov-forecast" id="st-firn-prov-badge">🔵 PROGNOSE</span>
                 </div>
                 <span class="sfc-status-pill" id="skitour-firn-window-pill">⭐ Fenster: 09:30 – 12:00 Uhr</span>
               </div>
@@ -1696,22 +1710,34 @@
             <!-- SCHNEE- & NEUSCHNEE-DOSSIER GRID -->
             <div class="skitour-snow-grid" id="skitour-snow-grid">
               <div class="ssg-card">
-                <span class="ssg-label">Neuschnee 24h / 72h</span>
+                <div class="ssg-top-row">
+                  <span class="ssg-label">Neuschnee 24h / 72h</span>
+                  <span class="st-prov-badge prov-forecast" id="st-freshsnow-prov">🔵 ANALYSE</span>
+                </div>
                 <strong class="ssg-val text-cyan" id="st-freshsnow-val">12 cm / 18 cm</strong>
                 <span class="ssg-sub" id="st-freshsnow-prog">+8 cm in 24h</span>
               </div>
               <div class="ssg-card">
-                <span class="ssg-label">Gesamtschnee (Tal / Berg)</span>
+                <div class="ssg-top-row">
+                  <span class="ssg-label">Gesamtschnee (Tal / Berg)</span>
+                  <span class="st-prov-badge prov-estimate" id="st-totalsnow-prov">🟠 SCHÄTZWERT</span>
+                </div>
                 <strong class="ssg-val text-white" id="st-totalsnow-val">25 cm / 140 cm</strong>
                 <span class="ssg-sub" id="st-snowline-val">Schneegrenze: ab 1.150 m</span>
               </div>
               <div class="ssg-card">
-                <span class="ssg-label">Schneequalität &amp; Dichte</span>
+                <div class="ssg-top-row">
+                  <span class="ssg-label">Schneequalität &amp; Dichte</span>
+                  <span class="st-prov-badge prov-forecast" id="st-density-prov">🔵 PHYSIK-MODELL</span>
+                </div>
                 <strong class="ssg-val text-yellow" id="st-density-val">85 kg/m³ (Alpinpulver)</strong>
                 <span class="ssg-sub" id="st-swe-val">Wasserwert SWE: 10.2 mm</span>
               </div>
               <div class="ssg-card">
-                <span class="ssg-label">Schichtungs-Gefahr</span>
+                <div class="ssg-top-row">
+                  <span class="ssg-label">Schichtungs-Gefahr</span>
+                  <span class="st-prov-badge prov-forecast" id="st-layer-prov">🔵 PHYSIK-MODELL</span>
+                </div>
                 <strong class="ssg-val text-accent" id="st-layer-val">Günstig</strong>
                 <span class="ssg-sub" id="st-crit-freshsnow">Krit. Neuschnee: 25 cm</span>
               </div>
@@ -1723,6 +1749,7 @@
                 <div class="sssc-title">
                   <span>📐</span>
                   <strong>GPX-Hangneigungsanalyse (Munter 3x3 Check)</strong>
+                  <span class="st-prov-badge prov-real" id="st-slope-prov-badge">🟢 ECHT (GPX-Track)</span>
                 </div>
                 <span class="sssc-max-badge" id="st-max-slope-badge">Max: 34°</span>
               </div>

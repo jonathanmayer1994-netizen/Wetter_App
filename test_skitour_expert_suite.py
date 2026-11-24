@@ -121,6 +121,13 @@ def run_skitour_suite():
         assert auto_sec_name != "Nord- & Nordosthänge" and ("Kritisch" in auto_sec_name or "Günstiger" in auto_sec_name), f"Primary sector diagnosis must auto-update for GPX route, got: {auto_sec_name}"
         print(f"✓ Auto-Diagnosed Route Sector verified: '{auto_sec_name}'")
 
+        # Check Data Provenance Badges (Echt vs Prognose vs Schätzwert)
+        eaws_prov = page.inner_text("#st-eaws-prov-badge")
+        totalsnow_prov = page.inner_text("#st-totalsnow-prov")
+        assert any(k in eaws_prov for k in ["ECHT", "PROGNOSE", "OFFLINE"]), f"EAWS provenance badge must distinguish Real vs Forecast, got: {eaws_prov}"
+        assert any(k in totalsnow_prov for k in ["ECHT", "MODELL", "SCHÄTZWERT"]), f"Total snow provenance badge must distinguish Station vs Model vs Estimate, got: {totalsnow_prov}"
+        print(f"✓ Provenance badges verified (EAWS: '{eaws_prov}', SnowDepth: '{totalsnow_prov}')")
+
         # Check Vector Danger Rose SVG
         assert page.is_visible("#skitour-danger-rose-svg"), "Vector danger rose SVG must be visible"
         page.click("#st-rose-n", force=True)
@@ -164,7 +171,7 @@ def run_skitour_suite():
         table_eaws_count = page.locator("#sports-waypoints-list .swt-desktop-cells .swt-eaws-badge").count()
         assert table_eaws_count >= 3, f"Expected >=3 waypoint table EAWS badges, got {table_eaws_count}"
         first_tbl_text = page.locator("#sports-waypoints-list .swt-desktop-cells .swt-eaws-badge").first.inner_text()
-        assert "LLB Stufe" in first_tbl_text and "/5" in first_tbl_text, f"Table EAWS badge must contain 'LLB Stufe X/5', got: {first_tbl_text}"
+        assert ("Offiz. LLB" in first_tbl_text or "Prognose" in first_tbl_text) and "/5" in first_tbl_text, f"Table EAWS badge must distinguish Official vs Prognose and contain X/5, got: {first_tbl_text}"
         print(f"✓ Waypoints table renders {table_eaws_count} EAWS badges (sample: '{first_tbl_text}')")
 
         # Verify category scoping: switching to mountain removes skitour EAWS waypoint pills, switching back restores them
@@ -207,7 +214,7 @@ def run_skitour_suite():
         # 9. TEST 8: Sources Banner, 10-Day Tour Planner & Interactive Day Switch
         print("\n--- TEST 8: 10-Day Skitour Fresh Snow & Avalanche Planner ---")
         src_label = page.inner_text("#skitour-source-label")
-        assert "Open-Meteo" in src_label or "SLF" in src_label or "Albina" in src_label, f"Source banner must state active data sources, got: {src_label}"
+        assert "Open-Meteo" in src_label or "SLF" in src_label or "Albina" in src_label or "GeoSphere" in src_label or "Prognose" in src_label, f"Source banner must state active data sources, got: {src_label}"
         rows = page.locator("#skitour-10day-list .skitour-10day-row")
         assert rows.count() == 10, f"10-Day Skitour Planner must render 10 days, got: {rows.count()}"
         day5 = rows.nth(4)
@@ -230,7 +237,7 @@ def run_skitour_suite():
         page.set_input_files("#sports-file-input", files=[{"name": "Weissfluhjoch.gpx", "mimeType": "application/gpx+xml", "buffer": swiss_gpx.encode("utf-8")}])
         page.wait_for_function("() => document.getElementById('skitour-agency-tag') && document.getElementById('skitour-agency-tag').innerText.includes('SLF Davos')", timeout=12000)
         slf_src = page.inner_text("#skitour-source-label")
-        assert "SLF Davos" in slf_src and "Offizieller LLB" in slf_src, f"Expected live SLF Davos official bulletin in source banner, got: {slf_src}"
+        assert "SLF Davos" in slf_src and ("ECHT / OFFIZIELL" in slf_src or "Offizieller LLB" in slf_src), f"Expected live SLF Davos official bulletin in source banner, got: {slf_src}"
         print(f"✓ Live SLF Davos Official Bulletin verified: '{slf_src}'")
         dashboard.screenshot(path=screenshot_path)
         print(f"📸 Updated Skitour Cockpit artifact (incl. 10-Day Planner & Official LLB): {screenshot_path}")

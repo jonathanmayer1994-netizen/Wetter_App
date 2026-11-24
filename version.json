@@ -1,5 +1,5 @@
 {
-  "version": "2.39.0",
-  "build": "20261124-2016",
-  "notes": "Add official EAWS CAAMLv6 live avalanche bulletin integration (SLF Davos GeoJSON + Albina Euregio) and full 10-day ski touring fresh snow, quality, and morning/afternoon danger planner"
+  "version": "2.40.0",
+  "build": "20261124-2029",
+  "notes": "Strict epistemic provenance badges (ECHT/Messstation vs PROGNOSE/Modell vs SCHÄTZWERT) across Skitour dashboard, GeoSphere TAWES live snow stakes, and 10-day planner"
 }

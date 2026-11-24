@@ -3364,6 +3364,73 @@ export const MicroEngine = {
   },
 
   /**
+   * Ruft echte physische Schneepegel-Messwerte über das GeoSphere Austria TAWES-Stationsnetz (CORS *) ab
+   */
+  async fetchNearbySnowStation(lat, lon, valleyEle = 1000, peakEle = 2400) {
+    // Deckt ganz Österreich sowie die Grenzregionen Allgäu, Bayern, Südtirol & Ostschweiz ab (~46.3–47.9 N, 9.4–16.5 E)
+    if (lat < 46.2 || lat > 48.0 || lon < 9.3 || lon > 16.5) return null;
+    try {
+      const meta = await resilientFetch('https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min/metadata', {
+        ttlMs: 6 * 3600 * 1000,
+        timeoutMs: 5000,
+        persist: true,
+        allowStaleOnError: true
+      });
+      if (!meta || !Array.isArray(meta.stations)) return null;
+
+      const distKm = (s) => Math.hypot((s.lat - lat) * 111, (s.lon - lon) * 75);
+      const candidates = meta.stations
+        .map(s => ({ ...s, dKm: distKm(s) }))
+        .filter(s => s.dKm <= 65)
+        .sort((a, b) => a.dKm - b.dKm);
+
+      if (candidates.length === 0) return null;
+
+      const valleyCand = candidates.filter(s => (s.altitude || 0) <= Math.max(1500, valleyEle + 350)).slice(0, 3);
+      const peakCand = candidates.filter(s => (s.altitude || 0) >= Math.max(1700, peakEle - 650)).slice(0, 4);
+      const picked = [...valleyCand, ...peakCand].filter((v, i, a) => a.findIndex(x => x.id === v.id) === i);
+      if (picked.length === 0) return null;
+
+      const ids = picked.map(s => s.id).join(',');
+      const obs = await resilientFetch(`https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min?parameters=SCHNEE,TL,FFX&station_ids=${ids}`, {
+        ttlMs: 10 * 60 * 1000,
+        timeoutMs: 5000,
+        persist: true,
+        allowStaleOnError: true
+      });
+      if (!obs || !Array.isArray(obs.features)) return null;
+
+      const stMap = new Map(picked.map(s => [String(s.id), s]));
+      const measured = obs.features.map(f => {
+        const p = f.properties || {};
+        const st = stMap.get(String(p.station));
+        if (!st || !p.parameters) return null;
+        const snowArr = p.parameters.SCHNEE && p.parameters.SCHNEE.data;
+        const tlArr = p.parameters.TL && p.parameters.TL.data;
+        const ffxArr = p.parameters.FFX && p.parameters.FFX.data;
+        const snowCm = Array.isArray(snowArr) ? snowArr[0] : null;
+        const tempC = Array.isArray(tlArr) ? tlArr[0] : null;
+        const gustKmH = (Array.isArray(ffxArr) && ffxArr[0] !== null) ? Math.round(ffxArr[0] * 3.6) : null;
+        if (snowCm === null || snowCm === undefined) return null;
+        return { id: st.id, name: st.name, ele: Math.round(st.altitude || 0), dKm: Math.round(st.dKm), snowCm: Math.round(snowCm), tempC, gustKmH };
+      }).filter(Boolean);
+
+      if (measured.length === 0) return null;
+      const valleyStation = measured.filter(m => m.ele <= Math.max(1550, valleyEle + 350)).sort((a, b) => a.dKm - b.dKm)[0] || null;
+      const peakStation = measured.filter(m => m.ele >= 1700 && (!valleyStation || m.id !== valleyStation.id)).sort((a, b) => a.dKm - b.dKm)[0] || null;
+
+      return {
+        source: 'GeoSphere Austria TAWES (Live-Schneepegel)',
+        valleyStation,
+        peakStation
+      };
+    } catch (err) {
+      console.warn('Live TAWES station snow fetch fallback:', err);
+      return null;
+    }
+  },
+
+  /**
    * Berechnet detaillierten 10-Tage Skitouren-, Neuschnee- & Tageszeit-Lawinenplaner
    */
   computeAvalanche10DayMatrix(elevation, minEle, hPeak, hv, hTimes, dominantWindDir, officialBulletin, selectedDateStr) {
@@ -4025,24 +4092,49 @@ export const MicroEngine = {
       stationName = 'Messnetz Ostalpen';
     }
 
-    // Präzise Live-Schneehöhen-Berechnung aus Tal- & Berg-Wegpunktdaten (snow_depth)
+    // Präzise Schneehöhen-Provenienz: 1) Echter Live-Schneepegel (GeoSphere TAWES) -> 2) Open-Meteo Modell -> 3) Klare Schätz-Kennzeichnung
     const minEle = (terrain && terrain.minElevation !== undefined) ? terrain.minElevation : Math.round(elevation * 0.55);
     const maxEle = (terrain && terrain.maxElevation !== undefined) ? terrain.maxElevation : elevation;
 
     let snowDepthPeakCm = 0;
     let snowDepthValleyCm = 0;
-    const peakSnowM = (h && h.snow_depth && h.snow_depth[nowIdx] !== undefined) ? h.snow_depth[nowIdx] : ((h && h.snow_depth && h.snow_depth[0] !== undefined) ? h.snow_depth[0] : null);
-    const valleySnowM = (hv && hv.snow_depth && hv.snow_depth[nowIdx] !== undefined) ? hv.snow_depth[nowIdx] : peakSnowM;
+    const isSynthetic = !!(h && h._isSynthetic);
+    const stationData = (terrain && terrain.snowStationData) ? terrain.snowStationData : null;
+    const peakSnowM = (!isSynthetic && h && h.snow_depth && h.snow_depth[nowIdx] !== undefined) ? h.snow_depth[nowIdx] : ((!isSynthetic && h && h.snow_depth && h.snow_depth[0] !== undefined) ? h.snow_depth[0] : null);
+    const valleySnowM = (!isSynthetic && hv && hv.snow_depth && hv.snow_depth[nowIdx] !== undefined) ? hv.snow_depth[nowIdx] : peakSnowM;
     const month = tourDateObj.getMonth();
     const isWinterSpring = month <= 4 || month >= 10;
 
-    if (peakSnowM !== null && peakSnowM > 0) {
+    let snowDepthProvenance = { kind: 'estimate', badge: '🟠 SCHÄTZWERT', note: 'Saisonschätzung (kein Live-Pegel / Modell-Limit)' };
+    let snowDepthStationLabel = 'Keine Live-Messdaten (≈ Saisonschätzung)';
+
+    if (stationData && (stationData.peakStation || stationData.valleyStation)) {
+      const pkSt = stationData.peakStation;
+      const valSt = stationData.valleyStation;
+      snowDepthPeakCm = pkSt ? pkSt.snowCm : (peakSnowM !== null ? Math.round(peakSnowM * 100) : null);
+      snowDepthValleyCm = valSt ? valSt.snowCm : (valleySnowM !== null ? Math.round(valleySnowM * 100) : null);
+      const stNames = [
+        valSt ? `${valSt.name} (${valSt.ele}m)` : null,
+        (pkSt && (!valSt || pkSt.id !== valSt.id)) ? `${pkSt.name} (${pkSt.ele}m)` : null
+      ].filter(Boolean).join(' / ');
+      snowDepthProvenance = {
+        kind: 'real',
+        badge: pkSt ? '🟢 ECHT (Messstation)' : '🟢 ECHT (Tal-Pegel)',
+        note: `Schneepegel: ${stNames}`
+      };
+      snowDepthStationLabel = `Live-Pegel: ${stNames}`;
+    } else if (peakSnowM !== null && peakSnowM !== undefined) {
       snowDepthPeakCm = Math.round(peakSnowM * 100);
       snowDepthValleyCm = (valleySnowM !== null && hv !== h)
         ? Math.round(valleySnowM * 100)
         : Math.max(0, Math.round(snowDepthPeakCm * (minEle >= 1500 ? 0.5 : 0.35)));
-      // Stelle sicher, dass Gipfel mind. >= Tal bleibt falls Modellzelle gröber
       if (snowDepthPeakCm < snowDepthValleyCm) snowDepthPeakCm = snowDepthValleyCm;
+      snowDepthProvenance = {
+        kind: 'forecast',
+        badge: '🔵 MODELL (Open-Meteo)',
+        note: 'NWP-Schneehöhenraster (keine lokale Messstation)'
+      };
+      snowDepthStationLabel = 'Open-Meteo NWP-Schneeraster (Modellwert)';
     } else {
       if (maxEle >= 2600) {
         snowDepthPeakCm = isWinterSpring ? Math.round(125 + freshSnow24 * 1.5) : Math.round(35 + freshSnow24);
@@ -4055,6 +4147,10 @@ export const MicroEngine = {
         snowDepthValleyCm = isWinterSpring ? Math.round(5 + freshSnow24 * 0.2) : 0;
       }
     }
+
+    const freshSnowProvenance = isSynthetic
+      ? { kind: 'estimate', badge: '🟠 SCHÄTZWERT (Offline)' }
+      : (refIdx >= 24 ? { kind: 'forecast', badge: '🔵 ANALYSE (ECMWF/ICON)' } : { kind: 'forecast', badge: '🔵 MODELL (Open-Meteo)' });
 
     // Kritische Höhenlage anhand realer Routenhöhe & Nullgradgrenze
     const criticalElevation = Math.max(
@@ -4084,8 +4180,14 @@ export const MicroEngine = {
       tourDayStart.getTime() < officialBulletin.validEndMs
     );
 
-    let sourceLabel = '🔭 10-Tage-Prognose (Open-Meteo ECMWF/ICON • Tal & Gipfel) + EAWS/Munter-Physik';
+    let sourceLabel = isSynthetic
+      ? '🟠 Offline-Schätzung (API-Limit/Offline — keine Live-Modelldaten)'
+      : '🔵 Prognose-Modell (Open-Meteo ECMWF/ICON • Kein aktiver offiz. LLB für Region/Tag)';
     let officialText = '';
+    let avalancheProvenance = { kind: 'forecast', badge: '🔵 PROGNOSE-MODELL' };
+    if (isSynthetic && !isOfficialActive) {
+      avalancheProvenance = { kind: 'estimate', badge: '🟠 OFFLINE-SCHÄTZUNG' };
+    }
 
     if (isOfficialActive) {
       dangerLevel = officialBulletin.dangerLevel;
@@ -4101,8 +4203,11 @@ export const MicroEngine = {
         problems.splice(0, problems.length, ...officialBulletin.problems);
       }
       stationAgency = officialBulletin.agency;
-      sourceLabel = `✅ Offizieller LLB: ${officialBulletin.agency} + Open-Meteo Tal/Gipfel`;
+      sourceLabel = `🟢 ECHT / OFFIZIELL: ${officialBulletin.agency}${snowDepthProvenance.kind === 'real' ? ' + GeoSphere Schneepegel' : ' + Open-Meteo Wetter'}`;
       officialText = officialBulletin.snowpackText || officialBulletin.highlights || officialBulletin.weatherText || '';
+      avalancheProvenance = { kind: 'real', badge: '🟢 ECHT / OFFIZ. LLB' };
+    } else if (snowDepthProvenance.kind === 'real') {
+      sourceLabel = `🟢 Pegel: GeoSphere TAWES (${snowDepthStationLabel}) • 🔵 Lawinen/Wetter: Prognose-Modell`;
     }
 
     const effectiveCriticalElevation = isOfficialActive && officialBulletin.criticalElevation
@@ -4135,6 +4240,10 @@ export const MicroEngine = {
       skiableSnowlineM,
       isAllDayColdWinter,
       isOfficialBulletin: isOfficialActive,
+      avalancheProvenance,
+      freshSnowProvenance,
+      snowDepthProvenance,
+      snowDepthStationLabel,
       sourceLabel,
       officialText,
       forecast10Days,
@@ -5092,6 +5201,7 @@ export const MicroEngine = {
         maxElevation: peakPoint.ele,
         waypoints: preMilestones,
         officialBulletin: athleteSettings.officialBulletin || null,
+        snowStationData: athleteSettings.snowStationData || null,
         slopeStats
       }
     );

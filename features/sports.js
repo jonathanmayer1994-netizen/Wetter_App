@@ -440,11 +440,13 @@ export async function refreshLiveSkitourForecast(forceRefresh = true) {
       state.sports.cachedForecast = pkg.valley;
       state.sports.cachedPeakForecast = pkg.peak || null;
       state.sports.officialBulletin = pkg.officialBulletin || null;
+      state.sports.snowStationData = pkg.snowStationData || null;
       state.sports.lastLiveFetchMs = pkg.fetchedAtMs || Date.now();
     } else if (pkg) {
       state.sports.cachedForecast = pkg;
       state.sports.cachedPeakForecast = null;
       state.sports.officialBulletin = null;
+      state.sports.snowStationData = null;
       state.sports.lastLiveFetchMs = Date.now();
     }
     recomputeSportsTimeline();
@@ -1091,8 +1093,9 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
   const hourlyVars = 'temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height,snowfall,snow_depth,cloud_cover';
   const currentVars = 'temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,snowfall,snow_depth,cloud_cover';
 
-  // Offiziellen Lawinenlagebericht (SLF Davos / Albina Euregio) parallel anfragen
+  // Offiziellen Lawinenlagebericht (SLF Davos / Albina) + Live-Schneepegel (GeoSphere TAWES) parallel anfragen
   const officialPromise = MicroEngine.fetchOfficialAvalancheBulletin(peakPt.lat, peakPt.lon).catch(() => null);
+  const snowStationPromise = MicroEngine.fetchNearbySnowStation(peakPt.lat, peakPt.lon, startPt.ele, peakPt.ele).catch(() => null);
 
   const hasDistinctPeak = peakPt !== startPt && (
     Math.abs((peakPt.ele || 0) - (startPt.ele || 0)) >= 120 ||
@@ -1106,9 +1109,10 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
       const lons = `${Number(startPt.lon).toFixed(3)},${Number(peakPt.lon).toFixed(3)}`;
       const eles = `${Math.round(startPt.ele || 800)},${Math.round(peakPt.ele || 2000)}`;
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&elevation=${eles}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=10&timezone=auto`;
-      const [res, officialBulletin] = await Promise.all([
+      const [res, officialBulletin, snowStationData] = await Promise.all([
         resilientFetch(url, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh }),
-        officialPromise
+        officialPromise,
+        snowStationPromise
       ]);
       const items = Array.isArray(res) ? res : (res && res.hourly ? [res] : []);
       if (items.length >= 2 && items[0].hourly && items[1].hourly) {
@@ -1122,6 +1126,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
             elevation: items[1].elevation !== undefined ? items[1].elevation : peakPt.ele
           },
           officialBulletin,
+          snowStationData,
           fetchedAtMs: Date.now()
         };
         state.sports.cachedForecasts[cacheKey] = pkg;
@@ -1133,9 +1138,10 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
     const targetPt = peakPt || startPt;
     const eleParam = targetPt.ele !== undefined ? `&elevation=${Math.round(targetPt.ele)}` : '';
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(targetPt.lat).toFixed(3)}&longitude=${Number(targetPt.lon).toFixed(3)}${eleParam}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=10&timezone=auto`;
-    const [data, officialBulletin] = await Promise.all([
+    const [data, officialBulletin, snowStationData] = await Promise.all([
       resilientFetch(url, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh }),
-      officialPromise
+      officialPromise,
+      snowStationPromise
     ]);
     if (data && data.hourly && data.hourly.time && data.hourly.time.length > 0) {
       data.hourly._modelElevation = data.elevation !== undefined ? data.elevation : targetPt.ele;
@@ -1147,6 +1153,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
           elevation: data.elevation !== undefined ? data.elevation : targetPt.ele
         },
         officialBulletin,
+        snowStationData,
         fetchedAtMs: Date.now()
       };
       state.sports.cachedForecasts[cacheKey] = pkg;
@@ -1156,13 +1163,14 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
     console.warn('Live route forecast fetch failed, using state fallback:', err);
   }
 
-  const officialBulletin = await officialPromise;
+  const [officialBulletin, snowStationData] = await Promise.all([officialPromise, snowStationPromise]);
 
   if (state.weatherData && state.weatherData.hourly) {
     return {
       valley: state.weatherData.hourly,
       peak: { hourly: state.weatherData.hourly, current: state.weatherData.current || null, elevation: peakPt.ele },
       officialBulletin,
+      snowStationData,
       fetchedAtMs: Date.now()
     };
   }
@@ -1172,6 +1180,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
     valley: synth,
     peak: { hourly: synth, current: null, elevation: peakPt.ele },
     officialBulletin,
+    snowStationData,
     fetchedAtMs: Date.now()
   };
 }
@@ -1211,6 +1220,7 @@ export function generateSyntheticSportsHourly() {
   }
 
   return {
+    _isSynthetic: true,
     time: times,
     temperature_2m: temps,
     precipitation: precips,
@@ -1294,11 +1304,13 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
     state.sports.cachedForecast = forecastPkg.valley;
     state.sports.cachedPeakForecast = forecastPkg.peak || null;
     state.sports.officialBulletin = forecastPkg.officialBulletin || null;
+    state.sports.snowStationData = forecastPkg.snowStationData || null;
     state.sports.lastLiveFetchMs = forecastPkg.fetchedAtMs || Date.now();
   } else {
     state.sports.cachedForecast = forecastPkg;
     state.sports.cachedPeakForecast = null;
     state.sports.officialBulletin = null;
+    state.sports.snowStationData = null;
     state.sports.lastLiveFetchMs = Date.now();
   }
 
@@ -1523,11 +1535,20 @@ export function renderSkitourDashboard(timeline) {
   const critFresh = document.getElementById('st-crit-freshsnow');
 
   if (freshSnowVal) freshSnowVal.innerText = `${av.freshSnow24hCm} cm (24h) / ${av.freshSnow72hCm || 0} cm (72h)`;
-  if (freshProg) freshProg.innerText = `Prognose nächste 24h: +${av.prognosis24hCm || 0} cm`;
-  if (totalSnow) totalSnow.innerText = `Tal ${av.snowDepthValleyCm} cm / Berg ${av.snowDepthPeakCm} cm`;
+  if (freshProg) freshProg.innerText = `🔵 Prognose (+24h): +${av.prognosis24hCm || 0} cm`;
+  if (totalSnow) {
+    const valTxt = (av.snowDepthValleyCm !== null && av.snowDepthValleyCm !== undefined) ? `${av.snowDepthValleyCm} cm` : 'k.A.';
+    const pkTxt = (av.snowDepthPeakCm !== null && av.snowDepthPeakCm !== undefined) ? `${av.snowDepthPeakCm} cm` : 'kein Pegel';
+    totalSnow.innerText = (av.snowDepthProvenance && av.snowDepthProvenance.kind === 'estimate')
+      ? `Keine Messdaten (≈ ~${valTxt}/${pkTxt})`
+      : `Tal ${valTxt} / Berg ${pkTxt}`;
+  }
   if (snowline) {
     const slM = av.skiableSnowlineM || Math.max(800, loc.elevation - Math.round(av.snowDepthValleyCm * 15));
-    snowline.innerText = `Fahrbare Schneegrenze: ab ~${slM.toLocaleString('de-DE')} m`;
+    const prefix = (av.snowDepthProvenance && av.snowDepthProvenance.kind === 'real') ? '🟢' : (av.snowDepthProvenance && av.snowDepthProvenance.kind === 'forecast' ? '🔵' : '🟠');
+    snowline.innerText = av.snowDepthStationLabel
+      ? `${prefix} ${av.snowDepthStationLabel} • Ab ~${slM.toLocaleString('de-DE')} m`
+      : `Fahrbare Schneegrenze: ab ~${slM.toLocaleString('de-DE')} m`;
   }
   if (densityVal) densityVal.innerText = `${av.densityKgM3} kg/m³ (${av.qualityClass})`;
   if (sweVal) sweVal.innerText = `Wasserwert SWE: ${av.sweMm} mm`;
@@ -1537,6 +1558,20 @@ export function renderSkitourDashboard(timeline) {
     layerVal.title = av.thermalLayerPattern || '';
   }
   if (critFresh) critFresh.innerText = `Krit. Neuschneemenge: ${av.criticalFreshSnowThresholdCm} cm (${av.criticalExceeded ? '⚠️ Erreicht' : 'Unterschritten'})`;
+
+  // Provenienz-Badges für jede Karte exakt setzen (ECHT vs PROGNOSE vs SCHÄTZWERT)
+  const applyProv = (id, kind, text) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = `st-prov-badge prov-${kind}`;
+    el.innerText = text;
+  };
+  if (av.avalancheProvenance) {
+    applyProv('st-eaws-prov-badge', av.avalancheProvenance.kind, av.avalancheProvenance.badge);
+    applyProv('st-rose-prov-badge', av.isOfficialBulletin ? 'real' : 'forecast', av.isOfficialBulletin ? '🟢 ECHT (Offiz. Exposition)' : '🔵 PROGNOSE (Lee-Modell)');
+  }
+  if (av.freshSnowProvenance) applyProv('st-freshsnow-prov', av.freshSnowProvenance.kind, av.freshSnowProvenance.badge);
+  if (av.snowDepthProvenance) applyProv('st-totalsnow-prov', av.snowDepthProvenance.kind, av.snowDepthProvenance.badge);
 
   // 5. GPX Hangneigungsanalyse & Munter 3x3 Check
   if (timeline && timeline.slopeStats) {
@@ -1603,7 +1638,7 @@ export function renderSkitourDashboard(timeline) {
             <span>${escapeHtml(d.dayLabel)}</span>
             ${d.isWeekend ? '<span class="s10d-wknd-tag">WE</span>' : ''}
           </div>
-          <span class="s10d-src-mini ${d.isOfficialDay ? 'official' : ''}">${d.isOfficialDay ? '✓ Offiz. LLB' : 'ECMWF/ICON'}</span>
+          <span class="s10d-src-mini ${d.isOfficialDay ? 'official' : ''}">${d.isOfficialDay ? '🟢 ECHT (Offiz. LLB)' : '🔵 PROGNOSE'}</span>
         </div>
 
         <div class="s10d-snow-col">
@@ -1658,7 +1693,8 @@ export function recomputeSportsTimeline() {
       skitourAscentHmH: state.sports.skitourAscentHmH,
       skitourDescentKmH: state.sports.skitourDescentKmH,
       peakForecast: state.sports.cachedPeakForecast || null,
-      officialBulletin: state.sports.officialBulletin || null
+      officialBulletin: state.sports.officialBulletin || null,
+      snowStationData: state.sports.snowStationData || null
     }
   );
 
@@ -2083,16 +2119,21 @@ export function renderSportsWaypointsTable(timeline) {
 
     const feltT = m.feltTempC !== undefined ? m.feltTempC : Math.round(m.tempC);
     const hasEaws = isSkitour && m.avalancheLevel;
+    const isOfficialAv = !!(timeline.avalancheReport && timeline.avalancheReport.isOfficialBulletin);
+    const eawsTagShort = isOfficialAv ? `✓ ${m.avalancheLevel}/5` : `~${m.avalancheLevel}/5`;
+    const eawsTagFull = isOfficialAv
+      ? `🟢 Offiz. LLB Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})`
+      : `🔵 Prognose LLB ~${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})`;
     const eawsMobileBadge = hasEaws
-      ? `<span class="sms-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};" title="Lawinenlagebericht: Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})">⚠️ ${m.avalancheLevel}/5</span>`
+      ? `<span class="sms-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};" title="${isOfficialAv ? 'Offizieller LLB' : 'Prognose (kein offiz. LLB)'}: Stufe ${m.avalancheLevel}/5">${eawsTagShort}</span>`
       : '';
     const eawsDesktopBadge = hasEaws
-      ? `<span class="swt-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">⚠️ LLB Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})</span>`
+      ? `<span class="swt-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">${eawsTagFull}</span>`
       : '';
     const eawsAccordionChip = hasEaws
       ? `<div class="sap-chip">
-           <span class="sap-label">⚠️ Lawinenlagebericht (EAWS)</span>
-           <strong class="sap-val"><span class="swt-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">Stufe ${m.avalancheLevel}/5 – ${escapeHtml(m.avalancheLabel)}</span></strong>
+           <span class="sap-label">${isOfficialAv ? '🟢 Offizieller Lawinenlagebericht (EAWS)' : '🔵 Lawinen-Prognosemodell (kein offiz. LLB)'}</span>
+           <strong class="sap-val"><span class="swt-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">${eawsTagFull}</span></strong>
            <span class="sap-sub">Höhe: <b>${Math.round(m.ele)} m</b> • Hangneigung: <b>${m.slopeDeg || 0}°</b></span>
          </div>`
       : '';
@@ -2373,11 +2414,12 @@ export function renderSportsMap(timeline) {
   const endMs = timeline.milestones[timeline.milestones.length - 1] || { weatherIcon: '☀️', tempC: 10, windKmH: 5, precipMm: 0, weatherCondition: 'Trocken' };
   const isSkitour = timeline.category === 'skitour';
 
+  const isOfficialAv = !!(timeline.avalancheReport && timeline.avalancheReport.isOfficialBulletin);
   const getMapEawsPill = (ms) => (isSkitour && ms && ms.avalancheLevel)
-    ? `<span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};" title="Lawinenlagebericht: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})">⚠️ ${ms.avalancheLevel}/5</span>`
+    ? `<span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};" title="${isOfficialAv ? '🟢 Offizieller LLB' : '🔵 Prognose (kein offiz. LLB)'}: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})">${isOfficialAv ? '✓' : '~'} ${ms.avalancheLevel}/5</span>`
     : '';
   const getPopupEawsRow = (ms) => (isSkitour && ms && ms.avalancheLevel)
-    ? `<div class="smp-eaws-row"><span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};">⚠️ Lawinenlagebericht: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})</span></div>`
+    ? `<div class="smp-eaws-row"><span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};">${isOfficialAv ? '🟢 Offiz. LLB' : '🔵 Prognose'}: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})</span></div>`
     : '';
 
   // 1. START Marker (Roter Pin mit weißem Kreis 'START' + Callout-Badge wie im Referenzdesign)
