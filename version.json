@@ -1,5 +1,5 @@
 {
-  "version": "2.37.7",
-  "build": "20261124-1510",
-  "notes": "Dynamic content-driven daily forecast columns with unclipped sunrise/sunset timestamps and laser-aligned layout"
+  "version": "2.37.8",
+  "build": "20261124-1758",
+  "notes": "Strictly exclude GPS position and map points from search history and recents; auto-sanitize legacy search entries"
 }

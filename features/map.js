@@ -206,8 +206,9 @@ export function initLeafletMap() {
         lon: lon,
         elevation: elev,
         country: '',
-        isMountain: isMtn
-      });
+        isMountain: isMtn,
+        isMapPoint: true
+      }, { addToRecents: false });
     }, 200);
   });
 

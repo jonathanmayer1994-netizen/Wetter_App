@@ -34,8 +34,11 @@ export function initSearchHandlers({ onLoadLocation, onRenderOverview, onRenderA
   if (onRenderAdaptiveTab2) onRenderAdaptiveTab2Callback = onRenderAdaptiveTab2;
 }
 
-export function selectExactLocation(loc) {
-  addSpotlightRecent(loc);
+export function selectExactLocation(loc, { addToRecents = true } = {}) {
+  // Aktueller GPS-Standort und Kartenpunkte sind kein Teil der Suche und werden nie im Verlauf gespeichert
+  if (addToRecents && loc && !loc.isGps && !loc.isMapPoint && !/^Mein Standort/i.test(loc.name || '') && !/^(?:Kartenpunkt|Bergpunkt)/i.test(loc.name || '')) {
+    addSpotlightRecent(loc);
+  }
   if (onLoadLocationCallback) {
     onLoadLocationCallback(loc);
   } else if (window.loadLocation) {
@@ -44,11 +47,28 @@ export function selectExactLocation(loc) {
 }
 
 export function getSpotlightRecents() {
-  return AlpineStorage.safeGetItem('alpine_recent_searches', []);
+  const raw = AlpineStorage.safeGetItem('alpine_recent_searches', []);
+  if (!Array.isArray(raw)) return [];
+  // Bereinigt historischen Speicher: Schließt GPS-Standorte und Kartenpunkte strikt aus
+  const sanitized = raw.filter(item => 
+    item && item.name && 
+    !item.isGps && 
+    !item.isMapPoint && 
+    !/^Mein Standort/i.test(item.name) && 
+    !/^(?:Kartenpunkt|Bergpunkt)/i.test(item.name)
+  );
+  if (sanitized.length !== raw.length) {
+    AlpineStorage.safeSetItem('alpine_recent_searches', sanitized);
+  }
+  return sanitized;
 }
 
 export function addSpotlightRecent(loc) {
   if (!loc || !loc.name) return;
+  // Der aktuelle Ort ist kein Teil der Suche und erscheint niemals im Suchverlauf oder in den Suchergebnissen
+  if (loc.isGps || loc.isMapPoint || /^Mein Standort/i.test(loc.name) || /^(?:Kartenpunkt|Bergpunkt)/i.test(loc.name)) {
+    return;
+  }
   try {
     let list = getSpotlightRecents();
     if (!Array.isArray(list)) list = [];
@@ -356,7 +376,7 @@ export async function triggerExactGps(options = {}) {
         Math.abs(state.currentLocation.lon - lon) < 0.005;
 
       if (!isAlreadyLoaded) {
-        selectExactLocation(locObj);
+        selectExactLocation(locObj, { addToRecents: false });
       } else {
         state.currentLocation = locObj;
         if (window.renderFavoritesTab) window.renderFavoritesTab();
