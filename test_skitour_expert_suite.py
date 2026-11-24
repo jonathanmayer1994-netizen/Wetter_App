@@ -136,10 +136,44 @@ def run_skitour_suite():
         assert "Munter" in munter_text or "Hangneigung" in munter_text, f"Munter check text must be present, got: {munter_text}"
         print(f"✓ GPX Slope Scan & Munter 3x3 Check verified ({max_slope})")
 
-        # 6. Capture Visual Verification Artifact
+        # 6. Verify Per-Waypoint Lawinenlagebericht Scale Values (Map, Table, Elevation Profile)
+        print("\n--- TEST 6: Per-Waypoint EAWS Scale Values ---")
+        page.wait_for_selector("#sports-map-container .ms-compact-pill .ms-eaws-pill", timeout=8000)
+        map_eaws_count = page.locator("#sports-map-container .ms-compact-pill .ms-eaws-pill").count()
+        assert map_eaws_count >= 3, f"Expected >=3 map waypoint EAWS pills (Start, waypoints, End), got {map_eaws_count}"
+        first_pill_text = page.locator("#sports-map-container .ms-compact-pill .ms-eaws-pill").first.inner_text()
+        assert "/5" in first_pill_text, f"Map waypoint EAWS pill must show X/5 scale value, got: {first_pill_text}"
+        print(f"✓ Map waypoints render {map_eaws_count} EAWS pills (sample: '{first_pill_text}')")
+
+        # Verify Waypoints Table EAWS Badges
+        page.eval_on_selector("#sports-waypoints-drawer", "el => el.open = true")
+        page.wait_for_timeout(200)
+        table_eaws_count = page.locator("#sports-waypoints-list .swt-desktop-cells .swt-eaws-badge").count()
+        assert table_eaws_count >= 3, f"Expected >=3 waypoint table EAWS badges, got {table_eaws_count}"
+        first_tbl_text = page.locator("#sports-waypoints-list .swt-desktop-cells .swt-eaws-badge").first.inner_text()
+        assert "LLB Stufe" in first_tbl_text and "/5" in first_tbl_text, f"Table EAWS badge must contain 'LLB Stufe X/5', got: {first_tbl_text}"
+        print(f"✓ Waypoints table renders {table_eaws_count} EAWS badges (sample: '{first_tbl_text}')")
+
+        # Verify category scoping: switching to mountain removes skitour EAWS waypoint pills, switching back restores them
+        page.locator("#sport-cat-mountain").click(force=True)
+        page.wait_for_timeout(300)
+        assert page.locator("#sports-map-container .ms-compact-pill .ms-eaws-pill").count() == 0, "EAWS pills must not show in mountain category"
+        page.locator("#sport-cat-skitour").click(force=True)
+        page.wait_for_timeout(300)
+        assert page.locator("#sports-map-container .ms-compact-pill .ms-eaws-pill").count() >= 3, "EAWS pills must reappear in skitour category"
+        print("✓ Category scoping verified: EAWS waypoint pills strictly bound to Skitour")
+
+        # 7. Capture Visual Verification Artifacts
         screenshot_path = "/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_skitour_cockpit.png"
         dashboard.screenshot(path=screenshot_path)
         print(f"📸 Captured Skitour Cockpit artifact: {screenshot_path}")
+
+        map_card = page.locator("#sports-map-card")
+        map_card.scroll_into_view_if_needed()
+        page.wait_for_timeout(800)
+        map_screenshot_path = "/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_skitour_map_waypoints.png"
+        map_card.screenshot(path=map_screenshot_path)
+        print(f"📸 Captured Skitour Map Waypoints artifact: {map_screenshot_path}")
 
         context.close()
         browser.close()

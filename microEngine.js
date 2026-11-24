@@ -3226,11 +3226,28 @@ export const MicroEngine = {
     let maxWind48 = 15;
     let avgSnowTemp = curTemp;
 
-    if (h && h.snowfall) {
+    if (h && h.snowfall && h.snowfall.some(v => v !== undefined && v !== null)) {
       freshSnow24 = h.snowfall.slice(0, 24).reduce((a, b) => a + (b || 0), 0);
       freshSnow48 = h.snowfall.slice(0, 48).reduce((a, b) => a + (b || 0), 0);
       freshSnow72 = h.snowfall.slice(0, 72).reduce((a, b) => a + (b || 0), 0);
       prognosis24h = h.snowfall.slice(24, 48).reduce((a, b) => a + (b || 0), 0);
+    } else if (h && h.precipitation && h.temperature_2m) {
+      const estSnow = (start, end) => {
+        let sum = 0;
+        for (let i = start; i < Math.min(end, h.precipitation.length); i++) {
+          const p = h.precipitation[i] || 0;
+          const t = h.temperature_2m[i] !== undefined ? h.temperature_2m[i] : 0;
+          const fl = (h.freezing_level_height && h.freezing_level_height[i] !== undefined) ? h.freezing_level_height[i] : 2500;
+          if (p > 0 && (t <= 1.5 || elevation >= fl)) {
+            sum += p * (t < -5 ? 1.3 : 1.0);
+          }
+        }
+        return sum;
+      };
+      freshSnow24 = estSnow(0, 24);
+      freshSnow48 = estSnow(0, 48);
+      freshSnow72 = estSnow(0, 72);
+      prognosis24h = estSnow(24, 48);
     }
     if (h && h.wind_gusts_10m) {
       maxWind48 = Math.max(...h.wind_gusts_10m.slice(0, 48));
@@ -3919,6 +3936,59 @@ export const MicroEngine = {
   },
 
   /**
+   * Liefert offizielle EAWS Lawinengefahren-Metadaten (Stufe 1–5, Farbe, Textkontrast)
+   */
+  getEawsScaleMeta(level) {
+    const clamped = Math.max(1, Math.min(5, Math.round(level || 1)));
+    const table = {
+      1: { level: 1, label: 'Gering', color: '#50b848', textColor: '#000000' },
+      2: { level: 2, label: 'Mäßig', color: '#fff200', textColor: '#000000' },
+      3: { level: 3, label: 'Erheblich', color: '#f7931e', textColor: '#000000' },
+      4: { level: 4, label: 'Groß', color: '#ed1c24', textColor: '#ffffff' },
+      5: { level: 5, label: 'Sehr Groß', color: '#991b1b', textColor: '#ffffff' }
+    };
+    return table[clamped];
+  },
+
+  /**
+   * Berechnet den wegpunkt-spezifischen Lawinenlagebericht-Skalawert (EAWS 1–5)
+   * unter Berücksichtigung von Höhe, Tagesgang, lokalem Wind, Neuschnee & Steilheit
+   */
+  computeWaypointAvalancheScale(m, h, hIdx, pointTemp, pointGusts, freezingLevel, regionalAv) {
+    const critElev = (regionalAv && regionalAv.criticalElevation) ? regionalAv.criticalElevation : 1800;
+    const baseMorning = (regionalAv && regionalAv.morningDangerLevel) ? regionalAv.morningDangerLevel : 1;
+    const baseAfternoon = (regionalAv && regionalAv.afternoonDangerLevel) ? regionalAv.afternoonDangerLevel : baseMorning;
+    const freshSnow24 = (regionalAv && regionalAv.freshSnow24hCm) ? regionalAv.freshSnow24hCm : 0;
+
+    const arrHr = m.arrivalDate ? m.arrivalDate.getHours() : 10;
+    let level = (arrHr >= 12 && (pointTemp > 0.5 || baseAfternoon > baseMorning)) ? baseAfternoon : baseMorning;
+
+    if (m.ele < critElev - 250) {
+      if (pointTemp < 5) {
+        level = Math.max(1, level - 1);
+      }
+    } else if (m.ele >= critElev) {
+      if ((pointGusts >= 45 && freshSnow24 >= 5) || (pointGusts >= 60 && m.ele >= 2200)) {
+        level = Math.max(level, 3);
+      } else if (m.ele >= 2200 || pointGusts >= 32 || freshSnow24 >= 4) {
+        level = Math.max(level, 2);
+      }
+    }
+
+    if ((m.slopeDeg || 0) >= 35 && level >= 2 && m.ele >= critElev && pointGusts >= 40) {
+      level = Math.min(5, level + 1);
+    }
+
+    const meta = this.getEawsScaleMeta(level);
+    return {
+      avalancheLevel: meta.level,
+      avalancheLabel: meta.label,
+      avalancheColor: meta.color,
+      avalancheTextColor: meta.textColor
+    };
+  },
+
+  /**
    * STUFE 9c: Dynamischer Strecken-Wetterverlauf über die gesamte Dauer der Route
    * Unterstützt 2 Sportart-Kategorien (Rad & Berge) mit stufenlosen Geschwindigkeiten & Hm/h
    */
@@ -4189,6 +4259,7 @@ export const MicroEngine = {
     // Wetterdaten für jeden Meilenstein zur genauen Ankunftszeit interpolieren
     const h = hourlyForecast || {};
     const hTimes = h.time || [];
+    const avalancheReport = this.computeAvalancheReport(peakPoint.lat, peakPoint.lon, peakPoint.ele, { hourly: h }, null);
 
     const enrichedMilestones = milestones.map((m, idx) => {
       const arrMs = m.arrivalMs;
@@ -4315,8 +4386,11 @@ export const MicroEngine = {
       else if (idx === milestones.length - 1) label = 'Zielankunft';
       else if (m.ele === parsedGPX.maxElevationM) label = 'Scheitelpunkt / Pass';
 
+      const eaws = this.computeWaypointAvalancheScale(m, h, hIdx, pointTemp, pointGusts, freezingLevel, avalancheReport);
+
       return {
         ...m,
+        ...eaws,
         label,
         arrivalTimeStr: `${arrHoursStr} Uhr`,
         arrivalDateStr,
@@ -4381,6 +4455,7 @@ export const MicroEngine = {
       maxElevationM: parsedGPX.maxElevationM,
       timedPoints,
       milestones: enrichedMilestones,
+      avalancheReport,
       hazards
     };
   },

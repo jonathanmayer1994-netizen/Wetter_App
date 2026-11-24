@@ -1029,7 +1029,7 @@ export async function fetchHourlyForRoute(lat, lon) {
   }
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height&forecast_days=7&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height,snowfall,snow_depth,cloud_cover&forecast_days=7&timezone=auto`;
     const data = await resilientFetch(url, { ttlMs: 30 * 60 * 1000, persist: true });
     if (data && data.hourly && data.hourly.time && data.hourly.time.length > 0) {
       state.sports.cachedForecasts[cacheKey] = data.hourly;
@@ -1223,8 +1223,12 @@ export function renderSkitourDashboard(timeline) {
   }
   card.style.display = 'block';
 
-  const loc = state.currentLocation || { lat: 47.4, lon: 10.3, elevation: 1800 };
-  const av = MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, null);
+  const loc = (timeline && timeline.timedPoints && timeline.timedPoints.length > 0)
+    ? { lat: timeline.timedPoints[0].lat, lon: timeline.timedPoints[0].lon, elevation: Math.round(timeline.maxElevationM || 1800) }
+    : (state.currentLocation || { lat: 47.4, lon: 10.3, elevation: 1800 });
+  const av = (timeline && timeline.avalancheReport)
+    ? timeline.avalancheReport
+    : MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, null);
   if (!av) return;
 
   // 1. EAWS Badge
@@ -1661,18 +1665,24 @@ export function renderSportsElevationProfile(timeline) {
   const fillPoly = `${polyBottomLeft} ${lineCoords.join(' ')} ${polyBottomRight}`;
 
   // Milestone Markers on SVG Profile
+  const isSkitour = timeline.category === 'skitour';
   let milestoneSVGElements = '';
   timeline.milestones.forEach((m, idx) => {
     const mx = getX(m.distFromStartKm);
     const my = getY(m.ele);
     const isPeak = m.ele === timeline.maxElevationM;
     const isCompleted = !!m.isCompleted;
+    const dotFill = isCompleted
+      ? '#30d158'
+      : (isSkitour && m.avalancheColor ? m.avalancheColor : (isPeak ? '#ffd166' : '#00e5ff'));
+    const eawsText = (isSkitour && m.avalancheLevel) ? ` ⚠️${m.avalancheLevel}` : '';
 
     milestoneSVGElements += `
       <g class="svg-milestone-pin ${isCompleted ? 'pin-completed' : ''}" data-km="${m.distFromStartKm}" ${isCompleted ? 'style="opacity: 0.45;"' : ''}>
-        <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${isPeak ? 5.5 : 4}" fill="${isCompleted ? '#30d158' : (isPeak ? '#ffd166' : '#00e5ff')}" stroke="#ffffff" stroke-width="1.8" />
+        <title>${escapeHtml(m.label || '')} • ${m.tempC}°C${isSkitour && m.avalancheLevel ? ` • Lawinenstufe ${m.avalancheLevel}/5 (${m.avalancheLabel})` : ''}</title>
+        <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${isPeak ? 5.5 : 4.2}" fill="${dotFill}" stroke="#ffffff" stroke-width="1.8" />
         <text x="${mx.toFixed(1)}" y="${(my - 12).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.8))">
-          ${isCompleted ? '✓ ' : ''}${m.weatherIcon} ${m.tempC}°
+          ${isCompleted ? '✓ ' : ''}${m.weatherIcon} ${m.tempC}°${eawsText}
         </text>
       </g>
     `;
@@ -1757,6 +1767,7 @@ export function renderSportsWaypointsTable(timeline) {
 
   const fragment = document.createDocumentFragment();
   const nextUncompletedIdx = visibleMilestones.findIndex(m => !m.isCompleted);
+  const isSkitour = timeline.category === 'skitour';
 
   visibleMilestones.forEach((m, idx) => {
     const row = document.createElement('div');
@@ -1832,6 +1843,20 @@ export function renderSportsWaypointsTable(timeline) {
     }
 
     const feltT = m.feltTempC !== undefined ? m.feltTempC : Math.round(m.tempC);
+    const hasEaws = isSkitour && m.avalancheLevel;
+    const eawsMobileBadge = hasEaws
+      ? `<span class="sms-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};" title="Lawinenlagebericht: Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})">⚠️ ${m.avalancheLevel}/5</span>`
+      : '';
+    const eawsDesktopBadge = hasEaws
+      ? `<span class="swt-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">⚠️ LLB Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})</span>`
+      : '';
+    const eawsAccordionChip = hasEaws
+      ? `<div class="sap-chip">
+           <span class="sap-label">⚠️ Lawinenlagebericht (EAWS)</span>
+           <strong class="sap-val"><span class="swt-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">Stufe ${m.avalancheLevel}/5 – ${escapeHtml(m.avalancheLabel)}</span></strong>
+           <span class="sap-sub">Höhe: <b>${Math.round(m.ele)} m</b> • Hangneigung: <b>${m.slopeDeg || 0}°</b></span>
+         </div>`
+      : '';
 
     // Standardmäßig erstes oder nächstes Element aufgeklappt
     if (isNext || (nextUncompletedIdx === -1 && idx === 0)) {
@@ -1847,6 +1872,7 @@ export function renderSportsWaypointsTable(timeline) {
             <div class="sms-title-row">
               <strong class="sms-name">${escapeHtml(labelText)}</strong>
               ${isPeak ? '<span class="sms-peak-badge">🏔️ Gipfel</span>' : ''}
+              ${eawsMobileBadge}
               ${hasWarning ? '<span class="sms-warn-badge">⚠️ Achtung</span>' : ''}
             </div>
             <div class="sms-sub-row">
@@ -1873,6 +1899,7 @@ export function renderSportsWaypointsTable(timeline) {
         <div class="swt-cell swt-milestone">
           <span class="swt-type-tag ${tagClass} ${isCompleted ? 'swt-completed-tag' : (isNext ? 'swt-live-next-tag' : '')}">${escapeHtml(typeTag)}</span>
           <span class="swt-m-name">${escapeHtml(labelText)}</span>
+          ${eawsDesktopBadge}
           <span class="swt-m-coords">${m.lat.toFixed(4)}°, ${m.lon.toFixed(4)}°</span>
         </div>
         <div class="swt-cell swt-dist-ele">
@@ -1940,6 +1967,7 @@ export function renderSportsWaypointsTable(timeline) {
               <strong class="sap-val">${escapeHtml(m.arrivalTimeStr)} (${escapeHtml(m.arrivalDateStr)})</strong>
               <span class="sap-sub">${m.lat.toFixed(4)}°, ${m.lon.toFixed(4)}° ${deltaHtml ? `• ${deltaHtml}` : ''}</span>
             </div>
+            ${eawsAccordionChip}
           </div>
 
           <div class="sap-footer">
@@ -2104,6 +2132,14 @@ export function renderSportsMap(timeline) {
   const endPt = timeline.timedPoints[timeline.timedPoints.length - 1];
   const startMs = timeline.milestones[0] || { weatherIcon: '☀️', tempC: 10, windKmH: 5, precipMm: 0, weatherCondition: 'Trocken' };
   const endMs = timeline.milestones[timeline.milestones.length - 1] || { weatherIcon: '☀️', tempC: 10, windKmH: 5, precipMm: 0, weatherCondition: 'Trocken' };
+  const isSkitour = timeline.category === 'skitour';
+
+  const getMapEawsPill = (ms) => (isSkitour && ms && ms.avalancheLevel)
+    ? `<span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};" title="Lawinenlagebericht: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})">⚠️ ${ms.avalancheLevel}/5</span>`
+    : '';
+  const getPopupEawsRow = (ms) => (isSkitour && ms && ms.avalancheLevel)
+    ? `<div class="smp-eaws-row"><span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};">⚠️ Lawinenlagebericht: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})</span></div>`
+    : '';
 
   // 1. START Marker (Roter Pin mit weißem Kreis 'START' + Callout-Badge wie im Referenzdesign)
   const startIcon = L.divIcon({
@@ -2114,6 +2150,7 @@ export function renderSportsMap(timeline) {
           <span class="ms-icon">${startMs.weatherIcon}</span>
           <span class="ms-temp">${startMs.tempC}°</span>
           <span class="ms-time">${timeline.startTimeStr}</span>
+          ${getMapEawsPill(startMs)}
         </div>
         <div class="sm-pin-icon-wrap">
           <div class="sm-pin-circle">
@@ -2136,6 +2173,7 @@ export function renderSportsMap(timeline) {
         <div>${startMs.weatherIcon} <b>${startMs.weatherCondition}</b></div>
         <div>🌡️ Temperatur: <b>${startMs.tempC}°C</b></div>
         <div>💨 Wind: <b>${startMs.windKmH} km/h</b></div>
+        ${getPopupEawsRow(startMs)}
       </div>
       <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(0)">
         📍 Im Streckenwetter anspringen
@@ -2152,6 +2190,7 @@ export function renderSportsMap(timeline) {
           <span class="ms-icon">${endMs.weatherIcon}</span>
           <span class="ms-temp">${endMs.tempC}°</span>
           <span class="ms-time">${timeline.endTimeStr}</span>
+          ${getMapEawsPill(endMs)}
         </div>
         <div class="sm-pin-icon-wrap">
           <div class="sm-pin-circle">
@@ -2174,6 +2213,7 @@ export function renderSportsMap(timeline) {
         <div>${endMs.weatherIcon} <b>${endMs.weatherCondition}</b></div>
         <div>🌡️ Temperatur: <b>${endMs.tempC}°C</b></div>
         <div>💨 Wind: <b>${endMs.windKmH} km/h</b></div>
+        ${getPopupEawsRow(endMs)}
       </div>
       <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(${timeline.totalDistanceKm})">
         📍 Im Streckenwetter anspringen
@@ -2195,6 +2235,7 @@ export function renderSportsMap(timeline) {
             <span class="ms-icon">${m.weatherIcon}</span>
             <span class="ms-temp">${m.tempC}°</span>
             <span class="ms-time">${m.arrivalTimeStr ? m.arrivalTimeStr.replace(' Uhr', '') : ''}</span>
+            ${getMapEawsPill(m)}
           </div>
           <!-- Ausführliche Detailansicht für die vergrößerte Karte -->
           <div class="ms-detailed-card sm-ref-card ${isPeak ? 'bubble-peak' : ''}">
@@ -2209,6 +2250,7 @@ export function renderSportsMap(timeline) {
               <span class="sm-wind">💨 ${m.windKmH} km/h</span>
               ${m.precipMm > 0 ? `<span class="sm-dot">•</span><span class="sm-rain">💧 ${m.precipMm.toFixed(1)}mm</span>` : ''}
             </div>
+            ${isSkitour && m.avalancheLevel ? `<div class="ms-detailed-eaws"><span class="ms-eaws-pill" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">⚠️ LLB Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})</span></div>` : ''}
             <div class="sm-ref-arrow"></div>
           </div>
           <div class="sm-trail-dot ${isPeak ? 'dot-peak' : ''}"></div>
@@ -2231,6 +2273,7 @@ export function renderSportsMap(timeline) {
           ${m.relWindBadge ? `<div class="smp-wind-badge">${m.relWindBadge}</div>` : ''}
           <div>💧 Niederschlag: <b>${m.precipMm.toFixed(1)} mm</b> (${m.popPercent}%)</div>
           ${m.isSnow ? '<div class="smp-snow-badge">❄️ Frost / Schneelage möglich</div>' : ''}
+          ${getPopupEawsRow(m)}
         </div>
         <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(${m.distFromStartKm})">
           📍 Im Streckenwetter anspringen
@@ -2375,7 +2418,9 @@ export function updateSportsScrubber(km) {
   }
   if (cwcCond) cwcCond.innerText = `${closestMs.weatherIcon} ${closestMs.weatherCondition || 'Normal'}`;
   if (cwcCondNote) {
-    if (closestMs.weatherCode >= 95) cwcCondNote.innerText = '⚡ Gewitter';
+    if (timeline.category === 'skitour' && closestMs.avalancheLevel) {
+      cwcCondNote.innerHTML = `<span class="swt-eaws-badge" style="background:${closestMs.avalancheColor};color:${closestMs.avalancheTextColor};">⚠️ LLB Stufe ${closestMs.avalancheLevel}/5 (${escapeHtml(closestMs.avalancheLabel)})</span>`;
+    } else if (closestMs.weatherCode >= 95) cwcCondNote.innerText = '⚡ Gewitter';
     else if (closestMs.isSnow) cwcCondNote.innerText = '❄️ Schneelage';
     else if (closestMs.precipMm >= 1) cwcCondNote.innerText = '🌧️ Regenphase';
     else cwcCondNote.innerText = 'Stabil';
