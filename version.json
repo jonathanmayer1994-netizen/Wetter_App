@@ -1,5 +1,5 @@
 {
-  "version": "2.38.2",
-  "build": "20261124-2010",
-  "notes": "Live multi-waypoint GPX avalanche & snow report synchronization (valley+peak Open-Meteo elevation query, 72h snowfall window, wind-lee rose, dynamic firn curve)"
+  "version": "2.39.0",
+  "build": "20261124-2016",
+  "notes": "Add official EAWS CAAMLv6 live avalanche bulletin integration (SLF Davos GeoJSON + Albina Euregio) and full 10-day ski touring fresh snow, quality, and morning/afternoon danger planner"
 }

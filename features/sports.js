@@ -14,7 +14,7 @@ import { updateNavigationWarningBadges } from './search.js';
 
 export function convertTemp(celsius) {
   if (state.unit === 'fahrenheit') {
-    return (celsius * 9/5) + 32;
+    return (celsius * 9 / 5) + 32;
   }
   return celsius;
 }
@@ -439,10 +439,12 @@ export async function refreshLiveSkitourForecast(forceRefresh = true) {
     if (pkg && pkg.valley) {
       state.sports.cachedForecast = pkg.valley;
       state.sports.cachedPeakForecast = pkg.peak || null;
+      state.sports.officialBulletin = pkg.officialBulletin || null;
       state.sports.lastLiveFetchMs = pkg.fetchedAtMs || Date.now();
     } else if (pkg) {
       state.sports.cachedForecast = pkg;
       state.sports.cachedPeakForecast = null;
+      state.sports.officialBulletin = null;
       state.sports.lastLiveFetchMs = Date.now();
     }
     recomputeSportsTimeline();
@@ -909,7 +911,7 @@ export function setupSportsTab() {
 
     chartWrapper.addEventListener('pointerdown', e => {
       isDraggingChart = true;
-      try { chartWrapper.setPointerCapture(e.pointerId); } catch (_) {}
+      try { chartWrapper.setPointerCapture(e.pointerId); } catch (_) { }
       handleChartScrub(e.clientX);
     });
     chartWrapper.addEventListener('pointermove', e => {
@@ -920,7 +922,7 @@ export function setupSportsTab() {
     const stopChartDrag = (e) => {
       if (isDraggingChart) {
         isDraggingChart = false;
-        try { chartWrapper.releasePointerCapture(e.pointerId); } catch (_) {}
+        try { chartWrapper.releasePointerCapture(e.pointerId); } catch (_) { }
       }
     };
     chartWrapper.addEventListener('pointerup', stopChartDrag);
@@ -1089,6 +1091,9 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
   const hourlyVars = 'temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height,snowfall,snow_depth,cloud_cover';
   const currentVars = 'temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,snowfall,snow_depth,cloud_cover';
 
+  // Offiziellen Lawinenlagebericht (SLF Davos / Albina Euregio) parallel anfragen
+  const officialPromise = MicroEngine.fetchOfficialAvalancheBulletin(peakPt.lat, peakPt.lon).catch(() => null);
+
   const hasDistinctPeak = peakPt !== startPt && (
     Math.abs((peakPt.ele || 0) - (startPt.ele || 0)) >= 120 ||
     Math.abs(peakPt.lat - startPt.lat) >= 0.015 ||
@@ -1100,8 +1105,11 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
       const lats = `${Number(startPt.lat).toFixed(3)},${Number(peakPt.lat).toFixed(3)}`;
       const lons = `${Number(startPt.lon).toFixed(3)},${Number(peakPt.lon).toFixed(3)}`;
       const eles = `${Math.round(startPt.ele || 800)},${Math.round(peakPt.ele || 2000)}`;
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&elevation=${eles}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=5&timezone=auto`;
-      const res = await resilientFetch(url, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh });
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&elevation=${eles}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=10&timezone=auto`;
+      const [res, officialBulletin] = await Promise.all([
+        resilientFetch(url, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh }),
+        officialPromise
+      ]);
       const items = Array.isArray(res) ? res : (res && res.hourly ? [res] : []);
       if (items.length >= 2 && items[0].hourly && items[1].hourly) {
         items[0].hourly._modelElevation = items[0].elevation !== undefined ? items[0].elevation : startPt.ele;
@@ -1113,6 +1121,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
             current: items[1].current || null,
             elevation: items[1].elevation !== undefined ? items[1].elevation : peakPt.ele
           },
+          officialBulletin,
           fetchedAtMs: Date.now()
         };
         state.sports.cachedForecasts[cacheKey] = pkg;
@@ -1120,11 +1129,14 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
       }
     }
 
-    // Fallback / Single-Point Live Query (mit past_days=3 & exakter Wegpunkthöhe)
+    // Fallback / Single-Point Live Query (mit past_days=3 & 10 Tagen Vorhersage)
     const targetPt = peakPt || startPt;
     const eleParam = targetPt.ele !== undefined ? `&elevation=${Math.round(targetPt.ele)}` : '';
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(targetPt.lat).toFixed(3)}&longitude=${Number(targetPt.lon).toFixed(3)}${eleParam}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=5&timezone=auto`;
-    const data = await resilientFetch(url, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh });
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(targetPt.lat).toFixed(3)}&longitude=${Number(targetPt.lon).toFixed(3)}${eleParam}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=10&timezone=auto`;
+    const [data, officialBulletin] = await Promise.all([
+      resilientFetch(url, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh }),
+      officialPromise
+    ]);
     if (data && data.hourly && data.hourly.time && data.hourly.time.length > 0) {
       data.hourly._modelElevation = data.elevation !== undefined ? data.elevation : targetPt.ele;
       const pkg = {
@@ -1134,6 +1146,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
           current: data.current || null,
           elevation: data.elevation !== undefined ? data.elevation : targetPt.ele
         },
+        officialBulletin,
         fetchedAtMs: Date.now()
       };
       state.sports.cachedForecasts[cacheKey] = pkg;
@@ -1143,10 +1156,13 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
     console.warn('Live route forecast fetch failed, using state fallback:', err);
   }
 
+  const officialBulletin = await officialPromise;
+
   if (state.weatherData && state.weatherData.hourly) {
     return {
       valley: state.weatherData.hourly,
       peak: { hourly: state.weatherData.hourly, current: state.weatherData.current || null, elevation: peakPt.ele },
+      officialBulletin,
       fetchedAtMs: Date.now()
     };
   }
@@ -1155,6 +1171,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
   return {
     valley: synth,
     peak: { hourly: synth, current: null, elevation: peakPt.ele },
+    officialBulletin,
     fetchedAtMs: Date.now()
   };
 }
@@ -1168,21 +1185,29 @@ export function generateSyntheticSportsHourly() {
   const winds = [];
   const gusts = [];
   const freezing = [];
+  const snowfall = [];
+  const snowDepth = [];
+  const clouds = [];
   const now = new Date();
-  now.setMinutes(0, 0, 0);
+  now.setHours(0, 0, 0, 0);
 
-  for (let i = 0; i < 168; i++) {
+  for (let i = 0; i < 240; i++) {
     const t = new Date(now.getTime() + i * 3600000);
     times.push(t.toISOString());
     const hr = t.getHours();
-    const temp = 14 + Math.sin((hr - 8) / 24 * Math.PI * 2) * 6;
+    const dayIdx = Math.floor(i / 24);
+    const temp = -3 + Math.sin((hr - 8) / 24 * Math.PI * 2) * 5;
     temps.push(Math.round(temp * 10) / 10);
-    precips.push(hr >= 14 && hr <= 17 ? 0.8 : 0);
-    pops.push(hr >= 14 && hr <= 17 ? 40 : 10);
-    codes.push(hr >= 14 && hr <= 17 ? 80 : 1);
-    winds.push(12 + Math.random() * 8);
-    gusts.push(22 + Math.random() * 15);
-    freezing.push(2800);
+    const isSnowBurst = (dayIdx === 2 || dayIdx === 5) && hr >= 3 && hr <= 11;
+    precips.push(isSnowBurst ? 1.8 : 0);
+    snowfall.push(isSnowBurst ? 1.8 : 0);
+    snowDepth.push(0.85);
+    clouds.push(isSnowBurst ? 90 : 30);
+    pops.push(isSnowBurst ? 75 : 15);
+    codes.push(isSnowBurst ? 73 : 1);
+    winds.push(isSnowBurst ? 30 : 15);
+    gusts.push(isSnowBurst ? 48 : 24);
+    freezing.push(1600);
   }
 
   return {
@@ -1193,7 +1218,10 @@ export function generateSyntheticSportsHourly() {
     weather_code: codes,
     wind_speed_10m: winds,
     wind_gusts_10m: gusts,
-    freezing_level_height: freezing
+    freezing_level_height: freezing,
+    snowfall,
+    snow_depth: snowDepth,
+    cloud_cover: clouds
   };
 }
 
@@ -1225,7 +1253,7 @@ export async function parseGPXAsync(gpxXml) {
 
         worker.postMessage({ action: 'parseGPX', payload: { xmlString: gpxXml } });
       });
-    } catch (e) {}
+    } catch (e) { }
   }
   return MicroEngine.parseGPXData(gpxXml);
 }
@@ -1265,10 +1293,12 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
   if (forecastPkg && forecastPkg.valley) {
     state.sports.cachedForecast = forecastPkg.valley;
     state.sports.cachedPeakForecast = forecastPkg.peak || null;
+    state.sports.officialBulletin = forecastPkg.officialBulletin || null;
     state.sports.lastLiveFetchMs = forecastPkg.fetchedAtMs || Date.now();
   } else {
     state.sports.cachedForecast = forecastPkg;
     state.sports.cachedPeakForecast = null;
+    state.sports.officialBulletin = null;
     state.sports.lastLiveFetchMs = Date.now();
   }
 
@@ -1288,8 +1318,8 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
     const isSki = state.sports.category === 'skitour';
     const paceTxt = isBike
       ? `Rad • ${(state.sports.bikeSpeedKmH || 26).toFixed(1)} km/h Pace`
-      : (isSki 
-        ? `Skitour • +${state.sports.skitourAscentHmH || 400} Hm/h • ↓${(state.sports.skitourDescentKmH || 25).toFixed(0)} km/h` 
+      : (isSki
+        ? `Skitour • +${state.sports.skitourAscentHmH || 400} Hm/h • ↓${(state.sports.skitourDescentKmH || 25).toFixed(0)} km/h`
         : `Berge • ${(state.sports.mountainSpeedKmH || 4).toFixed(1)} km/h • ${state.sports.mountainAscentHmH || 400} Hm/h`);
     heroSubEl.innerText = `${paceTxt} • Stufenlose SAC-Dynamik & Relativ-Wind`;
   }
@@ -1543,6 +1573,67 @@ export function renderSkitourDashboard(timeline) {
       }
     }
   }
+
+  // 6. Quellen-Transparenzbanner & 10-Tage Skitouren-Planer (Neuschnee, Qualität & VM/NM)
+  const srcBanner = document.getElementById('skitour-source-banner');
+  const srcIcon = document.getElementById('skitour-source-icon');
+  const srcLabel = document.getElementById('skitour-source-label');
+  const officialTextEl = document.getElementById('skitour-official-text');
+
+  if (srcBanner && srcLabel) {
+    srcBanner.classList.toggle('is-official', !!av.isOfficialBulletin);
+    if (srcIcon) srcIcon.innerText = av.isOfficialBulletin ? '✅' : '📡';
+    srcLabel.innerText = av.sourceLabel || 'Open-Meteo ECMWF/ICON + EAWS-Physik';
+    if (officialTextEl) {
+      if (av.officialText) {
+        officialTextEl.style.display = 'block';
+        officialTextEl.innerText = av.officialText;
+      } else {
+        officialTextEl.style.display = 'none';
+      }
+    }
+  }
+
+  const dayListEl = document.getElementById('skitour-10day-list');
+  if (dayListEl && Array.isArray(av.forecast10Days)) {
+    dayListEl.innerHTML = av.forecast10Days.map(d => `
+      <button type="button" class="skitour-10day-row ${d.isSelected ? 'is-selected' : ''}" data-date="${d.dateKey}">
+        <div class="s10d-day-col">
+          <div class="s10d-day-name">
+            <span>${escapeHtml(d.dayLabel)}</span>
+            ${d.isWeekend ? '<span class="s10d-wknd-tag">WE</span>' : ''}
+          </div>
+          <span class="s10d-src-mini ${d.isOfficialDay ? 'official' : ''}">${d.isOfficialDay ? '✓ Offiz. LLB' : 'ECMWF/ICON'}</span>
+        </div>
+
+        <div class="s10d-snow-col">
+          <span class="s10d-snow-main">${d.snowQualityIcon} +${d.freshSnowDayCm} cm (${escapeHtml(d.snowWindowStr)})</span>
+          <span class="s10d-snow-sub">72h: ${d.cumFreshSnow72hCm} cm • ${d.densityKgM3} kg/m³ ${escapeHtml(d.snowQuality)}</span>
+        </div>
+
+        <div class="s10d-hazard-col">
+          <span class="s10d-hazard-text">${escapeHtml(d.hazardSummary)}</span>
+          <span class="s10d-wind-text">Wind: ${escapeHtml(d.windFromSector)} (Böen ${d.maxWindKmH} km/h) • Gipfel: VM ${d.morning.tempC}° / NM ${d.afternoon.tempC}°</span>
+        </div>
+
+        <div class="s10d-periods-col">
+          <span class="s10d-period-pill" style="background:${d.morning.color};color:${d.morning.textColor};" title="Vormittag (06–12 Uhr): Stufe ${d.morning.level}/5 (${escapeHtml(d.morning.label)})">VM ${d.morning.level}/5</span>
+          <span class="s10d-period-pill" style="background:${d.afternoon.color};color:${d.afternoon.textColor};" title="Nachmittag (12–18 Uhr): Stufe ${d.afternoon.level}/5 (${escapeHtml(d.afternoon.label)})">NM ${d.afternoon.level}/5</span>
+        </div>
+      </button>
+    `).join('');
+
+    dayListEl.querySelectorAll('.skitour-10day-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chosenDate = btn.dataset.date;
+        if (!chosenDate) return;
+        const dateInput = document.getElementById('sports-date-input');
+        if (dateInput) dateInput.value = chosenDate;
+        document.querySelectorAll('#sports-date-presets .stsp-preset-btn').forEach(b => b.classList.remove('active'));
+        updateSportsStartTime(chosenDate, null);
+      });
+    });
+  }
 }
 
 export function recomputeSportsTimeline() {
@@ -1566,7 +1657,8 @@ export function recomputeSportsTimeline() {
       skitourSpeedKmH: state.sports.skitourSpeedKmH,
       skitourAscentHmH: state.sports.skitourAscentHmH,
       skitourDescentKmH: state.sports.skitourDescentKmH,
-      peakForecast: state.sports.cachedPeakForecast || null
+      peakForecast: state.sports.cachedPeakForecast || null,
+      officialBulletin: state.sports.officialBulletin || null
     }
   );
 
@@ -1627,8 +1719,8 @@ export function snapCoordinatesToRoute(lat, lon, points) {
     const dLat = (p.lat - lat) * toRad;
     const dLon = (p.lon - lon) * toRad;
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1) * Math.cos(lat2) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.cos(lat1) * Math.cos(lat2) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const d = R * c;
     if (d < minDistanceM) {
@@ -1647,17 +1739,17 @@ export function snapCoordinatesToRoute(lat, lon, points) {
 /**
  * Kompatibilitäts-Stubs: Live-Tour-Tracking wurde vollständig aus der App entfernt
  */
-export function startLiveTracking() {}
-export function stopLiveTracking() {}
-export function toggleLiveTracking() {}
+export function startLiveTracking() { }
+export function stopLiveTracking() { }
+export function toggleLiveTracking() { }
 export function updateInFlightProgress(newKm) {
   updateSportsScrubber(newKm);
 }
 export function resetInFlightProgress() {
   updateSportsScrubber(0);
 }
-export function renderInFlightTrackingPanel() {}
-export function updateInFlightMap() {}
+export function renderInFlightTrackingPanel() { }
+export function updateInFlightMap() { }
 
 export function renderSportsMetrics(timeline) {
   const dDist = document.getElementById('sm-val-dist');
@@ -2233,7 +2325,7 @@ export function renderSportsMap(timeline) {
       subdomains: ['a', 'b', 'c'],
       attribution: '© OpenStreetMap, SRTM | OpenTopoMap'
     });
-    topoLayer.on('tileerror', function(err) {
+    topoLayer.on('tileerror', function (err) {
       if (err.tile && !err.tile._fallbackTried) {
         err.tile._fallbackTried = true;
         const coords = err.coords;
@@ -2441,12 +2533,12 @@ export function renderSportsMap(timeline) {
   }
 
   // 5. Interaktiver Scrubber-Marker (Athleten-Pin ohne störende Animationen)
-  const athleteIcon = timeline.sportType === 'road_bike' 
-    ? '🚴' 
-    : (timeline.sportType === 'gravel_mtb' 
-      ? '🚵' 
-      : (timeline.sportType === 'trailrun' 
-        ? '🏃' 
+  const athleteIcon = timeline.sportType === 'road_bike'
+    ? '🚴'
+    : (timeline.sportType === 'gravel_mtb'
+      ? '🚵'
+      : (timeline.sportType === 'trailrun'
+        ? '🏃'
         : (timeline.category === 'skitour' || timeline.sportType === 'ski_touring' || timeline.sportType === 'skimo' ? '⛷️' : '🥾')));
   const scrubberIcon = L.divIcon({
     className: 'sports-scrubber-map-marker',

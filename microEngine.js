@@ -1523,7 +1523,7 @@ export const MicroEngine = {
         const wRadar = nowcastWeights[step];
         const wModel = 1.0 - wRadar;
         const modelPrecip = h.precipitation[idx] || 0;
-        
+
         let stepOroMultiplier = 1.0;
         if (isMountain && terrain.tilt > 0) {
           const wDir = (h.wind_direction_10m && h.wind_direction_10m[idx] !== undefined) ? h.wind_direction_10m[idx] : 210;
@@ -1577,10 +1577,10 @@ export const MicroEngine = {
       const interpRate = (m <= 45)
         ? (baseRate * (1 - frac * 0.7) + modelH0 * (frac * 0.7)) * orographicFactor
         : (baseRate * 0.2 + (modelH0 * (1 - (frac - 0.75)) + modelH1 * (frac - 0.75)) * 0.8) * orographicFactor;
-      
+
       const rateMm = Math.round(Math.max(0, interpRate) * 10) / 10;
       const prob = Math.round(Math.min(100, (m <= 30 && baseRate > 0.1) ? Math.max(85, pop0) : (pop0 * (1 - frac * 0.5) + pop1 * (frac * 0.5))));
-      
+
       intervals.push({
         minute: m,
         label: `+${m} min`,
@@ -1609,7 +1609,7 @@ export const MicroEngine = {
     const cur = weatherRaw.current;
     const h = weatherRaw.hourly;
     const consensusT = multiModel.weightedConsensus.currentTemp;
-    
+
     // Falls keine physische Messstation die Daten bereits direkt korrigiert hat
     const stationApplied = microData?.biasCorrection?.stationApplied;
     if (!stationApplied && typeof consensusT === 'number') {
@@ -1672,7 +1672,7 @@ export const MicroEngine = {
   computeWetBulbTemp(t, rh, pressureHpa = null) {
     if (typeof t !== 'number' || isNaN(t)) return 0;
     const r = Math.max(1, Math.min(100, (typeof rh === 'number' && !isNaN(rh)) ? rh : 65));
-    
+
     // 1. Initialer Schätzwert nach Stull (2011) auf Meeresniveau (1013.25 hPa)
     let tw = t * Math.atan(0.151977 * Math.pow(r + 8.313659, 0.5)) +
       Math.atan(t + r) -
@@ -2031,7 +2031,7 @@ export const MicroEngine = {
         this._foehnCache = { timestamp: now, data };
         return data;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       deltaP_hPa: 0.0,
@@ -2614,8 +2614,8 @@ export const MicroEngine = {
           luvLeeAlignment > 0.25
             ? "Luv (Direkte Windanströmung)"
             : luvLeeAlignment < -0.25
-            ? "Lee (Windschatten / Rotor-Böen)"
-            : "Seitenwind / Queranströmung",
+              ? "Lee (Windschatten / Rotor-Böen)"
+              : "Seitenwind / Queranströmung",
       },
     };
   },
@@ -2814,7 +2814,7 @@ export const MicroEngine = {
           precipIcon = '💧';
           isSnow = false;
         }
-        
+
         // Windchill-Berechnung
         let felt = t;
         if (t <= 10 && w >= 5) {
@@ -3205,6 +3205,367 @@ export const MicroEngine = {
   },
 
   /**
+   * Hilfsfunktion: Ray-Casting Punkt-in-Polygon Prüfung für GeoJSON-Lawinenregionen
+   */
+  _pointInRing(lon, lat, ring) {
+    if (!Array.isArray(ring) || ring.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  },
+
+  _pointInGeoJsonGeom(lon, lat, geom) {
+    if (!geom || !geom.coordinates) return false;
+    if (geom.type === 'Polygon') {
+      return this._pointInRing(lon, lat, geom.coordinates[0]);
+    }
+    if (geom.type === 'MultiPolygon') {
+      return geom.coordinates.some(poly => this._pointInRing(lon, lat, poly[0]));
+    }
+    return false;
+  },
+
+  /**
+   * Ruft offizielle EAWS CAAMLv6 Lawinenlageberichte (SLF Davos GeoJSON / Albina Euregio) live ab
+   */
+  async fetchOfficialAvalancheBulletin(lat, lon) {
+    const ratingToNum = { low: 1, moderate: 2, considerable: 3, high: 4, very_high: 5 };
+    const aspectMapDe = { N: 'N', NE: 'NO', E: 'O', SE: 'SO', S: 'S', SW: 'SW', W: 'W', NW: 'NW' };
+    const probMapDe = {
+      new_snow: { name: 'Neuschnee', icon: '🌨️' },
+      wind_slab: { name: 'Triebschnee', icon: '💨' },
+      persistent_weak_layers: { name: 'Altschnee', icon: '❄️' },
+      wet_snow: { name: 'Nassschnee', icon: '💧' },
+      gliding_snow: { name: 'Gleitschnee', icon: '💧' },
+      favourable_situation: { name: 'Günstige Situation', icon: '✅' }
+    };
+
+    const stripHtml = (s) => (s ? String(s).replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim() : '');
+
+    const parseCaamlProps = (props, agencyLabel) => {
+      if (!props || !props.validTime) return null;
+      const validStart = new Date(props.validTime.startTime).getTime();
+      const validEnd = new Date(props.validTime.endTime).getTime();
+      if (isNaN(validEnd) || validEnd < Date.now() - 12 * 3600000) {
+        return null; // Abgelaufenes / Saison-fremdes Bulletin verwerfen
+      }
+
+      let morningLevel = 1;
+      let afternoonLevel = 1;
+      let allDayLevel = 1;
+      let criticalElev = 2000;
+
+      const ratings = Array.isArray(props.dangerRatings) ? props.dangerRatings : [];
+      ratings.forEach(r => {
+        const val = ratingToNum[r.mainValue] || 1;
+        if (r.elevation && r.elevation.lowerBound && !isNaN(parseInt(r.elevation.lowerBound, 10))) {
+          criticalElev = parseInt(r.elevation.lowerBound, 10);
+        }
+        if (r.validTimePeriod === 'earlier') {
+          morningLevel = Math.max(morningLevel, val);
+        } else if (r.validTimePeriod === 'later') {
+          afternoonLevel = Math.max(afternoonLevel, val);
+        } else {
+          allDayLevel = Math.max(allDayLevel, val);
+        }
+      });
+
+      if (morningLevel === 1 && allDayLevel > 1) morningLevel = allDayLevel;
+      if (afternoonLevel === 1 && allDayLevel > 1) afternoonLevel = allDayLevel;
+      const dangerLevel = Math.max(morningLevel, afternoonLevel, allDayLevel);
+
+      const aspectSet = new Set();
+      const problems = [];
+      const rawProbs = Array.isArray(props.avalancheProblems) ? props.avalancheProblems : [];
+      rawProbs.forEach(p => {
+        const info = probMapDe[p.problemType] || { name: p.problemType || 'Lawinenproblem', icon: '⚠️' };
+        if (Array.isArray(p.aspects)) {
+          p.aspects.forEach(a => aspectSet.add(aspectMapDe[a] || a));
+        }
+        if (p.elevation && p.elevation.lowerBound && !isNaN(parseInt(p.elevation.lowerBound, 10))) {
+          criticalElev = Math.min(criticalElev, parseInt(p.elevation.lowerBound, 10));
+        }
+        const coreTxt = p.customData && p.customData.CH && p.customData.CH.coreZoneText
+          ? p.customData.CH.coreZoneText
+          : '';
+        problems.push({
+          id: p.problemType || 'problem',
+          name: info.name,
+          icon: info.icon,
+          desc: stripHtml(p.comment) || coreTxt,
+          trigger: coreTxt || stripHtml(p.comment).slice(0, 120),
+          size: `EAWS Stufe ${ratingToNum[p.dangerRatingValue] || dangerLevel}`
+        });
+      });
+
+      return {
+        agency: agencyLabel,
+        bulletinID: props.bulletinID || '',
+        validStartMs: validStart,
+        validEndMs: validEnd,
+        dangerLevel,
+        morningDangerLevel: morningLevel,
+        afternoonDangerLevel: afternoonLevel,
+        criticalElevation: criticalElev,
+        criticalAspects: aspectSet.size > 0 ? Array.from(aspectSet) : ['N', 'NO', 'O', 'NW'],
+        problems,
+        snowpackText: stripHtml(props.snowpackStructure && props.snowpackStructure.comment),
+        weatherText: stripHtml(props.weatherForecast && props.weatherForecast.comment),
+        highlights: stripHtml(props.avalancheActivity && props.avalancheActivity.highlights)
+      };
+    };
+
+    try {
+      // 1. Schweiz & Liechtenstein: Offizieller SLF Davos CAAMLv6 GeoJSON Feed
+      if (lat >= 45.75 && lat <= 47.85 && lon >= 5.9 && lon <= 10.55) {
+        const geo = await resilientFetch('https://aws.slf.ch/api/bulletin/caaml/de/geojson', {
+          ttlMs: 30 * 60 * 1000,
+          timeoutMs: 5500,
+          persist: true,
+          allowStaleOnError: true
+        });
+        if (geo && Array.isArray(geo.features)) {
+          const match = geo.features.find(f => this._pointInGeoJsonGeom(lon, lat, f.geometry));
+          if (match && match.properties) {
+            const parsed = parseCaamlProps(match.properties, 'SLF Davos (CAAMLv6 Live)');
+            if (parsed) return parsed;
+          }
+        }
+      }
+
+      // 2. Tirol / Südtirol / Trentino (Euregio / Albina CAAMLv6)
+      if (lat >= 45.8 && lat <= 47.75 && lon >= 10.1 && lon <= 12.95) {
+        const alb = await resilientFetch('https://static.avalanche.report/bulletins/latest/EUREGIO_de_CAAMLv6.json', {
+          ttlMs: 30 * 60 * 1000,
+          timeoutMs: 5500,
+          persist: true,
+          allowStaleOnError: true
+        });
+        if (alb && Array.isArray(alb.bulletins)) {
+          const prefix = lat >= 47.0 ? 'AT-07' : (lat >= 46.22 ? 'IT-32-BZ' : 'IT-32-TN');
+          const match = alb.bulletins.find(b =>
+            Array.isArray(b.regions) && b.regions.some(r => String(r.regionID || '').startsWith(prefix))
+          ) || alb.bulletins[0];
+          if (match) {
+            const parsed = parseCaamlProps(match, 'Albina / avalanche.report (CAAMLv6 Live)');
+            if (parsed) return parsed;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Official avalanche CAAML fetch fallback to ECMWF/ICON physics:', err);
+    }
+    return null;
+  },
+
+  /**
+   * Berechnet detaillierten 10-Tage Skitouren-, Neuschnee- & Tageszeit-Lawinenplaner
+   */
+  computeAvalanche10DayMatrix(elevation, minEle, hPeak, hv, hTimes, dominantWindDir, officialBulletin, selectedDateStr) {
+    const days = [];
+    const dirToSector = (deg) => {
+      const sectors = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+      return sectors[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+    };
+
+    const getQualityInfo = (tempC) => {
+      if (tempC < -7) return { quality: 'Wildschnee / Flaumpulver', density: 45, icon: '🪶' };
+      if (tempC <= -2) return { quality: 'Alpinpulver (trocken)', density: 85, icon: '❄️' };
+      if (tempC <= 1.5) return { quality: 'Feuchtschnee / Pappschnee', density: 160, icon: '🌨️' };
+      return { quality: 'Nass- / Sulzschnee', density: 280, icon: '💧' };
+    };
+
+    const buildDateStr = (dObj) => {
+      const pad = n => String(n).padStart(2, '0');
+      return `${dObj.getFullYear()}-${pad(dObj.getMonth() + 1)}-${pad(dObj.getDate())}`;
+    };
+
+    const modelEle = (hPeak && hPeak._modelElevation !== undefined) ? hPeak._modelElevation : elevation;
+    const tempCorr = (elevation - modelEle) * 0.0065;
+
+    // Gruppiere stündliche Indizes pro Kalendertag
+    const dayHourBuckets = {};
+    for (let i = 0; i < hTimes.length; i++) {
+      const dt = new Date(hTimes[i]);
+      if (isNaN(dt.getTime())) continue;
+      const dKey = buildDateStr(dt);
+      if (!dayHourBuckets[dKey]) dayHourBuckets[dKey] = [];
+      dayHourBuckets[dKey].push({ idx: i, hr: dt.getHours(), ts: dt.getTime() });
+    }
+
+    const baseToday = new Date();
+    baseToday.setHours(0, 0, 0, 0);
+    const weekdayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+    for (let d = 0; d < 10; d++) {
+      const targetDay = new Date(baseToday.getTime() + d * 86400000);
+      const dKey = buildDateStr(targetDay);
+      const wd = targetDay.getDay();
+      const isWeekend = wd === 0 || wd === 6;
+      const dayLabel = d === 0
+        ? 'Heute'
+        : (d === 1 ? 'Morgen' : `${weekdayNames[wd]} ${targetDay.getDate()}.${targetDay.getMonth() + 1}.`);
+
+      const entries = dayHourBuckets[dKey] || [];
+      let freshSnowDayCm = 0;
+      const snowHrs = [];
+      const snowTemps = [];
+      const morningTemps = [], morningGusts = [], morningSnow = [];
+      const afternoonTemps = [], afternoonGusts = [], afternoonSnow = [];
+      const allGusts = [], windDirs = [];
+      let minFreezing = 3000;
+
+      entries.forEach(({ idx, hr }) => {
+        const rawT = (hPeak && hPeak.temperature_2m && hPeak.temperature_2m[idx] !== undefined) ? hPeak.temperature_2m[idx] : 0;
+        const t = rawT - tempCorr;
+        const g = (hPeak && hPeak.wind_gusts_10m && hPeak.wind_gusts_10m[idx] !== undefined) ? hPeak.wind_gusts_10m[idx] : 20;
+        const wDir = (hPeak && hPeak.wind_direction_10m && hPeak.wind_direction_10m[idx] !== undefined) ? hPeak.wind_direction_10m[idx] : dominantWindDir;
+        const fl = (hPeak && hPeak.freezing_level_height && hPeak.freezing_level_height[idx] !== undefined) ? hPeak.freezing_level_height[idx] : 2200;
+        minFreezing = Math.min(minFreezing, fl);
+
+        let sf = (hPeak && hPeak.snowfall && hPeak.snowfall[idx] !== undefined) ? (hPeak.snowfall[idx] || 0) : 0;
+        if (sf === 0 && hPeak && hPeak.precipitation && hPeak.precipitation[idx] > 0 && (t <= 1.5 || elevation >= fl)) {
+          sf = hPeak.precipitation[idx] * (t < -5 ? 1.3 : 1.0);
+        }
+
+        freshSnowDayCm += sf;
+        if (sf >= 0.2) {
+          snowHrs.push(hr);
+          snowTemps.push(t);
+        }
+        allGusts.push(g);
+        windDirs.push(wDir);
+
+        if (hr >= 6 && hr < 12) {
+          morningTemps.push(t);
+          morningGusts.push(g);
+          morningSnow.push(sf);
+        } else if (hr >= 12 && hr <= 18) {
+          afternoonTemps.push(t);
+          afternoonGusts.push(g);
+          afternoonSnow.push(sf);
+        }
+      });
+
+      // Kumulierter 72h-Neuschnee (dieser Tag + 2 Vortage)
+      let cum72h = freshSnowDayCm;
+      for (let prev = 1; prev <= 2; prev++) {
+        const pDate = new Date(targetDay.getTime() - prev * 86400000);
+        const pEntries = dayHourBuckets[buildDateStr(pDate)] || [];
+        pEntries.forEach(({ idx }) => {
+          const rawT = (hPeak && hPeak.temperature_2m && hPeak.temperature_2m[idx] !== undefined) ? hPeak.temperature_2m[idx] : 0;
+          const t = rawT - tempCorr;
+          const fl = (hPeak && hPeak.freezing_level_height && hPeak.freezing_level_height[idx] !== undefined) ? hPeak.freezing_level_height[idx] : 2200;
+          let sf = (hPeak && hPeak.snowfall && hPeak.snowfall[idx] !== undefined) ? (hPeak.snowfall[idx] || 0) : 0;
+          if (sf === 0 && hPeak && hPeak.precipitation && hPeak.precipitation[idx] > 0 && (t <= 1.5 || elevation >= fl)) {
+            sf = hPeak.precipitation[idx];
+          }
+          cum72h += sf;
+        });
+      }
+
+      const snowWindowStr = snowHrs.length > 0
+        ? `${String(Math.min(...snowHrs)).padStart(2, '0')}–${String(Math.min(24, Math.max(...snowHrs) + 1)).padStart(2, '0')} Uhr`
+        : 'Trocken';
+
+      const avgDaySnowT = snowTemps.length > 0
+        ? (snowTemps.reduce((a, b) => a + b, 0) / snowTemps.length)
+        : (morningTemps.length > 0 ? morningTemps.reduce((a, b) => a + b, 0) / morningTemps.length : -4);
+      const qInfo = getQualityInfo(avgDaySnowT);
+
+      const mTempMax = morningTemps.length > 0 ? Math.max(...morningTemps) : avgDaySnowT;
+      const aTempMax = afternoonTemps.length > 0 ? Math.max(...afternoonTemps) : mTempMax + 2;
+      const mGustMax = morningGusts.length > 0 ? Math.max(...morningGusts) : 20;
+      const aGustMax = afternoonGusts.length > 0 ? Math.max(...afternoonGusts) : mGustMax;
+      const maxDayGust = allGusts.length > 0 ? Math.max(...allGusts) : 20;
+      const dayWindDir = windDirs.length > 0 ? windDirs[Math.floor(windDirs.length / 2)] : dominantWindDir;
+      const leeSector = dirToSector((dayWindDir + 180) % 360);
+      const windSector = dirToSector(dayWindDir);
+
+      // Vormittag- & Nachmittag-Gefahrenstufe berechnen
+      const calcPeriodLevel = (tempPeak, gustPeak, snow72h) => {
+        let lvl = 1;
+        if (snow72h > 35 || (snow72h > 20 && gustPeak > 60)) lvl = 4;
+        else if (snow72h > 15 || (snow72h > 8 && gustPeak > 40) || (tempPeak > 7 && elevation < minFreezing)) lvl = 3;
+        else if (snow72h > 4 || gustPeak > 30 || elevation > 2200) lvl = 2;
+        return lvl;
+      };
+
+      let mLevel = calcPeriodLevel(mTempMax, mGustMax, cum72h);
+      let aLevel = calcPeriodLevel(aTempMax, aGustMax, cum72h);
+      if ((aTempMax > 2.0 || (minFreezing > elevation - 150 && aTempMax > 0)) && aLevel < 4) {
+        aLevel = Math.max(aLevel, Math.min(4, mLevel + 1));
+      }
+
+      // Offizielles CAAML-Bulletin an diesem Tag anwenden falls der Kalendertag [00:00..24:00] den Gültigkeitszeitraum überlappt
+      const dayStartTs = targetDay.getTime();
+      const dayEndTs = dayStartTs + 86400000;
+      const isOfficialDay = !!(officialBulletin && dayEndTs > officialBulletin.validStartMs && dayStartTs < officialBulletin.validEndMs);
+      if (isOfficialDay) {
+        mLevel = officialBulletin.morningDangerLevel;
+        aLevel = officialBulletin.afternoonDangerLevel;
+      }
+
+      const mMeta = this.getEawsScaleMeta(mLevel);
+      const aMeta = this.getEawsScaleMeta(aLevel);
+
+      let hazardSummary = '✅ Günstige Verhältnisse, kaum Zusatzlast';
+      if (freshSnowDayCm >= 12 && maxDayGust >= 35) {
+        hazardSummary = `💨 Kritischer Triebschnee in ${leeSector} durch +${Math.round(freshSnowDayCm)} cm & ${Math.round(maxDayGust)} km/h Wind`;
+      } else if (freshSnowDayCm >= 10) {
+        hazardSummary = `🌨️ Neuschnee-Last (+${Math.round(freshSnowDayCm)} cm ${qInfo.quality})`;
+      } else if (aLevel > mLevel || aTempMax > 2.0) {
+        hazardSummary = `☀️ Tageserwärmung ab Mittag → Nassschnee-Anstieg (SO/S/SW)`;
+      } else if (maxDayGust >= 38) {
+        hazardSummary = `💨 Verfrachtung in ${leeSector}-Rinnen (${windSector}-Wind ${Math.round(maxDayGust)} km/h)`;
+      } else if (cum72h >= 8) {
+        hazardSummary = `❄️ Gesetzter ${qInfo.quality} (72h: ${Math.round(cum72h)} cm) • Gute Tourenlage`;
+      }
+
+      days.push({
+        dayOffset: d,
+        dateKey: dKey,
+        dayLabel,
+        isWeekend,
+        isSelected: dKey === selectedDateStr,
+        isOfficialDay,
+        freshSnowDayCm: Math.round(freshSnowDayCm * 10) / 10,
+        cumFreshSnow72hCm: Math.round(cum72h * 10) / 10,
+        snowWindowStr,
+        snowQuality: qInfo.quality,
+        snowQualityIcon: qInfo.icon,
+        densityKgM3: qInfo.density,
+        sweMm: Math.round(freshSnowDayCm * (qInfo.density / 100) * 10) / 10,
+        maxWindKmH: Math.round(maxDayGust),
+        windFromSector: windSector,
+        leeSector,
+        hazardSummary,
+        morning: {
+          level: mMeta.level,
+          label: mMeta.label,
+          color: mMeta.color,
+          textColor: mMeta.textColor,
+          tempC: Math.round(mTempMax * 10) / 10
+        },
+        afternoon: {
+          level: aMeta.level,
+          label: aMeta.label,
+          color: aMeta.color,
+          textColor: aMeta.textColor,
+          tempC: Math.round(aTempMax * 10) / 10
+        }
+      });
+    }
+
+    return days;
+  },
+
+  /**
    * STUFE 7: Lawinenlagebericht & Schneedecken-Stabilität (EAWS-Standard)
    */
   computeAvalancheReport(lat, lon, elevation, weatherData, terrain) {
@@ -3560,8 +3921,8 @@ export const MicroEngine = {
     let crustStability = nightRadiativeCoolingPct >= 70
       ? 'Tragfähiger Harschdeckel (optimales nächtliches Wiedergefrieren)'
       : nightRadiativeCoolingPct >= 40
-      ? 'Teilweise tragfähig (Bruchharsch in Zwischenzonen möglich)'
-      : 'Kein Durchfrieren (weicher, durchnässter Altschnee von Beginn an)';
+        ? 'Teilweise tragfähig (Bruchharsch in Zwischenzonen möglich)'
+        : 'Kein Durchfrieren (weicher, durchnässter Altschnee von Beginn an)';
 
     if (isAllDayColdWinter) {
       crustStability = `Hochwinterlich kalt (Max. ${Math.round(daytimeMaxTemp * 10) / 10}°C) – trockene Pulverschnee-Konservierung`;
@@ -3712,19 +4073,71 @@ export const MicroEngine = {
       skiableSnowlineM = Math.max(800, Math.round(freezingLevel - 400));
     }
 
+    // Offizielles Live-Bulletin (SLF Davos CAAMLv6 / Albina) einbinden falls für Tour-Datum (inkl. Abend-Ausgabe 17 Uhr) gültig
+    const officialBulletin = (terrain && terrain.officialBulletin) ? terrain.officialBulletin : null;
+    const tourDayStart = new Date(tourDateObj);
+    tourDayStart.setHours(0, 0, 0, 0);
+    const tourDayEndMs = tourDayStart.getTime() + 86400000;
+    const isOfficialActive = !!(
+      officialBulletin &&
+      tourDayEndMs > officialBulletin.validStartMs &&
+      tourDayStart.getTime() < officialBulletin.validEndMs
+    );
+
+    let sourceLabel = '🔭 10-Tage-Prognose (Open-Meteo ECMWF/ICON • Tal & Gipfel) + EAWS/Munter-Physik';
+    let officialText = '';
+
+    if (isOfficialActive) {
+      dangerLevel = officialBulletin.dangerLevel;
+      const dMeta = this.getEawsScaleMeta(dangerLevel);
+      dangerTitle = `${dMeta.level} - ${dMeta.label}`;
+      dangerColor = dMeta.color;
+      morningDangerLevel = officialBulletin.morningDangerLevel;
+      afternoonDangerLevel = officialBulletin.afternoonDangerLevel;
+      if (officialBulletin.criticalAspects && officialBulletin.criticalAspects.length > 0) {
+        criticalAspects.splice(0, criticalAspects.length, ...officialBulletin.criticalAspects);
+      }
+      if (officialBulletin.problems && officialBulletin.problems.length > 0) {
+        problems.splice(0, problems.length, ...officialBulletin.problems);
+      }
+      stationAgency = officialBulletin.agency;
+      sourceLabel = `✅ Offizieller LLB: ${officialBulletin.agency} + Open-Meteo Tal/Gipfel`;
+      officialText = officialBulletin.snowpackText || officialBulletin.highlights || officialBulletin.weatherText || '';
+    }
+
+    const effectiveCriticalElevation = isOfficialActive && officialBulletin.criticalElevation
+      ? officialBulletin.criticalElevation
+      : criticalElevation;
+
+    const selectedDateKey = `${tourDateObj.getFullYear()}-${String(tourDateObj.getMonth() + 1).padStart(2, '0')}-${String(tourDateObj.getDate()).padStart(2, '0')}`;
+    const forecast10Days = this.computeAvalanche10DayMatrix(
+      elevation,
+      minEle,
+      h,
+      hv,
+      hTimes,
+      dominantWindDir,
+      officialBulletin,
+      selectedDateKey
+    );
+
     return {
       dangerLevel,
       dangerTitle,
       dangerColor,
       morningDangerLevel,
       afternoonDangerLevel,
-      criticalElevation,
+      criticalElevation: effectiveCriticalElevation,
       criticalAspects,
       primarySector,
       dominantWindDir: Math.round(dominantWindDir),
       windFromSector: dirToSector(dominantWindDir),
       skiableSnowlineM,
       isAllDayColdWinter,
+      isOfficialBulletin: isOfficialActive,
+      sourceLabel,
+      officialText,
+      forecast10Days,
       problems,
       dangerPattern,
       freshSnow24hCm: Math.round(freshSnow24 * 10) / 10,
@@ -3758,8 +4171,8 @@ export const MicroEngine = {
       safetyRule: dangerLevel >= 3
         ? 'Steilhänge > 30° defensiv beurteilen, Einzelabstände einhalten und frischen Triebschnee strikt meiden.'
         : dangerLevel === 2
-        ? 'Gefahrenstellen vor allem an Steilhängen der Hochlagen und hinter Geländekanten beachten.'
-        : 'Allgemein günstige Verhältnisse. Vorsicht vor Absturzgefahr auf Harsch oder Blankeis.'
+          ? 'Gefahrenstellen vor allem an Steilhängen der Hochlagen und hinter Geländekanten beachten.'
+          : 'Allgemein günstige Verhältnisse. Vorsicht vor Absturzgefahr auf Harsch oder Blankeis.'
     };
   },
 
@@ -3777,7 +4190,7 @@ export const MicroEngine = {
 
     // Bestimme Gewitter-Aktivität & Distanz
     let hasNearbyStorm = isThunder || (precipProb > 65 && windGusts > 45);
-    
+
     // Erzeuge realistische Live-Blitzentladungen im Umkreis von 5 bis 45 km
     const strikes = [];
     const baseCount = isThunder ? 14 : (precipProb > 50 ? 5 : 2);
@@ -3805,11 +4218,11 @@ export const MicroEngine = {
     strikes.sort((a, b) => a.distKm - b.distKm);
     const closest = strikes[0];
 
-    const threatLevel = closest.distKm < 10 
-      ? '🚨 Akute Gefahr (Unter 10 km)' 
-      : closest.distKm < 20 
-      ? '⚠️ Erhöhte Gefahr (10–20 km)' 
-      : 'ℹ️ Mäßige Gewitteraktivität';
+    const threatLevel = closest.distKm < 10
+      ? '🚨 Akute Gefahr (Unter 10 km)'
+      : closest.distKm < 20
+        ? '⚠️ Erhöhte Gefahr (10–20 km)'
+        : 'ℹ️ Mäßige Gewitteraktivität';
 
     return {
       hasActiveStorm: hasNearbyStorm,
@@ -3948,10 +4361,10 @@ export const MicroEngine = {
     const R = 6371000; // Erdradius in Metern
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   },
 
@@ -4678,6 +5091,7 @@ export const MicroEngine = {
         minElevation: minEle,
         maxElevation: peakPoint.ele,
         waypoints: preMilestones,
+        officialBulletin: athleteSettings.officialBulletin || null,
         slopeStats
       }
     );
@@ -4724,10 +5138,10 @@ export const MicroEngine = {
       fitnessName: speedInfo.fitnessName,
       fitnessFactor: speedInfo.fitnessFactor,
       fitnessIcon: speedInfo.fitnessIcon,
-      paceLabel: category === 'bike' 
-        ? `${bikeSpeed.toFixed(1)} km/h` 
-        : (category === 'skitour' 
-          ? `+${skitourAscent} Hm/h • ↓${skitourDescent.toFixed(0)} km/h` 
+      paceLabel: category === 'bike'
+        ? `${bikeSpeed.toFixed(1)} km/h`
+        : (category === 'skitour'
+          ? `+${skitourAscent} Hm/h • ↓${skitourDescent.toFixed(0)} km/h`
           : `${mtnSpeed.toFixed(1)} km/h • ${mtnAscent} Hm/h`),
       startTimeMs,
       startTimeStr: new Date(startTimeMs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
@@ -5620,8 +6034,8 @@ export const MicroEngine = {
         const dLat = (entry.lat - lat) * Math.PI / 180;
         const dLon = (entry.lon - lon) * Math.PI / 180;
         const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(lat * Math.PI / 180) * Math.cos(entry.lat * Math.PI / 180) *
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          Math.cos(lat * Math.PI / 180) * Math.cos(entry.lat * Math.PI / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
         const distKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         if (distKm < minDistance) {
@@ -6541,7 +6955,7 @@ export const MicroEngine = {
     // Stufe 5: Reines Grau / Dauerhaft bedeckt (0 bis 0.4h Sonne und dichte Bewölkung)
     return { icon: '☁️', label: 'Bedeckt', synopNote: 'Überwiegend graue, geschlossene Wolkenschicht', theme: 'cloudy' };
   }
-,
+  ,
 
   async fetchBrightSkyCurrent(lat, lon, elevation = 500, isMountain = false, country = null) {
     try {
@@ -6571,7 +6985,8 @@ export const MicroEngine = {
     const max = Math.max(...nums);
     const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
     return { min, max, avg, spread: +(max - min).toFixed(1) };
-  }};
+  }
+};
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = MicroEngine;

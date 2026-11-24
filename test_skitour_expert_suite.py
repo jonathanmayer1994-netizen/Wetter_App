@@ -204,6 +204,37 @@ def run_skitour_suite():
         page.wait_for_timeout(500)
         print(f"✓ Custom GPX Live Adaptation verified: '{custom_tag}'")
 
+        # 9. TEST 8: Sources Banner, 10-Day Tour Planner & Interactive Day Switch
+        print("\n--- TEST 8: 10-Day Skitour Fresh Snow & Avalanche Planner ---")
+        src_label = page.inner_text("#skitour-source-label")
+        assert "Open-Meteo" in src_label or "SLF" in src_label or "Albina" in src_label, f"Source banner must state active data sources, got: {src_label}"
+        rows = page.locator("#skitour-10day-list .skitour-10day-row")
+        assert rows.count() == 10, f"10-Day Skitour Planner must render 10 days, got: {rows.count()}"
+        day5 = rows.nth(4)
+        day5_date = day5.get_attribute("data-date")
+        day5.click(force=True)
+        page.wait_for_timeout(300)
+        assert page.eval_on_selector("#sports-date-input", "el => el.value") == day5_date, "Clicking day 5 must sync #sports-date-input"
+        assert page.locator(f"#skitour-10day-list .skitour-10day-row[data-date='{day5_date}'].is-selected").count() == 1, "Day 5 must become selected"
+        print(f"✓ 10-Day Planner verified (10 days rendered, clicked future date {day5_date}, source: '{src_label}')")
+
+        # 10. TEST 9: Swiss SLF Davos Official Live CAAMLv6 GeoJSON Integration
+        print("\n--- TEST 9: Swiss SLF Davos CAAMLv6 Live Bulletin ---")
+        swiss_gpx = '''<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><name>Parsenn Weissfluhjoch</name><trkseg>
+<trkpt lat="46.8150" lon="9.8400"><ele>1560</ele></trkpt>
+<trkpt lat="46.8350" lon="9.7950"><ele>2693</ele></trkpt>
+</trkseg></trk></gpx>'''
+        # Reset tour date back to today (index 0) to inspect today's active SLF bulletin
+        rows.nth(0).click(force=True)
+        page.wait_for_timeout(200)
+        page.set_input_files("#sports-file-input", files=[{"name": "Weissfluhjoch.gpx", "mimeType": "application/gpx+xml", "buffer": swiss_gpx.encode("utf-8")}])
+        page.wait_for_function("() => document.getElementById('skitour-agency-tag') && document.getElementById('skitour-agency-tag').innerText.includes('SLF Davos')", timeout=12000)
+        slf_src = page.inner_text("#skitour-source-label")
+        assert "SLF Davos" in slf_src and "Offizieller LLB" in slf_src, f"Expected live SLF Davos official bulletin in source banner, got: {slf_src}"
+        print(f"✓ Live SLF Davos Official Bulletin verified: '{slf_src}'")
+        dashboard.screenshot(path=screenshot_path)
+        print(f"📸 Updated Skitour Cockpit artifact (incl. 10-Day Planner & Official LLB): {screenshot_path}")
+
         context.close()
         browser.close()
         print("\n==========================================")

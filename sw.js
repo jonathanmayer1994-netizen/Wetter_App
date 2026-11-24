@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.38.2';
-const CACHE_NAME = `best-weather-v2.38.2-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.39.0';
+const CACHE_NAME = `best-weather-v2.39.0-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
@@ -188,7 +188,7 @@ self.addEventListener('activate', (event) => {
       // Warm remaining offline assets in background without delaying SW activation or saturating sockets
       const remaining = STATIC_ASSETS.filter((a) => !CORE_PRECACHE_ASSETS.includes(a));
       setTimeout(() => {
-        precacheAssetList(remaining).catch(() => {});
+        precacheAssetList(remaining).catch(() => { });
       }, 600);
     })
   );
@@ -582,7 +582,7 @@ self.addEventListener('push', (event) => {
             console.log(`[SW] Tagesbericht ${notifId} wurde vom Nutzer bereits gelesen — erneute Push-Anzeige unterdrückt.`);
             return;
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // 2. ZUERST sofortige Anzeige im Sperrbildschirm & Notification Center
@@ -597,7 +597,7 @@ self.addEventListener('push', (event) => {
             renotify: true,
             data: notificationOptions.data
           });
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // 2. Parallel in IndexedDB für In-App Feed speichern & iOS App Badge setzen
@@ -608,7 +608,7 @@ self.addEventListener('push', (event) => {
       }
 
       if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
-        navigator.setAppBadge().catch(() => {});
+        navigator.setAppBadge().catch(() => { });
       }
     })()
   );
@@ -631,7 +631,7 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   if (typeof navigator !== 'undefined' && 'clearAppBadge' in navigator) {
-    navigator.clearAppBadge().catch(() => {});
+    navigator.clearAppBadge().catch(() => { });
   }
 
   event.waitUntil(

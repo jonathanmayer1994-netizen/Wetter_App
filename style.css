@@ -362,9 +362,21 @@ body {
 }
 
 @keyframes ntpPulse {
-  0% { transform: scale(0.9); opacity: 0.6; }
-  50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 10px rgba(56, 189, 248, 1); }
-  100% { transform: scale(0.9); opacity: 0.6; }
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 1);
+  }
+
+  100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
 }
 
 .ntp-text {
@@ -500,20 +512,23 @@ body {
 
 /* High-performance hardware-accelerated skeleton shimmer */
 .skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.05) 0%,
-    rgba(255, 255, 255, 0.12) 50%,
-    rgba(255, 255, 255, 0.05) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.05) 100%);
   background-size: 200% 100%;
   animation: skeletonWave 1.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--radius-sm, 8px);
 }
 
 @keyframes skeletonWave {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .search-container {
@@ -639,9 +654,20 @@ body {
 }
 
 @keyframes gpsPulse {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6); }
-  50% { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6);
+  }
+
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 6px rgba(56, 189, 248, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+  }
 }
 
 .header-action-group {
@@ -1095,7 +1121,7 @@ body {
 }
 
 .card-title-text,
-.card-title > span:not(.card-icon) {
+.card-title>span:not(.card-icon) {
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
@@ -1954,8 +1980,15 @@ body {
 }
 
 @keyframes accordionSlideDown {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .inline-section-header {
@@ -2048,8 +2081,15 @@ body {
 }
 
 @keyframes dchFadeIn {
-  from { opacity: 0; transform: translateY(-2px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .dch-badge {
@@ -2099,9 +2139,11 @@ body {
     padding: 4px 6px;
     min-height: 28px;
   }
+
   .dch-idle {
     font-size: 10px;
   }
+
   .dch-badge {
     padding: 2px 5px;
     font-size: 10px;
@@ -2139,9 +2181,12 @@ body {
 }
 
 @keyframes dayNowGlowPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.18;
   }
+
   50% {
     opacity: 0.42;
   }
@@ -2740,12 +2785,14 @@ body {
    BENTO DETAIL BOTTOM SHEET / MODAL
    ========================================================================== */
 .bento-modal-overlay {
-  align-items: flex-end; /* Mobile Bottom Sheet */
+  align-items: flex-end;
+  /* Mobile Bottom Sheet */
 }
 
 @media (min-width: 769px) {
   .bento-modal-overlay {
-    align-items: center; /* Desktop centered modal */
+    align-items: center;
+    /* Desktop centered modal */
   }
 }
 
@@ -2849,10 +2896,24 @@ body {
   font-weight: 800;
   color: var(--text-tertiary);
 }
-.cp-label.n { top: 4px; color: #ff453a; }
-.cp-label.s { bottom: 4px; }
-.cp-label.o, .cp-label.e { right: 6px; }
-.cp-label.w { left: 6px; }
+
+.cp-label.n {
+  top: 4px;
+  color: #ff453a;
+}
+
+.cp-label.s {
+  bottom: 4px;
+}
+
+.cp-label.o,
+.cp-label.e {
+  right: 6px;
+}
+
+.cp-label.w {
+  left: 6px;
+}
 
 .cp-needle {
   position: absolute;
@@ -3234,8 +3295,17 @@ body.is-scrolling .radar-floating-controls {
 }
 
 @keyframes notifPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.15); opacity: 0.85; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
 }
 
 .notif-header {
@@ -3453,12 +3523,41 @@ body.is-scrolling .radar-floating-controls {
   letter-spacing: 0.02em;
 }
 
-.notif-feed-badge.nfc-type-briefing { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
-.notif-feed-badge.nfc-type-storm { background: rgba(59, 130, 246, 0.18); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); }
-.notif-feed-badge.nfc-type-frost { background: rgba(14, 165, 233, 0.18); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.35); }
-.notif-feed-badge.nfc-type-extreme { background: rgba(239, 68, 68, 0.20); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
-.notif-feed-badge.nfc-type-test { background: rgba(168, 85, 247, 0.18); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
-.notif-feed-badge.nfc-type-alert { background: rgba(100, 116, 139, 0.22); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.35); }
+.notif-feed-badge.nfc-type-briefing {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.notif-feed-badge.nfc-type-storm {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.notif-feed-badge.nfc-type-frost {
+  background: rgba(14, 165, 233, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
+.notif-feed-badge.nfc-type-extreme {
+  background: rgba(239, 68, 68, 0.20);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.notif-feed-badge.nfc-type-test {
+  background: rgba(168, 85, 247, 0.18);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.notif-feed-badge.nfc-type-alert {
+  background: rgba(100, 116, 139, 0.22);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
 
 .notif-feed-time {
   font-size: 0.75rem;
@@ -3636,12 +3735,12 @@ body.is-scrolling .radar-floating-controls {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.ios-switch input:checked + .ios-slider {
+.ios-switch input:checked+.ios-slider {
   background-color: #0284c7;
   border-color: #38bdf8;
 }
 
-.ios-switch input:checked + .ios-slider:before {
+.ios-switch input:checked+.ios-slider:before {
   transform: translateX(20px);
 }
 
@@ -3785,9 +3884,11 @@ body.is-scrolling .radar-floating-controls {
   padding-bottom: 2px;
   scrollbar-width: none;
 }
+
 .notif-quick-nav::-webkit-scrollbar {
   display: none;
 }
+
 .notif-nav-pill {
   display: inline-flex;
   align-items: center;
@@ -3803,6 +3904,7 @@ body.is-scrolling .radar-floating-controls {
   white-space: nowrap;
   transition: all 0.2s ease;
 }
+
 .notif-nav-pill:hover,
 .notif-nav-pill:focus-visible {
   background: rgba(56, 189, 248, 0.15);
@@ -3820,6 +3922,7 @@ body.is-scrolling .radar-floating-controls {
   flex-direction: column;
   gap: 10px;
 }
+
 .ntc-header {
   display: flex;
   justify-content: space-between;
@@ -3827,6 +3930,7 @@ body.is-scrolling .radar-floating-controls {
   flex-wrap: wrap;
   gap: 6px;
 }
+
 .ntc-title {
   display: flex;
   align-items: center;
@@ -3835,6 +3939,7 @@ body.is-scrolling .radar-floating-controls {
   font-weight: 700;
   color: #ffffff;
 }
+
 .ntc-current-badge {
   background: rgba(34, 197, 94, 0.2);
   color: #4ade80;
@@ -3844,20 +3949,24 @@ body.is-scrolling .radar-floating-controls {
   font-size: 0.7rem;
   font-weight: 600;
 }
+
 .ntc-current-badge.badge-quiet {
   background: rgba(168, 85, 247, 0.2);
   color: #c084fc;
   border-color: rgba(168, 85, 247, 0.4);
 }
+
 .ntc-tz {
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.55);
 }
+
 .notif-timeline-bar-wrapper {
   position: relative;
   width: 100%;
   padding-top: 14px;
 }
+
 .notif-timeline-bar {
   display: flex;
   width: 100%;
@@ -3867,6 +3976,7 @@ body.is-scrolling .radar-floating-controls {
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
+
 .ntb-segment {
   display: flex;
   align-items: center;
@@ -3882,34 +3992,41 @@ body.is-scrolling .radar-floating-controls {
   padding: 0 4px;
   box-sizing: border-box;
 }
+
 .ntb-seg-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .ntb-seg-icon {
   flex-shrink: 0;
 }
+
 @media (max-width: 600px) {
   .ntb-segment {
     font-size: 0.64rem;
     gap: 2px;
     padding: 0 3px;
   }
+
   .notif-timeline-bar .ntb-segment:last-child .ntb-seg-text {
     display: none;
   }
 }
+
 .ntb-segment.ntb-quiet {
   background: linear-gradient(90deg, #1e1b4b 0%, #312e81 100%);
   color: #c7d2fe;
 }
+
 .ntb-segment.ntb-active {
   background: linear-gradient(90deg, #0284c7 0%, #0ea5e9 40%, #f59e0b 100%);
   color: #ffffff;
   font-weight: 700;
 }
+
 .notif-timeline-indicator {
   position: absolute;
   top: 4px;
@@ -3920,6 +4037,7 @@ body.is-scrolling .radar-floating-controls {
   pointer-events: none;
   transition: left 0.3s ease;
 }
+
 .nti-pin {
   width: 3px;
   height: 38px;
@@ -3927,6 +4045,7 @@ body.is-scrolling .radar-floating-controls {
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.9), 0 0 2px #000;
   border-radius: 2px;
 }
+
 .notif-timeline-legend {
   display: flex;
   flex-wrap: wrap;
@@ -3934,21 +4053,25 @@ body.is-scrolling .radar-floating-controls {
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.7);
 }
+
 .ntl-item {
   display: flex;
   align-items: center;
   gap: 6px;
 }
+
 .ntl-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   display: inline-block;
 }
+
 .ntl-dot.dot-active {
   background: #38bdf8;
   box-shadow: 0 0 6px #38bdf8;
 }
+
 .ntl-dot.dot-quiet {
   background: #818cf8;
 }
@@ -3960,6 +4083,7 @@ body.is-scrolling .radar-floating-controls {
   gap: 8px;
   margin-top: 6px;
 }
+
 .notif-preset-card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -3972,16 +4096,19 @@ body.is-scrolling .radar-floating-controls {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
+
 .notif-preset-card:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
+
 .notif-preset-card.is-selected {
   background: linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(14, 165, 233, 0.1) 100%);
   border-color: #38bdf8;
   box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
 }
+
 .npc-badge {
   display: inline-block;
   align-self: flex-start;
@@ -3994,20 +4121,24 @@ body.is-scrolling .radar-floating-controls {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.85);
 }
+
 .notif-preset-card.is-selected .npc-badge {
   background: rgba(56, 189, 248, 0.25);
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.4);
 }
+
 .npc-title {
   font-size: 0.85rem;
   font-weight: 700;
   color: #ffffff;
 }
+
 .npc-runs {
   font-size: 0.74rem;
   color: #94a3b8;
 }
+
 .notif-preset-card.is-selected .npc-runs {
   color: #e2e8f0;
 }
@@ -4016,10 +4147,12 @@ body.is-scrolling .radar-floating-controls {
 .notif-rule-item {
   transition: all 0.25s ease;
 }
+
 .notif-rule-item.is-disabled {
   opacity: 0.5;
   background: rgba(255, 255, 255, 0.015);
 }
+
 .notif-rule-item:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.12);
@@ -4031,10 +4164,12 @@ body.is-scrolling .radar-floating-controls {
   display: flex;
   align-items: center;
 }
+
 .notif-input-wrapper input {
   width: 100%;
   padding-right: 40px;
 }
+
 .notif-toggle-eye-btn {
   position: absolute;
   right: 8px;
@@ -4047,6 +4182,7 @@ body.is-scrolling .radar-floating-controls {
   border-radius: 6px;
   transition: color 0.15s ease;
 }
+
 .notif-toggle-eye-btn:hover {
   color: #ffffff;
 }
@@ -4061,6 +4197,7 @@ body.is-scrolling .radar-floating-controls {
   margin-top: 2px;
   transition: opacity 0.15s ease;
 }
+
 .notif-help-link:hover {
   text-decoration: underline;
   opacity: 0.9;
@@ -4076,11 +4213,13 @@ body.is-scrolling .radar-floating-controls {
   border-radius: 14px;
   padding: 14px;
 }
+
 .notif-user-actions-row {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
+
 .notif-user-actions-row .action-btn {
   flex: 1;
   min-width: 140px;
@@ -4097,12 +4236,14 @@ body.is-scrolling .radar-floating-controls {
   margin-top: 6px;
   transition: all 0.25s ease;
 }
+
 .notif-dev-accordion[open] {
   padding: 14px;
   background: rgba(15, 23, 42, 0.85);
   border-style: solid;
   border-color: rgba(56, 189, 248, 0.3);
 }
+
 .notif-dev-summary {
   font-size: 0.78rem;
   font-weight: 600;
@@ -4114,9 +4255,11 @@ body.is-scrolling .radar-floating-controls {
   gap: 6px;
   transition: color 0.15s ease;
 }
+
 .notif-dev-summary:hover {
   color: #38bdf8;
 }
+
 .notif-dev-content {
   margin-top: 14px;
   display: flex;
@@ -4146,8 +4289,13 @@ body.is-scrolling .radar-floating-controls {
 }
 
 @keyframes notifUnsavedFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .notif-unsaved-card {
@@ -4164,8 +4312,15 @@ body.is-scrolling .radar-floating-controls {
 }
 
 @keyframes notifUnsavedPopIn {
-  from { opacity: 0; transform: scale(0.94) translateY(8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .notif-unsaved-icon {
@@ -4353,10 +4508,12 @@ body.is-scrolling .radar-floating-controls {
     row-gap: 10px;
     align-items: center;
   }
+
   .notif-rule-item:has(.notif-rule-control) .notif-rule-info {
     flex: 1 1 calc(100% - 44px);
     min-width: 0;
   }
+
   .notif-rule-item .notif-rule-control {
     width: 100%;
     display: flex;
@@ -4462,6 +4619,7 @@ body.is-scrolling .radar-floating-controls {
   background: rgba(56, 189, 248, 0.25);
   color: #ffffff;
 }
+
 /* ==========================================================================
    TAB 2: BERG & HÖHE (Höhenprofil & Wand-Ausrichtung)
    ========================================================================== */
@@ -4622,12 +4780,15 @@ body.is-scrolling .radar-floating-controls {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
+
   .mh-tile {
     padding: 10px 12px;
   }
+
   .mh-val {
     font-size: 16px;
   }
+
   .alpine-details-grid {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -4950,16 +5111,20 @@ body.is-scrolling .radar-floating-controls {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 10px !important;
   }
+
   .ch-tile {
     padding: 10px 12px;
   }
+
   .ch-val {
     font-size: 16px;
   }
+
   .city-details-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
+
   .cmsc-row {
     flex-direction: column;
     align-items: flex-start;
@@ -5600,8 +5765,15 @@ body.is-scrolling .radar-floating-controls {
 }
 
 @keyframes vcbPopIn {
-  0% { transform: scale(0); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .vcb-buttons-row.has-selected .vcb-btn:not(.is-selected) {
@@ -5654,8 +5826,17 @@ body.is-scrolling .radar-floating-controls {
 }
 
 @keyframes vccPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 
 .vcc-time-badge {
@@ -5837,13 +6018,16 @@ body.is-scrolling .radar-floating-controls {
     grid-template-columns: 1fr;
     gap: 10px;
   }
+
   .vfy-scorecard-grid {
     grid-template-columns: 1fr;
     gap: 8px;
   }
+
   .vcb-buttons-row {
     grid-template-columns: repeat(4, 1fr);
   }
+
   .ved-grid {
     grid-template-columns: 1fr;
   }
@@ -5855,14 +6039,17 @@ body.is-scrolling .radar-floating-controls {
     grid-template-columns: repeat(4, 1fr);
     gap: 5px;
   }
+
   .vcb-btn {
     padding: 8px 3px;
     font-size: 10px;
     gap: 3px;
   }
+
   .vcc-footer-row {
     justify-content: stretch;
   }
+
   .vcc-reset-btn {
     width: 100%;
     text-align: center;
@@ -6371,6 +6558,7 @@ body.is-scrolling .radar-floating-controls {
   border-color: #f59e0b;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
+
 /* 4. Altitude Levels Container & Cards (Konsolidiertes Akkordeon) */
 .altitude-time-row {
   display: flex;
@@ -6586,12 +6774,15 @@ body.is-scrolling .radar-floating-controls {
   .tcb-metrics {
     gap: 8px;
   }
+
   .tcb-condition .p-text {
     display: none;
   }
+
   .tcb-wind {
     font-size: 11px;
   }
+
   .tier-drawer-grid {
     grid-template-columns: 1fr;
   }
@@ -7652,6 +7843,7 @@ body.is-scrolling .radar-floating-controls {
     opacity: 0;
     transform: translate(-50%, -46%) scale(0.96);
   }
+
   to {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
@@ -7663,6 +7855,7 @@ body.is-scrolling .radar-floating-controls {
     opacity: 0;
     transform: translateY(-8px) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -7867,31 +8060,38 @@ body.is-scrolling .radar-floating-controls {
   .mld-header {
     padding: 12px 14px;
   }
+
   .mld-body {
     padding: 12px 14px;
     gap: 14px;
   }
+
   .mld-grid {
     gap: 7px;
   }
+
   .map-overlay-btn,
   .map-base-btn {
     padding: 8px 20px 8px 9px;
     gap: 7px;
   }
+
   .mob-icon,
   .mbb-icon {
     font-size: 16px;
   }
+
   .mob-name,
   .mbb-name {
     font-size: 11.5px;
   }
+
   .mob-desc,
   .mbb-desc {
     font-size: 9.8px;
     line-height: 1.22;
   }
+
   .mob-check,
   .mbb-check {
     top: 7px;
@@ -8056,9 +8256,19 @@ body.is-scrolling .radar-floating-controls {
   letter-spacing: 0.2px;
 }
 
-.legend-phase-tag.rain { color: #60a5fa; }
-.legend-phase-tag.mix { color: #34d399; min-width: 42px; }
-.legend-phase-tag.snow { color: #bae6fd; min-width: 50px; }
+.legend-phase-tag.rain {
+  color: #60a5fa;
+}
+
+.legend-phase-tag.mix {
+  color: #34d399;
+  min-width: 42px;
+}
+
+.legend-phase-tag.snow {
+  color: #bae6fd;
+  min-width: 50px;
+}
 
 .legend-swatch-strip {
   display: flex;
@@ -9153,7 +9363,7 @@ body.is-scrolling .radar-floating-controls {
 }
 
 .ms-scrubber-needle.is-active,
-#radar-time-slider:active ~ .ms-scrubber-needle {
+#radar-time-slider:active~.ms-scrubber-needle {
   width: 3.5px;
   box-shadow: 0 0 12px rgba(255, 255, 255, 1), 0 0 20px rgba(56, 189, 248, 0.9);
 }
@@ -9360,6 +9570,7 @@ body.is-scrolling .radar-floating-controls {
 
 /* IPAD & TABLET (641px - 1024px) */
 @media (max-width: 1024px) {
+
   #radar-floating-controls,
   .ms-timeline-dock {
     bottom: 12px;
@@ -9372,6 +9583,7 @@ body.is-scrolling .radar-floating-controls {
 
 /* IPHONE & MOBILE (< 640px) */
 @media (max-width: 640px) {
+
   #radar-floating-controls,
   .ms-timeline-dock {
     bottom: max(10px, env(safe-area-inset-bottom, 10px));
@@ -9834,7 +10046,9 @@ body.is-scrolling .radar-floating-controls {
 }
 
 @keyframes ptrSpin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .ptr-indicator.is-refreshing .ptr-arrow {
@@ -10835,7 +11049,7 @@ body.is-scrolling .radar-floating-controls {
   }
 
   .bento-compact-card .card-title-text,
-  .bento-compact-card .card-title > span:not(.card-icon) {
+  .bento-compact-card .card-title>span:not(.card-icon) {
     flex: 1 1 auto !important;
     min-width: 0 !important;
     overflow: hidden !important;
@@ -11302,6 +11516,7 @@ body.is-scrolling .radar-floating-controls {
     .daily-astro-pill {
       display: none !important;
     }
+
     .daily-precip-cell {
       flex-shrink: 0;
       margin-left: auto;
@@ -11339,15 +11554,19 @@ body.is-scrolling .radar-floating-controls {
     .daily-row-mobile-bottom {
       gap: 4px;
     }
+
     .daily-sun-cell {
       gap: 4px;
     }
+
     .dsm-hours {
       font-size: 10px;
     }
+
     .msb-bar {
       width: 1.6px;
     }
+
     .daily-precip-chip {
       padding: 2px 5px;
       font-size: 9.5px;
@@ -11546,7 +11765,7 @@ body.is-scrolling .radar-floating-controls {
     overflow: hidden !important;
   }
 
-  body.mobile-map-fullscreen-active .map-view-card > .card-header {
+  body.mobile-map-fullscreen-active .map-view-card>.card-header {
     display: none !important;
   }
 
@@ -11747,6 +11966,7 @@ body.is-scrolling .radar-floating-controls {
       opacity: 0;
       transform: translateY(100%);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -11874,6 +12094,7 @@ body.is-scrolling .radar-floating-controls {
   .map-wind-compass-widget.compact .mwc-header {
     display: none;
   }
+
   .map-wind-compass-widget.compact {
     padding: 5px 10px;
     gap: 8px;
@@ -11969,9 +12190,11 @@ body.is-scrolling .radar-floating-controls {
   .map-point-weather-card.collapsed .mpw-elevation-chip {
     display: none !important;
   }
+
   .map-point-weather-card.collapsed {
     padding: 5px 10px;
   }
+
   .map-point-weather-card.collapsed .mpw-header {
     border-bottom: none;
     padding-bottom: 0;
@@ -15362,7 +15585,7 @@ body.sports-map-fullscreen-active #sports-map-card {
   box-shadow: none !important;
 }
 
-body.sports-map-fullscreen-active #sports-map-card > .card-header {
+body.sports-map-fullscreen-active #sports-map-card>.card-header {
   display: none !important;
 }
 
@@ -16215,13 +16438,16 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     flex-direction: column;
     align-items: stretch;
   }
+
   .sports-demo-block {
     flex-direction: column;
     align-items: flex-start;
   }
+
   .sdb-buttons {
     width: 100%;
   }
+
   .sdb-buttons .sports-route-preset {
     flex: 1;
     text-align: center;
@@ -16597,7 +16823,8 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 /* Lock outer document on mobile/touch iOS so Safari/PWA UIScrollView NEVER rubber-bands
    past the top edge AND stretches edge-to-edge across the true adaptive screen height
    (bypasses the iOS Standalone black-translucent Initial Containing Block ~59px cutoff bug). */
-@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+@media (max-width: 768px),
+(hover: none) and (pointer: coarse) {
   html {
     width: 100%;
     height: var(--app-height, 100vh);
@@ -16690,14 +16917,12 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     padding: 6px 8px;
     box-sizing: border-box;
     border-radius: 36px;
-    
+
     /* Apple Vision / iOS 18 Liquid Glass Shader */
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.18) 0%,
-      rgba(255, 255, 255, 0.05) 45%,
-      rgba(15, 23, 42, 0.45) 100%
-    ), rgba(12, 19, 36, 0.65);
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.18) 0%,
+        rgba(255, 255, 255, 0.05) 45%,
+        rgba(15, 23, 42, 0.45) 100%), rgba(12, 19, 36, 0.65);
     backdrop-filter: blur(30px) saturate(210%);
     -webkit-backdrop-filter: blur(30px) saturate(210%);
 
@@ -16790,7 +17015,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   .mbn-btn.active {
     color: #ffffff;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.04) 100%);
-    box-shadow: 
+    box-shadow:
       inset 0 1px 1px rgba(255, 255, 255, 0.35),
       inset 0 0 12px rgba(0, 229, 255, 0.12),
       0 2px 8px rgba(0, 0, 0, 0.25);
@@ -16930,6 +17155,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     padding-bottom: 24px;
     text-align: center;
   }
+
   .footer-container {
     flex-direction: column;
     justify-content: center;
@@ -17447,10 +17673,12 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   .sports-hero-title {
     font-size: 13.5px;
   }
+
   .sports-quick-gpx-btn {
     font-size: 10.5px;
     padding: 4px 7px;
   }
+
   .sports-metrics-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 6px !important;
@@ -17480,14 +17708,37 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 }
 
 /* Explicit order to guarantee original mobile sequence */
-#hero-hazard-alert { order: 1; }
-.hero-card { order: 2; }
-.hourly-card { order: 3; }
-.daily-card { order: 4; }
-#bento-grid { order: 5; }
-.expert-mode-toggle-bar { order: 6; }
-#expert-details-container { order: 7; }
-#verification-dashboard-section { order: 8; }
+#hero-hazard-alert {
+  order: 1;
+}
+
+.hero-card {
+  order: 2;
+}
+
+.hourly-card {
+  order: 3;
+}
+
+.daily-card {
+  order: 4;
+}
+
+#bento-grid {
+  order: 5;
+}
+
+.expert-mode-toggle-bar {
+  order: 6;
+}
+
+#expert-details-container {
+  order: 7;
+}
+
+#verification-dashboard-section {
+  order: 8;
+}
 
 /* --- Desktop Layout (>= 1024px: 14" & 16" Retina MacBook Pro / Desktop Displays) --- */
 @media (min-width: 1024px) {
@@ -17625,7 +17876,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     width: 100%;
   }
 
-  .desktop-overview-grid > #hero-hazard-alert {
+  .desktop-overview-grid>#hero-hazard-alert {
     grid-column: 1 / -1;
   }
 
@@ -17672,15 +17923,18 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     .overview-col-right .daily-card {
       padding: 16px 14px;
     }
+
     .overview-col-right .daily-astro-pill {
       display: none !important;
     }
+
     .overview-col-right .daily-table-header {
       grid-template-columns: 88px minmax(140px, 1fr) 92px 110px 75px 18px;
       gap: 6px;
       font-size: 10px;
       padding: 8px 8px 10px 8px;
     }
+
     .overview-col-right .daily-interactive-row {
       grid-template-columns: 88px minmax(140px, 1fr) 92px 110px 75px 18px;
       gap: 6px;
@@ -17696,7 +17950,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     box-shadow: none;
   }
 
-  #tab-map .map-view-card > .card-header {
+  #tab-map .map-view-card>.card-header {
     display: none;
   }
 
@@ -17785,6 +18039,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
    across all iPhone models (SE, Mini, 12-16, Pro, Pro Max).
    ========================================================================== */
 @media (max-width: 768px) {
+
   .glass-card,
   .bento-item,
   .modal-card,
@@ -17811,22 +18066,22 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     box-sizing: border-box;
   }
 
-  .mld-grid > *,
-  .bento-grid > *,
-  .notif-schedule-presets > *,
-  .vfy-scorecard-grid > *,
-  .mtn-metrics-grid > *,
-  .city-metrics-grid > *,
-  .modal-day-parts-grid > *,
-  .modal-astro-grid > *,
-  .sports-summary-grid > *,
-  .sports-controls-grid > * {
+  .mld-grid>*,
+  .bento-grid>*,
+  .notif-schedule-presets>*,
+  .vfy-scorecard-grid>*,
+  .mtn-metrics-grid>*,
+  .city-metrics-grid>*,
+  .modal-day-parts-grid>*,
+  .modal-astro-grid>*,
+  .sports-summary-grid>*,
+  .sports-controls-grid>* {
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
   }
 
-  .card-title > span {
+  .card-title>span {
     min-width: 0;
     overflow-wrap: break-word;
   }
@@ -17837,25 +18092,31 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     left: 6px !important;
     right: 6px !important;
   }
+
   .mld-header {
     padding: 10px 12px;
   }
+
   .mld-body {
     padding: 10px 12px;
     gap: 12px;
   }
+
   .mld-grid {
     gap: 6px;
   }
+
   .map-overlay-btn,
   .map-base-btn {
     padding: 7px 18px 7px 8px;
     gap: 6px;
   }
+
   .mob-name,
   .mbb-name {
     font-size: 11px;
   }
+
   .mob-desc,
   .mbb-desc {
     font-size: 9.5px;
@@ -17904,6 +18165,205 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
 .skitour-live-btn.is-loading {
   opacity: 0.65;
   pointer-events: none;
+}
+
+.skitour-source-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 10px;
+  font-size: 11.5px;
+  color: #cbd5e1;
+}
+
+.skitour-source-banner.is-official {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(20, 83, 45, 0.22);
+}
+
+.ssb-src-icon {
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.ssb-src-text strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 12px;
+}
+
+.ssb-src-text p {
+  margin: 4px 0 0;
+  color: #e2e8f0;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+/* 10-TAGE SKITOUREN- & NEUSCHNEE-PLANER */
+.skitour-10day-card {
+  margin-top: 14px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.s10d-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.s10d-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #f8fafc;
+}
+
+.s10d-hint {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.s10d-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skitour-10day-row {
+  display: grid;
+  grid-template-columns: 115px 150px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+}
+
+.skitour-10day-row:hover {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.skitour-10day-row.is-selected {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
+
+.s10d-day-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.s10d-day-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.s10d-wknd-tag {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+}
+
+.s10d-src-mini {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.s10d-src-mini.official {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.s10d-snow-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.s10d-snow-main {
+  font-size: 12px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.s10d-snow-sub {
+  font-size: 10.5px;
+  color: #cbd5e1;
+}
+
+.s10d-hazard-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.s10d-hazard-text {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.s10d-wind-text {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
+.s10d-periods-col {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.s10d-period-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  padding: 3px 7px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16);
+  white-space: nowrap;
+}
+
+@media (max-width: 780px) {
+  .skitour-10day-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+  .s10d-snow-col,
+  .s10d-hazard-col {
+    grid-column: 1 / -1;
+  }
 }
 
 .skitour-eaws-hero-banner {
@@ -18042,9 +18502,17 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   display: inline-block;
 }
 
-.strl-dot.danger-high { background: #f7931e; }
-.strl-dot.danger-med { background: #fff200; }
-.strl-dot.danger-low { background: #50b848; }
+.strl-dot.danger-high {
+  background: #f7931e;
+}
+
+.strl-dot.danger-med {
+  background: #fff200;
+}
+
+.strl-dot.danger-low {
+  background: #50b848;
+}
 
 .skitour-rose-details {
   display: flex;
@@ -18067,7 +18535,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   padding: 10px 12px;
 }
 
-.srd-sector-card > strong {
+.srd-sector-card>strong {
   display: block;
   font-size: 13.5px;
   color: #ffffff;
@@ -18246,10 +18714,21 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   transition: width 0.3s ease;
 }
 
-.ssb-under30 { background: #22c55e; }
-.ssb-30to34 { background: #eab308; }
-.ssb-35to39 { background: #f97316; }
-.ssb-over40 { background: #ef4444; }
+.ssb-under30 {
+  background: #22c55e;
+}
+
+.ssb-30to34 {
+  background: #eab308;
+}
+
+.ssb-35to39 {
+  background: #f97316;
+}
+
+.ssb-over40 {
+  background: #ef4444;
+}
 
 .slope-spectrum-legend {
   display: flex;
@@ -18296,6 +18775,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     grid-template-columns: 1fr;
     justify-items: center;
   }
+
   .skitour-snow-grid {
     grid-template-columns: 1fr 1fr;
   }
