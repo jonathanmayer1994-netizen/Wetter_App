@@ -840,18 +840,33 @@
             <div class="card-header">
               <div class="card-title">
                 <span class="card-icon">⚠️</span>
-                <span>LAWINENLAGEBERICHT & SCHNEEDECKEN-STABILITÄT</span>
+                <span>LAWINENLAGEBERICHT &amp; SCHNEEDECKEN-STABILITÄT</span>
               </div>
-              <div class="eaws-level-badge" id="eaws-level-badge" style="background:#f7931e; color:#000;">
-                <span class="eaws-num" id="eaws-level-num">3</span>
-                <span class="eaws-text" id="eaws-level-text">Erheblich</span>
+              <div class="av-header-badges">
+                <span class="st-prov-badge prov-forecast" id="av-eaws-prov-badge">🔵 PROGNOSE</span>
+                <div class="eaws-level-badge" id="eaws-level-badge" style="background:#f7931e; color:#000;">
+                  <span class="eaws-num" id="eaws-level-num">3</span>
+                  <span class="eaws-text" id="eaws-level-text">Erheblich</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quellen- & Offizieller LLB Transparenzbanner (Berg-Modus) -->
+            <div class="skitour-source-banner" id="av-source-banner" style="margin-bottom: 12px;">
+              <span class="ssb-src-icon" id="av-source-icon">📡</span>
+              <div class="ssb-src-text">
+                <div class="ssb-src-head">
+                  <strong id="av-source-label">Datenquellen werden geladen...</strong>
+                  <span class="av-diurnal-sub" id="av-diurnal-sub">VM -- / NM --</span>
+                </div>
+                <p id="av-official-text" style="display: none;"></p>
               </div>
             </div>
 
             <div class="avalanche-content-grid">
               <!-- Gefahrenrose (SVG Interaktive Hangexpositionen) -->
               <div class="avalanche-rose-col">
-                <div class="rose-title">Kritische Expositionen & Hänge:</div>
+                <div class="rose-title">Kritische Expositionen &amp; Hänge:</div>
                 <div class="avalanche-rose-wrapper">
                   <svg viewBox="0 0 160 160" class="avalanche-rose-svg">
                     <!-- Kreisringe -->
@@ -882,39 +897,63 @@
                 </div>
               </div>
 
-              <!-- Hauptprobleme & Kennzahlen -->
+              <!-- Hauptprobleme & detaillierte Schnee-/Neuschnee-Kennzahlen -->
               <div class="avalanche-details-col">
                 <div class="av-problems-list" id="av-problems-list">
                   <!-- Dynamisch befüllt mit Hauptproblemen -->
                 </div>
 
-                <div class="av-metrics-row">
+                <div class="av-metrics-row av-metrics-rich">
                   <div class="av-metric-pill">
-                    <span class="amp-label">Schnee Berg (Gipfel):</span>
+                    <div class="ssg-top-row">
+                      <span class="amp-label">Schnee Berg / Tal:</span>
+                      <span class="st-prov-badge prov-estimate" id="av-snow-prov">🟠 SCHÄTZWERT</span>
+                    </div>
                     <span class="amp-val text-cyan" id="av-totalsnow-peak">-- cm</span>
+                    <span class="amp-sub" id="av-totalsnow-valley">Tal: -- cm • Schneegrenze: --</span>
                   </div>
                   <div class="av-metric-pill">
-                    <span class="amp-label">Schnee Tal:</span>
-                    <span class="amp-val text-cyan" id="av-totalsnow-valley">-- cm</span>
-                  </div>
-                  <div class="av-metric-pill">
-                    <span class="amp-label">Neuschnee 24h:</span>
+                    <div class="ssg-top-row">
+                      <span class="amp-label">Neuschnee (24h / 72h):</span>
+                      <span class="st-prov-badge prov-forecast" id="av-freshsnow-prov">🔵 MODELL</span>
+                    </div>
                     <span class="amp-val text-green" id="av-freshsnow-val">-- cm</span>
+                    <span class="amp-sub" id="av-freshsnow-prog">Prognose +24h: -- cm</span>
                   </div>
                   <div class="av-metric-pill">
-                    <span class="amp-label">Grat-Windspitzen:</span>
+                    <span class="ssg-top-row">
+                      <span class="amp-label">Schneequalität &amp; SWE:</span>
+                      <span class="st-prov-badge prov-forecast">🔵 PHYSIK</span>
+                    </div>
+                    <span class="amp-val text-yellow" id="av-snow-quality-val">-- kg/m³</span>
+                    <span class="amp-sub" id="av-swe-sub">Wasserwert SWE: -- mm</span>
+                  </div>
+                  <div class="av-metric-pill">
+                    <div class="ssg-top-row">
+                      <span class="amp-label">Grat-Wind &amp; Firn/Schicht:</span>
+                      <span class="st-prov-badge prov-forecast">🔵 MODELL</span>
+                    </div>
                     <span class="amp-val text-yellow" id="av-wind-val">-- km/h</span>
+                    <span class="amp-sub" id="av-firn-layer-val">Firn &amp; Bindung: --</span>
+                  </div>
+                </div>
+
+                <!-- 10-Tage Berg-Schnee- & Lawinenverlauf -->
+                <div class="av-10day-strip-wrap" id="av-10day-strip-wrap">
+                  <div class="av-10d-title">📅 10-Tage Schnee-, Neuschnee- &amp; Lawinenverlauf (Tag / VM–NM):</div>
+                  <div class="av-10day-strip" id="av-10day-strip">
+                    <!-- Dynamisch befüllt -->
                   </div>
                 </div>
 
                 <div class="av-station-meta" id="av-station-meta">
                   <span class="asm-dot">🟢</span>
-                  <span id="av-station-name">Offizielles Alpen-Messnetz (SLF / LWD / ZAMG)</span>
+                  <span id="av-station-name">Offizielles Alpen-Messnetz (SLF / LWD / GeoSphere)</span>
                   <span class="asm-time" id="av-station-time">Stand: Heute</span>
                 </div>
 
                 <div class="av-safety-box">
-                  <div class="asb-title">Alpin-Empfehlung des Lawinenwarndienstes:</div>
+                  <div class="asb-title">Alpin-Empfehlung &amp; Sicherheitsregel:</div>
                   <div class="asb-text" id="av-safety-text">Verhältnisse werden berechnet...</div>
                 </div>
 

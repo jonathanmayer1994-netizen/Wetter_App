@@ -242,6 +242,37 @@ def run_skitour_suite():
         dashboard.screenshot(path=screenshot_path)
         print(f"📸 Updated Skitour Cockpit artifact (incl. 10-Day Planner & Official LLB): {screenshot_path}")
 
+        # 11. TEST 10: Harmonized Mountain Tab Avalanche/Snow Details & Overview Exact LLB Score
+        print("\n--- TEST 10: Mountain Forecast Snow/Avalanche & Overview LLB Score ---")
+        # Search for Zermatt / Matterhorn or Davos so Tab Mountain + Overview load Swiss official SLF bulletin
+        page.evaluate("() => window.loadLocation && window.loadLocation({ name: 'Davos Weissfluhjoch', lat: 46.835, lon: 9.795, elevation: 2693, country: 'Schweiz', isMountain: true })")
+        page.wait_for_function("() => window.state && window.state.microData && window.state.microData.avalancheReport && window.state.microData.avalancheReport.isOfficialBulletin", timeout=12000)
+        page.wait_for_timeout(400)
+
+        # Verify Overview hourly & daily exact LLB pills are rendered because exact SLF CAAMLv6 values are active!
+        page.locator("[data-tab='tab-overview']").first.click(force=True)
+        page.wait_for_timeout(300)
+        hourly_llb = page.locator("#hourly-forecast-list .hourly-llb-pill").count()
+        daily_llb = page.locator("#daily-forecast-list .daily-llb-pill").count()
+        assert hourly_llb >= 1, f"Overview hourly slider must show exact LLB pill when official SLF bulletin is active, got {hourly_llb}"
+        assert daily_llb >= 1, f"Overview daily forecast must show exact LLB pill when official SLF bulletin is active, got {daily_llb}"
+        print(f"✓ Overview LLB Scores verified (Hourly: {hourly_llb} exact pills, Daily: {daily_llb} exact pills)")
+
+        # Switch to Mountain Tab and verify rich snow, fresh snow, quality, provenance & 10-day strip match
+        page.locator("[data-tab='tab-mountain']").first.click(force=True)
+        page.wait_for_timeout(400)
+        mtn_prov = page.inner_text("#av-eaws-prov-badge")
+        mtn_qual = page.inner_text("#av-snow-quality-val")
+        mtn_10d = page.locator("#av-10day-strip .av-10d-pill").count()
+        mtn_wall_snow = page.inner_text("#active-wall-snow")
+        assert "ECHT" in mtn_prov and "kg/m³" in mtn_qual and mtn_10d == 10, f"Mountain tab must render official provenance, snow quality & 10-day strip (got prov={mtn_prov}, qual={mtn_qual}, 10d={mtn_10d})"
+        assert "Neuschnee" in mtn_wall_snow, f"Mountain active wall snow must show fresh snow & quality, got: {mtn_wall_snow}"
+        print(f"✓ Mountain Forecast Snow & Avalanche harmonized (Prov: '{mtn_prov}', Quality: '{mtn_qual}', 10-Day strip: {mtn_10d})")
+
+        mtn_av_card = page.locator("#avalanche-danger-card")
+        mtn_av_card.screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_mountain_avalanche_card.png")
+        print("📸 Captured Mountain Avalanche & Snow artifact: verified_mountain_avalanche_card.png")
+
         context.close()
         browser.close()
         print("\n==========================================")

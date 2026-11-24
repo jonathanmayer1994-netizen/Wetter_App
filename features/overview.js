@@ -596,13 +596,14 @@ export function updateHeroHazardAlert(cur, daily, hourly, microData) {
   }
 
   // 3. Lawinenwarnstufe >= 3 bei Bergstandorten (Priorität 3)
-  if (!hazard && state.currentLocation && state.currentLocation.isMountain && microData && microData.avalanche) {
-    const avLevel = microData.avalanche.dangerLevel || 1;
+  const activeAv = microData && (microData.avalancheReport || microData.avalanche);
+  if (!hazard && state.currentLocation && (state.currentLocation.isMountain || state.currentLocation.elevation >= 1000) && activeAv) {
+    const avLevel = activeAv.dangerLevel || 1;
     if (avLevel >= 3) {
       hazard = {
         icon: '⚠️',
-        badge: `LAWINENWARNSTUFE ${avLevel} (${avLevel >= 4 ? 'GROSS' : 'ERHEBLICH'})`,
-        msg: `${microData.avalanche.dangerTitle}: Störanfällige Schneedecke & Triebschnee im Steilgelände.`,
+        badge: `${activeAv.isOfficialBulletin ? '🟢 OFFIZ. ' : ''}LAWINENWARNSTUFE ${avLevel} (${avLevel >= 4 ? 'GROSS' : 'ERHEBLICH'})`,
+        msg: `${activeAv.dangerTitle} über ${activeAv.criticalElevation?.toLocaleString('de-DE') || 2000} m: ${activeAv.safetyRule || 'Störanfällige Schneedecke & Triebschnee im Steilgelände.'}`,
         actionText: 'Lawinenbericht ➔',
         action: () => {
           switchTab('tab-mountain');
@@ -864,6 +865,17 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
   }
 }
 
+function getExactHourlyLlbBadge(ptDate) {
+  const av = state.microData && state.microData.avalancheReport;
+  const ob = state.microData && state.microData.officialBulletin;
+  if (!av || !av.isOfficialBulletin || !ob || !ptDate) return '';
+  const ms = ptDate.getTime();
+  if (ms < ob.validStartMs || ms > ob.validEndMs) return '';
+  const lvl = ptDate.getHours() < 12 ? av.morningDangerLevel : av.afternoonDangerLevel;
+  const meta = MicroEngine.getEawsScaleMeta(lvl);
+  return `<div class="hourly-llb-pill" style="background:${meta.color};color:${meta.textColor};" title="Exakter offizieller Lawinenlagebericht (${escapeHtml(av.stationAgency)}): Stufe ${meta.level}/5 (${escapeHtml(meta.label)})">LLB ${meta.level}/5</div>`;
+}
+
 function createHourlyItemElement(pt, label, tag, typeClass) {
   const item = document.createElement('div');
   item.className = `hourly-item ${typeClass || ''}`;
@@ -896,6 +908,8 @@ function createHourlyItemElement(pt, label, tag, typeClass) {
     metricText = `<span style="font-size:9px; color:#fbbf24; font-weight:700;">☀️ ${harm.sunMin}m</span>`;
   }
 
+  const llbBadgeHtml = getExactHourlyLlbBadge(pt.timestamp);
+
   item.innerHTML = `
     ${tagHtml}
     <div class="hourly-time">
@@ -905,6 +919,7 @@ function createHourlyItemElement(pt, label, tag, typeClass) {
     <div class="hourly-icon">${harm.icon}</div>
     <div class="hourly-pop">${metricText}</div>
     <div class="hourly-temp">${temp}°</div>
+    ${llbBadgeHtml}
     <div class="hourly-wind">💨 ${pt.wind} <small>km/h</small></div>
   `;
   return item;
@@ -987,6 +1002,7 @@ export function renderHourlySlider(hourly) {
         metricText = `<span style="font-size:9px; color:#fbbf24; font-weight:700;">☀️ ${harm.sunMin}m</span>`;
       }
 
+      const llbBadgeHtml = getExactHourlyLlbBadge(t);
       const item = document.createElement('div');
       item.className = 'hourly-item';
       item.innerHTML = `
@@ -994,6 +1010,7 @@ export function renderHourlySlider(hourly) {
         <div class="hourly-icon">${harm.icon}</div>
         <div class="hourly-pop">${metricText}</div>
         <div class="hourly-temp">${temp}°</div>
+        ${llbBadgeHtml}
         <div class="hourly-wind">💨 ${wind} <small>km/h</small></div>
       `;
       fragment.appendChild(item);
@@ -1028,6 +1045,7 @@ export function renderHourlySlider(hourly) {
         metricText = `<span style="font-size:9px; color:#fbbf24; font-weight:700;">☀️ ${harm.sunMin}m</span>`;
       }
 
+      const llbBadgeHtml = getExactHourlyLlbBadge(t);
       const item = document.createElement('div');
       item.className = `hourly-item ${isNow ? 'current-now' : ''}`;
       item.innerHTML = `
@@ -1035,6 +1053,7 @@ export function renderHourlySlider(hourly) {
         <div class="hourly-icon">${harm.icon}</div>
         <div class="hourly-pop">${metricText}</div>
         <div class="hourly-temp">${temp}°</div>
+        ${llbBadgeHtml}
         <div class="hourly-wind">💨 ${wind} <small>km/h</small></div>
       `;
       fragment.appendChild(item);
@@ -1732,9 +1751,19 @@ export function render10DayForecast(daily, hourly) {
             </div>
           </div>
 
-          <!-- 6. Precipitation -->
+          <!-- 6. Precipitation & Exact EAWS Avalanche Score (when official bulletin active) -->
           <div class="daily-precip-cell">
             ${(() => {
+              const avDays = (state.microData && state.microData.avalancheReport && Array.isArray(state.microData.avalancheReport.forecast10Days))
+                ? state.microData.avalancheReport.forecast10Days : [];
+              const avDay = avDays.find(x => x.dateKey === dateKey);
+              let llbChip = '';
+              if (avDay && avDay.isOfficialDay) {
+                const maxLvl = Math.max(avDay.morning.level, avDay.afternoon.level);
+                const meta = MicroEngine.getEawsScaleMeta(maxLvl);
+                const lbl = avDay.morning.level === avDay.afternoon.level ? `LLB ${maxLvl}/5` : `LLB ${avDay.morning.level}/${avDay.afternoon.level}`;
+                llbChip = `<span class="daily-llb-pill" style="background:${meta.color};color:${meta.textColor};" title="Exakter offizieller Lawinenlagebericht: VM ${avDay.morning.level}/5 • NM ${avDay.afternoon.level}/5">🟢 ${lbl}</span>`;
+              }
               const snowSum = daily.snowfall_sum ? (daily.snowfall_sum[i] || 0) : 0;
               const parts = [];
               if (pop > 10 || rainSum > 0.05) {
@@ -1747,8 +1776,10 @@ export function render10DayForecast(daily, hourly) {
                 const snowStr = String(snowVal).replace('.', ',');
                 parts.push(`❄️ ${snowStr} cm`);
               }
-              if (parts.length === 0) return '<span class="daily-precip-dry">💧 0%</span>';
-              return `<span class="daily-precip-chip ${rainSum >= 5 || snowSum >= 5 ? 'heavy-rain' : ''}">${parts.join(' · ')}</span>`;
+              const precipHtml = parts.length === 0
+                ? '<span class="daily-precip-dry">💧 0%</span>'
+                : `<span class="daily-precip-chip ${rainSum >= 5 || snowSum >= 5 ? 'heavy-rain' : ''}">${parts.join(' · ')}</span>`;
+              return `${llbChip}${precipHtml}`;
             })()}
           </div>
         </div>
@@ -1761,7 +1792,20 @@ export function render10DayForecast(daily, hourly) {
           <!-- 24h-Tagesverlauf (Apple-Weather-Grade SVG: Temperaturverlauf, Sonnenstunden, Meilensteine & bedingter Niederschlag) -->
           <div class="inline-section-header">
             <span class="ish-title">⏱️ 24h-Tagesverlauf</span>
-            <span class="ish-badge">☀️ ${sunHoursFormatted}${sunQuotaPct > 0 ? ` (${sunQuotaPct}% Sonne)` : ''}</span>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              ${(() => {
+                const avDays = (state.microData && state.microData.avalancheReport && Array.isArray(state.microData.avalancheReport.forecast10Days))
+                  ? state.microData.avalancheReport.forecast10Days : [];
+                const avDay = avDays.find(x => x.dateKey === dateKey);
+                if (avDay && avDay.isOfficialDay) {
+                  const maxLvl = Math.max(avDay.morning.level, avDay.afternoon.level);
+                  const meta = MicroEngine.getEawsScaleMeta(maxLvl);
+                  return `<span class="ish-badge ish-llb-badge" style="background:${meta.color};color:${meta.textColor};">🟢 Offiz. LLB: VM ${avDay.morning.level}/5 • NM ${avDay.afternoon.level}/5</span>`;
+                }
+                return '';
+              })()}
+              <span class="ish-badge">☀️ ${sunHoursFormatted}${sunQuotaPct > 0 ? ` (${sunQuotaPct}% Sonne)` : ''}</span>
+            </div>
           </div>
           <div class="inline-day-chart-card" data-day-index="${i}">
             <!-- Minimalist Dynamic Scrubber HUD (Stunden-Details ohne Inhaltsverdeckung) -->

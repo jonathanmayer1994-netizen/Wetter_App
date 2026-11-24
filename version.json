@@ -1,5 +1,5 @@
 {
-  "version": "2.40.0",
-  "build": "20261124-2029",
-  "notes": "Strict epistemic provenance badges (ECHT/Messstation vs PROGNOSE/Modell vs SCHÄTZWERT) across Skitour dashboard, GeoSphere TAWES live snow stakes, and 10-day planner"
+  "version": "2.41.0",
+  "build": "20261124-2038",
+  "notes": "Harmonize weather forecast & avalanche/snow report across Overview, Mountain, and Skitour tabs; expose rich snow/fresh-snow/quality details on Mountain tab and exact official LLB scores in Overview hourly & daily timelines"
 }

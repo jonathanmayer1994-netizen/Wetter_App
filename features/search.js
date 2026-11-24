@@ -931,9 +931,15 @@ export function updateNavigationWarningBadges() {
   const sportsDotDesktop = document.getElementById('tab-dot-sports');
 
   const loc = state.currentLocation;
-  const av = (loc && state.weatherData)
-    ? MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, state.microData ? state.microData.terrain10m : null)
-    : null;
+  const av = (state.microData && state.microData.avalancheReport)
+    ? state.microData.avalancheReport
+    : ((loc && state.weatherData)
+      ? MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, {
+          ...(state.microData ? state.microData.terrain10m : {}),
+          officialBulletin: state.microData ? state.microData.officialBulletin : null,
+          snowStationData: state.microData ? state.microData.snowStationData : null
+        })
+      : null);
 
   const hasMountainWarning = av && av.dangerLevel >= 3;
   [mtnDotMobile, mtnDotDesktop].forEach(dot => {

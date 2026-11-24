@@ -79,11 +79,14 @@ export const MicroEngine = {
       ...(options && options.forceRefresh ? { forceRefresh: true } : {})
     };
     const weatherRaw = await this.fetchOpenMeteoMultiLayer(lat, lon, terrain, reqOpts);
-    const [stationData, modelHistory, radarData, alpineFoehn] = await Promise.all([
+    const isAlpineLoc = isMountain || terrain.elevation >= 800;
+    const [stationData, modelHistory, radarData, alpineFoehn, officialBulletin, snowStationData] = await Promise.all([
       this.fetchStationData(lat, lon, terrain, isMountain, country, reqOpts),
       isApiCoolingDown('https://api.open-meteo.com') ? Promise.resolve(null) : this.fetchModelHistory(lat, lon, terrain.elevation, reqOpts),
       this.fetchRadarNowcastData(lat, lon, reqOpts),
-      isApiCoolingDown('https://api.open-meteo.com') ? Promise.resolve(null) : this.fetchAlpinePressureGradient(lat, lon, reqOpts)
+      isApiCoolingDown('https://api.open-meteo.com') ? Promise.resolve(null) : this.fetchAlpinePressureGradient(lat, lon, reqOpts),
+      isAlpineLoc ? this.fetchOfficialAvalancheBulletin(lat, lon).catch(() => null) : Promise.resolve(null),
+      isAlpineLoc ? this.fetchNearbySnowStation(lat, lon, Math.round(terrain.elevation * 0.45), terrain.elevation).catch(() => null) : Promise.resolve(null)
     ]);
 
     // 2b. Dynamische Bias-Korrektur anwenden, BEVOR microWeather.temperature10m berechnet wird
@@ -108,11 +111,24 @@ export const MicroEngine = {
       }
     }
 
+    const avalancheReport = isAlpineLoc
+      ? this.computeAvalancheReport(lat, lon, terrain.elevation, weatherRaw, {
+          ...terrain,
+          minElevation: Math.round(terrain.elevation * 0.45),
+          maxElevation: terrain.elevation,
+          officialBulletin,
+          snowStationData
+        })
+      : null;
+
     return {
       ...physics,
       biasCorrection,
       altitudeProfile,
       foehnDiagnostic: alpineFoehn,
+      officialBulletin,
+      snowStationData,
+      avalancheReport,
       weatherRaw,
       stationData,
       modelHistory,
@@ -392,6 +408,7 @@ export const MicroEngine = {
       "cloud_cover",
       "cape",
       "snowfall",
+      "snow_depth",
       "freezing_level_height",
       "shortwave_radiation",
       "global_tilted_irradiance",
@@ -4201,6 +4218,14 @@ export const MicroEngine = {
       }
       if (officialBulletin.problems && officialBulletin.problems.length > 0) {
         problems.splice(0, problems.length, ...officialBulletin.problems);
+        const topProbId = problems[0].id;
+        if (topProbId === 'persistent_weak_layers' || topProbId === 'old-snow') {
+          dangerPattern = { id: 'GM1', name: 'GM 1: Tiefenreif / Altschnee (Offizieller LLB)', desc: problems[0].desc || dangerPattern.desc };
+        } else if (topProbId === 'wind_slab' || topProbId === 'new_snow' || topProbId === 'drift') {
+          dangerPattern = { id: 'GM4', name: 'GM 4: Triebschnee / Neuschnee (Offizieller LLB)', desc: problems[0].desc || dangerPattern.desc };
+        } else if (topProbId === 'wet_snow' || topProbId === 'gliding_snow') {
+          dangerPattern = { id: 'GM2', name: 'GM 2: Nassschnee & Gleitschnee (Offizieller LLB)', desc: problems[0].desc || dangerPattern.desc };
+        }
       }
       stationAgency = officialBulletin.agency;
       sourceLabel = `🟢 ECHT / OFFIZIELL: ${officialBulletin.agency}${snowDepthProvenance.kind === 'real' ? ' + GeoSphere Schneepegel' : ' + Open-Meteo Wetter'}`;
@@ -4225,6 +4250,26 @@ export const MicroEngine = {
       officialBulletin,
       selectedDateKey
     );
+
+    // 100%-Konsistenz zwischen Wetterprognose und Lawinenlagebericht für den gewählten Tourtag erzwingen
+    const selectedDayEntry = forecast10Days.find(d => d.dateKey === selectedDateKey);
+    if (selectedDayEntry) {
+      if (!isOfficialActive) {
+        morningDangerLevel = selectedDayEntry.morning.level;
+        afternoonDangerLevel = selectedDayEntry.afternoon.level;
+        dangerLevel = Math.max(morningDangerLevel, afternoonDangerLevel);
+        const alignedMeta = this.getEawsScaleMeta(dangerLevel);
+        dangerTitle = `${alignedMeta.level} - ${alignedMeta.label}`;
+        dangerColor = alignedMeta.color;
+      }
+      if (selectedDayEntry.dayOffset > 0) {
+        prognosis24h = selectedDayEntry.freshSnowDayCm;
+        freshSnow72 = selectedDayEntry.cumFreshSnow72hCm;
+        densityKgM3 = selectedDayEntry.densityKgM3;
+        qualityClass = selectedDayEntry.snowQuality;
+        qualityIcon = selectedDayEntry.snowQualityIcon;
+      }
+    }
 
     return {
       dangerLevel,
@@ -5225,7 +5270,7 @@ export const MicroEngine = {
       avalancheReport.dangerColor = topMeta.color;
     }
 
-    const hazards = this.analyzeRouteHazards(enrichedMilestones, category);
+    const hazards = this.analyzeRouteHazards(enrichedMilestones, category, avalancheReport);
 
     const totalDurationHours = cumulativeHours;
     const durH = Math.floor(totalDurationHours);
@@ -5274,9 +5319,23 @@ export const MicroEngine = {
   /**
    * STUFE 9d: Routen-Gefahrenanalyse & Passwarnung
    */
-  analyzeRouteHazards(milestones, category = 'bike') {
+  analyzeRouteHazards(milestones, category = 'bike', avalancheReport = null) {
     const alerts = [];
     let worstSeverity = 'green';
+
+    if ((category === 'skitour' || category === 'mountain') && avalancheReport && avalancheReport.dangerLevel >= 3) {
+      alerts.push({
+        severity: avalancheReport.dangerLevel >= 4 ? 'red' : 'yellow',
+        icon: '⚠️',
+        type: 'Lawinengefahr (EAWS)',
+        km: 0,
+        ele: avalancheReport.criticalElevation || 2000,
+        time: avalancheReport.isOfficialBulletin ? 'Offizieller LLB' : 'Prognose',
+        title: `Lawinenwarnstufe ${avalancheReport.dangerTitle} über ${avalancheReport.criticalElevation} m`,
+        desc: avalancheReport.safetyRule || 'Steilhänge > 30° strikt nach Munter-Reduktionsmethode beurteilen.'
+      });
+      worstSeverity = avalancheReport.dangerLevel >= 4 ? 'red' : 'yellow';
+    }
 
     milestones.forEach(m => {
       // 1. Gewitter & Blitzgefahr (Kritisches Alpin-Fenster)

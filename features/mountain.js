@@ -164,7 +164,12 @@ export function renderMountainPanel() {
   const actTempSubEl = document.getElementById('active-wall-temp-sub');
   if (actTempSubEl) actTempSubEl.innerText = `Gefühlt: ${Math.round(convertTemp(w.feltTemp))}°C`;
   const actSnowEl = document.getElementById('active-wall-snow');
-  if (actSnowEl) actSnowEl.innerText = w.snowCondition;
+  if (actSnowEl) {
+    const avRef = state.microData ? state.microData.avalancheReport : null;
+    actSnowEl.innerText = avRef
+      ? `${w.snowCondition} • Neuschnee: ${avRef.freshSnow24hCm} cm (24h) • ${avRef.qualityClass} (${avRef.densityKgM3} kg/m³)`
+      : w.snowCondition;
+  }
   const actWindEl = document.getElementById('active-wall-wind');
   if (actWindEl) actWindEl.innerText = w.slopeWindExposure;
   const actWindSubEl = document.getElementById('active-wall-wind-sub');
@@ -184,13 +189,25 @@ export function renderAvalancheReport() {
 
   const loc = state.currentLocation;
   const terrain = state.microData ? state.microData.terrain10m : null;
-  const av = MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, terrain);
+  const av = (state.microData && state.microData.avalancheReport)
+    ? state.microData.avalancheReport
+    : MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, {
+        ...(terrain || {}),
+        officialBulletin: state.microData ? state.microData.officialBulletin : null,
+        snowStationData: state.microData ? state.microData.snowStationData : null
+      });
   if (!av) return;
 
-  // 1. EAWS Stufen-Badge
+  // 1. EAWS Stufen-Badge + Provenienz
   const badge = document.getElementById('eaws-level-badge');
   const numElem = document.getElementById('eaws-level-num');
   const textElem = document.getElementById('eaws-level-text');
+  const provBadge = document.getElementById('av-eaws-prov-badge');
+  const diurnalSub = document.getElementById('av-diurnal-sub');
+  const srcBanner = document.getElementById('av-source-banner');
+  const srcIcon = document.getElementById('av-source-icon');
+  const srcLabel = document.getElementById('av-source-label');
+  const officialTextEl = document.getElementById('av-official-text');
 
   if (badge) {
     badge.style.background = av.dangerColor;
@@ -198,6 +215,26 @@ export function renderAvalancheReport() {
   }
   if (numElem) numElem.innerText = av.dangerLevel;
   if (textElem) textElem.innerText = av.dangerTitle.replace(/^[0-9]\s*-\s*/, '');
+  if (provBadge && av.avalancheProvenance) {
+    provBadge.className = `st-prov-badge prov-${av.avalancheProvenance.kind}`;
+    provBadge.innerText = av.avalancheProvenance.badge;
+  }
+  if (diurnalSub) {
+    diurnalSub.innerText = `VM ${av.morningDangerLevel}/5 • NM ${av.afternoonDangerLevel}/5`;
+  }
+  if (srcBanner && srcLabel) {
+    srcBanner.classList.toggle('is-official', !!av.isOfficialBulletin);
+    if (srcIcon) srcIcon.innerText = av.isOfficialBulletin ? '✅' : '📡';
+    srcLabel.innerText = av.sourceLabel || 'Open-Meteo ECMWF/ICON + EAWS-Physik';
+    if (officialTextEl) {
+      if (av.officialText) {
+        officialTextEl.style.display = 'block';
+        officialTextEl.innerText = av.officialText;
+      } else {
+        officialTextEl.style.display = 'none';
+      }
+    }
+  }
 
   // 2. Kritische Höhenlage
   const critElevElem = document.getElementById('rose-crit-elev');
@@ -269,22 +306,63 @@ export function renderAvalancheReport() {
     `).join('');
   }
 
-  // 5. Kennzahlen, Schneehöhen & Alpinempfehlung
+  // 5. Kennzahlen, Schneehöhen, Neuschnee, Qualität, Firn & Alpinempfehlung
   const freshSnowVal = document.getElementById('av-freshsnow-val');
+  const freshSnowProg = document.getElementById('av-freshsnow-prog');
+  const freshSnowProv = document.getElementById('av-freshsnow-prov');
   const windVal = document.getElementById('av-wind-val');
   const safetyText = document.getElementById('av-safety-text');
   const peakSnow = document.getElementById('av-totalsnow-peak');
   const valleySnow = document.getElementById('av-totalsnow-valley');
+  const snowProv = document.getElementById('av-snow-prov');
+  const qualityVal = document.getElementById('av-snow-quality-val');
+  const sweSub = document.getElementById('av-swe-sub');
+  const firnLayerVal = document.getElementById('av-firn-layer-val');
   const stationName = document.getElementById('av-station-name');
   const stationTime = document.getElementById('av-station-time');
+  const dayStrip = document.getElementById('av-10day-strip');
 
-  if (freshSnowVal) freshSnowVal.innerText = `${av.freshSnow24hCm} cm`;
-  if (windVal) windVal.innerText = `${av.maxRidgeWindKmH} km/h`;
+  if (freshSnowVal) freshSnowVal.innerText = `${av.freshSnow24hCm} cm / ${av.freshSnow72hCm || 0} cm`;
+  if (freshSnowProg) freshSnowProg.innerText = `🔵 Prognose (+24h): +${av.prognosis24hCm || 0} cm`;
+  if (freshSnowProv && av.freshSnowProvenance) {
+    freshSnowProv.className = `st-prov-badge prov-${av.freshSnowProvenance.kind}`;
+    freshSnowProv.innerText = av.freshSnowProvenance.badge;
+  }
+  if (windVal) windVal.innerText = `${av.maxRidgeWindKmH} km/h (${av.windFromSector || 'W'} → Lee ${av.primarySector || 'O'})`;
   if (safetyText) safetyText.innerText = av.safetyRule;
-  if (peakSnow) peakSnow.innerText = `${av.snowDepthPeakCm} cm`;
-  if (valleySnow) valleySnow.innerText = `${av.snowDepthValleyCm} cm`;
+  if (peakSnow) {
+    const valTxt = (av.snowDepthValleyCm !== null && av.snowDepthValleyCm !== undefined) ? `${av.snowDepthValleyCm} cm` : 'k.A.';
+    const pkTxt = (av.snowDepthPeakCm !== null && av.snowDepthPeakCm !== undefined) ? `${av.snowDepthPeakCm} cm` : 'kein Pegel';
+    peakSnow.innerText = (av.snowDepthProvenance && av.snowDepthProvenance.kind === 'estimate')
+      ? `Keine Messdaten (≈ ~${valTxt}/${pkTxt})`
+      : `${pkTxt} / Tal ${valTxt}`;
+  }
+  if (valleySnow) {
+    const slM = av.skiableSnowlineM || Math.round(loc.elevation * 0.65);
+    valleySnow.innerText = `${av.snowDepthStationLabel || 'Modell'} • Schneegrenze: ab ~${slM.toLocaleString('de-DE')} m`;
+  }
+  if (snowProv && av.snowDepthProvenance) {
+    snowProv.className = `st-prov-badge prov-${av.snowDepthProvenance.kind}`;
+    snowProv.innerText = av.snowDepthProvenance.badge;
+  }
+  if (qualityVal) qualityVal.innerText = `${av.densityKgM3} kg/m³ (${av.qualityClass})`;
+  if (sweSub) sweSub.innerText = `Wasserwert SWE: ${av.sweMm} mm • Krit. Neu: ${av.criticalFreshSnowThresholdCm} cm`;
+  if (firnLayerVal) {
+    const firnStr = av.firnAnalysis ? av.firnAnalysis.firnBadgeText : '';
+    firnLayerVal.innerText = `${firnStr} • ${av.thermalLayerSeverity === 'danger' ? '⚠️ Schichtung krit.' : 'Bindung stabil'}`;
+  }
   if (stationName) stationName.innerText = `${av.stationAgency} (${av.stationName})`;
   if (stationTime) stationTime.innerText = av.stationTime;
+
+  if (dayStrip && Array.isArray(av.forecast10Days)) {
+    dayStrip.innerHTML = av.forecast10Days.map(d => `
+      <div class="av-10d-pill ${d.isSelected ? 'is-active' : ''}" title="${escapeHtml(d.hazardSummary)}">
+        <span class="av10-day">${escapeHtml(d.dayLabel)}</span>
+        <span class="av10-snow">${d.snowQualityIcon} +${d.freshSnowDayCm}cm</span>
+        <span class="av10-lvl" style="background:${d.afternoon.color};color:${d.afternoon.textColor};">${d.isOfficialDay ? '✓' : '~'} ${d.morning.level}/${d.afternoon.level}</span>
+      </div>
+    `).join('');
+  }
 
   // Feature 9A: Badges aktualisieren (Lawinen-/Bergwarnung)
   updateNavigationWarningBadges();
