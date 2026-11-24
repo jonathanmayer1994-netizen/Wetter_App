@@ -1,5 +1,5 @@
 {
-  "version": "2.37.5",
-  "build": "20261124-1355",
-  "notes": "Remove Command+K badge from search bar for clean, unclipped placeholder layout and pure Apple GPS icon"
+  "version": "2.37.6",
+  "build": "20261124-1440",
+  "notes": "Harmonize desktop daily forecast grid: flexible 1fr weather condition column to prevent text clipping and eliminate dead whitespace before temperature"
 }

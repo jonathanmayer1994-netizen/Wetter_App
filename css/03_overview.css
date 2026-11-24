@@ -581,7 +581,7 @@
    ========================================================================== */
 .daily-table-header {
   display: grid;
-  grid-template-columns: 95px minmax(145px, 175px) 90px minmax(0, 1fr) 85px 22px;
+  grid-template-columns: 92px minmax(170px, 1fr) 98px 238px 80px 22px;
   align-items: center;
   gap: 8px;
   padding: 8px 12px 10px 12px;
@@ -690,7 +690,7 @@
 
 .daily-interactive-row {
   display: grid;
-  grid-template-columns: 95px minmax(145px, 175px) 90px minmax(0, 1fr) 85px 22px;
+  grid-template-columns: 92px minmax(170px, 1fr) 98px 238px 80px 22px;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -763,7 +763,8 @@
 .daily-condition-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .daily-icon-box {
@@ -791,6 +792,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.2px;
+  min-width: 0;
 }
 
 /* Col 3: Precip */

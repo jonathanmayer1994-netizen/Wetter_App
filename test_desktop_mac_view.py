@@ -1,18 +1,41 @@
 import time
+import os
+import sys
+import http.server
+import threading
+
+# Ensure Playwright driver node is on PATH if needed
+node_dir = '/Users/jona/Library/Python/3.9/lib/python/site-packages/playwright/driver'
+if os.path.exists(node_dir) and node_dir not in os.environ.get('PATH', ''):
+    os.environ['PATH'] = f"{node_dir}:{os.environ.get('PATH', '')}"
+
 from playwright.sync_api import sync_playwright
 
 def run_desktop_verification():
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    
+    Handler = http.server.SimpleHTTPRequestHandler
+    Handler.log_message = lambda *args: None
+    
+    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    port = httpd.server_address[1]
+    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    server_thread.start()
+    
+    print(f"🚀 Mac Desktop Test Server running on http://127.0.0.1:{port}")
+    
     with sync_playwright() as p:
         # Launch browser with Mac desktop viewport (1440 x 900)
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             viewport={'width': 1440, 'height': 900},
-            device_scale_factor=2
+            device_scale_factor=2,
+            service_workers="block"
         )
         page = context.new_page()
 
-        print("Navigating to http://127.0.0.1:8080 ...")
-        page.goto("http://127.0.0.1:8080", wait_until="domcontentloaded")
+        print(f"Navigating to http://127.0.0.1:{port} ...")
+        page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#daily-item-0 .daily-interactive-row", timeout=10000)
         time.sleep(1)
 

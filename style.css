@@ -1499,7 +1499,7 @@ body {
    ========================================================================== */
 .daily-table-header {
   display: grid;
-  grid-template-columns: 95px minmax(145px, 175px) 90px minmax(0, 1fr) 85px 22px;
+  grid-template-columns: 92px minmax(170px, 1fr) 98px 238px 80px 22px;
   align-items: center;
   gap: 8px;
   padding: 8px 12px 10px 12px;
@@ -1608,7 +1608,7 @@ body {
 
 .daily-interactive-row {
   display: grid;
-  grid-template-columns: 95px minmax(145px, 175px) 90px minmax(0, 1fr) 85px 22px;
+  grid-template-columns: 92px minmax(170px, 1fr) 98px 238px 80px 22px;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -1681,7 +1681,8 @@ body {
 .daily-condition-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .daily-icon-box {
@@ -1709,6 +1710,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.2px;
+  min-width: 0;
 }
 
 /* Col 3: Precip */
@@ -10674,15 +10676,15 @@ body.is-scrolling .radar-floating-controls {
    ========================================================================== */
 @media (max-width: 1024px) {
   .daily-table-header {
-    grid-template-columns: 90px minmax(135px, 160px) 85px minmax(0, 1fr) 80px 22px;
-    gap: 8px;
-    padding: 8px 12px 10px 12px;
+    grid-template-columns: 82px minmax(180px, 1fr) 85px 225px 75px 20px;
+    gap: 6px;
+    padding: 8px 10px 10px 10px;
   }
 
   .daily-interactive-row {
-    grid-template-columns: 90px minmax(135px, 160px) 85px minmax(0, 1fr) 80px 22px;
-    gap: 8px;
-    padding: 10px 12px;
+    grid-template-columns: 82px minmax(180px, 1fr) 85px 225px 75px 20px;
+    gap: 6px;
+    padding: 10px 10px;
   }
 
   .daily-date-cell {
@@ -17617,10 +17619,24 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     padding: 20px 20px;
   }
 
-  /* Responsive Astro-Pill in 10-Tage-Trend on Desktop: If viewport is tight (< 1260px), hide astro times to keep Min/Max 100% visible */
-  @media (max-width: 1260px) {
+  /* Responsive Astro-Pill in 10-Tage-Trend on Desktop: If viewport is tight (<= 1280px), hide astro times to keep Min/Max and condition text 100% visible */
+  @media (max-width: 1280px) {
+    .overview-col-right .daily-card {
+      padding: 16px 14px;
+    }
     .overview-col-right .daily-astro-pill {
       display: none !important;
+    }
+    .overview-col-right .daily-table-header {
+      grid-template-columns: 88px minmax(140px, 1fr) 92px 110px 75px 18px;
+      gap: 6px;
+      font-size: 10px;
+      padding: 8px 8px 10px 8px;
+    }
+    .overview-col-right .daily-interactive-row {
+      grid-template-columns: 88px minmax(140px, 1fr) 92px 110px 75px 18px;
+      gap: 6px;
+      padding: 9px 8px;
     }
   }
 

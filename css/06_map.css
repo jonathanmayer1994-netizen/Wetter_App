@@ -3730,15 +3730,15 @@
    ========================================================================== */
 @media (max-width: 1024px) {
   .daily-table-header {
-    grid-template-columns: 90px minmax(135px, 160px) 85px minmax(0, 1fr) 80px 22px;
-    gap: 8px;
-    padding: 8px 12px 10px 12px;
+    grid-template-columns: 82px minmax(180px, 1fr) 85px 225px 75px 20px;
+    gap: 6px;
+    padding: 8px 10px 10px 10px;
   }
 
   .daily-interactive-row {
-    grid-template-columns: 90px minmax(135px, 160px) 85px minmax(0, 1fr) 80px 22px;
-    gap: 8px;
-    padding: 10px 12px;
+    grid-template-columns: 82px minmax(180px, 1fr) 85px 225px 75px 20px;
+    gap: 6px;
+    padding: 10px 10px;
   }
 
   .daily-date-cell {

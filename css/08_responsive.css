@@ -630,10 +630,24 @@
     padding: 20px 20px;
   }
 
-  /* Responsive Astro-Pill in 10-Tage-Trend on Desktop: If viewport is tight (< 1260px), hide astro times to keep Min/Max 100% visible */
-  @media (max-width: 1260px) {
+  /* Responsive Astro-Pill in 10-Tage-Trend on Desktop: If viewport is tight (<= 1280px), hide astro times to keep Min/Max and condition text 100% visible */
+  @media (max-width: 1280px) {
+    .overview-col-right .daily-card {
+      padding: 16px 14px;
+    }
     .overview-col-right .daily-astro-pill {
       display: none !important;
+    }
+    .overview-col-right .daily-table-header {
+      grid-template-columns: 88px minmax(140px, 1fr) 92px 110px 75px 18px;
+      gap: 6px;
+      font-size: 10px;
+      padding: 8px 8px 10px 8px;
+    }
+    .overview-col-right .daily-interactive-row {
+      grid-template-columns: 88px minmax(140px, 1fr) 92px 110px 75px 18px;
+      gap: 6px;
+      padding: 9px 8px;
     }
   }
 
