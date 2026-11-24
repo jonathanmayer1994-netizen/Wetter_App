@@ -1,5 +1,5 @@
 {
-  "version": "2.37.2",
-  "build": "20261124-1315",
-  "notes": "Redesigned search bar with readable placeholder 'Ort oder Berg suchen' and pure Apple-grade GPS symbol button"
+  "version": "2.37.3",
+  "build": "20261124-1325",
+  "notes": "Harmonize daily forecast weather condition with sunshine duration: prevent false 'Bedeckt' on sunny days"
 }

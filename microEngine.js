@@ -5553,17 +5553,8 @@ export const MicroEngine = {
       for (let h = startH; h < endH; h++) daytimeIndices.push(h);
     }
 
-    // Für 'Heute': Berücksichtige insbesondere die aktive & verbleibende Tageszeit
-    let activeIndices = daytimeIndices;
-    if (isToday) {
-      const nowHour = new Date().getHours();
-      if (nowHour >= Math.ceil(sunriseDec) && nowHour <= Math.ceil(sunsetDec)) {
-        const remaining = daytimeIndices.filter(h => (h - startH) >= nowHour);
-        if (remaining.length > 0) {
-          activeIndices = remaining;
-        }
-      }
-    }
+    // Repräsentative Tageslicht-Stunden für die Tageswetterlage (konsistent mit Tages-Sonnenschein & Min/Max)
+    const activeIndices = daytimeIndices;
 
     // Kennzahlen extrahieren (synchronisiert mit render10DayForecast)
     const codes = activeIndices.map(h => (hourly && hourly.weather_code) ? hourly.weather_code[h] : 0);
@@ -5816,41 +5807,56 @@ export const MicroEngine = {
       return hod >= 5 && hod <= 9 && (c === 45 || c === 48);
     });
 
-    if (fogCoreHours >= 4) {
+    if (fogCoreHours >= 4 && sunHours < 2.0) {
       return { icon: '🌫️', label: 'Dichter Nebel', synopNote: 'Ganztägig zäher Nebel / Hochnebel', theme: 'fog' };
     }
 
-    if (fogMorning && sunRatio >= 0.40 && !isToday) {
+    if (fogMorning && (sunRatio >= 0.40 || sunHours >= 3.5)) {
+      if (isToday) {
+        const curH = new Date().getHours();
+        if (curH >= 11) {
+          if (sunRatio >= 0.65 || sunHours >= 5.5) {
+            return { icon: '🌤️', label: 'Heiter', synopNote: `Nach Nebelauflösung viel Sonne (${sunHoursFormatted})`, theme: 'clear-day' };
+          }
+          return { icon: '🌤️', label: 'Überwiegend heiter', synopNote: `Nach Nebelauflösung sonnige Phasen (${sunHoursFormatted})`, theme: 'clear-day' };
+        }
+      }
       return {
         icon: '🌤️',
-        label: sunRatio >= 0.65 ? 'Frühnebel, sonnig' : 'Frühnebel, heiter',
+        label: (sunRatio >= 0.65 || sunHours >= 5.5) ? 'Frühnebel, sonnig' : 'Frühnebel, heiter',
         synopNote: `Nach Auflösung des Frühnebels viel Sonne (${sunHoursFormatted})`,
         theme: 'clear-day'
       };
     }
 
-    // Für Heute: Wenn aktuelle Zeit >= 11 Uhr ist und Himmel klar/wolkig ist, niemals 'Nebel' anzeigen
-    if (isToday && curWeather) {
-      const curCloud = curWeather.cloud_cover !== undefined ? curWeather.cloud_cover : avgCloud;
-      const curWCode = curWeather.weather_code !== undefined ? curWeather.weather_code : 0;
-      if (curWCode !== 45 && curWCode !== 48) {
-        if (curCloud <= 25) return { icon: '☀️', label: 'Sonnig', synopNote: 'Sonnig und wolkenlos', theme: 'clear-day' };
-        if (curCloud <= 50) return { icon: '🌤️', label: 'Überwiegend heiter', synopNote: 'Sonnige Abschnitte mit lockeren Wolken', theme: 'clear-day' };
-        if (curCloud <= 75) return { icon: '⛅', label: 'Teils wolkig', synopNote: 'Wechsel von Wolken und Aufheiterungen', theme: 'cloudy' };
-        return { icon: '☁️', label: 'Bedeckt', synopNote: 'Überwiegend geschlossene Wolkendecke', theme: 'cloudy' };
-      }
-    }
-
-    // Sonnenschein & Bewölkungs-Stufen
-    if (sunRatio >= 0.68 || avgCloud < 25) {
+    // 4B. Sonnenschein- & Bewölkungs-Stufen (strenger Schutz vor fehlerhafter 'Bedeckt'-Klassifikation bei viel Sonne)
+    // Stufe 1: Ausgesprochen sonnig (>= 68% der Tagessonne oder >= 5.5h Sonne bei avgCloud <= 35)
+    if (sunRatio >= 0.68 || (sunHours >= 5.5 && avgCloud <= 35) || avgCloud <= 20) {
       return { icon: '☀️', label: 'Sonnig', synopNote: `Sonnig und wolkenloser Himmel (${sunHoursFormatted})`, theme: 'clear-day' };
     }
-    if (sunRatio >= 0.45 || avgCloud < 50) {
-      return { icon: '🌤️', label: 'Überwiegend heiter', synopNote: `Viel Sonnenschein (${sunHoursFormatted}) bei lockeren Wolken`, theme: 'clear-day' };
+
+    // Stufe 2: Heiter / Überwiegend heiter (>= 45% Sonne oder >= 4.0h Sonne oder lockere Wolken avgCloud <= 50)
+    if (sunRatio >= 0.45 || sunHours >= 4.0 || avgCloud <= 50) {
+      const isVerySunny = sunRatio >= 0.60 || sunHours >= 5.0;
+      return {
+        icon: '🌤️',
+        label: isVerySunny ? 'Heiter' : 'Überwiegend heiter',
+        synopNote: `Viel Sonnenschein (${sunHoursFormatted}) bei lockeren Wolken`,
+        theme: 'clear-day'
+      };
     }
-    if (sunRatio >= 0.20 || avgCloud < 75) {
-      return { icon: '⛅', label: 'Teils wolkig', synopNote: 'Mischung aus Wolken und heiteren Phasen', theme: 'cloudy' };
+
+    // Stufe 3: Teils wolkig / Aufheiterungen (>= 20% Sonne oder >= 1.5h Sonne oder mittlere Bewölkung avgCloud <= 75)
+    if (sunRatio >= 0.20 || sunHours >= 1.5 || avgCloud <= 75) {
+      return { icon: '⛅', label: 'Teils wolkig', synopNote: `Mischung aus Wolken und heiteren Phasen (${sunHoursFormatted})`, theme: 'cloudy' };
     }
+
+    // Stufe 4: Geringer Sonnenschein / Stark bewölkt (< 20% Sonne und < 1.5h Sonne, aber nicht komplett grau)
+    if (sunHours >= 0.5 || avgCloud < 85) {
+      return { icon: '⛅', label: 'Stark bewölkt', synopNote: 'Meist dichte Wolken mit nur kurzen Aufheiterungen', theme: 'cloudy' };
+    }
+
+    // Stufe 5: Reines Grau / Dauerhaft bedeckt (0 bis 0.4h Sonne und dichte Bewölkung)
     return { icon: '☁️', label: 'Bedeckt', synopNote: 'Überwiegend graue, geschlossene Wolkenschicht', theme: 'cloudy' };
   }
 ,
