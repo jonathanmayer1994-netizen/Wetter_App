@@ -1133,7 +1133,7 @@
                 <input type="file" id="sports-file-input" accept=".gpx" style="display:none;">
               </div>
 
-              <!-- Exakt 2 Demos: 1 Berg & 1 Radtour -->
+              <!-- 3 Demos: 1 Berg, 1 Radtour & 1 Skitour -->
               <div class="sports-demo-block" id="sports-demo-block">
                 <span class="sdb-caption">Oder Demo-Tour testen:</span>
                 <div class="sdb-buttons">
@@ -1144,6 +1144,10 @@
                   <button type="button" class="sports-route-preset" data-tour="allgaeu-radtour" title="Rad-Demo: Allgäu-Runde 42 km">
                     <span class="srp-icon">🚴</span>
                     <span class="srp-title">Rad: Allgäu-Runde</span>
+                  </button>
+                  <button type="button" class="sports-route-preset" data-tour="skitour-sellrain" title="Skitour-Demo: Lampsenspitze 2.875 m (Sellrain)">
+                    <span class="srp-icon">⛷️</span>
+                    <span class="srp-title">Skitour: Lampsenspitze</span>
                   </button>
                 </div>
               </div>
@@ -1295,7 +1299,7 @@
             </summary>
 
             <div class="alpine-drawer-body">
-              <!-- Haupt-Kategorie Wähler (2 Sportarten: Rad & Berge) -->
+              <!-- Haupt-Kategorie Wähler (3 Sportarten: Rad, Berge & Skitour) -->
               <div class="athlete-category-selector" id="athlete-category-selector">
                 <button type="button" class="athlete-cat-card" id="sport-cat-bike" data-category="bike">
                   <div class="acc-icon-wrap">🚴</div>
@@ -1315,6 +1319,16 @@
                       <span class="acc-badge" id="acc-mountain-badge">4.0 km/h</span>
                     </div>
                     <p class="acc-desc">Wandern, Bergtour, Klettersteig &amp; Trailrun</p>
+                  </div>
+                </button>
+                <button type="button" class="athlete-cat-card" id="sport-cat-skitour" data-category="skitour">
+                  <div class="acc-icon-wrap">⛷️</div>
+                  <div class="acc-content">
+                    <div class="acc-title-row">
+                      <span class="acc-title">Skitour</span>
+                      <span class="acc-badge" id="acc-skitour-badge">400 Hm/h</span>
+                    </div>
+                    <p class="acc-desc">Skitouren, Skibergsteigen &amp; Skiabfahrt</p>
                   </div>
                 </button>
               </div>
@@ -1404,6 +1418,64 @@
                   </div>
                 </div>
                 <p class="atp-physics-note">💡 <em>Offizielle Schweizer Alpen-Club (SAC) &amp; DAV Formel: Horizontale Zeit &amp; Höhenzeit werden mit T = max(Th, Tv) + min(Th, Tv)/2 exakt verrechnet.</em></p>
+              </div>
+
+              <!-- SKITOUR CONTROLS -->
+              <div class="athlete-tuning-panel" id="athlete-skitour-controls" style="display: none;">
+                <!-- Vertikale Aufstiegsleistung Hm/h mit Fellen -->
+                <div class="atp-subblock">
+                  <div class="atp-header">
+                    <div class="atp-title">
+                      <span class="atp-icon">🧗‍♂️</span>
+                      <strong>Fell-Steigrate (Hm/h)</strong>
+                    </div>
+                    <div class="atp-stepper-wrap">
+                      <button type="button" class="atp-step-btn" id="skitour-ascent-minus" title="25 Hm/h weniger">− 25</button>
+                      <span class="atp-live-val text-yellow" id="skitour-ascent-val">400 Hm/h</span>
+                      <button type="button" class="atp-step-btn" id="skitour-ascent-plus" title="25 Hm/h mehr">+ 25</button>
+                    </div>
+                  </div>
+                  <div class="atp-slider-row">
+                    <span class="slider-boundary">150 Hm/h</span>
+                    <input type="range" id="skitour-ascent-slider" min="150" max="1200" step="25" value="400" class="athlete-range-slider">
+                    <span class="slider-boundary">1.200 Hm/h</span>
+                  </div>
+                  <div class="atp-presets-row" id="skitour-ascent-presets">
+                    <span class="atp-preset-hint">Aufstiegs-Pace:</span>
+                    <button type="button" class="atp-preset-btn" data-skiascent="250">☕ Genuss (250 Hm/h)</button>
+                    <button type="button" class="atp-preset-btn active" data-skiascent="400">🏔️ DAV Norm (400 Hm/h)</button>
+                    <button type="button" class="atp-preset-btn" data-skiascent="600">⚡ Sportiv (600 Hm/h)</button>
+                    <button type="button" class="atp-preset-btn" data-skiascent="900">🏆 Skimo Race (900+ Hm/h)</button>
+                  </div>
+                </div>
+
+                <!-- Ski-Abfahrtsgeschwindigkeit -->
+                <div class="atp-subblock" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08);">
+                  <div class="atp-header">
+                    <div class="atp-title">
+                      <span class="atp-icon">⛷️</span>
+                      <strong>Skiabfahrts-Tempo (Freigelände)</strong>
+                    </div>
+                    <div class="atp-stepper-wrap">
+                      <button type="button" class="atp-step-btn" id="skitour-descent-minus" title="2 km/h langsamer">− 2</button>
+                      <span class="atp-live-val text-cyan" id="skitour-descent-val">25.0 km/h</span>
+                      <button type="button" class="atp-step-btn" id="skitour-descent-plus" title="2 km/h schneller">+ 2</button>
+                    </div>
+                  </div>
+                  <div class="atp-slider-row">
+                    <span class="slider-boundary">15 km/h</span>
+                    <input type="range" id="skitour-descent-slider" min="15" max="60" step="1" value="25" class="athlete-range-slider">
+                    <span class="slider-boundary">60 km/h</span>
+                  </div>
+                  <div class="atp-presets-row" id="skitour-descent-presets">
+                    <span class="atp-preset-hint">Abfahrts-Modus:</span>
+                    <button type="button" class="atp-preset-btn" data-skidescent="18">❄️ Vorsichtig (18 km/h)</button>
+                    <button type="button" class="atp-preset-btn active" data-skidescent="25">🎿 Alpin (25 km/h)</button>
+                    <button type="button" class="atp-preset-btn" data-skidescent="38">🔥 Zügig (38 km/h)</button>
+                    <button type="button" class="atp-preset-btn" data-skidescent="50">⚡ Freeride (50 km/h)</button>
+                  </div>
+                </div>
+                <p class="atp-physics-note">💡 <em>Skitouren-Kalkulation: Asymmetrischer Rhythmus mit Fellen bergauf, automatischem 10-Minuten-Abfellpuffer am Scheitelpunkt und zügiger Skiabfahrt talwärts.</em></p>
               </div>
 
               <!-- TOURENSTART: SEPARATE DATUM- & UHRZEIT-SELEKTION -->
@@ -1530,6 +1602,142 @@
                 ✕
               </button>
             </div>
+          </section>
+
+          <!-- 6B. SKITOUR: LAWINEN- & SCHNEEDECKEN-SICHERHEITS-COCKPIT -->
+          <section class="glass-card skitour-dashboard-card" id="skitour-dashboard-card" style="display: none;">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon">⛷️</span>
+                <span>SKITOUR: LAWINENLAGE &amp; SCHNEEBERICHT</span>
+              </div>
+              <span class="card-tag" id="skitour-agency-tag">EAWS / Albina / LWD</span>
+            </div>
+
+            <!-- EAWS Gefahrenstufen Banner -->
+            <div class="skitour-eaws-hero-banner" id="skitour-eaws-hero-banner">
+              <div class="skitour-eaws-level-badge" id="skitour-eaws-badge" style="background: #f7931e; color: #000;">
+                <span class="sehb-number" id="skitour-eaws-num">3</span>
+                <span class="sehb-label" id="skitour-eaws-label">ERHEBLICH</span>
+              </div>
+              <div class="skitour-eaws-meta">
+                <div class="skitour-eaws-title" id="skitour-eaws-title">Stufe 3 (Erheblich) • Vormittags Stufe 2, nachmittags Stufe 3</div>
+                <div class="skitour-eaws-sub" id="skitour-eaws-elev">Gefahr vor allem über <strong>2.000 m</strong> • Kernproblem: <strong>Triebschnee</strong></div>
+                <div class="skitour-pattern-badge" id="skitour-pattern-badge">⚠️ GM 4: Kalt auf Warm / Triebschnee</div>
+              </div>
+            </div>
+
+            <!-- Interaktive Gefahrenrose & Sektor-Details -->
+            <div class="skitour-rose-container">
+              <div class="skitour-rose-col">
+                <div class="skitour-rose-svg-wrap">
+                  <svg id="skitour-danger-rose-svg" viewBox="0 0 200 200" width="160" height="160" class="skitour-vector-rose">
+                    <circle cx="100" cy="100" r="90" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+                    <circle cx="100" cy="100" r="52" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+                    <path class="st-rose-sec danger-high" id="st-rose-n" data-aspect="N" d="M 100,10 L 100,48 A 52,52 0 0,0 63.2,63.2 L 36.4,36.4 A 90,90 0 0,1 100,10 Z"/>
+                    <path class="st-rose-sec danger-high" id="st-rose-no" data-aspect="NO" d="M 100,10 A 90,90 0 0,1 163.6,36.4 L 136.8,63.2 A 52,52 0 0,0 100,48 Z"/>
+                    <path class="st-rose-sec danger-high" id="st-rose-o" data-aspect="O" d="M 163.6,36.4 A 90,90 0 0,1 190,100 L 152,100 A 52,52 0 0,0 136.8,63.2 Z"/>
+                    <path class="st-rose-sec danger-med" id="st-rose-so" data-aspect="SO" d="M 190,100 A 90,90 0 0,1 163.6,163.6 L 136.8,136.8 A 52,52 0 0,0 152,100 Z"/>
+                    <path class="st-rose-sec danger-low" id="st-rose-s" data-aspect="S" d="M 163.6,163.6 A 90,90 0 0,1 100,190 L 100,152 A 52,52 0 0,0 136.8,136.8 Z"/>
+                    <path class="st-rose-sec danger-low" id="st-rose-sw" data-aspect="SW" d="M 100,190 A 90,90 0 0,1 36.4,163.6 L 63.2,136.8 A 52,52 0 0,0 100,152 Z"/>
+                    <path class="st-rose-sec danger-med" id="st-rose-w" data-aspect="W" d="M 36.4,163.6 A 90,90 0 0,1 10,100 L 48,100 A 52,52 0 0,0 63.2,136.8 Z"/>
+                    <path class="st-rose-sec danger-high" id="st-rose-nw" data-aspect="NW" d="M 10,100 A 90,90 0 0,1 36.4,36.4 L 63.2,63.2 A 52,52 0 0,0 48,100 Z"/>
+                    <circle cx="100" cy="100" r="16" fill="#1e293b" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+                    <text x="100" y="104" text-anchor="middle" font-size="10" fill="#f8fafc" font-weight="bold">ALP</text>
+                  </svg>
+                  <div class="st-rose-legend">
+                    <span class="strl-item"><span class="strl-dot danger-high"></span> Kritisch (Stufe 3)</span>
+                    <span class="strl-item"><span class="strl-dot danger-med"></span> Erhöht (Stufe 2)</span>
+                    <span class="strl-item"><span class="strl-dot danger-low"></span> Günstig (Stufe 1)</span>
+                  </div>
+                </div>
+              </div>
+              <div class="skitour-rose-details">
+                <div class="srd-title">Expositions-Diagnose:</div>
+                <div class="srd-sector-card" id="skitour-sector-card">
+                  <strong id="skitour-sector-name">Nord- &amp; Nordosthänge</strong>
+                  <p id="skitour-sector-desc">Hauptgefahr durch frische Triebschneeansammlungen hinter Geländekanten. Steilhänge &gt; 30° meiden.</p>
+                </div>
+                <div class="skitour-problems-row" id="skitour-problems-row">
+                  <div class="stp-badge">💨 Triebschnee (Geringe Zusatzlast)</div>
+                  <div class="stp-badge">❄️ Altschnee (Kammlagen)</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- FIRN- & HARSCHDECKEL-TIMELINE -->
+            <div class="skitour-firn-card" id="skitour-firn-card">
+              <div class="sfc-header">
+                <div class="sfc-title">
+                  <span>☀️</span>
+                  <strong>Firn-Fenster &amp; Harschdeckel-Rechner</strong>
+                </div>
+                <span class="sfc-status-pill" id="skitour-firn-window-pill">⭐ Fenster: 09:30 – 12:00 Uhr</span>
+              </div>
+              <p class="sfc-desc" id="skitour-firn-desc">Nächtliche Ausstrahlung: <strong>85% (Klar)</strong> • Harschdeckel morgens tragfähig (Harscheisen mitführen). Ab 12:30 Uhr rasche Durchnässung &amp; Sumpfschnee.</p>
+              
+              <div class="firn-timeline-track" id="firn-timeline-track">
+                <!-- Dynamisch erzeugte Stundenbalken -->
+              </div>
+            </div>
+
+            <!-- SCHNEE- & NEUSCHNEE-DOSSIER GRID -->
+            <div class="skitour-snow-grid" id="skitour-snow-grid">
+              <div class="ssg-card">
+                <span class="ssg-label">Neuschnee 24h / 72h</span>
+                <strong class="ssg-val text-cyan" id="st-freshsnow-val">12 cm / 18 cm</strong>
+                <span class="ssg-sub" id="st-freshsnow-prog">+8 cm in 24h</span>
+              </div>
+              <div class="ssg-card">
+                <span class="ssg-label">Gesamtschnee (Tal / Berg)</span>
+                <strong class="ssg-val text-white" id="st-totalsnow-val">25 cm / 140 cm</strong>
+                <span class="ssg-sub" id="st-snowline-val">Schneegrenze: ab 1.150 m</span>
+              </div>
+              <div class="ssg-card">
+                <span class="ssg-label">Schneequalität &amp; Dichte</span>
+                <strong class="ssg-val text-yellow" id="st-density-val">85 kg/m³ (Alpinpulver)</strong>
+                <span class="ssg-sub" id="st-swe-val">Wasserwert SWE: 10.2 mm</span>
+              </div>
+              <div class="ssg-card">
+                <span class="ssg-label">Schichtungs-Gefahr</span>
+                <strong class="ssg-val text-accent" id="st-layer-val">Günstig</strong>
+                <span class="ssg-sub" id="st-crit-freshsnow">Krit. Neuschnee: 25 cm</span>
+              </div>
+            </div>
+
+            <!-- GPX ROUTEN-HANGNEIGUNG & MUNTER-SCAN -->
+            <div class="skitour-slope-scan-card" id="skitour-slope-scan-card">
+              <div class="sssc-header">
+                <div class="sssc-title">
+                  <span>📐</span>
+                  <strong>GPX-Hangneigungsanalyse (Munter 3x3 Check)</strong>
+                </div>
+                <span class="sssc-max-badge" id="st-max-slope-badge">Max: 34°</span>
+              </div>
+              
+              <div class="slope-spectrum-bar">
+                <div class="ssb-segment ssb-under30" id="ssb-under30" style="width: 70%;" title="Flach bis mäßig (<30°)"></div>
+                <div class="ssb-segment ssb-30to34" id="ssb-30to34" style="width: 20%;" title="Steil (30–34°)"></div>
+                <div class="ssb-segment ssb-35to39" id="ssb-35to39" style="width: 10%;" title="Sehr steil (35–39°)"></div>
+                <div class="ssb-segment ssb-over40" id="ssb-over40" style="width: 0%;" title="Extremsteilhänge (≥40°)"></div>
+              </div>
+
+              <div class="slope-spectrum-legend">
+                <span class="ssl-item"><span class="ssl-box ssb-under30"></span> &lt; 30° (<span id="st-pct-under30">70%</span>)</span>
+                <span class="ssl-item"><span class="ssl-box ssb-30to34"></span> 30–34° (<span id="st-pct-30to34">20%</span>)</span>
+                <span class="ssl-item"><span class="ssl-box ssb-35to39"></span> 35–39° (<span id="st-pct-35to39">10%</span>)</span>
+                <span class="ssl-item"><span class="ssl-box ssb-over40"></span> ≥ 40° (<span id="st-pct-over40">0%</span>)</span>
+              </div>
+
+              <div class="munter-verdict-box" id="munter-verdict-box">
+                <span class="mvb-icon" id="mvb-icon">⚡</span>
+                <div class="mvb-text" id="mvb-text">
+                  <strong>Munter 3x3 Sicherheits-Check:</strong>
+                  <span id="st-munter-text">Route quert Steilhänge bis 34°. Bei Stufe 2 gut machbar mit Entlastungsabständen im Aufstieg.</span>
+                </div>
+              </div>
+            </div>
+
           </section>
 
           <!-- 7. ROUTEN-GEFAHRENANALYSE & EXPOSITIONSSCHUTZ -->

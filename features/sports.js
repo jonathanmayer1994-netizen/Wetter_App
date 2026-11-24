@@ -393,15 +393,20 @@ export function updateSportsStartTime(newDateStr, newTimeStr) {
 
 export function setAthleteCategory(cat) {
   state.sports.category = cat;
-  state.sports.sportType = cat === 'bike' ? 'road_bike' : 'hiking';
+  state.sports.sportType = cat === 'bike' ? 'road_bike' : (cat === 'skitour' ? 'ski_touring' : 'hiking');
 
   const catCards = document.querySelectorAll('.athlete-cat-card');
   catCards.forEach(c => c.classList.toggle('active', c.dataset.category === cat));
 
   const bikePanel = document.getElementById('athlete-bike-controls');
   const mtnPanel = document.getElementById('athlete-mountain-controls');
+  const skiPanel = document.getElementById('athlete-skitour-controls');
+  const skiDash = document.getElementById('skitour-dashboard-card');
+
   if (bikePanel) bikePanel.style.display = cat === 'bike' ? 'block' : 'none';
   if (mtnPanel) mtnPanel.style.display = cat === 'mountain' ? 'block' : 'none';
+  if (skiPanel) skiPanel.style.display = cat === 'skitour' ? 'block' : 'none';
+  if (skiDash) skiDash.style.display = cat === 'skitour' ? 'block' : 'none';
 
   // Synchronisiere versteckte Legacy-Pills für Tests
   document.querySelectorAll('.sport-pill').forEach(sp => {
@@ -548,6 +553,89 @@ export function setupSportsTab() {
     btn.addEventListener('click', () => {
       const asc = parseInt(btn.dataset.ascent, 10);
       if (!isNaN(asc)) setMtnAscent(asc);
+    });
+  });
+
+  // 3b. SKITOUR: STUFENLOSE FELL-STEIGRATE (Hm/h) & SKIABFAHRT (km/h)
+  const skiAscentSlider = document.getElementById('skitour-ascent-slider');
+  const skiAscentVal = document.getElementById('skitour-ascent-val');
+  const skiAscentMinus = document.getElementById('skitour-ascent-minus');
+  const skiAscentPlus = document.getElementById('skitour-ascent-plus');
+  const skiAscentPresets = document.querySelectorAll('#skitour-ascent-presets .atp-preset-btn');
+
+  function setSkiAscent(hmh) {
+    const val = Math.max(150, Math.min(1200, Math.round(hmh / 25) * 25));
+    state.sports.skitourAscentHmH = val;
+    if (skiAscentSlider) skiAscentSlider.value = val;
+    if (skiAscentVal) skiAscentVal.innerText = `${val} Hm/h`;
+    const badge = document.getElementById('acc-skitour-badge');
+    if (badge) badge.innerText = `${val} Hm/h`;
+
+    skiAscentPresets.forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.skiascent, 10) === val);
+    });
+    recomputeSportsTimeline();
+  }
+
+  if (skiAscentSlider) {
+    skiAscentSlider.addEventListener('input', () => {
+      setSkiAscent(parseInt(skiAscentSlider.value, 10) || 400);
+    });
+  }
+  if (skiAscentMinus) {
+    skiAscentMinus.addEventListener('click', () => {
+      setSkiAscent((state.sports.skitourAscentHmH || 400) - 25);
+    });
+  }
+  if (skiAscentPlus) {
+    skiAscentPlus.addEventListener('click', () => {
+      setSkiAscent((state.sports.skitourAscentHmH || 400) + 25);
+    });
+  }
+  skiAscentPresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const asc = parseInt(btn.dataset.skiascent, 10);
+      if (!isNaN(asc)) setSkiAscent(asc);
+    });
+  });
+
+  const skiDescentSlider = document.getElementById('skitour-descent-slider');
+  const skiDescentVal = document.getElementById('skitour-descent-val');
+  const skiDescentMinus = document.getElementById('skitour-descent-minus');
+  const skiDescentPlus = document.getElementById('skitour-descent-plus');
+  const skiDescentPresets = document.querySelectorAll('#skitour-descent-presets .atp-preset-btn');
+
+  function setSkiDescent(kmh) {
+    const val = Math.max(15, Math.min(60, Math.round(kmh)));
+    state.sports.skitourDescentKmH = val;
+    if (skiDescentSlider) skiDescentSlider.value = val;
+    if (skiDescentVal) skiDescentVal.innerText = `${val.toFixed(1)} km/h`;
+
+    skiDescentPresets.forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.skidescent, 10) === val);
+    });
+    recomputeSportsTimeline();
+  }
+
+  if (skiDescentSlider) {
+    skiDescentSlider.addEventListener('input', () => {
+      setSkiDescent(parseFloat(skiDescentSlider.value) || 25);
+    });
+  }
+  if (skiDescentMinus) {
+    skiDescentMinus.addEventListener('click', () => {
+      setSkiDescent((state.sports.skitourDescentKmH || 25) - 2);
+    });
+  }
+  if (skiDescentPlus) {
+    skiDescentPlus.addEventListener('click', () => {
+      setSkiDescent((state.sports.skitourDescentKmH || 25) + 2);
+    });
+  }
+  skiDescentPresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const desc = parseInt(btn.dataset.skidescent, 10);
+      if (!isNaN(desc)) setSkiDescent(desc);
     });
   });
 
@@ -889,9 +977,11 @@ export async function loadSportsPresetTour(tourId) {
   state.sports.activeTour = tourId;
   state.sports.gpxName = sample.name;
 
-  // Auto-Switch Athleten-Kategorie: Radtour -> Rad (bike), Bergtour -> Berge (mountain)
+  // Auto-Switch Athleten-Kategorie: Radtour -> Rad (bike), Skitour -> Skitour (skitour), Bergtour -> Berge (mountain)
   if (tourId === 'allgaeu-radtour') {
     setAthleteCategory('bike');
+  } else if (tourId.startsWith('skitour')) {
+    setAthleteCategory('skitour');
   } else {
     setAthleteCategory('mountain');
   }
@@ -1067,16 +1157,19 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
   const sliderTotal = document.getElementById('cockpit-slider-total');
 
   if (heroIconEl) {
-    heroIconEl.innerText = state.sports.category === 'bike' ? '🚴' : '🏔️';
+    heroIconEl.innerText = state.sports.category === 'bike' ? '🚴' : (state.sports.category === 'skitour' ? '⛷️' : '🏔️');
   }
   if (heroTitleEl) {
     heroTitleEl.innerText = tourName || state.sports.gpxName || 'Aktive Tour';
   }
   if (heroSubEl) {
     const isBike = state.sports.category === 'bike';
+    const isSki = state.sports.category === 'skitour';
     const paceTxt = isBike
       ? `Rad • ${(state.sports.bikeSpeedKmH || 26).toFixed(1)} km/h Pace`
-      : `Berge • ${(state.sports.mountainSpeedKmH || 4).toFixed(1)} km/h • ${state.sports.mountainAscentHmH || 400} Hm/h`;
+      : (isSki 
+        ? `Skitour • +${state.sports.skitourAscentHmH || 400} Hm/h • ↓${(state.sports.skitourDescentKmH || 25).toFixed(0)} km/h` 
+        : `Berge • ${(state.sports.mountainSpeedKmH || 4).toFixed(1)} km/h • ${state.sports.mountainAscentHmH || 400} Hm/h`);
     heroSubEl.innerText = `${paceTxt} • Stufenlose SAC-Dynamik & Relativ-Wind`;
   }
   if (sliderTotal && parsed.totalDistanceKm) {
@@ -1089,21 +1182,29 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
 export function updateSportPaceBadges() {
   const bikeBadge = document.getElementById('acc-bike-badge');
   const mtnBadge = document.getElementById('acc-mountain-badge');
+  const skiBadge = document.getElementById('acc-skitour-badge');
   const bikeVal = document.getElementById('bike-speed-val');
   const mtnSpeedVal = document.getElementById('mtn-speed-val');
   const mtnAscentVal = document.getElementById('mtn-ascent-val');
+  const skiAscentVal = document.getElementById('skitour-ascent-val');
+  const skiDescentVal = document.getElementById('skitour-descent-val');
 
   const bSpeed = state.sports.bikeSpeedKmH || 26.0;
   const mSpeed = state.sports.mountainSpeedKmH || 4.0;
   const mAsc = state.sports.mountainAscentHmH || 400;
+  const skiAsc = state.sports.skitourAscentHmH || 400;
+  const skiDesc = state.sports.skitourDescentKmH || 25.0;
 
   if (bikeBadge) bikeBadge.innerText = `${bSpeed.toFixed(1)} km/h`;
   if (mtnBadge) mtnBadge.innerText = `${mSpeed.toFixed(1)} km/h`;
+  if (skiBadge) skiBadge.innerText = `${skiAsc} Hm/h`;
   if (bikeVal) bikeVal.innerText = `${bSpeed.toFixed(1)} km/h`;
   if (mtnSpeedVal) mtnSpeedVal.innerText = `${mSpeed.toFixed(1)} km/h`;
   if (mtnAscentVal) mtnAscentVal.innerText = `${mAsc} Hm/h`;
+  if (skiAscentVal) skiAscentVal.innerText = `${skiAsc} Hm/h`;
+  if (skiDescentVal) skiDescentVal.innerText = `${skiDesc.toFixed(1)} km/h`;
 
-  const sports = ['hiking', 'road_bike', 'gravel_mtb', 'trailrun'];
+  const sports = ['hiking', 'road_bike', 'gravel_mtb', 'trailrun', 'ski_touring', 'skimo'];
   sports.forEach(sp => {
     const badge = document.getElementById(`sp-pace-${sp}`);
     if (badge) {
@@ -1111,6 +1212,187 @@ export function updateSportPaceBadges() {
       badge.innerText = info.paceLabel;
     }
   });
+}
+
+export function renderSkitourDashboard(timeline) {
+  const card = document.getElementById('skitour-dashboard-card');
+  if (!card) return;
+  if (state.sports.category !== 'skitour') {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+
+  const loc = state.currentLocation || { lat: 47.4, lon: 10.3, elevation: 1800 };
+  const av = MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, null);
+  if (!av) return;
+
+  // 1. EAWS Badge
+  const badge = document.getElementById('skitour-eaws-badge');
+  const num = document.getElementById('skitour-eaws-num');
+  const label = document.getElementById('skitour-eaws-label');
+  if (badge) {
+    badge.style.background = av.dangerColor;
+    badge.style.color = av.dangerLevel >= 4 ? '#ffffff' : '#000000';
+  }
+  if (num) num.innerText = av.dangerLevel;
+  if (label) {
+    const titles = ['', 'GERING', 'MÄSSIG', 'ERHEBLICH', 'GROSS', 'SEHR GROSS'];
+    label.innerText = titles[av.dangerLevel] || 'MÄSSIG';
+  }
+
+  // Title & Sub & Pattern
+  const titleEl = document.getElementById('skitour-eaws-title');
+  const elevEl = document.getElementById('skitour-eaws-elev');
+  const patternEl = document.getElementById('skitour-pattern-badge');
+
+  if (titleEl) {
+    titleEl.innerText = `Stufe ${av.dangerLevel} (${av.dangerTitle.replace(/^[0-9]\s*-\s*/, '')}) • Vormittags Stufe ${av.morningDangerLevel}, nachmittags Stufe ${av.afternoonDangerLevel}`;
+  }
+  if (elevEl) {
+    elevEl.innerHTML = `Gefahr vor allem über <strong>${av.criticalElevation.toLocaleString('de-DE')} m</strong> • Kernproblem: <strong>${av.problems[0] ? av.problems[0].name : 'Triebschnee'}</strong>`;
+  }
+  if (patternEl && av.dangerPattern) {
+    patternEl.innerText = `⚠️ ${av.dangerPattern.name}`;
+    patternEl.title = av.dangerPattern.desc;
+  }
+
+  // 2. Vector Danger Rose
+  const aspectMapping = {
+    'st-rose-n': 'N',
+    'st-rose-no': 'NO',
+    'st-rose-o': 'O',
+    'st-rose-so': 'SO',
+    'st-rose-s': 'S',
+    'st-rose-sw': 'SW',
+    'st-rose-w': 'W',
+    'st-rose-nw': 'NW'
+  };
+
+  const aspectDetails = {
+    'N': { name: 'Nordhang', icon: '❄️', steep: '> 30°', text: 'Kritisch im Triebschnee. Geringe Zusatzbelastung reicht oft zur Schneebrettauslösung.' },
+    'NO': { name: 'Nordosthang', icon: '❄️', steep: '> 32°', text: 'Kammnahe Rinnen und Mulden stark mit Einwehungen verfüllt.' },
+    'O': { name: 'Osthang', icon: '💨', steep: '> 30°', text: 'Leehang mit frischen Triebschneepaketen. Geländekanten meiden.' },
+    'SO': { name: 'Südosthang', icon: '☀️', steep: '> 35°', text: 'Tageserwärmung schwächt die Schneedecke ab dem Vormittag.' },
+    'S': { name: 'Südhang', icon: '☀️', steep: '> 35°', text: 'Nassschnee- und Gleitschneerutsche an steilen Sonnenhängen.' },
+    'SW': { name: 'Südwesthang', icon: '🌤️', steep: '> 34°', text: 'Windverblasene Rücken oft hart gefroren, Rinnen triebschneebelastet.' },
+    'W': { name: 'Westhang', icon: '💨', steep: '> 30°', text: 'Windseitige Grate abgeblasen (Harsch/Eis), Rinnen heikel.' },
+    'NW': { name: 'Nordwesthang', icon: '❄️', steep: '> 30°', text: 'Schattig und kalt. Ungünstiger Altschneeaufbau in Hochlagen.' }
+  };
+
+  Object.entries(aspectMapping).forEach(([secId, asp]) => {
+    const path = document.getElementById(secId);
+    if (path) {
+      const isCritical = av.criticalAspects.includes(asp);
+      path.classList.remove('danger-high', 'danger-med', 'danger-low');
+      if (isCritical) {
+        path.classList.add(av.dangerLevel >= 3 ? 'danger-high' : 'danger-med');
+      } else {
+        path.classList.add('danger-low');
+      }
+      path.onclick = () => {
+        document.querySelectorAll('.st-rose-sec').forEach(p => p.classList.remove('selected-sector'));
+        path.classList.add('selected-sector');
+        const det = aspectDetails[asp];
+        const secName = document.getElementById('skitour-sector-name');
+        const secDesc = document.getElementById('skitour-sector-desc');
+        if (secName && det) secName.innerText = `${det.icon} ${det.name} (${asp}): ${isCritical ? '⚠️ Kritisch' : '✅ Günstiger'}`;
+        if (secDesc && det) secDesc.innerHTML = `Kritische Steilheit: <strong>${det.steep}</strong><br>${det.text}`;
+      };
+    }
+  });
+
+  // Problems Row
+  const probRow = document.getElementById('skitour-problems-row');
+  if (probRow && av.problems) {
+    probRow.innerHTML = av.problems.map(p => `
+      <div class="stp-badge">
+        <span>${p.icon}</span>
+        <strong>${p.name}</strong>: ${p.trigger || p.desc}
+      </div>
+    `).join('');
+  }
+
+  // 3. Firn & Harsch Timeline
+  const firn = av.firnAnalysis;
+  const firnPill = document.getElementById('skitour-firn-window-pill');
+  const firnDesc = document.getElementById('skitour-firn-desc');
+  const firnTrack = document.getElementById('firn-timeline-track');
+
+  if (firnPill && firn) {
+    firnPill.innerText = `⭐ Firn-Fenster: ${firn.firnWindowStart} – ${firn.firnWindowEnd} Uhr`;
+  }
+  if (firnDesc && firn) {
+    firnDesc.innerHTML = `Nächtliche Ausstrahlung: <strong>${firn.nightCoolingRating}%</strong> • <em>${firn.crustStability}</em>`;
+  }
+  if (firnTrack && firn && firn.firnTimeline) {
+    firnTrack.innerHTML = firn.firnTimeline.map(item => `
+      <div class="firn-track-hour" style="background: ${item.color};" title="${item.hour}: ${item.label}">
+        <span class="fth-time">${item.hour.split(':')[0]}</span>
+      </div>
+    `).join('');
+  }
+
+  // 4. Schnee- & Neuschnee-Dossier Grid
+  const freshSnowVal = document.getElementById('st-freshsnow-val');
+  const freshProg = document.getElementById('st-freshsnow-prog');
+  const totalSnow = document.getElementById('st-totalsnow-val');
+  const snowline = document.getElementById('st-snowline-val');
+  const densityVal = document.getElementById('st-density-val');
+  const sweVal = document.getElementById('st-swe-val');
+  const layerVal = document.getElementById('st-layer-val');
+  const critFresh = document.getElementById('st-crit-freshsnow');
+
+  if (freshSnowVal) freshSnowVal.innerText = `${av.freshSnow24hCm} cm (24h) / ${av.freshSnow72hCm || 0} cm (72h)`;
+  if (freshProg) freshProg.innerText = `Prognose nächste 24h: +${av.prognosis24hCm || 0} cm`;
+  if (totalSnow) totalSnow.innerText = `Tal ${av.snowDepthValleyCm} cm / Berg ${av.snowDepthPeakCm} cm`;
+  if (snowline) {
+    const slM = Math.max(800, loc.elevation - Math.round(av.snowDepthValleyCm * 15));
+    snowline.innerText = `Fahrbare Schneegrenze: ab ~${slM} m`;
+  }
+  if (densityVal) densityVal.innerText = `${av.densityKgM3} kg/m³ (${av.qualityClass})`;
+  if (sweVal) sweVal.innerText = `Wasserwert SWE: ${av.sweMm} mm`;
+  if (layerVal) {
+    layerVal.innerText = av.thermalLayerSeverity === 'danger' ? '⚠️ Kritisch' : (av.thermalLayerSeverity === 'good' ? '✅ Günstig' : 'Normal');
+    layerVal.className = `ssg-val ${av.thermalLayerSeverity === 'danger' ? 'text-red' : 'text-accent'}`;
+  }
+  if (critFresh) critFresh.innerText = `Krit. Neuschneemenge: ${av.criticalFreshSnowThresholdCm} cm (${av.criticalExceeded ? '⚠️ Erreicht' : 'Unterschritten'})`;
+
+  // 5. GPX Hangneigungsanalyse & Munter 3x3 Check
+  if (timeline && timeline.slopeStats) {
+    const s = timeline.slopeStats;
+    const maxBadge = document.getElementById('st-max-slope-badge');
+    const u30 = document.getElementById('ssb-under30');
+    const b30 = document.getElementById('ssb-30to34');
+    const b35 = document.getElementById('ssb-35to39');
+    const o40 = document.getElementById('ssb-over40');
+    const pUnder30 = document.getElementById('st-pct-under30');
+    const p30to34 = document.getElementById('st-pct-30to34');
+    const p35to39 = document.getElementById('st-pct-35to39');
+    const pOver40 = document.getElementById('st-pct-over40');
+    const munterText = document.getElementById('st-munter-text');
+
+    if (maxBadge) maxBadge.innerText = `Max: ${s.maxSlopeDeg}°`;
+    if (u30) u30.style.width = `${s.pctUnder30}%`;
+    if (b30) b30.style.width = `${s.pct30to34}%`;
+    if (b35) b35.style.width = `${s.pct35to39}%`;
+    if (o40) o40.style.width = `${s.pctOver40}%`;
+
+    if (pUnder30) pUnder30.innerText = `${s.pctUnder30}%`;
+    if (p30to34) p30to34.innerText = `${s.pct30to34}%`;
+    if (p35to39) p35to39.innerText = `${s.pct35to39}%`;
+    if (pOver40) pOver40.innerText = `${s.pctOver40}%`;
+
+    if (munterText) {
+      if (av.dangerLevel >= 3 && s.pct35to39 + s.pctOver40 > 0) {
+        munterText.innerHTML = `<span class="text-red"><strong>Achtung Munter Reduktionsmethode:</strong> Bei Stufe 3 (Erheblich) müssen Hänge ≥ 35° strikt gemieden werden! Route quert ${s.keySectionCount} Schlüsselstellen mit bis zu ${s.maxSlopeDeg}°.</span>`;
+      } else if (av.dangerLevel >= 2 && s.maxSlopeDeg >= 30) {
+        munterText.innerHTML = `<span><strong>Munter Check:</strong> Bei Stufe 2 sind Hänge bis 34° bei Einhaltung von Entlastungsabständen im Aufstieg machbar. Max. Steilheit: ${s.maxSlopeDeg}°.</span>`;
+      } else {
+        munterText.innerText = timeline.munterEvaluation || 'Geringe Hangneigung: Routenverlauf im unkritischen Bereich.';
+      }
+    }
+  }
 }
 
 export function recomputeSportsTimeline() {
@@ -1130,7 +1412,10 @@ export function recomputeSportsTimeline() {
       category: state.sports.category,
       bikeSpeedKmH: state.sports.bikeSpeedKmH,
       mountainSpeedKmH: state.sports.mountainSpeedKmH,
-      mountainAscentHmH: state.sports.mountainAscentHmH
+      mountainAscentHmH: state.sports.mountainAscentHmH,
+      skitourSpeedKmH: state.sports.skitourSpeedKmH,
+      skitourAscentHmH: state.sports.skitourAscentHmH,
+      skitourDescentKmH: state.sports.skitourDescentKmH
     }
   );
 
@@ -1146,6 +1431,7 @@ export function recomputeSportsTimeline() {
   updateSportPaceBadges();
   renderInFlightTrackingPanel(timeline);
   renderSportsMetrics(timeline);
+  renderSkitourDashboard(timeline);
   renderSportsHazards(timeline.hazards);
   updateNavigationWarningBadges();
   renderSportsElevationProfile(timeline);
@@ -1965,7 +2251,13 @@ export function renderSportsMap(timeline) {
   }
 
   // 5. Interaktiver Scrubber-Marker (Athleten-Pin ohne störende Animationen)
-  const athleteIcon = timeline.sportType === 'road_bike' ? '🚴' : (timeline.sportType === 'gravel_mtb' ? '🚵' : (timeline.sportType === 'trailrun' ? '🏃' : '🥾'));
+  const athleteIcon = timeline.sportType === 'road_bike' 
+    ? '🚴' 
+    : (timeline.sportType === 'gravel_mtb' 
+      ? '🚵' 
+      : (timeline.sportType === 'trailrun' 
+        ? '🏃' 
+        : (timeline.category === 'skitour' || timeline.sportType === 'ski_touring' || timeline.sportType === 'skimo' ? '⛷️' : '🥾')));
   const scrubberIcon = L.divIcon({
     className: 'sports-scrubber-map-marker',
     html: `<div class="scrubber-pin-static">${athleteIcon}</div>`,

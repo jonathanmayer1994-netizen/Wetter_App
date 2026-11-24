@@ -17819,3 +17819,411 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
     font-size: 9.5px;
   }
 }
+
+/* =============================================================================
+ * SKITOUR: LAWINENLAGE & SCHNEEBERICHT COCKPIT
+ * ============================================================================= */
+.skitour-dashboard-card {
+  margin-top: 18px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.7) 100%);
+  border-radius: var(--radius-lg, 16px);
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px);
+}
+
+.skitour-eaws-hero-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.skitour-eaws-level-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.skitour-eaws-level-badge .sehb-number {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.skitour-eaws-level-badge .sehb-label {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.skitour-eaws-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.skitour-eaws-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.skitour-eaws-sub {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.skitour-pattern-badge {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 6px;
+  padding: 2px 8px;
+  width: fit-content;
+  margin-top: 2px;
+}
+
+/* GEFAHRENROSE CONTAINER */
+.skitour-rose-container {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 18px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.skitour-rose-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.skitour-vector-rose {
+  cursor: pointer;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+}
+
+.st-rose-sec {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.st-rose-sec:hover,
+.st-rose-sec.selected-sector {
+  stroke: #ffffff;
+  stroke-width: 2px;
+  filter: brightness(1.2);
+}
+
+.st-rose-sec.danger-high {
+  fill: #f7931e;
+}
+
+.st-rose-sec.danger-med {
+  fill: #fff200;
+}
+
+.st-rose-sec.danger-low {
+  fill: #50b848;
+}
+
+.st-rose-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.strl-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.strl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.strl-dot.danger-high { background: #f7931e; }
+.strl-dot.danger-med { background: #fff200; }
+.strl-dot.danger-low { background: #50b848; }
+
+.skitour-rose-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.srd-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.srd-sector-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid #38bdf8;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.srd-sector-card strong {
+  display: block;
+  font-size: 13.5px;
+  color: #ffffff;
+  margin-bottom: 3px;
+}
+
+.srd-sector-card p {
+  font-size: 12px;
+  color: #cbd5e1;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.skitour-problems-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.stp-badge {
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #e2e8f0;
+}
+
+/* FIRN & HARSCH TIMELINE */
+.skitour-firn-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.sfc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.sfc-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sfc-status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 12px;
+  padding: 3px 10px;
+}
+
+.sfc-desc {
+  font-size: 12.5px;
+  color: #94a3b8;
+  margin: 0 0 10px 0;
+  line-height: 1.4;
+}
+
+.firn-timeline-track {
+  display: flex;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  gap: 2px;
+}
+
+.firn-track-hour {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #0f172a;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.firn-track-hour:hover {
+  opacity: 0.85;
+}
+
+/* SCHNEE & NEUSCHNEE DOSSIER GRID */
+.skitour-snow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ssg-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ssg-label {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.ssg-val {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.ssg-sub {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+/* SLOPE SPECTRUM & MUNTER CHECK */
+.skitour-slope-scan-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.sssc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.sssc-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sssc-max-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 12px;
+  padding: 3px 8px;
+}
+
+.slope-spectrum-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.ssb-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.ssb-under30 { background: #22c55e; }
+.ssb-30to34 { background: #eab308; }
+.ssb-35to39 { background: #f97316; }
+.ssb-over40 { background: #ef4444; }
+
+.slope-spectrum-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+
+.ssl-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ssl-box {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.munter-verdict-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+
+.mvb-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .skitour-rose-container {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .skitour-snow-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

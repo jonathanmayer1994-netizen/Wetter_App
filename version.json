@@ -1,5 +1,5 @@
 {
-  "version": "2.37.8",
-  "build": "20261124-1758",
-  "notes": "Strictly exclude GPS position and map points from search history and recents; auto-sanitize legacy search entries"
+  "version": "2.38.0",
+  "build": "20261124-1950",
+  "notes": "Introduce ski touring & mountaineering sport with EAWS avalanche cockpit, interactive danger rose, firn timeline and GPX slope analysis"
 }

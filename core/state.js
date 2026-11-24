@@ -81,12 +81,15 @@ export const state = {
   canvasEngine: null,
   sports: {
     initialized: false,
-    category: 'mountain', // 'bike' oder 'mountain' (Allgäuer Berg-Default)
+    category: 'mountain', // 'bike', 'mountain' oder 'skitour'
     sportType: 'hiking',
     fitnessLevel: 'normal',
     bikeSpeedKmH: 26.0,
     mountainSpeedKmH: 4.0,
     mountainAscentHmH: 400,
+    skitourAscentHmH: 400,
+    skitourSpeedKmH: 3.5,
+    skitourDescentKmH: 25.0,
     startDateStr: new Date().toISOString().slice(0, 10),
     startTimeStr: '08:00',
     waypointFilter: 'all',

@@ -3211,22 +3211,39 @@ export const MicroEngine = {
     const h = weatherData ? weatherData.hourly : null;
     const cur = weatherData ? weatherData.current : null;
 
-    // 24h & 48h Neuschneesumme (cm)
-    let freshSnow24 = 0;
-    let maxWind48 = 15;
-    if (h && h.snowfall) {
-      freshSnow24 = h.snowfall.slice(0, 24).reduce((a, b) => a + (b || 0), 0);
-    }
-    if (h && h.wind_gusts_10m) {
-      maxWind48 = Math.max(...h.wind_gusts_10m.slice(0, 48));
-    }
-
     const curTemp = cur && cur.temperature_2m !== undefined 
       ? cur.temperature_2m 
       : (h && h.temperature_2m && h.temperature_2m[0] !== undefined ? h.temperature_2m[0] : 0);
     const freezingLevel = (h && h.freezing_level_height && h.freezing_level_height[0] !== undefined) 
       ? h.freezing_level_height[0] 
       : 2500;
+
+    // 24h & 48h & 72h Neuschneesumme (cm)
+    let freshSnow24 = 0;
+    let freshSnow48 = 0;
+    let freshSnow72 = 0;
+    let prognosis24h = 0;
+    let maxWind48 = 15;
+    let avgSnowTemp = curTemp;
+
+    if (h && h.snowfall) {
+      freshSnow24 = h.snowfall.slice(0, 24).reduce((a, b) => a + (b || 0), 0);
+      freshSnow48 = h.snowfall.slice(0, 48).reduce((a, b) => a + (b || 0), 0);
+      freshSnow72 = h.snowfall.slice(0, 72).reduce((a, b) => a + (b || 0), 0);
+      prognosis24h = h.snowfall.slice(24, 48).reduce((a, b) => a + (b || 0), 0);
+    }
+    if (h && h.wind_gusts_10m) {
+      maxWind48 = Math.max(...h.wind_gusts_10m.slice(0, 48));
+    }
+    if (h && h.temperature_2m) {
+      const snowHours = [];
+      for (let i = 0; i < 24; i++) {
+        if (h.snowfall && h.snowfall[i] > 0) snowHours.push(h.temperature_2m[i]);
+      }
+      if (snowHours.length > 0) {
+        avgSnowTemp = snowHours.reduce((a, b) => a + b, 0) / snowHours.length;
+      }
+    }
 
     // Einstufung nach Europäischer Lawinengefahrenskala (EAWS 1–5)
     let dangerLevel = 1;
@@ -3247,30 +3264,126 @@ export const MicroEngine = {
       dangerColor = '#fff200'; // EAWS Gelb
     }
 
-    // Hauptlawinenprobleme definieren
+    // Doppel-Stufen-Tagesgang (Vormittag vs. Nachmittag)
+    let morningDangerLevel = dangerLevel;
+    let afternoonDangerLevel = dangerLevel;
+    const isThermalWarmingDay = curTemp > 3 || (freezingLevel > elevation - 200);
+    if (isThermalWarmingDay && dangerLevel < 4) {
+      afternoonDangerLevel = Math.min(5, dangerLevel + 1);
+    }
+
+    // Dichte & Schneequalitäts-Klassifikation nach Physik
+    let densityKgM3 = 85;
+    let qualityClass = 'Alpinpulver (trocken)';
+    let qualityIcon = '❄️';
+    if (avgSnowTemp < -7) {
+      densityKgM3 = 45;
+      qualityClass = 'Wildschnee / Flaumpulver';
+      qualityIcon = '🪶';
+    } else if (avgSnowTemp >= -7 && avgSnowTemp <= -2) {
+      densityKgM3 = 85;
+      qualityClass = 'Klassischer Alpinpulver';
+      qualityIcon = '❄️';
+    } else if (avgSnowTemp > -2 && avgSnowTemp <= 1.5) {
+      densityKgM3 = 160;
+      qualityClass = 'Feuchter Neuschnee / Pappschnee';
+      qualityIcon = '🌨️';
+    } else {
+      densityKgM3 = 280;
+      qualityClass = 'Nasser Schwer- / Sulzschnee';
+      qualityIcon = '💧';
+    }
+    const sweMm = Math.round((freshSnow24 * (densityKgM3 / 100)) * 10) / 10;
+
+    // Thermisches Bindungs-Muster ("Warm auf Kalt" vs. "Kalt auf Warm")
+    let thermalLayerPattern = 'Homogene Schichtbindung';
+    let thermalLayerSeverity = 'safe';
+    if (h && h.temperature_2m && h.temperature_2m.length >= 24) {
+      const pastMin = Math.min(...h.temperature_2m.slice(0, 12));
+      if (pastMin < -5 && curTemp >= 0) {
+        thermalLayerPattern = '⚠️ Warm auf Kalt (Kritische Brettbildung auf lockerer Unterlage!)';
+        thermalLayerSeverity = 'danger';
+      } else if (pastMin > -1 && curTemp < -4) {
+        thermalLayerPattern = '✅ Kalt auf Warm (Günstige Verzahnung & Verfilzung)';
+        thermalLayerSeverity = 'good';
+      }
+    }
+
+    // Kritische Neuschneemenge-Schwellenwert nach SLF / DAV
+    let criticalFreshSnowThresholdCm = 25;
+    if (maxWind48 > 30 || avgSnowTemp < -6) {
+      criticalFreshSnowThresholdCm = 15;
+    } else if (maxWind48 < 15 && avgSnowTemp >= -2) {
+      criticalFreshSnowThresholdCm = 35;
+    }
+    const criticalExceeded = freshSnow24 >= criticalFreshSnowThresholdCm;
+
+    // Gefahrenmuster nach EAWS (GM 1 bis GM 10)
+    let dangerPattern = {
+      id: 'GM1',
+      name: 'GM 1: Tiefenreif an der Basis (Altschnee)',
+      desc: 'Schwache Schichten aus kantigen Kristallen im Altschneefundament schwer erkennbar.'
+    };
+    if (freshSnow24 > 12 && maxWind48 > 25) {
+      dangerPattern = {
+        id: 'GM4',
+        name: 'GM 4: Kalt auf Warm / Frischer Triebschnee',
+        desc: 'Wind verfrachtet Schnee und bildet leicht auslösbare Schneebretter in Rinnen und Mulden.'
+      };
+    } else if (isThermalWarmingDay) {
+      dangerPattern = {
+        id: 'GM2',
+        name: 'GM 2: Nassschnee & Gleitschnee',
+        desc: 'Tageszeitliche Erwärmung schwächt die Bindung, Selbstauslösung an steilen Hängen.'
+      };
+    } else if (elevation > 2500) {
+      dangerPattern = {
+        id: 'GM6',
+        name: 'GM 6: Lockere Schichten in Kammlagen',
+        desc: 'Gefahrenstellen vor allem in extrem steilen Hochlagen und Rinnen.'
+      };
+    }
+
+    // Hauptlawinenprobleme definieren (mit Auslösebereitschaft & Lawinengröße)
     const problems = [];
-    if (maxWind48 > 30 && (freshSnow24 > 2 || elevation > 2000)) {
+    if (maxWind48 > 25 && (freshSnow24 > 2 || elevation > 1900)) {
       problems.push({
         id: 'drift',
         name: 'Triebschnee',
-        desc: 'Frische, störanfällige Schneeansammlungen in Rinnen, Mulden und hinter Geländekanten.',
-        icon: '💨'
+        desc: 'Frische, spröde Schneeansammlungen in Rinnen, Mulden und hinter Kanten.',
+        icon: '💨',
+        trigger: dangerLevel >= 3 ? 'Geringe Zusatzlast (1 Skifahrer)' : 'Große Zusatzlast (Gruppe)',
+        size: dangerLevel >= 3 ? 'Größe 2–3 (Mittlere bis große Lawinen)' : 'Größe 1–2 (Kleine Lawinen)'
       });
     }
-    if (elevation > 2400) {
+    if (elevation > 2200) {
       problems.push({
         id: 'old-snow',
         name: 'Altschnee',
-        desc: 'Schwachschichten im Altschneefundament (Schwimmschnee / Becherkristalle) schwer erkennbar.',
-        icon: '❄️'
+        desc: 'Tückische Schwachschichten im Altschneefundament (Schwimmschnee / Becherkristalle).',
+        icon: '❄️',
+        trigger: 'Geringe Zusatzlast an Übergängen von viel zu wenig Schnee',
+        size: 'Größe 2–4 (Große, zerstörerische Schneebretter)'
       });
     }
-    if (curTemp > 3 || (freezingLevel > elevation - 300 && elevation < 2800)) {
+    if (isThermalWarmingDay) {
       problems.push({
         id: 'wet-snow',
         name: 'Nassschnee & Gleitschnee',
-        desc: 'Tageserwärmung und Einstrahlung schwächen die Schneedecke an steilen Sonnenhängen.',
-        icon: '💧'
+        desc: 'Tageserwärmung und Einstrahlung schwächen die Schneedecke vor allem ab Mittag.',
+        icon: '💧',
+        trigger: 'Spontanauslösung durch Festigkeitsverlust (freies Wasser)',
+        size: 'Größe 2–3 (Nassschneelawinen & Grundgleiten)'
+      });
+    }
+    if (freshSnow24 > 10) {
+      problems.push({
+        id: 'new-snow',
+        name: 'Neuschnee',
+        desc: 'Zusatzlast durch ergiebigen Neuschneefall überlastet das Fundament.',
+        icon: '🌨️',
+        trigger: 'Geringe bis mittlere Zusatzlast',
+        size: 'Größe 2–3'
       });
     }
     if (problems.length === 0) {
@@ -3278,7 +3391,49 @@ export const MicroEngine = {
         id: 'stable',
         name: 'Günstige Schneedecke',
         desc: 'Weitgehend verfestigte, stabile Verhältnisse.',
-        icon: '✅'
+        icon: '✅',
+        trigger: 'Nur bei extremer Zusatzlast',
+        size: 'Größe 1 (Rutsche)'
+      });
+    }
+
+    // Firn-Fenster- & Harschdeckel-Kalkulator
+    const cloudCoverAvg = h && h.cloud_cover ? (h.cloud_cover.slice(0, 12).reduce((a, b) => a + b, 0) / 12) : 50;
+    const nightRadiativeCoolingPct = Math.max(10, Math.min(100, Math.round(100 - cloudCoverAvg * 0.8)));
+    const crustStability = nightRadiativeCoolingPct >= 70 
+      ? 'Tragfähiger Harschdeckel (optimales nächtliches Wiedergefrieren)'
+      : nightRadiativeCoolingPct >= 40
+      ? 'Teilweise tragfähig (Bruchharsch in Zwischenzonen möglich)'
+      : 'Kein Durchfrieren (weicher, durchnässter Altschnee von Beginn an)';
+
+    let firnStartHour = 9;
+    let firnEndHour = 12;
+    if (curTemp > 6) { firnStartHour = 8; firnEndHour = 11; }
+    else if (curTemp < -2) { firnStartHour = 10; firnEndHour = 13; }
+
+    const firnTimeline = [];
+    for (let hr = 5; hr <= 18; hr++) {
+      let state = 'frozen';
+      let stateLabel = 'Gefroren (Harscheisen)';
+      let stateColor = '#38bdf8';
+      if (hr >= firnStartHour && hr < firnEndHour) {
+        state = 'firn';
+        stateLabel = '⭐ Perfekter Firn (Traumabfahrt)';
+        stateColor = '#22c55e';
+      } else if (hr >= firnEndHour && hr <= firnEndHour + 2) {
+        state = 'slush';
+        stateLabel = 'Aufweichend (Sulz / tief)';
+        stateColor = '#f59e0b';
+      } else if (hr > firnEndHour + 2) {
+        state = 'danger';
+        stateLabel = '⚠️ Nassschneegefahr / Sumpf';
+        stateColor = '#ef4444';
+      }
+      firnTimeline.push({
+        hour: `${String(hr).padStart(2, '0')}:00`,
+        state,
+        label: stateLabel,
+        color: stateColor
       });
     }
 
@@ -3336,16 +3491,37 @@ export const MicroEngine = {
       dangerLevel,
       dangerTitle,
       dangerColor,
+      morningDangerLevel,
+      afternoonDangerLevel,
       criticalElevation,
       criticalAspects,
       problems,
+      dangerPattern,
       freshSnow24hCm: Math.round(freshSnow24 * 10) / 10,
+      freshSnow48hCm: Math.round(freshSnow48 * 10) / 10,
+      freshSnow72hCm: Math.round(freshSnow72 * 10) / 10,
+      prognosis24hCm: Math.round(prognosis24h * 10) / 10,
+      densityKgM3,
+      sweMm,
+      qualityClass,
+      qualityIcon,
+      thermalLayerPattern,
+      thermalLayerSeverity,
+      criticalFreshSnowThresholdCm,
+      criticalExceeded,
       maxRidgeWindKmH: Math.round(maxWind48),
       snowDepthPeakCm,
       snowDepthValleyCm,
       stationAgency,
       stationName,
       stationTime: `Stand: Heute, ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`,
+      firnAnalysis: {
+        nightCoolingRating: nightRadiativeCoolingPct,
+        crustStability,
+        firnWindowStart: `${String(firnStartHour).padStart(2, '0')}:00`,
+        firnWindowEnd: `${String(firnEndHour).padStart(2, '0')}:00`,
+        firnTimeline
+      },
       safetyRule: dangerLevel >= 3 
         ? 'Steilhänge > 30° defensiv beurteilen, Einzelabstände einhalten und frischen Triebschnee strikt meiden.'
         : dangerLevel === 2
@@ -3598,6 +3774,35 @@ export const MicroEngine = {
           { lat: 47.5680, lon: 10.3120, ele: 800 },   // Rettenberg Brauereidorf
           { lat: 47.5750, lon: 10.2980, ele: 740 }    // Hasengarten Talabschluss
         ]
+      },
+      'skitour-sellrain': {
+        name: 'Skitour: Lampsenspitze (2.875 m)',
+        region: 'Sellrain / Praxmar (Tirol)',
+        points: [
+          { lat: 47.1950, lon: 11.0850, ele: 1513 },   // Praxmar Parkplatz
+          { lat: 47.1890, lon: 11.0780, ele: 1820 },   // Schönangeralm
+          { lat: 47.1810, lon: 11.0690, ele: 2150 },   // Kogelhütte (Waldgrenze)
+          { lat: 47.1740, lon: 11.0580, ele: 2480 },   // Sattel-Plateau (32° Hang)
+          { lat: 47.1680, lon: 11.0490, ele: 2875 },   // Lampsenspitze Gipfel (2.875 m)
+          { lat: 47.1750, lon: 11.0600, ele: 2450 },   // Pulverabfahrt Nordostmulde
+          { lat: 47.1820, lon: 11.0710, ele: 2100 },   // Zirbenwald Abfahrt
+          { lat: 47.1885, lon: 11.0775, ele: 1810 },   // Almwiesen
+          { lat: 47.1950, lon: 11.0850, ele: 1513 }    // Praxmar Ziel
+        ]
+      },
+      'skitour-daumen-allgaeu': {
+        name: 'Skitour: Großer Daumen (2.280 m)',
+        region: 'Hinterstein / Allgäuer Alpen',
+        points: [
+          { lat: 47.4520, lon: 10.3700, ele: 870 },    // Parkplatz Hinterstein
+          { lat: 47.4450, lon: 10.3800, ele: 1180 },   // Mitterhaus Tal
+          { lat: 47.4320, lon: 10.3950, ele: 1540 },   // Schwarzenberghütte
+          { lat: 47.4250, lon: 10.4050, ele: 1890 },   // Daumensattel (34° Hang)
+          { lat: 47.4180, lon: 10.4120, ele: 2280 },   // Großer Daumen Gipfel
+          { lat: 47.4260, lon: 10.4040, ele: 1880 },   // Nordabfahrt Mulde
+          { lat: 47.4330, lon: 10.3940, ele: 1530 },   // Almabfahrt
+          { lat: 47.4520, lon: 10.3700, ele: 870 }     // Hinterstein Tal
+        ]
       }
     };
 
@@ -3659,6 +3864,22 @@ export const MicroEngine = {
         ascentMPerHour: null,
         descentMPerHour: null,
         desc: 'Berglauf-Gradient'
+      },
+      'ski_touring': {
+        name: 'Skitour & Skibergsteigen',
+        icon: '⛷️',
+        baseFlatSpeedKmH: 3.5,
+        ascentMPerHour: 400,
+        descentMPerHour: 2500,
+        desc: 'Fell-Aufstieg & Skiabfahrt'
+      },
+      'skimo': {
+        name: 'Skimo / Wettkampf',
+        icon: '🎿',
+        baseFlatSpeedKmH: 5.0,
+        ascentMPerHour: 800,
+        descentMPerHour: 4000,
+        desc: 'Express-Speed & Race'
       }
     };
 
@@ -3711,27 +3932,61 @@ export const MicroEngine = {
     let cumulativeHours = 0;
     const timedPoints = [];
 
-    // Sportler-Kategorie: 'bike' oder 'mountain'
-    const category = athleteSettings.category || (sportType === 'hiking' || sportType === 'trailrun' ? 'mountain' : 'bike');
+    // Sportler-Kategorie: 'bike', 'mountain' oder 'skitour'
+    const category = athleteSettings.category || (sportType === 'ski_touring' || sportType === 'skimo' ? 'skitour' : (sportType === 'hiking' || sportType === 'trailrun' ? 'mountain' : 'bike'));
     const bikeSpeed = athleteSettings.bikeSpeedKmH !== undefined ? athleteSettings.bikeSpeedKmH : 26.0;
     const mtnSpeed = athleteSettings.mountainSpeedKmH !== undefined ? athleteSettings.mountainSpeedKmH : 4.0;
     const mtnAscent = athleteSettings.mountainAscentHmH !== undefined ? athleteSettings.mountainAscentHmH : 400;
+    const skitourSpeed = athleteSettings.skitourSpeedKmH !== undefined ? athleteSettings.skitourSpeedKmH : 3.5;
+    const skitourAscent = athleteSettings.skitourAscentHmH !== undefined ? athleteSettings.skitourAscentHmH : 400;
+    const skitourDescent = athleteSettings.skitourDescentKmH !== undefined ? athleteSettings.skitourDescentKmH : 25.0;
 
     const fitFactor = speedInfo.fitnessFactor || 1.0;
     const flatV = speedInfo.baseFlatSpeedKmH;
     const ascRate = speedInfo.ascentMPerHour || 400;
     const descRate = speedInfo.descentMPerHour || 800;
 
+    // Hangneigungs-Zähler für Munter 3x3 Reduktionsanalyse
+    let slopeCountUnder30 = 0;
+    let slopeCount30to34 = 0;
+    let slopeCount35to39 = 0;
+    let slopeCountOver40 = 0;
+    let maxSlopeDeg = 0;
+
     for (let i = 0; i < points.length; i++) {
       const pt = points[i];
+      let slopeDeg = 0;
+      let slopeBand = '< 30°';
+      let slopeColor = '#22c55e';
+
       if (i > 0) {
         const prev = points[i - 1];
         const distKm = Math.max(0.001, (pt.distFromStartKm || 0) - (prev.distFromStartKm || 0));
         const dzM = pt.ele - prev.ele;
         const grad = (dzM / (distKm * 1000)) * 100;
 
+        // Exakte Hangneigung in Grad: arctan(dz / dx)
+        slopeDeg = Math.round((Math.atan2(Math.abs(dzM), Math.max(1, distKm * 1000)) * (180 / Math.PI)) * 10) / 10;
+        if (slopeDeg > maxSlopeDeg) maxSlopeDeg = slopeDeg;
+
+        if (slopeDeg >= 40) {
+          slopeBand = '≥ 40° (Extremgelände)';
+          slopeColor = '#ef4444';
+          slopeCountOver40++;
+        } else if (slopeDeg >= 35) {
+          slopeBand = '35–39° (Schlüsselstelle)';
+          slopeColor = '#f97316';
+          slopeCount35to39++;
+        } else if (slopeDeg >= 30) {
+          slopeBand = '30–34° (Erheblichkeitsgrenze)';
+          slopeColor = '#eab308';
+          slopeCount30to34++;
+        } else {
+          slopeCountUnder30++;
+        }
+
         let segHours = 0;
-        if (athleteSettings.category === 'bike') {
+        if (category === 'bike') {
           // Stufenlose Rad-Physik mit realistischer Steigungs- & Gefälle-Modellierung
           let v = bikeSpeed;
           if (grad > 0) {
@@ -3742,7 +3997,22 @@ export const MicroEngine = {
             v = Math.min(72.0, bikeSpeed + Math.abs(grad) * 1.6);
           }
           segHours = distKm / v;
-        } else if (athleteSettings.category === 'mountain') {
+        } else if (category === 'skitour') {
+          // Spezifische Skitouren-Physik (Asymmetrisch: Felle im Aufstieg vs. Skiabfahrt)
+          if (dzM > 0) {
+            // Aufstieg mit Fellen: SAC/DAV-Marschzeit mit skitourAscent (Hm/h) & skitourSpeed (km/h)
+            const tH = distKm / skitourSpeed;
+            const tV = dzM / skitourAscent;
+            segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
+          } else if (dzM >= -15) {
+            // Flachstück / leichtes Gefälle: Gleiten & Gehen mit Fellen
+            segHours = distKm / Math.max(4.0, skitourSpeed * 1.3);
+          } else {
+            // Abfahrt auf Ski: Hohes Tempo im freien Gelände (20–50 km/h)
+            const downhillSpeed = Math.max(15.0, Math.min(50.0, skitourDescent + Math.abs(grad) * 0.4));
+            segHours = distKm / downhillSpeed;
+          }
+        } else if (category === 'mountain') {
           // Offizielle Schweizer Alpen-Club (SAC) / DAV Marschzeit-Formel mit stufenloser Pace
           const tH = distKm / mtnSpeed;
           const descentAscentRatio = mtnAscent * 2; // Im Abstieg schafft man doppelte Höhenmeter
@@ -3754,6 +4024,22 @@ export const MicroEngine = {
             const tH = distKm / flatV;
             const tV = (dzM > 0 ? dzM / ascRate : Math.abs(dzM) / descRate);
             segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
+          } else if (sportType === 'ski_touring') {
+            if (dzM > 0) {
+              const tH = distKm / 3.5;
+              const tV = dzM / 400;
+              segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
+            } else {
+              segHours = distKm / 25.0;
+            }
+          } else if (sportType === 'skimo') {
+            if (dzM > 0) {
+              const tH = distKm / 5.0;
+              const tV = dzM / 800;
+              segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
+            } else {
+              segHours = distKm / 40.0;
+            }
           } else if (sportType === 'road_bike') {
             const baseV = 25 * fitFactor;
             const v = Math.max(8 * fitFactor, Math.min(60 * fitFactor, baseV - grad * 1.4));
@@ -3769,15 +4055,40 @@ export const MicroEngine = {
           }
         }
         cumulativeHours += Math.max(0.005, segHours);
+      } else {
+        slopeCountUnder30++;
       }
 
       const arrivalMs = startTimeMs + Math.round(cumulativeHours * 3600000);
       timedPoints.push({
         ...pt,
+        slopeDeg,
+        slopeBand,
+        slopeColor,
         cumulativeHours,
         arrivalMs,
         arrivalDate: new Date(arrivalMs)
       });
+    }
+
+    // Hangneigungs-Statistik für die gesamte Route (Munter-Reduktionsmethode)
+    const totalSlopePoints = Math.max(1, points.length);
+    const slopeStats = {
+      pctUnder30: Math.round((slopeCountUnder30 / totalSlopePoints) * 100),
+      pct30to34: Math.round((slopeCount30to34 / totalSlopePoints) * 100),
+      pct35to39: Math.round((slopeCount35to39 / totalSlopePoints) * 100),
+      pctOver40: Math.round((slopeCountOver40 / totalSlopePoints) * 100),
+      maxSlopeDeg,
+      keySectionCount: slopeCount35to39 + slopeCountOver40
+    };
+
+    let munterEvaluation = '✅ Mäßig geneigtes Gelände (< 30°): Geringe Lawinenrelevanz';
+    if (maxSlopeDeg >= 40) {
+      munterEvaluation = '🚨 Extremes Steilgelände (≥ 40°): Höchstes Risiko, nur bei Stufe 1 & stabiler Schneedecke!';
+    } else if (maxSlopeDeg >= 35) {
+      munterEvaluation = '⚠️ Schlüsselstellen 35–39°: Bei EAWS-Stufe 3 (Erheblich) strikt meiden!';
+    } else if (maxSlopeDeg >= 30) {
+      munterEvaluation = '⚡ Steilhänge 30–34°: Typisches Skitouren-Gelände, Entlastungsabstände einhalten.';
     }
 
     // Intelligente Wegpunkt- & Meilenstein-Generierung im ~200 Hm Abstand (plus Start, Peak & Ziel)
@@ -4040,14 +4351,23 @@ export const MicroEngine = {
       bikeSpeedKmH: bikeSpeed,
       mountainSpeedKmH: mtnSpeed,
       mountainAscentHmH: mtnAscent,
+      skitourSpeedKmH: skitourSpeed,
+      skitourAscentHmH: skitourAscent,
+      skitourDescentKmH: skitourDescent,
+      slopeStats,
+      munterEvaluation,
       sportType,
-      sportName: category === 'bike' ? 'Rad' : 'Berge',
-      sportIcon: category === 'bike' ? '🚴' : '🏔️',
+      sportName: category === 'bike' ? 'Rad' : (category === 'skitour' ? 'Skitour' : 'Berge'),
+      sportIcon: category === 'bike' ? '🚴' : (category === 'skitour' ? '⛷️' : '🏔️'),
       fitnessLevel: speedInfo.fitnessLevel,
       fitnessName: speedInfo.fitnessName,
       fitnessFactor: speedInfo.fitnessFactor,
       fitnessIcon: speedInfo.fitnessIcon,
-      paceLabel: category === 'bike' ? `${bikeSpeed.toFixed(1)} km/h` : `${mtnSpeed.toFixed(1)} km/h • ${mtnAscent} Hm/h`,
+      paceLabel: category === 'bike' 
+        ? `${bikeSpeed.toFixed(1)} km/h` 
+        : (category === 'skitour' 
+          ? `+${skitourAscent} Hm/h • ↓${skitourDescent.toFixed(0)} km/h` 
+          : `${mtnSpeed.toFixed(1)} km/h • ${mtnAscent} Hm/h`),
       startTimeMs,
       startTimeStr: new Date(startTimeMs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
       startDateStr: new Date(startTimeMs).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }),
