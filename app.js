@@ -61,6 +61,7 @@ export function hydrateTab(tabId) {
 // TAB CONTROLLER & PAGE VISIBILITY
 // =============================================================================
 export function switchTab(tabId) {
+  const isTabChanged = state.activeTab !== tabId;
   if (state.activeTab && state.activeTab !== 'tab-map') {
     state.previousTab = state.activeTab;
   }
@@ -68,9 +69,11 @@ export function switchTab(tabId) {
   document.querySelectorAll('.tab-btn, .mbn-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === tabId));
 
-  const appLayoutEl = document.querySelector('.app-layout');
-  if (appLayoutEl) appLayoutEl.scrollTop = 0;
-  if (window.scrollY > 0) window.scrollTo(0, 0);
+  if (isTabChanged) {
+    const appLayoutEl = document.querySelector('.app-layout');
+    if (appLayoutEl) appLayoutEl.scrollTop = 0;
+    if (window.scrollY > 0) window.scrollTo(0, 0);
+  }
 
   // On-Demand Virtual Hydration (Task 2a)
   hydrateTab(tabId);

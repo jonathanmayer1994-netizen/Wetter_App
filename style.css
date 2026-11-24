@@ -18840,6 +18840,10 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
 
 .firn-track-hour {
   flex: 1;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18847,11 +18851,15 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
   font-weight: 700;
   color: #0f172a;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, box-shadow 0.15s;
 }
 
 .firn-track-hour:hover {
   opacity: 0.85;
+}
+
+.firn-track-hour.is-selected {
+  box-shadow: inset 0 0 0 2px #ffffff;
 }
 
 /* SCHNEE & NEUSCHNEE DOSSIER GRID */

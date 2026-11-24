@@ -1517,11 +1517,30 @@ export function renderSkitourDashboard(timeline) {
     firnDesc.innerHTML = `Nächtliche Ausstrahlung: <strong>${firn.nightCoolingRating}%</strong> • <em>${firn.crustStability}</em>`;
   }
   if (firnTrack && firn && firn.firnTimeline) {
-    firnTrack.innerHTML = firn.firnTimeline.map(item => `
-      <div class="firn-track-hour" style="background: ${item.color};" title="${item.hour}: ${item.label}">
-        <span class="fth-time">${item.hour.split(':')[0]}</span>
-      </div>
+    const defaultFirnHtml = `Nächtliche Ausstrahlung: <strong>${firn.nightCoolingRating}%</strong> • <em>${escapeHtml(firn.crustStability)}</em>`;
+    firnTrack.innerHTML = firn.firnTimeline.map((item, idx) => `
+      <button type="button" class="firn-track-hour" data-hour-idx="${idx}" style="background: ${item.color};" title="${escapeHtml(item.hour)}: ${escapeHtml(item.label)}">
+        <span class="fth-time">${escapeHtml(item.hour.split(':')[0])}</span>
+      </button>
     `).join('');
+    firnTrack.querySelectorAll('.firn-track-hour').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const idx = parseInt(btn.dataset.hourIdx, 10);
+        const item = firn.firnTimeline[idx];
+        if (!item) return;
+        const wasSelected = btn.classList.contains('is-selected');
+        firnTrack.querySelectorAll('.firn-track-hour').forEach(b => b.classList.remove('is-selected'));
+        if (wasSelected) {
+          if (firnDesc) firnDesc.innerHTML = defaultFirnHtml;
+        } else {
+          btn.classList.add('is-selected');
+          if (firnDesc) {
+            firnDesc.innerHTML = `<strong>${escapeHtml(item.hour)} Uhr:</strong> ${escapeHtml(item.label)} • <em>Ausstrahlung ${firn.nightCoolingRating}%</em>`;
+          }
+        }
+      });
+    });
   }
 
   // 4. Schnee- & Neuschnee-Dossier Grid
@@ -1662,10 +1681,18 @@ export function renderSkitourDashboard(timeline) {
       btn.addEventListener('click', () => {
         const chosenDate = btn.dataset.date;
         if (!chosenDate) return;
+        const topBefore = btn.getBoundingClientRect().top;
         const dateInput = document.getElementById('sports-date-input');
         if (dateInput) dateInput.value = chosenDate;
         document.querySelectorAll('#sports-date-presets .stsp-preset-btn').forEach(b => b.classList.remove('active'));
         updateSportsStartTime(chosenDate, null);
+        // Bewahre die exakte Viewport-Position der geklickten Zeile, falls oben Text ein-/ausgeblendet wurde
+        const freshBtn = dayListEl.querySelector(`.skitour-10day-row[data-date="${chosenDate}"]`);
+        if (freshBtn) {
+          const topAfter = freshBtn.getBoundingClientRect().top;
+          const delta = topAfter - topBefore;
+          if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+        }
       });
     });
   }
@@ -2776,15 +2803,12 @@ export function updateSportsScrubber(km) {
     state.sports.scrubberMarker.setLatLng([closestPt.lat, closestPt.lon]);
   }
 
-  // Wegpunkt-Zeile in Tabelle hervorheben & Accordion fokussieren
+  // Wegpunkt-Zeile in Tabelle hervorheben (ohne Seiten-Scroll-Jump auf Mobile)
   const rows = document.querySelectorAll('.swt-row');
-  rows.forEach((row, i) => {
+  rows.forEach((row) => {
     const rIdx = parseInt(row.dataset.idx, 10);
     const isActive = rIdx === closestMsIdx;
     row.classList.toggle('active-waypoint', isActive);
-    if (isActive && window.innerWidth <= 768) {
-      row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
   });
 }
 

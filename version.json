@@ -1,5 +1,5 @@
 {
-  "version": "2.41.2",
-  "build": "20261124-2104",
-  "notes": "Spell out all avalanche, time-of-day (Vormittag/Nachmittag), snow water equivalent, and official bulletin labels without abbreviations while keeping iPhone layouts compact"
+  "version": "2.41.3",
+  "build": "20261124-2130",
+  "notes": "Fix global scroll-to-top jump on focusout/click across entire app, prevent unintended vertical scroll on horizontal scrollers & modals, and make Firn timeline hours interactively clickable"
 }

@@ -1198,10 +1198,10 @@ function updateUIElements() {
               devAcc.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
             const projField = document.getElementById('notif-gitlab-project');
-            if (projField && !projectId) projField.focus();
+            if (projField && !projectId) projField.focus({ preventScroll: true });
             else {
               const cidField = document.getElementById('notif-gitlab-client-id');
-              if (cidField) cidField.focus();
+              if (cidField) cidField.focus({ preventScroll: true });
             }
             return;
           }
@@ -1320,7 +1320,7 @@ function openUnsavedChangesDialog() {
   }
   dialog.style.display = 'flex';
   const saveBtn = document.getElementById('notif-unsaved-save-btn');
-  if (saveBtn) saveBtn.focus();
+  if (saveBtn) saveBtn.focus({ preventScroll: true });
 }
 
 function closeUnsavedChangesDialog() {

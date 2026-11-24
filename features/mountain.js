@@ -1134,7 +1134,11 @@ export function selectAltitudeHour(hourIndex, shouldScroll = true) {
     if (pillHour === h) {
       pill.classList.add('active');
       if (shouldScroll) {
-        pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        const scroller = pill.parentElement;
+        if (scroller) {
+          const targetLeft = pill.offsetLeft - (scroller.clientWidth / 2) + (pill.offsetWidth / 2);
+          scroller.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+        }
       }
     } else {
       pill.classList.remove('active');

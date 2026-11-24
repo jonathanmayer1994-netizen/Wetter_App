@@ -1063,11 +1063,12 @@ export function renderHourlySlider(hourly) {
   // Single-commit DOM update (Task 4b)
   container.replaceChildren(fragment);
 
-  // Auto-Scroll sanft zur aktuellen Stunde / Jetzt
+  // Auto-Scroll sanft zur aktuellen Stunde / Jetzt (nur horizontal im Slider, niemals vertikal auf Window!)
   const activeNowItem = container.querySelector('.hourly-item.current-now');
   if (activeNowItem) {
     setTimeout(() => {
-      activeNowItem.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      const targetLeft = activeNowItem.offsetLeft - (container.clientWidth / 2) + (activeNowItem.offsetWidth / 2);
+      container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
     }, 80);
   }
 }

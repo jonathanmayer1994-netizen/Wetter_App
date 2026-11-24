@@ -273,6 +273,78 @@ def run_skitour_suite():
         mtn_av_card.screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_mountain_avalanche_card.png")
         print("📸 Captured Mountain Avalanche & Snow artifact: verified_mountain_avalanche_card.png")
 
+        # 12. TEST 11: App-Wide Scroll-Jump Guard (Focusout, Firn Red Block, Rose, 10-Day, Spotlight, Overview)
+        print("\n--- TEST 11: App-Wide Zero Scroll-Jump Verification ---")
+
+        def click_without_scroll_jump(locator, pre_focus_selector=None, scroll_y=None):
+            if scroll_y is not None:
+                page.evaluate(f"() => window.scrollTo(0, {scroll_y})")
+            else:
+                locator.scroll_into_view_if_needed()
+            if pre_focus_selector:
+                page.evaluate(f"() => document.querySelector({pre_focus_selector!r})?.focus({{ preventScroll: true }})")
+            page.wait_for_timeout(80)
+            y_before = page.evaluate("() => window.scrollY")
+            box = locator.bounding_box()
+            assert box, "Target element must have visible bounding box"
+            page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            page.wait_for_timeout(200)
+            y_after = page.evaluate("() => window.scrollY")
+            assert abs(y_after - y_before) <= 5, f"Scroll jump detected! before={y_before}, after={y_after}"
+            return y_after
+
+        # Overview: pre-focus search input without scrolling, click daily row -> scrollY stays put
+        page.locator("[data-tab='tab-overview']").first.click(force=True)
+        page.wait_for_timeout(300)
+        y_ov = click_without_scroll_jump(
+            page.locator("#daily-forecast-list .daily-interactive-row").nth(2),
+            pre_focus_selector="#location-search-input",
+            scroll_y=360
+        )
+
+        # Mountain: click danger rose & hourly profile pill -> never jump to top
+        page.locator("[data-tab='tab-mountain']").first.click(force=True)
+        page.wait_for_timeout(300)
+        y_mtn = click_without_scroll_jump(
+            page.locator("#rose-sec-n"),
+            pre_focus_selector="#location-search-input",
+            scroll_y=450
+        )
+
+        # Skitour: pre-focus step button, scroll to Firn timeline, click red hour square & rose & 10-day row -> zero jump!
+        page.locator("[data-tab='tab-sports']").first.click(force=True)
+        page.wait_for_timeout(300)
+        page.locator("#sport-cat-skitour").click(force=True)
+        page.wait_for_timeout(200)
+        firn_last = page.locator("#firn-timeline-track .firn-track-hour").last
+        firn_last.scroll_into_view_if_needed()
+        y_firn_target = page.evaluate("() => window.scrollY")
+        y_firn = click_without_scroll_jump(
+            firn_last,
+            pre_focus_selector="#skitour-ascent-plus",
+            scroll_y=y_firn_target
+        )
+        firn_txt = page.inner_text("#skitour-firn-desc")
+        assert "Uhr:" in firn_txt, f"Clicking firn hour button must reveal exact hour diagnostic, got: {firn_txt}"
+
+        y_st_rose = click_without_scroll_jump(
+            page.locator("#st-rose-n"),
+            pre_focus_selector="#skitour-ascent-plus",
+            scroll_y=y_firn_target
+        )
+        day_row2 = page.locator("#skitour-10day-list .skitour-10day-row").nth(2)
+        day_row2.scroll_into_view_if_needed()
+        page.wait_for_timeout(80)
+        page.evaluate("() => document.querySelector('#skitour-ascent-plus')?.focus({ preventScroll: true })")
+        rect_before = day_row2.bounding_box()
+        assert rect_before, "10-day row must be visible"
+        page.mouse.click(rect_before["x"] + rect_before["width"] / 2, rect_before["y"] + rect_before["height"] / 2)
+        page.wait_for_timeout(200)
+        y_st_day = page.evaluate("() => window.scrollY")
+        rect_after = page.locator("#skitour-10day-list .skitour-10day-row").nth(2).bounding_box()
+        assert y_st_day >= 1500 and rect_after and abs(rect_after["y"] - rect_before["y"]) <= 5, f"10-day row shifted or jumped! scrollY={y_st_day}, dy={rect_after['y'] - rect_before['y'] if rect_after else 'none'}"
+        print(f"✓ Zero scroll-to-top jumps verified across Overview (y={y_ov}), Mountain (y={y_mtn}), Skitour Firn/Rose (y={y_firn}->{y_st_rose}) & 10-Day Row (y={y_st_day}, dy={rect_after['y'] - rect_before['y']:.1f}px)")
+
         context.close()
         browser.close()
         print("\n==========================================")

@@ -132,7 +132,6 @@
       });
       document.addEventListener('focusout', function () {
         setTimeout(function () {
-          if (window.scrollY !== 0) window.scrollTo(0, 0);
           syncAppViewportMetrics();
         }, 80);
       });
@@ -3332,7 +3331,7 @@
         <img id="webcam-modal-img" src="" alt="Webcam Live View" class="webcam-modal-img">
         <div class="webcam-modal-meta" id="webcam-modal-meta">--</div>
         <div class="webcam-modal-actions">
-          <a id="webcam-official-link" href="#" target="_blank" rel="noopener noreferrer" class="action-btn" style="display:none; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);">🏔️ Offizielle Gipfel-Livecam</a>
+          <a id="webcam-official-link" href="#" onclick="if(this.getAttribute('href')==='#') return false;" target="_blank" rel="noopener noreferrer" class="action-btn" style="display:none; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);">🏔️ Offizielle Gipfel-Livecam</a>
           <a id="webcam-external-link" href="#" target="_blank" rel="noopener noreferrer" class="action-btn">🔗 Auf bergfex.de ansehen</a>
           <button type="button" class="action-btn action-btn-secondary" id="webcam-modal-close-action" aria-label="Webcam schließen">✕ Schließen</button>
         </div>

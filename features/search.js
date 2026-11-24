@@ -661,12 +661,12 @@ export function setupSpotlightAndQuickGps() {
     if (e.shiftKey) {
       if (document.activeElement === first) {
         e.preventDefault();
-        last.focus();
+        last.focus({ preventScroll: true });
       }
     } else {
       if (document.activeElement === last) {
         e.preventDefault();
-        first.focus();
+        first.focus({ preventScroll: true });
       }
     }
   }
@@ -678,14 +678,14 @@ export function setupSpotlightAndQuickGps() {
     renderSpotlightRecentsUI();
     renderSpotlightInitial();
     modal.addEventListener('keydown', trapModalFocus);
-    setTimeout(() => input.focus(), 60);
+    setTimeout(() => input.focus({ preventScroll: true }), 60);
   }
 
   function closeSpotlight() {
     modal.style.display = 'none';
     modal.removeEventListener('keydown', trapModalFocus);
     if (debounceTimer) clearTimeout(debounceTimer);
-    if (triggerBtn) triggerBtn.focus();
+    if (triggerBtn) triggerBtn.focus({ preventScroll: true });
   }
 
   function renderSpotlightInitial() {
