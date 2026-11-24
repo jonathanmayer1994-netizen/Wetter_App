@@ -92,16 +92,17 @@ body {
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
+  user-select: none;
 }
 
 .brand-logo {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15);
+  border: none;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
   flex-shrink: 0;
@@ -113,29 +114,52 @@ body {
 .brand-text {
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 .brand-title {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 800;
   letter-spacing: -0.4px;
   color: #ffffff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
   -webkit-font-smoothing: antialiased;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
-.brand-badge {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ios-cyan);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-}
-
+.brand-badge,
 .brand-subline {
+  display: none !important;
+}
+
+/* Unscheinbare System- & Netzwerk-Telemetrie im Einstellungs-Footer */
+.notif-telemetry-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 2px;
+  justify-content: space-between;
+}
+
+.notif-telemetry-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.65;
+  transition: opacity 0.2s ease;
+}
+
+.notif-telemetry-inner:hover {
+  opacity: 1;
+}
+
+.nti-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: -0.1px;
 }
 
 /* Real-time Network Latency & Telemetry Pill */

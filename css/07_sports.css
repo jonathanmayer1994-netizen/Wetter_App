@@ -107,12 +107,22 @@
     grid-template-areas:
       "brand actions"
       "search search";
-    gap: 10px 8px;
+    gap: 12px 10px;
     align-items: center;
+    padding: 2px 0 4px 0;
   }
 
   .nav-brand {
     grid-area: brand;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+  }
+
+  .brand-logo {
+    width: 36px;
+    height: 36px;
   }
 
   .search-container {
@@ -125,6 +135,21 @@
     align-items: center;
     gap: 8px;
     justify-content: flex-end;
+  }
+
+  .header-action-group .nav-icon-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
+    background: rgba(16, 25, 44, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .header-action-group .unit-btn {
+    font-size: 12.5px;
   }
 
   .search-input-wrapper {

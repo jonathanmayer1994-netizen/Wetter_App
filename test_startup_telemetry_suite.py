@@ -64,28 +64,49 @@ def run_startup_telemetry_tests():
         tpb = page.evaluate("!!document.getElementById('topline-progress-bar') && !!document.getElementById('tpb-fill')")
         report("Topline Progress Bar & Fill elements exist in DOM", tpb)
         
-        # Test 4: Network Telemetry Pill in Header Brand
-        ntp = page.evaluate("""() => {
+        # Test 4: Header Brand is clean: Stadt/Flachland and 5G pill are NOT in header
+        header_clean = page.evaluate("""() => {
+            const navBrand = document.querySelector('.nav-brand');
+            const hasPillInHeader = !!navBrand.querySelector('#network-telemetry-pill');
+            const badge = document.getElementById('location-type-badge');
+            const isBadgeHidden = !badge || window.getComputedStyle(badge).display === 'none';
+            return !hasPillInHeader && isBadgeHidden;
+        }""")
+        report("Header brand is ultra-clean (no Stadt/Flachland & no 5G pill)", header_clean)
+
+        # Capture Screenshot of Redesigned Top Bar
+        artifact_path = "/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_redesigned_top_bar.png"
+        page.screenshot(path=artifact_path, clip={"x": 0, "y": 0, "width": 393, "height": 260})
+        report(f"Saved verified screenshot of redesigned top bar to {artifact_path}", os.path.exists(artifact_path))
+
+        # Test 5: Network Telemetry Pill exists in Notification Settings
+        ntp_in_settings = page.evaluate("""() => {
+            const notifSettings = document.querySelector('#notif-view-settings');
             const pill = document.getElementById('network-telemetry-pill');
             const dot = document.getElementById('ntp-dot');
             const txt = document.getElementById('ntp-text');
-            return !!pill && !!dot && !!txt && txt.innerText.length > 0;
+            return !!notifSettings && notifSettings.contains(pill) && !!dot && !!txt && txt.innerText.length > 0;
         }""")
-        report("Network Telemetry Pill exists with live dot & status text", ntp)
+        report("Network Telemetry Pill is embedded subtly in notification settings", ntp_in_settings)
         
-        # Test 5: Telemetry Engine API in JS Context
+        # Test 6: Weather & Telemetry modules loaded in window context
         telemetry_ok = page.evaluate("""() => {
             return typeof window.TelemetryEngine !== 'undefined' || typeof window.loadLocation !== 'undefined';
         }""")
         report("Weather & Telemetry modules loaded in window context", telemetry_ok)
         
-        # Test 6: Clicking Telemetry Pill opens Diagnostics Modal
+        # Test 7: Open Notification Settings & Click Telemetry Pill opens Diagnostics Modal
+        page.click("#notif-settings-btn")
+        page.wait_for_selector("#notif-modal-overlay", timeout=3000)
+        page.click("#notif-tab-settings-btn")
+        page.wait_for_timeout(300)
+        
         page.click("#network-telemetry-pill")
         page.wait_for_selector("#telemetry-diag-modal.is-open", timeout=3000)
         modal_open = page.is_visible("#telemetry-diag-modal.is-open")
         report("Clicking telemetry pill displays diagnostics modal (.is-open)", modal_open)
         
-        # Test 7: Modal content check
+        # Test 8: Modal content check
         diag_content = page.evaluate("""() => {
             const modal = document.getElementById('telemetry-diag-modal');
             return {
@@ -97,11 +118,13 @@ def run_startup_telemetry_tests():
         report("Modal contains diagnostics title, refresh button & close button", 
                "Netzwerk" in diag_content["title"] and diag_content["hasRefresh"] and diag_content["hasClose"])
         
-        # Test 8: Close Diagnostics Modal
+        # Test 9: Close Diagnostics Modal & Notification Modal
         page.click("#telemetry-diag-modal .tdm-close")
         page.wait_for_timeout(400)
         modal_closed = not page.is_visible("#telemetry-diag-modal.is-open")
         report("Modal closes cleanly when close button is clicked", modal_closed)
+        page.click("#notif-modal-close")
+        page.wait_for_timeout(400)
         
         # Test 9: Zero-Prompt GPS: Check localStorage key persistence
         gps_persistence_ok = page.evaluate("""() => {

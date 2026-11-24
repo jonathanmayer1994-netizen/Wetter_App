@@ -1,5 +1,5 @@
 {
-  "version": "2.37.0",
-  "build": "20261124-0955",
-  "notes": "Zero-latency dark launch, instant 0ms cache-hydration, telemetry HUD, fast-race SW and permanent GPS anchor"
+  "version": "2.37.1",
+  "build": "20261124-1305",
+  "notes": "Redesigned clean top bar, hidden telemetry in notification settings, removed Stadt/Flachland badge"
 }

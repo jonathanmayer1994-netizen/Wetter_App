@@ -69,7 +69,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=3.1.0">
+  <link rel="stylesheet" href="style.css?v=3.1.1">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -175,13 +175,7 @@
           <img src="./logo.png" srcset="./logo.png 1x, ./apple-touch-icon.png 2x" alt="Best Weather Logo" class="brand-logo" width="38" height="38" onerror="this.onerror=null; this.src='./favicon.png';">
           <div class="brand-text">
             <span class="brand-title">Best Weather</span>
-            <div class="brand-subline">
-              <span class="brand-badge" id="location-type-badge">📍 Ort</span>
-              <button type="button" class="network-telemetry-pill" id="network-telemetry-pill" title="Verbindungsqualität & Latenz (Tippen für Diagnose)" aria-label="Netzwerkstatus">
-                <span class="ntp-dot" id="ntp-dot"></span>
-                <span class="ntp-text" id="ntp-text">Bereit</span>
-              </button>
-            </div>
+            <span class="brand-badge" id="location-type-badge" style="display:none;" aria-hidden="true">📍 Ort</span>
           </div>
         </div>
 
@@ -3413,6 +3407,16 @@
             </div>
           </div>
         </details>
+          <!-- Unscheinbare System- & Netzwerk-Telemetrie ganz unten in den Einstellungen -->
+          <div class="notif-telemetry-section" id="notif-telemetry-section">
+            <div class="notif-telemetry-inner">
+              <span class="nti-label">Netzwerk &amp; Latenz:</span>
+              <button type="button" class="network-telemetry-pill" id="network-telemetry-pill" title="Verbindungsqualität &amp; Latenz (Tippen für Diagnose)" aria-label="Netzwerkstatus">
+                <span class="ntp-dot" id="ntp-dot"></span>
+                <span class="ntp-text" id="ntp-text">Bereit</span>
+              </button>
+            </div>
+          </div>
         </div> <!-- /notif-view-settings -->
       </div> <!-- /notif-modal-body -->
 
