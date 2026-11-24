@@ -220,7 +220,7 @@ export function renderAvalancheReport() {
     provBadge.innerText = av.avalancheProvenance.badge;
   }
   if (diurnalSub) {
-    diurnalSub.innerText = `VM ${av.morningDangerLevel}/5 • NM ${av.afternoonDangerLevel}/5`;
+    diurnalSub.innerText = `Vormittag ${av.morningDangerLevel}/5 • Nachmittag ${av.afternoonDangerLevel}/5`;
   }
   if (srcBanner && srcLabel) {
     srcBanner.classList.toggle('is-official', !!av.isOfficialBulletin);
@@ -346,17 +346,17 @@ export function renderAvalancheReport() {
     snowProv.innerText = av.snowDepthProvenance.badge;
   }
   if (qualityVal) qualityVal.innerText = `${av.densityKgM3} kg/m³ (${av.qualityClass})`;
-  if (sweSub) sweSub.innerText = `Wasserwert SWE: ${av.sweMm} mm • Krit. Neu: ${av.criticalFreshSnowThresholdCm} cm`;
+  if (sweSub) sweSub.innerText = `Schneewasseräquivalent: ${av.sweMm} mm • Kritischer Neuschnee: ${av.criticalFreshSnowThresholdCm} cm`;
   if (firnLayerVal) {
     const firnStr = av.firnAnalysis ? av.firnAnalysis.firnBadgeText : '';
-    firnLayerVal.innerText = `${firnStr} • ${av.thermalLayerSeverity === 'danger' ? '⚠️ Schichtung krit.' : 'Bindung stabil'}`;
+    firnLayerVal.innerText = `${firnStr} • ${av.thermalLayerSeverity === 'danger' ? '⚠️ Schichtung kritisch' : 'Bindung stabil'}`;
   }
   if (stationName) stationName.innerText = `${av.stationAgency} (${av.stationName})`;
   if (stationTime) stationTime.innerText = av.stationTime;
 
   if (dayStrip && Array.isArray(av.forecast10Days)) {
     dayStrip.innerHTML = av.forecast10Days.map(d => `
-      <div class="av-10d-pill ${d.isSelected ? 'is-active' : ''}" title="${escapeHtml(d.hazardSummary)}">
+      <div class="av-10d-pill ${d.isSelected ? 'is-active' : ''}" title="${escapeHtml(d.hazardSummary)} • Vormittag Stufe ${d.morning.level}/5 / Nachmittag Stufe ${d.afternoon.level}/5">
         <span class="av10-day">${escapeHtml(d.dayLabel)}</span>
         <span class="av10-snow">${d.snowQualityIcon} +${d.freshSnowDayCm}cm</span>
         <span class="av10-lvl" style="background:${d.afternoon.color};color:${d.afternoon.textColor};">${d.isOfficialDay ? '✓' : '~'} ${d.morning.level}/${d.afternoon.level}</span>

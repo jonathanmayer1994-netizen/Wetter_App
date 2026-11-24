@@ -171,7 +171,7 @@ def run_skitour_suite():
         table_eaws_count = page.locator("#sports-waypoints-list .swt-desktop-cells .swt-eaws-badge").count()
         assert table_eaws_count >= 3, f"Expected >=3 waypoint table EAWS badges, got {table_eaws_count}"
         first_tbl_text = page.locator("#sports-waypoints-list .swt-desktop-cells .swt-eaws-badge").first.inner_text()
-        assert ("Offiz. LLB" in first_tbl_text or "Prognose" in first_tbl_text) and "/5" in first_tbl_text, f"Table EAWS badge must distinguish Official vs Prognose and contain X/5, got: {first_tbl_text}"
+        assert ("Offizieller Lawinenlagebericht" in first_tbl_text or "Prognose" in first_tbl_text) and "/5" in first_tbl_text, f"Table EAWS badge must distinguish Official vs Prognose and contain X/5, got: {first_tbl_text}"
         print(f"✓ Waypoints table renders {table_eaws_count} EAWS badges (sample: '{first_tbl_text}')")
 
         # Verify category scoping: switching to mountain removes skitour EAWS waypoint pills, switching back restores them
@@ -237,7 +237,7 @@ def run_skitour_suite():
         page.set_input_files("#sports-file-input", files=[{"name": "Weissfluhjoch.gpx", "mimeType": "application/gpx+xml", "buffer": swiss_gpx.encode("utf-8")}])
         page.wait_for_function("() => document.getElementById('skitour-agency-tag') && document.getElementById('skitour-agency-tag').innerText.includes('SLF Davos')", timeout=12000)
         slf_src = page.inner_text("#skitour-source-label")
-        assert "SLF Davos" in slf_src and ("ECHT / OFFIZIELL" in slf_src or "Offizieller LLB" in slf_src), f"Expected live SLF Davos official bulletin in source banner, got: {slf_src}"
+        assert "SLF Davos" in slf_src and ("ECHT / OFFIZIELL" in slf_src or "Offizieller Lawinenlagebericht" in slf_src), f"Expected live SLF Davos official bulletin in source banner, got: {slf_src}"
         print(f"✓ Live SLF Davos Official Bulletin verified: '{slf_src}'")
         dashboard.screenshot(path=screenshot_path)
         print(f"📸 Updated Skitour Cockpit artifact (incl. 10-Day Planner & Official LLB): {screenshot_path}")

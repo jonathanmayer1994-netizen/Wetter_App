@@ -873,7 +873,7 @@ function getExactHourlyLlbBadge(ptDate) {
   if (ms < ob.validStartMs || ms > ob.validEndMs) return '';
   const lvl = ptDate.getHours() < 12 ? av.morningDangerLevel : av.afternoonDangerLevel;
   const meta = MicroEngine.getEawsScaleMeta(lvl);
-  return `<div class="hourly-llb-pill" style="background:${meta.color};color:${meta.textColor};" title="Exakter offizieller Lawinenlagebericht (${escapeHtml(av.stationAgency)}): Stufe ${meta.level}/5 (${escapeHtml(meta.label)})">LLB ${meta.level}/5</div>`;
+  return `<div class="hourly-llb-pill" style="background:${meta.color};color:${meta.textColor};" title="Exakter offizieller Lawinenlagebericht (${escapeHtml(av.stationAgency)}): Stufe ${meta.level}/5 (${escapeHtml(meta.label)})">Lawine ${meta.level}/5</div>`;
 }
 
 function createHourlyItemElement(pt, label, tag, typeClass) {
@@ -1761,8 +1761,8 @@ export function render10DayForecast(daily, hourly) {
               if (avDay && avDay.isOfficialDay) {
                 const maxLvl = Math.max(avDay.morning.level, avDay.afternoon.level);
                 const meta = MicroEngine.getEawsScaleMeta(maxLvl);
-                const lbl = avDay.morning.level === avDay.afternoon.level ? `LLB ${maxLvl}/5` : `LLB ${avDay.morning.level}/${avDay.afternoon.level}`;
-                llbChip = `<span class="daily-llb-pill" style="background:${meta.color};color:${meta.textColor};" title="Exakter offizieller Lawinenlagebericht: VM ${avDay.morning.level}/5 • NM ${avDay.afternoon.level}/5">🟢 ${lbl}</span>`;
+                const lbl = avDay.morning.level === avDay.afternoon.level ? `Lawinenstufe ${maxLvl}/5` : `Lawinenstufe ${avDay.morning.level}/${avDay.afternoon.level}`;
+                llbChip = `<span class="daily-llb-pill" style="background:${meta.color};color:${meta.textColor};" title="Exakter offizieller Lawinenlagebericht: Vormittag ${avDay.morning.level}/5 • Nachmittag ${avDay.afternoon.level}/5">🟢 ${lbl}</span>`;
               }
               const snowSum = daily.snowfall_sum ? (daily.snowfall_sum[i] || 0) : 0;
               const parts = [];
@@ -1800,7 +1800,7 @@ export function render10DayForecast(daily, hourly) {
                 if (avDay && avDay.isOfficialDay) {
                   const maxLvl = Math.max(avDay.morning.level, avDay.afternoon.level);
                   const meta = MicroEngine.getEawsScaleMeta(maxLvl);
-                  return `<span class="ish-badge ish-llb-badge" style="background:${meta.color};color:${meta.textColor};">🟢 Offiz. LLB: VM ${avDay.morning.level}/5 • NM ${avDay.afternoon.level}/5</span>`;
+                  return `<span class="ish-badge ish-llb-badge" style="background:${meta.color};color:${meta.textColor};">🟢 Offizieller Lawinenlagebericht: Vormittag ${avDay.morning.level}/5 • Nachmittag ${avDay.afternoon.level}/5</span>`;
                 }
                 return '';
               })()}

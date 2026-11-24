@@ -4199,7 +4199,7 @@ export const MicroEngine = {
 
     let sourceLabel = isSynthetic
       ? '🟠 Offline-Schätzung (API-Limit/Offline — keine Live-Modelldaten)'
-      : '🔵 Prognose-Modell (Open-Meteo ECMWF/ICON • Kein aktiver offiz. LLB für Region/Tag)';
+      : '🔵 Prognose-Modell (Open-Meteo ECMWF/ICON • Kein aktiver offizieller Lawinenlagebericht für Region/Tag)';
     let officialText = '';
     let avalancheProvenance = { kind: 'forecast', badge: '🔵 PROGNOSE-MODELL' };
     if (isSynthetic && !isOfficialActive) {
@@ -4220,17 +4220,17 @@ export const MicroEngine = {
         problems.splice(0, problems.length, ...officialBulletin.problems);
         const topProbId = problems[0].id;
         if (topProbId === 'persistent_weak_layers' || topProbId === 'old-snow') {
-          dangerPattern = { id: 'GM1', name: 'GM 1: Tiefenreif / Altschnee (Offizieller LLB)', desc: problems[0].desc || dangerPattern.desc };
+          dangerPattern = { id: 'GM1', name: 'GM 1: Tiefenreif / Altschnee (Offizieller Lawinenlagebericht)', desc: problems[0].desc || dangerPattern.desc };
         } else if (topProbId === 'wind_slab' || topProbId === 'new_snow' || topProbId === 'drift') {
-          dangerPattern = { id: 'GM4', name: 'GM 4: Triebschnee / Neuschnee (Offizieller LLB)', desc: problems[0].desc || dangerPattern.desc };
+          dangerPattern = { id: 'GM4', name: 'GM 4: Triebschnee / Neuschnee (Offizieller Lawinenlagebericht)', desc: problems[0].desc || dangerPattern.desc };
         } else if (topProbId === 'wet_snow' || topProbId === 'gliding_snow') {
-          dangerPattern = { id: 'GM2', name: 'GM 2: Nassschnee & Gleitschnee (Offizieller LLB)', desc: problems[0].desc || dangerPattern.desc };
+          dangerPattern = { id: 'GM2', name: 'GM 2: Nassschnee & Gleitschnee (Offizieller Lawinenlagebericht)', desc: problems[0].desc || dangerPattern.desc };
         }
       }
       stationAgency = officialBulletin.agency;
       sourceLabel = `🟢 ECHT / OFFIZIELL: ${officialBulletin.agency}${snowDepthProvenance.kind === 'real' ? ' + GeoSphere Schneepegel' : ' + Open-Meteo Wetter'}`;
       officialText = officialBulletin.snowpackText || officialBulletin.highlights || officialBulletin.weatherText || '';
-      avalancheProvenance = { kind: 'real', badge: '🟢 ECHT / OFFIZ. LLB' };
+      avalancheProvenance = { kind: 'real', badge: '🟢 ECHT / OFFIZIELL' };
     } else if (snowDepthProvenance.kind === 'real') {
       sourceLabel = `🟢 Pegel: GeoSphere TAWES (${snowDepthStationLabel}) • 🔵 Lawinen/Wetter: Prognose-Modell`;
     }
@@ -5330,7 +5330,7 @@ export const MicroEngine = {
         type: 'Lawinengefahr (EAWS)',
         km: 0,
         ele: avalancheReport.criticalElevation || 2000,
-        time: avalancheReport.isOfficialBulletin ? 'Offizieller LLB' : 'Prognose',
+        time: avalancheReport.isOfficialBulletin ? 'Offizieller Lawinenlagebericht' : 'Prognose',
         title: `Lawinenwarnstufe ${avalancheReport.dangerTitle} über ${avalancheReport.criticalElevation} m`,
         desc: avalancheReport.safetyRule || 'Steilhänge > 30° strikt nach Munter-Reduktionsmethode beurteilen.'
       });

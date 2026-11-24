@@ -1551,13 +1551,13 @@ export function renderSkitourDashboard(timeline) {
       : `Fahrbare Schneegrenze: ab ~${slM.toLocaleString('de-DE')} m`;
   }
   if (densityVal) densityVal.innerText = `${av.densityKgM3} kg/m³ (${av.qualityClass})`;
-  if (sweVal) sweVal.innerText = `Wasserwert SWE: ${av.sweMm} mm`;
+  if (sweVal) sweVal.innerText = `Schneewasseräquivalent: ${av.sweMm} mm`;
   if (layerVal) {
     layerVal.innerText = av.thermalLayerSeverity === 'danger' ? '⚠️ Kritisch' : (av.thermalLayerSeverity === 'good' ? '✅ Günstig' : 'Normal');
     layerVal.className = `ssg-val ${av.thermalLayerSeverity === 'danger' ? 'text-red' : 'text-accent'}`;
     layerVal.title = av.thermalLayerPattern || '';
   }
-  if (critFresh) critFresh.innerText = `Krit. Neuschneemenge: ${av.criticalFreshSnowThresholdCm} cm (${av.criticalExceeded ? '⚠️ Erreicht' : 'Unterschritten'})`;
+  if (critFresh) critFresh.innerText = `Kritische Neuschneemenge: ${av.criticalFreshSnowThresholdCm} cm (${av.criticalExceeded ? '⚠️ Erreicht' : 'Unterschritten'})`;
 
   // Provenienz-Badges für jede Karte exakt setzen (ECHT vs PROGNOSE vs SCHÄTZWERT)
   const applyProv = (id, kind, text) => {
@@ -1636,9 +1636,9 @@ export function renderSkitourDashboard(timeline) {
         <div class="s10d-day-col">
           <div class="s10d-day-name">
             <span>${escapeHtml(d.dayLabel)}</span>
-            ${d.isWeekend ? '<span class="s10d-wknd-tag">WE</span>' : ''}
+            ${d.isWeekend ? '<span class="s10d-wknd-tag">Wochenende</span>' : ''}
           </div>
-          <span class="s10d-src-mini ${d.isOfficialDay ? 'official' : ''}">${d.isOfficialDay ? '🟢 ECHT (Offiz. LLB)' : '🔵 PROGNOSE'}</span>
+          <span class="s10d-src-mini ${d.isOfficialDay ? 'official' : ''}">${d.isOfficialDay ? '🟢 ECHT (Offiziell)' : '🔵 PROGNOSE'}</span>
         </div>
 
         <div class="s10d-snow-col">
@@ -1648,12 +1648,12 @@ export function renderSkitourDashboard(timeline) {
 
         <div class="s10d-hazard-col">
           <span class="s10d-hazard-text">${escapeHtml(d.hazardSummary)}</span>
-          <span class="s10d-wind-text">Wind: ${escapeHtml(d.windFromSector)} (Böen ${d.maxWindKmH} km/h) • Gipfel: VM ${d.morning.tempC}° / NM ${d.afternoon.tempC}°</span>
+          <span class="s10d-wind-text">Wind: ${escapeHtml(d.windFromSector)} (Böen ${d.maxWindKmH} km/h) • Gipfel: Vormittag ${d.morning.tempC}° / Nachmittag ${d.afternoon.tempC}°</span>
         </div>
 
         <div class="s10d-periods-col">
-          <span class="s10d-period-pill" style="background:${d.morning.color};color:${d.morning.textColor};" title="Vormittag (06–12 Uhr): Stufe ${d.morning.level}/5 (${escapeHtml(d.morning.label)})">VM ${d.morning.level}/5</span>
-          <span class="s10d-period-pill" style="background:${d.afternoon.color};color:${d.afternoon.textColor};" title="Nachmittag (12–18 Uhr): Stufe ${d.afternoon.level}/5 (${escapeHtml(d.afternoon.label)})">NM ${d.afternoon.level}/5</span>
+          <span class="s10d-period-pill" style="background:${d.morning.color};color:${d.morning.textColor};" title="Vormittag (06–12 Uhr): Stufe ${d.morning.level}/5 (${escapeHtml(d.morning.label)})">Vormittag ${d.morning.level}/5</span>
+          <span class="s10d-period-pill" style="background:${d.afternoon.color};color:${d.afternoon.textColor};" title="Nachmittag (12–18 Uhr): Stufe ${d.afternoon.level}/5 (${escapeHtml(d.afternoon.label)})">Nachmittag ${d.afternoon.level}/5</span>
         </div>
       </button>
     `).join('');
@@ -2122,17 +2122,17 @@ export function renderSportsWaypointsTable(timeline) {
     const isOfficialAv = !!(timeline.avalancheReport && timeline.avalancheReport.isOfficialBulletin);
     const eawsTagShort = isOfficialAv ? `✓ ${m.avalancheLevel}/5` : `~${m.avalancheLevel}/5`;
     const eawsTagFull = isOfficialAv
-      ? `🟢 Offiz. LLB Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})`
-      : `🔵 Prognose LLB ~${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})`;
+      ? `🟢 Offizieller Lawinenlagebericht Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})`
+      : `🔵 Prognose Lawinenlagebericht ~${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})`;
     const eawsMobileBadge = hasEaws
-      ? `<span class="sms-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};" title="${isOfficialAv ? 'Offizieller LLB' : 'Prognose (kein offiz. LLB)'}: Stufe ${m.avalancheLevel}/5">${eawsTagShort}</span>`
+      ? `<span class="sms-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};" title="${isOfficialAv ? 'Offizieller Lawinenlagebericht' : 'Prognose (kein offizieller Lawinenlagebericht)'}: Stufe ${m.avalancheLevel}/5">${eawsTagShort}</span>`
       : '';
     const eawsDesktopBadge = hasEaws
       ? `<span class="swt-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">${eawsTagFull}</span>`
       : '';
     const eawsAccordionChip = hasEaws
       ? `<div class="sap-chip">
-           <span class="sap-label">${isOfficialAv ? '🟢 Offizieller Lawinenlagebericht (EAWS)' : '🔵 Lawinen-Prognosemodell (kein offiz. LLB)'}</span>
+           <span class="sap-label">${isOfficialAv ? '🟢 Offizieller Lawinenlagebericht (EAWS)' : '🔵 Lawinen-Prognosemodell (kein offizieller Lawinenlagebericht)'}</span>
            <strong class="sap-val"><span class="swt-eaws-badge" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">${eawsTagFull}</span></strong>
            <span class="sap-sub">Höhe: <b>${Math.round(m.ele)} m</b> • Hangneigung: <b>${m.slopeDeg || 0}°</b></span>
          </div>`
@@ -2416,10 +2416,10 @@ export function renderSportsMap(timeline) {
 
   const isOfficialAv = !!(timeline.avalancheReport && timeline.avalancheReport.isOfficialBulletin);
   const getMapEawsPill = (ms) => (isSkitour && ms && ms.avalancheLevel)
-    ? `<span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};" title="${isOfficialAv ? '🟢 Offizieller LLB' : '🔵 Prognose (kein offiz. LLB)'}: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})">${isOfficialAv ? '✓' : '~'} ${ms.avalancheLevel}/5</span>`
+    ? `<span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};" title="${isOfficialAv ? '🟢 Offizieller Lawinenlagebericht' : '🔵 Prognose (kein offizieller Lawinenlagebericht)'}: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})">${isOfficialAv ? '✓' : '~'} ${ms.avalancheLevel}/5</span>`
     : '';
   const getPopupEawsRow = (ms) => (isSkitour && ms && ms.avalancheLevel)
-    ? `<div class="smp-eaws-row"><span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};">${isOfficialAv ? '🟢 Offiz. LLB' : '🔵 Prognose'}: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})</span></div>`
+    ? `<div class="smp-eaws-row"><span class="ms-eaws-pill" style="background:${ms.avalancheColor};color:${ms.avalancheTextColor};">${isOfficialAv ? '🟢 Offizieller Lawinenlagebericht' : '🔵 Prognose'}: Stufe ${ms.avalancheLevel}/5 (${escapeHtml(ms.avalancheLabel)})</span></div>`
     : '';
 
   // 1. START Marker (Roter Pin mit weißem Kreis 'START' + Callout-Badge wie im Referenzdesign)
@@ -2531,7 +2531,7 @@ export function renderSportsMap(timeline) {
               <span class="sm-wind">💨 ${m.windKmH} km/h</span>
               ${m.precipMm > 0 ? `<span class="sm-dot">•</span><span class="sm-rain">💧 ${m.precipMm.toFixed(1)}mm</span>` : ''}
             </div>
-            ${isSkitour && m.avalancheLevel ? `<div class="ms-detailed-eaws"><span class="ms-eaws-pill" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">⚠️ LLB Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})</span></div>` : ''}
+            ${isSkitour && m.avalancheLevel ? `<div class="ms-detailed-eaws"><span class="ms-eaws-pill" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">⚠️ Lawinenlagebericht Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})</span></div>` : ''}
             <div class="sm-ref-arrow"></div>
           </div>
           <div class="sm-trail-dot ${isPeak ? 'dot-peak' : ''}"></div>
@@ -2700,7 +2700,7 @@ export function updateSportsScrubber(km) {
   if (cwcCond) cwcCond.innerText = `${closestMs.weatherIcon} ${closestMs.weatherCondition || 'Normal'}`;
   if (cwcCondNote) {
     if (timeline.category === 'skitour' && closestMs.avalancheLevel) {
-      cwcCondNote.innerHTML = `<span class="swt-eaws-badge" style="background:${closestMs.avalancheColor};color:${closestMs.avalancheTextColor};">⚠️ LLB Stufe ${closestMs.avalancheLevel}/5 (${escapeHtml(closestMs.avalancheLabel)})</span>`;
+      cwcCondNote.innerHTML = `<span class="swt-eaws-badge" style="background:${closestMs.avalancheColor};color:${closestMs.avalancheTextColor};">⚠️ Lawinenlagebericht Stufe ${closestMs.avalancheLevel}/5 (${escapeHtml(closestMs.avalancheLabel)})</span>`;
     } else if (closestMs.weatherCode >= 95) cwcCondNote.innerText = '⚡ Gewitter';
     else if (closestMs.isSnow) cwcCondNote.innerText = '❄️ Schneelage';
     else if (closestMs.precipMm >= 1) cwcCondNote.innerText = '🌧️ Regenphase';

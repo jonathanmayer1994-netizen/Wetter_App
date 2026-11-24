@@ -1,5 +1,5 @@
 {
-  "version": "2.41.1",
-  "build": "20261124-2043",
-  "notes": "Fix Mountain avalanche card HTML nesting for snow quality/SWE pill and widen 10-day snow/avalanche progression strip across full card width"
+  "version": "2.41.2",
+  "build": "20261124-2104",
+  "notes": "Spell out all avalanche, time-of-day (Vormittag/Nachmittag), snow water equivalent, and official bulletin labels without abbreviations while keeping iPhone layouts compact"
 }
