@@ -218,3 +218,7 @@ export const TelemetryEngine = {
     modal.classList.add('is-open');
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.TelemetryEngine = TelemetryEngine;
+}

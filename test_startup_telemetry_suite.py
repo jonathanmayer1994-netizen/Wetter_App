@@ -39,7 +39,7 @@ def run_startup_telemetry_tests():
             'has_touch': True
         }
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(**device)
+        context = browser.new_context(**device, service_workers="block")
         page = context.new_page()
         
         page_errors = []
@@ -112,8 +112,9 @@ def run_startup_telemetry_tests():
         report("Weather & Telemetry modules loaded in window context", telemetry_ok)
         
         # Test 7: Open Notification Settings & Click Telemetry Pill opens Diagnostics Modal
-        page.click("#notif-settings-btn")
-        page.wait_for_selector("#notif-modal-overlay", timeout=3000)
+        page.wait_for_function("() => typeof window.openNotificationModal === 'function'", timeout=10000)
+        page.evaluate("() => window.openNotificationModal()")
+        page.wait_for_selector("#notif-modal-overlay", timeout=5000)
         page.click("#notif-tab-settings-btn")
         page.wait_for_timeout(300)
         

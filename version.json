@@ -1,5 +1,5 @@
 {
-  "version": "2.37.3",
-  "build": "20261124-1325",
-  "notes": "Harmonize daily forecast weather condition with sunshine duration: prevent false 'Bedeckt' on sunny days"
+  "version": "2.37.4",
+  "build": "20261124-1335",
+  "notes": "Strict 1x Daily Report guarantee: eliminate hourly briefing push loop, deduplicate shared endpoints, preserve read status, collapse feed spam"
 }

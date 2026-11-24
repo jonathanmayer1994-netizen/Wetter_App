@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.37.3';
-const CACHE_NAME = `best-weather-v2.37.3-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.37.4';
+const CACHE_NAME = `best-weather-v2.37.4-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
@@ -377,6 +377,31 @@ const NOTIF_IDB_NAME = 'best-weather-db';
 const NOTIF_IDB_STORE = 'notifications';
 const NOTIF_RETENTION_MS = 24 * 60 * 60 * 1000;
 
+function getNotifFromIndexedDB(id) {
+  if (!id || typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(NOTIF_IDB_NAME, 1);
+      req.onsuccess = (e) => {
+        const db = e.target.result;
+        try {
+          if (!db.objectStoreNames.contains(NOTIF_IDB_STORE)) return resolve(null);
+          const tx = db.transaction([NOTIF_IDB_STORE], 'readonly');
+          const store = tx.objectStore(NOTIF_IDB_STORE);
+          const getReq = store.get(id);
+          getReq.onsuccess = () => resolve(getReq.result || null);
+          getReq.onerror = () => resolve(null);
+        } catch (_) {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
+
 function saveNotifToIndexedDB(record) {
   if (typeof indexedDB === 'undefined') return Promise.resolve();
   return new Promise((resolve) => {
@@ -395,7 +420,18 @@ function saveNotifToIndexedDB(record) {
         try {
           const tx = db.transaction([NOTIF_IDB_STORE], 'readwrite');
           const store = tx.objectStore(NOTIF_IDB_STORE);
-          store.put(record);
+          const getReq = store.get(record.id);
+          getReq.onsuccess = () => {
+            const existing = getReq.result;
+            // Wenn der Nutzer diesen Bericht bereits gelesen hat, behalte read: true bei!
+            if (existing && existing.read) {
+              record.read = true;
+            }
+            store.put(record);
+          };
+          getReq.onerror = () => {
+            store.put(record);
+          };
 
           // 24h Pruning alter Meldungen
           const index = store.index('timestamp');
@@ -476,8 +512,9 @@ self.addEventListener('push', (event) => {
   const title = String(payload.title || 'Best Weather');
   const body = String(payload.body || 'Neue Wetterdaten verfügbar');
   const tag = String(payload.tag || 'best-weather-alert');
-  const notifId = payload.id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const notifType = payload.type || payload.data?.type || (tag.includes('briefing') ? 'briefing' : tag.includes('storm') ? 'storm' : tag.includes('frost') ? 'frost' : tag.includes('extreme') ? 'extreme' : 'alert');
+  const isBriefing = notifType === 'briefing' || tag.includes('briefing');
+  const notifId = payload.id || (isBriefing && tag ? tag : `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
 
   // Prüfe Plattform: iOS WebKit nutzt für Web-Clip-PWA-Benachrichtigungen automatisch das Homescreen-Icon.
   // Das Übergeben von externen/relativen Bild-URLs während des Reconnect-Fensters aus dem Flugmodus
@@ -536,7 +573,19 @@ self.addEventListener('push', (event) => {
   // unabhängig von IndexedDB-Locks beim Reconnect
   event.waitUntil(
     (async () => {
-      // 1. ZUERST sofortige Anzeige im Sperrbildschirm & Notification Center
+      // 1. Tagesbericht-Unterdrückung: Wurde der Tagesbericht für heute bereits empfangen und
+      // vom Nutzer als GELESEN markiert, wird keine weitere Notification im Sperrbildschirm erzeugt!
+      if (isBriefing) {
+        try {
+          const existing = await getNotifFromIndexedDB(notifId);
+          if (existing && existing.read) {
+            console.log(`[SW] Tagesbericht ${notifId} wurde vom Nutzer bereits gelesen — erneute Push-Anzeige unterdrückt.`);
+            return;
+          }
+        } catch (_) {}
+      }
+
+      // 2. ZUERST sofortige Anzeige im Sperrbildschirm & Notification Center
       try {
         await self.registration.showNotification(title, notificationOptions);
       } catch (err) {

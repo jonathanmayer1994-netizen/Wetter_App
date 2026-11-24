@@ -66,8 +66,27 @@ export async function saveNotification(entry) {
     const db = await openNotifDB();
     await pruneOldRecords(db);
 
+    const isBriefing = entry.type === 'briefing' || String(entry.tag || '').includes('briefing');
+    const recordId = entry.id || (isBriefing && entry.tag ? entry.tag : `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+
+    // Prüfen ob bereits vorhanden und vom Nutzer bereits gelesen
+    let wasRead = Boolean(entry.read);
+    const existing = await new Promise((res) => {
+      try {
+        const tx = db.transaction([STORE_NAME], 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(recordId);
+        req.onsuccess = () => res(req.result || null);
+        req.onerror = () => res(null);
+      } catch (_) { res(null); }
+    });
+
+    if (existing && existing.read) {
+      wasRead = true;
+    }
+
     const record = {
-      id: entry.id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id: recordId,
       title: String(entry.title || 'Wetter-Benachrichtigung'),
       body: String(entry.body || ''),
       icon: entry.icon || './icon-192.png',
@@ -75,8 +94,8 @@ export async function saveNotification(entry) {
       tag: entry.tag || 'best-weather-alert',
       type: entry.type || 'alert',
       data: entry.data || {},
-      timestamp: Number(entry.timestamp || Date.now()),
-      read: Boolean(entry.read)
+      timestamp: Number(entry.timestamp || (existing ? existing.timestamp : Date.now())),
+      read: wasRead
     };
 
     await new Promise((resolve, reject) => {
@@ -99,6 +118,7 @@ export async function saveNotification(entry) {
 
 /**
  * Liefert alle Benachrichtigungen der letzten 24 Stunden, absteigend nach Zeit sortiert
+ * Dedupliziert mehrfache Tagesberichte desselben Kalendertags automatisch auf die neueste Meldung.
  */
 export async function getNotifications() {
   try {
@@ -106,7 +126,7 @@ export async function getNotifications() {
     await pruneOldRecords(db);
 
     return new Promise((resolve) => {
-      const tx = db.transaction([STORE_NAME], 'readonly');
+      const tx = db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const req = store.getAll();
       req.onsuccess = () => {
@@ -115,7 +135,33 @@ export async function getNotifications() {
         const valid = list
           .filter((item) => item.timestamp >= cutoff)
           .sort((a, b) => b.timestamp - a.timestamp);
-        resolve(valid);
+
+        // Intelligente Deduplizierung: Mehrfache Tagesberichte am selben Kalendertag
+        // werden zu einem einzigen Eintrag zusammengefasst (überflüssige Duplikate bereinigt)
+        const seenBriefingDates = new Set();
+        const deduplicated = [];
+        const toDeleteIds = [];
+
+        for (const item of valid) {
+          const isBriefing = item.type === 'briefing' || String(item.tag || '').includes('briefing');
+          if (isBriefing) {
+            const dateStr = item.data?.dateString || new Date(item.timestamp).toISOString().slice(0, 10);
+            if (seenBriefingDates.has(dateStr)) {
+              toDeleteIds.push(item.id);
+              continue;
+            }
+            seenBriefingDates.add(dateStr);
+          }
+          deduplicated.push(item);
+        }
+
+        if (toDeleteIds.length > 0) {
+          for (const delId of toDeleteIds) {
+            try { store.delete(delId); } catch (_) {}
+          }
+        }
+
+        resolve(deduplicated);
       };
       req.onerror = () => resolve([]);
     });
