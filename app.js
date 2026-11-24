@@ -28,6 +28,7 @@ import { GoogleSheetsSync } from './core/googleSheetsSync.js';
 import { AlpineStorage } from './storage.js';
 import { initScrollOptimizer } from './core/scrollOptimizer.js';
 import { initNotifications, openNotificationModal } from './features/notifications.js';
+import { TelemetryEngine } from './core/telemetryEngine.js';
 
 // Central Dispatcher Event Bus Subscriptions
 export function setupDispatcherSubscriptions() {
@@ -257,24 +258,64 @@ export async function loadLocation(loc, options = {}) {
   activeLocationAbortController = new AbortController();
   const currentSeq = ++activeLocationSequence;
 
+  // SÄULE 3: 0ms Warm Start & Instant Cache-Hydration (Stale-While-Revalidate)
+  // Zeige SOFORT die zuletzt gespeicherten Daten dieses Standorts an, noch bevor das Netz anfragt!
+  const locKey = `${validLoc.lat.toFixed(3)}_${validLoc.lon.toFixed(3)}`;
+  const hasLiveWeatherAlready = state.weatherData && state.currentLocation &&
+    Math.abs(state.currentLocation.lat - validLoc.lat) < 0.005 &&
+    Math.abs(state.currentLocation.lon - validLoc.lon) < 0.005;
+
+  if (!hasLiveWeatherAlready) {
+    try {
+      const cached = await WeatherTourCache.getCachedWeather(locKey);
+      if (cached?.weatherData) {
+        state.weatherData = cached.weatherData;
+        if (cached.microData) state.microData = { ...cached.microData, weatherRaw: cached.weatherData };
+        state.lastWeatherLoadedAt = cached.timestamp || Date.now();
+        state.lastWeatherDayKey = getLocalDateKey(state.lastWeatherLoadedAt);
+
+        // 0ms First Paint: Dashboard steht sofort komplett mit echten Daten!
+        renderOverviewTab();
+        renderAdaptiveTab2();
+        renderFavoritesTab();
+        updateNavigationWarningBadges();
+
+        const heroTime = document.getElementById('hero-update-time');
+        if (heroTime) {
+          const cachedDate = new Date(cached.timestamp).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+          const tsStr = new Date(cached.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+          heroTime.innerText = `🔄 Aktualisiere live... • Stand: ${cachedDate} ${tsStr}`;
+        }
+      }
+    } catch (_) {}
+  }
+
+  TelemetryEngine.startProgress('Wetterdaten');
+  const t0 = performance.now();
+
   try {
     const customTilt = state.activeAspect.isAuto ? null : state.activeAspect.tilt;
     const customAzimuth = state.activeAspect.isAuto ? null : state.activeAspect.azimuth;
     const reqOpts = { signal: activeLocationAbortController.signal, forceRefresh };
 
-    const microResult = await MicroEngine.getMicroScaleWeather(
-      validLoc.lat,
-      validLoc.lon,
-      validLoc.elevation,
-      validLoc.isMountain,
-      customTilt,
-      customAzimuth,
-      validLoc.country,
-      reqOpts
+    TelemetryEngine.setProgress(35, 'ICON-D2 & ECMWF...');
+    const microResult = await TelemetryEngine.raceWithTimeout(
+      MicroEngine.getMicroScaleWeather(
+        validLoc.lat,
+        validLoc.lon,
+        validLoc.elevation,
+        validLoc.isMountain,
+        customTilt,
+        customAzimuth,
+        validLoc.country,
+        reqOpts
+      ),
+      6500
     );
 
     if (currentSeq !== activeLocationSequence) return { ok: false, aborted: true };
 
+    TelemetryEngine.setProgress(70, 'Satellit & Luftgüte...');
     const [multiModel, airQuality] = await Promise.all([
       MicroEngine.fetchMultiModelComparison(validLoc.lat, validLoc.lon, validLoc.elevation, validLoc.isMountain, reqOpts),
       MicroEngine.fetchAirQualityAndUV(validLoc.lat, validLoc.lon, validLoc.elevation, reqOpts)
@@ -363,8 +404,16 @@ export async function loadLocation(loc, options = {}) {
     updateMapLocation();
     updateNavigationWarningBadges();
 
+    TelemetryEngine.recordApiLatency(performance.now() - t0);
+    TelemetryEngine.finishProgress(true);
+
     return { ok: true, refreshedAt: state.lastWeatherLoadedAt };
   } catch (err) {
+    TelemetryEngine.finishProgress(false);
+    if (err?.isTimeout) {
+      TelemetryEngine.updatePillState('slow', 'Timeout • Offline-Cache');
+    }
+
     if (err?.name === 'AbortError' || currentSeq !== activeLocationSequence) {
       return { ok: false, aborted: true };
     }
@@ -385,14 +434,18 @@ export async function loadLocation(loc, options = {}) {
       const heroTime = document.getElementById('hero-update-time');
       const cachedDate = new Date(cached.timestamp).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
       const tsStr = new Date(cached.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-      if (heroTime) heroTime.innerText = isRateLimit ? `API-Cooldown · Cache (${cachedDate} ${tsStr})` : `Offline-Cache (${cachedDate} ${tsStr})`;
+      if (heroTime) {
+        if (isRateLimit) heroTime.innerText = `API-Cooldown · Cache (${cachedDate} ${tsStr})`;
+        else if (err?.isTimeout) heroTime.innerText = `⚠️ Funkloch · Offline-Stand (${cachedDate} ${tsStr}) aktiv`;
+        else heroTime.innerText = `Offline-Cache (${cachedDate} ${tsStr})`;
+      }
       return { ok: false, isRateLimit, retryAfterMs: err?.retryAfterMs || 0, usedCache: true };
     } else {
       const cond = document.getElementById('hero-condition-text');
       if (cond) {
         cond.innerText = isRateLimit
           ? `Open-Meteo Rate-Limit / Cooldown aktiv${retryWaitLabel ? ` (~${retryWaitLabel})` : ''}`
-          : 'Verbindungsfehler beim Laden der Daten';
+          : (err?.isTimeout ? 'Zeitüberschreitung: Keine Verbindung zum Wetterdienst' : 'Verbindungsfehler beim Laden der Daten');
       }
       return { ok: false, isRateLimit, retryAfterMs: err?.retryAfterMs || 0, usedCache: false };
     }
@@ -438,6 +491,7 @@ window.persistFavorites = persistFavorites;
 // MAIN INITIALIZATION
 // =============================================================================
 function startApp() {
+  TelemetryEngine.init();
   initScrollOptimizer();
   state.canvasEngine = new BackgroundCanvasEngine('weather-canvas');
   initSearchHandlers({ onLoadLocation: loadLocation, onRenderOverview: renderOverviewTab, onRenderAdaptiveTab2: renderAdaptiveTab2 });
@@ -476,15 +530,17 @@ function startApp() {
     GoogleSheetsSync.pullAll();
   }
 
-  // DEFAULT LOCATION: Beim Öffnen immer aktueller GPS-Standort des Geräts
+  // DEFAULT LOCATION: Beim Öffnen immer gespeicherter GPS-Standort des Geräts (0 Popups!)
   const cachedGps = AlpineStorage.safeGetItem('best_weather_last_gps', null);
+  const isGpsConfirmed = AlpineStorage.safeGetItem('bw_gps_confirmed') === 'true';
   if (cachedGps) {
+    if (isGpsConfirmed) cachedGps.isGps = true;
     loadLocation(cachedGps);
   } else {
     loadLocation(state.currentLocation);
   }
 
-  // Live-Standort via GPS ermitteln & synchronisieren
+  // Live-Standort via GPS synchronisieren (nur geräuschlos wenn 'granted', niemals unaufgefordert mit Popup)
   if ('geolocation' in navigator) {
     triggerExactGps({ isStartup: true });
   }

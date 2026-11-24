@@ -1,5 +1,5 @@
 {
-  "version": "2.36.9",
-  "build": "20261123-2055",
-  "notes": "Apple-grade 120 FPS map timeline scrubber with floating HUD, 48px touch hitbox, and 3-ring predictive cache"
+  "version": "2.37.0",
+  "build": "20261124-0955",
+  "notes": "Zero-latency dark launch, instant 0ms cache-hydration, telemetry HUD, fast-race SW and permanent GPS anchor"
 }

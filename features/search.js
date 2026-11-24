@@ -259,7 +259,7 @@ export async function triggerExactGps(options = {}) {
     return;
   }
 
-  // Beim App-Start immer GPS abfragen, außer der Nutzer hat Geolocation explizit verweigert ('denied')
+  // Beim App-Start: NIEMALS unaufgefordert nach Geolocation fragen, falls nicht dauerhaft 'granted'
   if (isStartup) {
     const prevLsGps = AlpineStorage.safeGetItem('best_weather_last_gps', null);
     const [permState, storedPerm, idbLastGps] = await Promise.all([
@@ -274,9 +274,18 @@ export async function triggerExactGps(options = {}) {
     }
 
     const cachedGps = prevLsGps || idbLastGps;
-    if (!prevLsGps && idbLastGps) {
-      AlpineStorage.safeSetItem('best_weather_last_gps', idbLastGps);
-      selectExactLocation(idbLastGps);
+    if (cachedGps) {
+      if (!prevLsGps && idbLastGps) {
+        AlpineStorage.safeSetItem('best_weather_last_gps', idbLastGps);
+      }
+      // Der bestätigte GPS-Standort wurde beim Start bereits sofort geladen!
+    }
+
+    // Nur wenn das System Geolocation bereits DAUERHAFT freigegeben hat ('granted'),
+    // dürfen wir geräuschlos im Hintergrund ohne Popup die Koordinate abgleichen.
+    // Bei 'prompt' oder 'unsupported' darf beim Start KEIN System-Popup erscheinen!
+    if (permState !== 'granted') {
+      return;
     }
   } else {
     if (quickGpsBtn) {
@@ -292,8 +301,9 @@ export async function triggerExactGps(options = {}) {
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
 
-      // Bestätigung dauerhaft in LocalStorage + IndexedDB sichern
+      // Bestätigung dauerhaft in LocalStorage + IndexedDB sichern (für immer pro iPhone)
       AlpineStorage.setMeta(GPS_PERM_META_KEY, { status: 'granted', updatedAt: Date.now() });
+      AlpineStorage.safeSetItem('bw_gps_confirmed', 'true');
 
       if (quickGpsBtn) {
         quickGpsBtn.style.opacity = '1';
@@ -335,6 +345,7 @@ export async function triggerExactGps(options = {}) {
 
       // In persistent storage (LocalStorage + IndexedDB) sichern für sofortigen Start ohne erneute Abfrage
       AlpineStorage.setMeta('best_weather_last_gps', locObj);
+      AlpineStorage.safeSetItem('best_weather_last_gps', locObj);
 
       // Falls beim Start bereits fast identische Koordinaten geladen sind, nur Objekt aktualisieren
       const isAlreadyLoaded = isStartup && state.weatherData &&

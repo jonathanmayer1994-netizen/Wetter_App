@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.36.9';
-const CACHE_NAME = `best-weather-v2.36.9-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.37.0';
+const CACHE_NAME = `best-weather-v2.37.0-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
@@ -36,6 +36,7 @@ const STATIC_ASSETS = [
   './gpx.worker.js',
   './background.worker.js',
   './physics.worker.js',
+  './core/telemetryEngine.js',
   './core/appUpdater.js',
   './core/dispatcher.js',
   './core/state.js',
@@ -239,31 +240,53 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // A2. Meteorological APIs: Network First with Instant Cache Fallback & JSON Error
+  // A2. Meteorological APIs: Fast-Race Network (max 2.5s) mit Instant-Cache-Fallback & JSON-Error
   if (isMeteorologicalAPI) {
-    event.respondWith(
+    const raceApi = new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          reject(new Error('SW_API_TIMEOUT_FAST_RACE'));
+        }
+      }, 2500);
+
       fetch(req)
         .then((networkRes) => {
-          if (networkRes && networkRes.status === 200) {
-            const clone = networkRes.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            if (networkRes && networkRes.status === 200) {
+              const clone = networkRes.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+            }
+            resolve(networkRes);
           }
-          return networkRes;
         })
-        .catch(async () => {
-          const cached = await caches.match(req);
-          if (cached) return cached;
-          return new Response(JSON.stringify({ offline: true, error: 'Offline im Alpingebiet (Kein Netzempfang)' }), {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: { 'Content-Type': 'application/json' }
-          });
-        })
+        .catch((err) => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
+          }
+        });
+    });
+
+    event.respondWith(
+      raceApi.catch(async () => {
+        const cached = await caches.match(req);
+        if (cached) return cached;
+        return new Response(JSON.stringify({ offline: true, error: 'Offline im Alpingebiet (Kein Netzempfang)' }), {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      })
     );
     return;
   }
 
-  // B. Same-Origin App Shell, HTML, JS & CSS: Network-First mit CDN-Token-Bypass & Offline-Fallback
+  // B. Same-Origin App Shell, HTML, JS & CSS: Fast-Race Network (max 1.2s) mit Instant-Cache-Fallback
   const isCodeOrMarkup = isSameOrigin && (
     req.mode === 'navigate' ||
     url.pathname === '/' ||
@@ -276,24 +299,48 @@ self.addEventListener('fetch', (event) => {
 
   if (isCodeOrMarkup) {
     const bustUrl = appendBustParam(req.url, '_sw', activeBustToken);
-    event.respondWith(
+
+    // Fast-Race Promise: Max. 1200ms Timeout bei instabilem Netz / Funkloch
+    const raceNetwork = new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          reject(new Error('SW_NETWORK_TIMEOUT_FAST_RACE'));
+        }
+      }, 1200);
+
       fetch(bustUrl, { cache: 'no-store' })
         .then((networkRes) => {
-          if (networkRes && networkRes.status === 200) {
-            const clone = networkRes.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            if (networkRes && networkRes.status === 200) {
+              const clone = networkRes.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+            }
+            resolve(networkRes);
           }
-          return networkRes;
         })
-        .catch(async () => {
-          const cached = await caches.match(req, { ignoreSearch: true });
-          if (cached) return cached;
-          if (req.mode === 'navigate') {
-            const indexFallback = await caches.match('./index.html', { ignoreSearch: true });
-            if (indexFallback) return indexFallback;
+        .catch((err) => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
           }
-          return new Response('Offline', { status: 503, statusText: 'Offline' });
-        })
+        });
+    });
+
+    event.respondWith(
+      raceNetwork.catch(async () => {
+        const cached = await caches.match(req, { ignoreSearch: true });
+        if (cached) return cached;
+        if (req.mode === 'navigate') {
+          const indexFallback = await caches.match('./index.html', { ignoreSearch: true });
+          if (indexFallback) return indexFallback;
+        }
+        return new Response('Offline', { status: 503, statusText: 'Offline' });
+      })
     );
     return;
   }

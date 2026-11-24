@@ -11,9 +11,52 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Best Weather">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2.5.0">
+  <link rel="apple-touch-startup-image" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2.5.0">
   <link rel="manifest" href="manifest.json?v=2.5.0">
-  <meta name="theme-color" content="#0d1b2a">
+  <meta name="theme-color" content="#0b1329">
+
+  <!-- Instant Critical Dark Paint (Eliminates White Flash / FOUC on WebKit Boot) -->
+  <style>
+    html, body {
+      background-color: #0b1329 !important;
+      background: #0b1329 !important;
+      color: #ffffff;
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #app-container, .app-layout {
+      background-color: transparent !important;
+    }
+    /* Topline Micro-ProgressBar (Apple Dynamic Island Glow) */
+    .topline-progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2.5px;
+      z-index: 10000;
+      pointer-events: none;
+      background: transparent;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .topline-progress-bar.is-active {
+      opacity: 1;
+    }
+    .topline-progress-bar .tpb-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #38bdf8 0%, #818cf8 50%, #06b6d4 100%);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.9), 0 0 4px rgba(129, 140, 248, 0.8);
+      border-radius: 0 2px 2px 0;
+      transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: width;
+    }
+  </style>
 
   <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,7 +69,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=3.0.9">
+  <link rel="stylesheet" href="style.css?v=3.1.0">
 
   <!-- Adaptive Edge-to-Edge Viewport Sync (bypasses iOS Standalone black-translucent ~59px ICB cutoff) -->
   <script>
@@ -100,6 +143,11 @@
   </script>
 </head>
 <body class="weather-clear-day">
+  <!-- Topline Micro-ProgressBar: 2.5px Apple Dynamic Island Shimmer Progress -->
+  <div id="topline-progress-bar" class="topline-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true">
+    <div class="tpb-fill" id="tpb-fill"></div>
+  </div>
+
   <!-- Dynamic Atmospheric Background Canvas -->
   <canvas id="weather-canvas" role="img" aria-label="Dynamischer Wetterhintergrund mit Partikelanimation"></canvas>
   <div id="ambient-glow" class="ambient-glow"></div>
@@ -127,7 +175,13 @@
           <img src="./logo.png" srcset="./logo.png 1x, ./apple-touch-icon.png 2x" alt="Best Weather Logo" class="brand-logo" width="38" height="38" onerror="this.onerror=null; this.src='./favicon.png';">
           <div class="brand-text">
             <span class="brand-title">Best Weather</span>
-            <span class="brand-badge" id="location-type-badge">📍 Ort</span>
+            <div class="brand-subline">
+              <span class="brand-badge" id="location-type-badge">📍 Ort</span>
+              <button type="button" class="network-telemetry-pill" id="network-telemetry-pill" title="Verbindungsqualität & Latenz (Tippen für Diagnose)" aria-label="Netzwerkstatus">
+                <span class="ntp-dot" id="ntp-dot"></span>
+                <span class="ntp-text" id="ntp-text">Bereit</span>
+              </button>
+            </div>
           </div>
         </div>
 
