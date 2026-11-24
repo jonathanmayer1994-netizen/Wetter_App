@@ -3208,33 +3208,70 @@ export const MicroEngine = {
    * STUFE 7: Lawinenlagebericht & Schneedecken-Stabilität (EAWS-Standard)
    */
   computeAvalancheReport(lat, lon, elevation, weatherData, terrain) {
-    const h = weatherData ? weatherData.hourly : null;
-    const cur = weatherData ? weatherData.current : null;
+    const peakData = (weatherData && weatherData.peakHourly) ? weatherData.peakHourly : null;
+    const valleyData = (weatherData && weatherData.valleyHourly) ? weatherData.valleyHourly : null;
+    const h = peakData || (weatherData ? weatherData.hourly : null);
+    const cur = (weatherData && weatherData.peakCurrent) || (weatherData ? weatherData.current : null);
+    const hv = valleyData || h;
 
-    const curTemp = cur && cur.temperature_2m !== undefined 
-      ? cur.temperature_2m 
-      : (h && h.temperature_2m && h.temperature_2m[0] !== undefined ? h.temperature_2m[0] : 0);
-    const freezingLevel = (h && h.freezing_level_height && h.freezing_level_height[0] !== undefined) 
-      ? h.freezing_level_height[0] 
+    const hTimes = (h && h.time) ? h.time : [];
+    const refMs = (terrain && terrain.referenceTimeMs) ? terrain.referenceTimeMs : Date.now();
+
+    // Finde den exakten Zeitindex (refIdx für gewählten Tour-Zeitpunkt & nowIdx für Live-Istzustand)
+    let refIdx = 0;
+    let nowIdx = 0;
+    if (hTimes.length > 0) {
+      let minRefDiff = Infinity;
+      let minNowDiff = Infinity;
+      const nowMs = Date.now();
+      for (let i = 0; i < hTimes.length; i++) {
+        const tMs = new Date(hTimes[i]).getTime();
+        if (isNaN(tMs)) continue;
+        const dRef = Math.abs(tMs - refMs);
+        const dNow = Math.abs(tMs - nowMs);
+        if (dRef < minRefDiff) { minRefDiff = dRef; refIdx = i; }
+        if (dNow < minNowDiff) { minNowDiff = dNow; nowIdx = i; }
+      }
+    }
+
+    const curTemp = cur && cur.temperature_2m !== undefined
+      ? cur.temperature_2m
+      : (h && h.temperature_2m && h.temperature_2m[refIdx] !== undefined ? h.temperature_2m[refIdx] : 0);
+    const freezingLevel = (h && h.freezing_level_height && h.freezing_level_height[refIdx] !== undefined)
+      ? h.freezing_level_height[refIdx]
       : 2500;
 
-    // 24h & 48h & 72h Neuschneesumme (cm)
+    // 24h & 48h & 72h Neuschneesumme (cm) relativ zum exakten Tour-/Live-Zeitpunkt
     let freshSnow24 = 0;
     let freshSnow48 = 0;
     let freshSnow72 = 0;
     let prognosis24h = 0;
     let maxWind48 = 15;
     let avgSnowTemp = curTemp;
+    let dominantWindDir = (h && h.wind_direction_10m && h.wind_direction_10m[refIdx] !== undefined) ? h.wind_direction_10m[refIdx] : 270;
+
+    const sumWindow = (arr, start, end) => {
+      let sum = 0;
+      for (let i = Math.max(0, start); i < Math.min(arr.length, end); i++) {
+        sum += (arr[i] || 0);
+      }
+      return sum;
+    };
+
+    const past24Start = refIdx >= 24 ? refIdx - 24 : 0;
+    const past24End = refIdx >= 24 ? refIdx + 1 : Math.min(hTimes.length || 24, 24);
+    const past48Start = refIdx >= 48 ? refIdx - 48 : 0;
+    const past72Start = refIdx >= 72 ? refIdx - 72 : 0;
 
     if (h && h.snowfall && h.snowfall.some(v => v !== undefined && v !== null)) {
-      freshSnow24 = h.snowfall.slice(0, 24).reduce((a, b) => a + (b || 0), 0);
-      freshSnow48 = h.snowfall.slice(0, 48).reduce((a, b) => a + (b || 0), 0);
-      freshSnow72 = h.snowfall.slice(0, 72).reduce((a, b) => a + (b || 0), 0);
-      prognosis24h = h.snowfall.slice(24, 48).reduce((a, b) => a + (b || 0), 0);
+      freshSnow24 = sumWindow(h.snowfall, past24Start, past24End);
+      freshSnow48 = sumWindow(h.snowfall, past48Start, past24End);
+      freshSnow72 = sumWindow(h.snowfall, past72Start, past24End);
+      prognosis24h = sumWindow(h.snowfall, refIdx, refIdx + 24);
     } else if (h && h.precipitation && h.temperature_2m) {
       const estSnow = (start, end) => {
         let sum = 0;
-        for (let i = start; i < Math.min(end, h.precipitation.length); i++) {
+        for (let i = Math.max(0, start); i < Math.min(end, h.precipitation.length); i++) {
           const p = h.precipitation[i] || 0;
           const t = h.temperature_2m[i] !== undefined ? h.temperature_2m[i] : 0;
           const fl = (h.freezing_level_height && h.freezing_level_height[i] !== undefined) ? h.freezing_level_height[i] : 2500;
@@ -3244,22 +3281,94 @@ export const MicroEngine = {
         }
         return sum;
       };
-      freshSnow24 = estSnow(0, 24);
-      freshSnow48 = estSnow(0, 48);
-      freshSnow72 = estSnow(0, 72);
-      prognosis24h = estSnow(24, 48);
+      freshSnow24 = estSnow(past24Start, past24End);
+      freshSnow48 = estSnow(past48Start, past24End);
+      freshSnow72 = estSnow(past72Start, past24End);
+      prognosis24h = estSnow(refIdx, refIdx + 24);
     }
-    if (h && h.wind_gusts_10m) {
-      maxWind48 = Math.max(...h.wind_gusts_10m.slice(0, 48));
+
+    if (h && h.wind_gusts_10m && h.wind_gusts_10m.length > 0) {
+      const wStart = Math.max(0, refIdx - 36);
+      const wEnd = Math.min(h.wind_gusts_10m.length, refIdx + 12);
+      const slice = h.wind_gusts_10m.slice(wStart, wEnd).filter(v => v !== null && v !== undefined);
+      if (slice.length > 0) maxWind48 = Math.max(...slice);
     }
+
+    // Berücksichtige echte Wegpunkt-Böen (falls Route über exponierte Gipfel/Grate läuft)
+    const waypoints = (terrain && Array.isArray(terrain.waypoints)) ? terrain.waypoints : [];
+    if (waypoints.length > 0) {
+      const wpMaxGust = Math.max(...waypoints.map(w => w.gustsKmH || 0));
+      if (wpMaxGust > maxWind48) maxWind48 = wpMaxGust;
+      // Dominante Windrichtung am Gipfel-Wegpunkt übernehmen
+      const peakWp = waypoints.reduce((best, w) => (!best || w.ele > best.ele ? w : best), null);
+      if (peakWp && peakWp.windDirDeg !== undefined) {
+        dominantWindDir = peakWp.windDirDeg;
+      }
+    }
+
     if (h && h.temperature_2m) {
       const snowHours = [];
-      for (let i = 0; i < 24; i++) {
+      for (let i = past24Start; i < Math.min(h.temperature_2m.length, refIdx + 24); i++) {
         if (h.snowfall && h.snowfall[i] > 0) snowHours.push(h.temperature_2m[i]);
       }
       if (snowHours.length > 0) {
         avgSnowTemp = snowHours.reduce((a, b) => a + b, 0) / snowHours.length;
+      } else if (waypoints.length > 0) {
+        const peakWp = waypoints.reduce((best, w) => (!best || w.ele > best.ele ? w : best), null);
+        if (peakWp && peakWp.tempC !== undefined) avgSnowTemp = peakWp.tempC;
       }
+    }
+
+    // Tages-Temperaturkurve des exakten Tourtages entlang des Routen-Höhenbands
+    const tourDateObj = new Date(refMs);
+    const tourDateStr = `${tourDateObj.getFullYear()}-${String(tourDateObj.getMonth() + 1).padStart(2, '0')}-${String(tourDateObj.getDate()).padStart(2, '0')}`;
+    const minEleRoute = (terrain && terrain.minElevation !== undefined) ? terrain.minElevation : Math.round(elevation * 0.55);
+    const midUpperEle = Math.round((minEleRoute + elevation * 2) / 3);
+    const modelEleForH = (h && h._modelElevation !== undefined)
+      ? h._modelElevation
+      : ((weatherData && weatherData.valleyElevation !== undefined && !peakData) ? weatherData.valleyElevation : elevation);
+    const tempEleDelta = midUpperEle - modelEleForH;
+    const tempLapseCorr = tempEleDelta * 0.0065;
+
+    const dayTempByHour = {};
+    const dayCloudByHour = {};
+    let nightMinTemp = curTemp - tempLapseCorr;
+    let nightCloudSamples = [];
+    let daytimeMaxTemp = curTemp - tempLapseCorr;
+    let hasTourDayData = false;
+
+    if (hTimes.length > 0 && h && h.temperature_2m) {
+      let maxDayT = -99;
+      let minNightT = 99;
+      for (let i = 0; i < hTimes.length; i++) {
+        const tStr = String(hTimes[i]);
+        const dt = new Date(tStr);
+        if (isNaN(dt.getTime())) continue;
+        const dKey = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        const hr = dt.getHours();
+        const rawT = h.temperature_2m[i];
+        const tVal = (rawT !== undefined && rawT !== null) ? (rawT - tempLapseCorr) : rawT;
+        const cVal = (h.cloud_cover && h.cloud_cover[i] !== undefined) ? h.cloud_cover[i] : 50;
+
+        // Nachtausstrahlung vor der Tour (00:00-06:00 am Tourtag oder 21:00-23:59 Vortag)
+        if ((dKey === tourDateStr && hr <= 6) || (Math.abs(dt.getTime() - refMs) < 18 * 3600000 && (hr >= 21 || hr <= 6))) {
+          if (tVal !== undefined && tVal !== null) {
+            minNightT = Math.min(minNightT, tVal);
+          }
+          nightCloudSamples.push(cVal);
+        }
+
+        if (dKey === tourDateStr) {
+          hasTourDayData = true;
+          dayTempByHour[hr] = tVal;
+          dayCloudByHour[hr] = cVal;
+          if (hr >= 10 && hr <= 17 && tVal !== undefined && tVal !== null) {
+            maxDayT = Math.max(maxDayT, tVal);
+          }
+        }
+      }
+      if (maxDayT > -99) daytimeMaxTemp = maxDayT;
+      if (minNightT < 99) nightMinTemp = minNightT;
     }
 
     // Einstufung nach Europäischer Lawinengefahrenskala (EAWS 1–5)
@@ -3271,7 +3380,7 @@ export const MicroEngine = {
       dangerLevel = 4;
       dangerTitle = '4 - Groß';
       dangerColor = '#ed1c24'; // EAWS Rot
-    } else if (freshSnow24 > 15 || (freshSnow24 > 8 && maxWind48 > 40) || (curTemp > 8 && elevation < freezingLevel)) {
+    } else if (freshSnow24 > 15 || (freshSnow24 > 8 && maxWind48 > 40) || (daytimeMaxTemp > 8 && elevation < freezingLevel)) {
       dangerLevel = 3;
       dangerTitle = '3 - Erheblich';
       dangerColor = '#f7931e'; // EAWS Orange
@@ -3281,10 +3390,10 @@ export const MicroEngine = {
       dangerColor = '#fff200'; // EAWS Gelb
     }
 
-    // Doppel-Stufen-Tagesgang (Vormittag vs. Nachmittag)
+    // Doppel-Stufen-Tagesgang (Vormittag vs. Nachmittag) anhand echter Routen-Tagestemperatur
     let morningDangerLevel = dangerLevel;
     let afternoonDangerLevel = dangerLevel;
-    const isThermalWarmingDay = curTemp > 3 || (freezingLevel > elevation - 200);
+    const isThermalWarmingDay = daytimeMaxTemp > 2.5 || (freezingLevel > elevation - 150 && daytimeMaxTemp > 0);
     if (isThermalWarmingDay && dangerLevel < 4) {
       afternoonDangerLevel = Math.min(5, dangerLevel + 1);
     }
@@ -3312,16 +3421,21 @@ export const MicroEngine = {
     }
     const sweMm = Math.round((freshSnow24 * (densityKgM3 / 100)) * 10) / 10;
 
-    // Thermisches Bindungs-Muster ("Warm auf Kalt" vs. "Kalt auf Warm")
+    // Thermisches Bindungs-Muster ("Warm auf Kalt" vs. "Kalt auf Warm" vs. "Trocken-kalt")
     let thermalLayerPattern = 'Homogene Schichtbindung';
     let thermalLayerSeverity = 'safe';
     if (h && h.temperature_2m && h.temperature_2m.length >= 24) {
-      const pastMin = Math.min(...h.temperature_2m.slice(0, 12));
-      if (pastMin < -5 && curTemp >= 0) {
-        thermalLayerPattern = '⚠️ Warm auf Kalt (Kritische Brettbildung auf lockerer Unterlage!)';
+      const lookbackStart = Math.max(0, refIdx - 48);
+      const pastSlice = h.temperature_2m.slice(lookbackStart, Math.max(lookbackStart + 12, refIdx + 1)).filter(v => v !== null && v !== undefined);
+      const pastMin = pastSlice.length > 0 ? Math.min(...pastSlice) : curTemp;
+      if (pastMin < -5 && daytimeMaxTemp >= 0.5) {
+        thermalLayerPattern = '⚠️ Warm auf Kalt (Kritische Brettbildung / Aufweichung auf lockerer Unterlage!)';
         thermalLayerSeverity = 'danger';
       } else if (pastMin > -1 && curTemp < -4) {
         thermalLayerPattern = '✅ Kalt auf Warm (Günstige Verzahnung & Verfilzung)';
+        thermalLayerSeverity = 'good';
+      } else if (daytimeMaxTemp <= -2 && nightMinTemp <= -5) {
+        thermalLayerPattern = '❄️ Stabil trocken-kalt (Hochwinterliche Pulverschnee-Unterlage)';
         thermalLayerSeverity = 'good';
       }
     }
@@ -3353,13 +3467,35 @@ export const MicroEngine = {
         name: 'GM 2: Nassschnee & Gleitschnee',
         desc: 'Tageszeitliche Erwärmung schwächt die Bindung, Selbstauslösung an steilen Hängen.'
       };
-    } else if (elevation > 2500) {
+    } else if (maxWind48 > 35 && elevation >= 2000) {
       dangerPattern = {
         id: 'GM6',
-        name: 'GM 6: Lockere Schichten in Kammlagen',
-        desc: 'Gefahrenstellen vor allem in extrem steilen Hochlagen und Rinnen.'
+        name: 'GM 6: Kalte Lockere Schichten & Windverfrachtung',
+        desc: 'Starker Höhenwind verfrachtet Oberflächenschnee in windabgewandte Leehänge & Mulden.'
       };
     }
+
+    // Dynamische Lee-Expositions-Analyse aus echter Live-Windrichtung (dominantWindDir)
+    const dirToSector = (deg) => {
+      const sectors = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+      return sectors[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+    };
+    const leeBearing = (dominantWindDir + 180) % 360;
+    const critSet = new Set([
+      dirToSector(leeBearing - 45),
+      dirToSector(leeBearing),
+      dirToSector(leeBearing + 45)
+    ]);
+    if (isThermalWarmingDay) {
+      critSet.add('SO');
+      critSet.add('S');
+      critSet.add('SW');
+    } else if (elevation >= 2200) {
+      critSet.add('N');
+      critSet.add('NW');
+    }
+    const criticalAspects = Array.from(critSet);
+    const primarySector = dirToSector(leeBearing);
 
     // Hauptlawinenprobleme definieren (mit Auslösebereitschaft & Lawinengröße)
     const problems = [];
@@ -3367,7 +3503,7 @@ export const MicroEngine = {
       problems.push({
         id: 'drift',
         name: 'Triebschnee',
-        desc: 'Frische, spröde Schneeansammlungen in Rinnen, Mulden und hinter Kanten.',
+        desc: `Frische Windverfrachtungen in Leehängen (${primarySector} bei Wind aus ${dirToSector(dominantWindDir)}).`,
         icon: '💨',
         trigger: dangerLevel >= 3 ? 'Geringe Zusatzlast (1 Skifahrer)' : 'Große Zusatzlast (Gruppe)',
         size: dangerLevel >= 3 ? 'Größe 2–3 (Mittlere bis große Lawinen)' : 'Größe 1–2 (Kleine Lawinen)'
@@ -3414,38 +3550,83 @@ export const MicroEngine = {
       });
     }
 
-    // Firn-Fenster- & Harschdeckel-Kalkulator
-    const cloudCoverAvg = h && h.cloud_cover ? (h.cloud_cover.slice(0, 12).reduce((a, b) => a + b, 0) / 12) : 50;
+    // Dynamischer Firn-Fenster- & Harschdeckel-Kalkulator auf Basis der exakten Tour-Tagestemperaturen
+    const cloudCoverAvg = nightCloudSamples.length > 0
+      ? nightCloudSamples.reduce((a, b) => a + b, 0) / nightCloudSamples.length
+      : (h && h.cloud_cover ? (h.cloud_cover.slice(0, 12).reduce((a, b) => a + (b || 0), 0) / 12) : 50);
     const nightRadiativeCoolingPct = Math.max(10, Math.min(100, Math.round(100 - cloudCoverAvg * 0.8)));
-    const crustStability = nightRadiativeCoolingPct >= 70 
+
+    const isAllDayColdWinter = daytimeMaxTemp < -1.5;
+    let crustStability = nightRadiativeCoolingPct >= 70
       ? 'Tragfähiger Harschdeckel (optimales nächtliches Wiedergefrieren)'
       : nightRadiativeCoolingPct >= 40
       ? 'Teilweise tragfähig (Bruchharsch in Zwischenzonen möglich)'
       : 'Kein Durchfrieren (weicher, durchnässter Altschnee von Beginn an)';
 
-    let firnStartHour = 9;
-    let firnEndHour = 12;
-    if (curTemp > 6) { firnStartHour = 8; firnEndHour = 11; }
-    else if (curTemp < -2) { firnStartHour = 10; firnEndHour = 13; }
+    if (isAllDayColdWinter) {
+      crustStability = `Hochwinterlich kalt (Max. ${Math.round(daytimeMaxTemp * 10) / 10}°C) – trockene Pulverschnee-Konservierung`;
+    }
 
     const firnTimeline = [];
+    const firnHours = [];
     for (let hr = 5; hr <= 18; hr++) {
+      const hrT = (hasTourDayData && dayTempByHour[hr] !== undefined)
+        ? dayTempByHour[hr]
+        : curTemp + Math.sin(((hr - 9) / 14) * Math.PI) * 3.5;
+
       let state = 'frozen';
       let stateLabel = 'Gefroren (Harscheisen)';
       let stateColor = '#38bdf8';
-      if (hr >= firnStartHour && hr < firnEndHour) {
-        state = 'firn';
-        stateLabel = '⭐ Perfekter Firn (Traumabfahrt)';
-        stateColor = '#22c55e';
-      } else if (hr >= firnEndHour && hr <= firnEndHour + 2) {
-        state = 'slush';
-        stateLabel = 'Aufweichend (Sulz / tief)';
-        stateColor = '#f59e0b';
-      } else if (hr > firnEndHour + 2) {
-        state = 'danger';
-        stateLabel = '⚠️ Nassschneegefahr / Sumpf';
-        stateColor = '#ef4444';
+
+      if (isAllDayColdWinter) {
+        if (hrT <= -5) {
+          state = 'powder-cold';
+          stateLabel = `❄️ Kalter Pulver (${Math.round(hrT * 10) / 10}°C)`;
+          stateColor = '#0284c7';
+        } else {
+          state = 'powder';
+          stateLabel = `❄️ Griffiger Alpinpulver (${Math.round(hrT * 10) / 10}°C)`;
+          stateColor = '#38bdf8';
+        }
+      } else {
+        if (hr >= 16 || hr < 8) {
+          if (hrT <= 1.5) {
+            state = 'frozen';
+            stateLabel = hr >= 16
+              ? `Wiedergefrierend / Abendharsch (${Math.round(hrT * 10) / 10}°C)`
+              : `Gefroren / Harscheisen (${Math.round(hrT * 10) / 10}°C)`;
+            stateColor = '#38bdf8';
+          } else if (hrT <= 5.0) {
+            state = 'slush';
+            stateLabel = hr >= 16
+              ? `Aufweichend / Sulz (${Math.round(hrT * 10) / 10}°C)`
+              : `Ungefrorener Altschnee (${Math.round(hrT * 10) / 10}°C)`;
+            stateColor = '#f59e0b';
+          } else {
+            state = 'danger';
+            stateLabel = `⚠️ Nassschneegefahr (${Math.round(hrT * 10) / 10}°C)`;
+            stateColor = '#ef4444';
+          }
+        } else if (hrT < -0.5) {
+          state = 'frozen';
+          stateLabel = `Gefroren / Harscheisen (${Math.round(hrT * 10) / 10}°C)`;
+          stateColor = '#38bdf8';
+        } else if (hrT >= -0.5 && hrT <= 3.5) {
+          state = 'firn';
+          stateLabel = `⭐ Perfekter Firn (${Math.round(hrT * 10) / 10}°C)`;
+          stateColor = '#22c55e';
+          firnHours.push(hr);
+        } else if (hrT > 3.5 && hrT <= 6.5) {
+          state = 'slush';
+          stateLabel = `Aufweichend / Sulz (${Math.round(hrT * 10) / 10}°C)`;
+          stateColor = '#f59e0b';
+        } else {
+          state = 'danger';
+          stateLabel = `⚠️ Nassschneegefahr / Sumpf (${Math.round(hrT * 10) / 10}°C)`;
+          stateColor = '#ef4444';
+        }
       }
+
       firnTimeline.push({
         hour: `${String(hr).padStart(2, '0')}:00`,
         state,
@@ -3454,55 +3635,82 @@ export const MicroEngine = {
       });
     }
 
-    // Regionale Zuordnung zu offiziellen Messnetzen (SLF Davos, LWD Bayern, LWD Tirol, etc.)
+    let firnWindowStart = firnHours.length > 0 ? `${String(firnHours[0]).padStart(2, '0')}:00` : '09:00';
+    let firnWindowEnd = firnHours.length > 0 ? `${String(firnHours[firnHours.length - 1] + 1).padStart(2, '0')}:00` : '12:00';
+    let firnBadgeText = isAllDayColdWinter
+      ? '❄️ Ganztägig Pulver (kein Firn-Tau)'
+      : (firnHours.length > 0 ? `⭐ Firn-Fenster: ${firnWindowStart} – ${firnWindowEnd} Uhr` : '⚠️ Durchgehend nass / weich (Frühstart nötig)');
+
+    // Regionale Zuordnung zu offiziellen Lawinenwarndiensten im Alpenraum
     let stationAgency = 'Alpen-Messnetz (SLF / LWD / GeoSphere)';
     let stationName = 'Meteo-Station Hochalpen';
-    if (lat >= 45.8 && lat <= 47.8 && lon >= 5.9 && lon <= 10.5) {
+    if (lat >= 47.28 && lat <= 47.85 && lon >= 10.05 && lon <= 13.1) {
+      stationAgency = 'LWD Bayern (Allgäu / Bayerische Alpen)';
+      stationName = 'DWD / LWD Bergmessnetz';
+    } else if (lat >= 46.84 && lat < 47.45 && lon >= 9.52 && lon < 10.22) {
+      stationAgency = 'LWD Vorarlberg (Lawinenwarndienst)';
+      stationName = 'LWD Messnetz Vorarlberg';
+    } else if (lat >= 46.75 && lat <= 47.7 && lon >= 10.1 && lon <= 12.9) {
+      stationAgency = 'LWD Tirol / Albina (avalanche.report)';
+      stationName = 'LWD Messnetz Tirol';
+    } else if (lat >= 45.8 && lat <= 47.8 && lon >= 5.9 && lon <= 10.5) {
       stationAgency = 'SLF Davos (IMIS Messnetz Schweiz)';
       stationName = elevation > 2500 ? 'SLF Hochalpin-Station' : 'SLF Tal/Zwischenstation';
-    } else if (lat >= 47.2 && lat <= 47.8 && lon >= 9.8 && lon <= 13.1) {
-      stationAgency = 'LWD Bayern (Bayerische Lawinenwarnzentrale)';
-      stationName = 'DWD / LWD Bergmessnetz';
-    } else if (lat >= 46.8 && lat <= 47.7 && lon >= 10.0 && lon <= 12.9) {
-      stationAgency = 'LWD Tirol / GeoSphere Austria';
-      stationName = 'LWD Messnetz Tirol';
-    } else if (lat >= 46.2 && lat <= 47.1 && lon >= 10.4 && lon <= 12.5) {
-      stationAgency = 'LWD Südtirol / ARPAV (avalanche.report)';
+    } else if (lat >= 45.9 && lat <= 47.1 && lon >= 10.4 && lon <= 12.5) {
+      stationAgency = 'LWD Südtirol / Albina (avalanche.report)';
       stationName = 'Messnetz Südtirol & Dolomiten';
     } else if (lat >= 46.3 && lat <= 47.9 && lon >= 12.5 && lon <= 16.5) {
-      stationAgency = 'GeoSphere Austria / LWD Salzburg & Kärnten';
+      stationAgency = 'LWD Salzburg / GeoSphere Austria';
       stationName = 'Messnetz Ostalpen';
     }
 
-    // Präzise Schneehöhen-Berechnung Berg (Gipfel) vs. Tal
+    // Präzise Live-Schneehöhen-Berechnung aus Tal- & Berg-Wegpunktdaten (snow_depth)
+    const minEle = (terrain && terrain.minElevation !== undefined) ? terrain.minElevation : Math.round(elevation * 0.55);
+    const maxEle = (terrain && terrain.maxElevation !== undefined) ? terrain.maxElevation : elevation;
+
     let snowDepthPeakCm = 0;
     let snowDepthValleyCm = 0;
-    const baseSnowM = (h && h.snow_depth && h.snow_depth[0] !== undefined) ? h.snow_depth[0] : null;
-    const month = new Date().getMonth();
+    const peakSnowM = (h && h.snow_depth && h.snow_depth[nowIdx] !== undefined) ? h.snow_depth[nowIdx] : ((h && h.snow_depth && h.snow_depth[0] !== undefined) ? h.snow_depth[0] : null);
+    const valleySnowM = (hv && hv.snow_depth && hv.snow_depth[nowIdx] !== undefined) ? hv.snow_depth[nowIdx] : peakSnowM;
+    const month = tourDateObj.getMonth();
     const isWinterSpring = month <= 4 || month >= 10;
 
-    if (baseSnowM !== null && baseSnowM > 0) {
-      const baseCm = Math.round(baseSnowM * 100);
-      snowDepthValleyCm = Math.max(0, Math.round(baseCm * 0.4));
-      snowDepthPeakCm = Math.max(baseCm, Math.round(baseCm * (elevation > 2000 ? 1.8 : 1.2)));
+    if (peakSnowM !== null && peakSnowM > 0) {
+      snowDepthPeakCm = Math.round(peakSnowM * 100);
+      snowDepthValleyCm = (valleySnowM !== null && hv !== h)
+        ? Math.round(valleySnowM * 100)
+        : Math.max(0, Math.round(snowDepthPeakCm * (minEle >= 1500 ? 0.5 : 0.35)));
+      // Stelle sicher, dass Gipfel mind. >= Tal bleibt falls Modellzelle gröber
+      if (snowDepthPeakCm < snowDepthValleyCm) snowDepthPeakCm = snowDepthValleyCm;
     } else {
-      if (elevation >= 3000) {
-        snowDepthPeakCm = isWinterSpring ? Math.round(140 + freshSnow24 * 1.5) : Math.round(45 + freshSnow24);
+      if (maxEle >= 2600) {
+        snowDepthPeakCm = isWinterSpring ? Math.round(125 + freshSnow24 * 1.5) : Math.round(35 + freshSnow24);
         snowDepthValleyCm = isWinterSpring ? Math.round(25 + freshSnow24 * 0.3) : 0;
-      } else if (elevation >= 2000) {
-        snowDepthPeakCm = isWinterSpring ? Math.round(85 + freshSnow24 * 1.2) : Math.round(15 + freshSnow24 * 0.5);
+      } else if (maxEle >= 1900) {
+        snowDepthPeakCm = isWinterSpring ? Math.round(75 + freshSnow24 * 1.2) : Math.round(12 + freshSnow24 * 0.5);
         snowDepthValleyCm = isWinterSpring ? Math.round(10 + freshSnow24 * 0.2) : 0;
-      } else if (elevation >= 1400) {
-        snowDepthPeakCm = isWinterSpring ? Math.round(35 + freshSnow24) : 0;
-        snowDepthValleyCm = isWinterSpring ? Math.round(5 + freshSnow24 * 0.1) : 0;
       } else {
-        snowDepthPeakCm = isWinterSpring ? Math.round(10 + freshSnow24 * 0.8) : 0;
-        snowDepthValleyCm = isWinterSpring ? Math.round(5 + freshSnow24 * 0.5) : 0;
+        snowDepthPeakCm = isWinterSpring ? Math.round(30 + freshSnow24) : 0;
+        snowDepthValleyCm = isWinterSpring ? Math.round(5 + freshSnow24 * 0.2) : 0;
       }
     }
 
-    const criticalElevation = Math.max(1600, Math.round(elevation * 0.72));
-    const criticalAspects = ['N', 'NO', 'O', 'NW']; // Typische Lee-Expositionen in den Alpen
+    // Kritische Höhenlage anhand realer Routenhöhe & Nullgradgrenze
+    const criticalElevation = Math.max(
+      Math.round(minEle + 200),
+      Math.min(Math.round(maxEle - 150), Math.round(maxEle * 0.72))
+    );
+
+    // Fahrbare Schneegrenze dynamisch aus Tal- & Berg-Schneehöhe ableiten
+    let skiableSnowlineM = Math.round(minEle);
+    if (snowDepthValleyCm >= 12) {
+      skiableSnowlineM = Math.round(minEle);
+    } else if (snowDepthPeakCm >= 15 && snowDepthPeakCm > snowDepthValleyCm) {
+      const neededRatio = Math.min(1, Math.max(0, (15 - snowDepthValleyCm) / (snowDepthPeakCm - snowDepthValleyCm)));
+      skiableSnowlineM = Math.round(minEle + neededRatio * (maxEle - minEle));
+    } else {
+      skiableSnowlineM = Math.max(800, Math.round(freezingLevel - 400));
+    }
 
     return {
       dangerLevel,
@@ -3512,6 +3720,11 @@ export const MicroEngine = {
       afternoonDangerLevel,
       criticalElevation,
       criticalAspects,
+      primarySector,
+      dominantWindDir: Math.round(dominantWindDir),
+      windFromSector: dirToSector(dominantWindDir),
+      skiableSnowlineM,
+      isAllDayColdWinter,
       problems,
       dangerPattern,
       freshSnow24hCm: Math.round(freshSnow24 * 10) / 10,
@@ -3529,17 +3742,20 @@ export const MicroEngine = {
       maxRidgeWindKmH: Math.round(maxWind48),
       snowDepthPeakCm,
       snowDepthValleyCm,
+      minElevationM: Math.round(minEle),
+      maxElevationM: Math.round(maxEle),
       stationAgency,
       stationName,
-      stationTime: `Stand: Heute, ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`,
+      stationTime: `Stand: Live ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`,
       firnAnalysis: {
         nightCoolingRating: nightRadiativeCoolingPct,
         crustStability,
-        firnWindowStart: `${String(firnStartHour).padStart(2, '0')}:00`,
-        firnWindowEnd: `${String(firnEndHour).padStart(2, '0')}:00`,
+        firnWindowStart,
+        firnWindowEnd,
+        firnBadgeText,
         firnTimeline
       },
-      safetyRule: dangerLevel >= 3 
+      safetyRule: dangerLevel >= 3
         ? 'Steilhänge > 30° defensiv beurteilen, Einzelabstände einhalten und frischen Triebschnee strikt meiden.'
         : dangerLevel === 2
         ? 'Gefahrenstellen vor allem an Steilhängen der Hochlagen und hinter Geländekanten beachten.'
@@ -4256,37 +4472,67 @@ export const MicroEngine = {
       }
     }
 
-    // Wetterdaten für jeden Meilenstein zur genauen Ankunftszeit interpolieren
+    // Wetterdaten für jeden Meilenstein zur genauen Ankunftszeit interpolieren (Tal + Gipfel Live-Daten)
     const h = hourlyForecast || {};
+    const peakPkg = athleteSettings.peakForecast || null;
+    const hPeak = (peakPkg && peakPkg.hourly) ? peakPkg.hourly : h;
     const hTimes = h.time || [];
-    const avalancheReport = this.computeAvalancheReport(peakPoint.lat, peakPoint.lon, peakPoint.ele, { hourly: h }, null);
+    const hPeakTimes = hPeak.time || hTimes;
+    const eleSpan = Math.max(100, peakPoint.ele - minEle);
 
-    const enrichedMilestones = milestones.map((m, idx) => {
-      const arrMs = m.arrivalMs;
-      let hIdx = 0;
-      let minDiffMs = Infinity;
-
-      for (let i = 0; i < hTimes.length; i++) {
-        const tMs = new Date(hTimes[i]).getTime();
-        const diff = Math.abs(tMs - arrMs);
-        if (diff < minDiffMs) {
-          minDiffMs = diff;
-          hIdx = i;
+    const findClosestIdx = (timesArr, targetMs) => {
+      let bestIdx = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i < timesArr.length; i++) {
+        const tMs = new Date(timesArr[i]).getTime();
+        const diff = Math.abs(tMs - targetMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestIdx = i;
         }
       }
+      return bestIdx;
+    };
 
-      // Barometrischer Höhenabgleich: -0.65°C pro 100 Höhenmeter
-      const baseT = (h.temperature_2m && h.temperature_2m[hIdx] !== undefined) ? h.temperature_2m[hIdx] : 12;
-      const dElev = m.ele - baseElevation;
-      const pointTemp = Math.round((baseT - (dElev * 0.0065)) * 10) / 10;
+    const preMilestones = milestones.map((m, idx) => {
+      const arrMs = m.arrivalMs;
+      const hIdx = findClosestIdx(hTimes, arrMs);
+      const pHIdx = hPeak === h ? hIdx : findClosestIdx(hPeakTimes, arrMs);
+      const eleWeight = Math.max(0, Math.min(1, (m.ele - minEle) / eleSpan));
 
-      // Wind nach Höhenlage
-      const baseW = (h.wind_speed_10m && h.wind_speed_10m[hIdx] !== undefined) ? h.wind_speed_10m[hIdx] : 15;
-      const baseG = (h.wind_gusts_10m && h.wind_gusts_10m[hIdx] !== undefined) ? h.wind_gusts_10m[hIdx] : baseW * 1.35;
-      const altitudeWindFactor = 1 + Math.max(0, dElev / 2000) * 0.5;
-      const pointWind = Math.round(baseW * altitudeWindFactor);
-      const pointGusts = Math.round(baseG * altitudeWindFactor);
-      const pointDir = (h.wind_direction_10m && h.wind_direction_10m[hIdx] !== undefined) ? h.wind_direction_10m[hIdx] : 220;
+      // Live-Interpolation zwischen Tal-Wegpunkt & Gipfel-Wegpunkt (berücksichtigt Inversionen & Kammwind)
+      const valT = (h.temperature_2m && h.temperature_2m[hIdx] !== undefined) ? h.temperature_2m[hIdx] : 12;
+      const peakT = (hPeak.temperature_2m && hPeak.temperature_2m[pHIdx] !== undefined) ? hPeak.temperature_2m[pHIdx] : (valT - eleSpan * 0.0065);
+      let pointTemp;
+      if (hPeak !== h && hPeak.temperature_2m && hPeak.temperature_2m[pHIdx] !== undefined) {
+        const modelValleyEle = h._modelElevation !== undefined ? h._modelElevation : minEle;
+        const modelPeakEle = peakPkg.elevation !== undefined ? peakPkg.elevation : peakPoint.ele;
+        const interpT = valT * (1 - eleWeight) + peakT * eleWeight;
+        const interpModelEle = modelValleyEle * (1 - eleWeight) + modelPeakEle * eleWeight;
+        pointTemp = Math.round((interpT - (m.ele - interpModelEle) * 0.0065) * 10) / 10;
+      } else {
+        const dElev = m.ele - baseElevation;
+        pointTemp = Math.round((valT - (dElev * 0.0065)) * 10) / 10;
+      }
+
+      // Wind & Böen nach Höhenlage (Tal vs. Gipfel-Gitterpunkt)
+      const valW = (h.wind_speed_10m && h.wind_speed_10m[hIdx] !== undefined) ? h.wind_speed_10m[hIdx] : 15;
+      const valG = (h.wind_gusts_10m && h.wind_gusts_10m[hIdx] !== undefined) ? h.wind_gusts_10m[hIdx] : valW * 1.35;
+      const pkW = (hPeak.wind_speed_10m && hPeak.wind_speed_10m[pHIdx] !== undefined) ? hPeak.wind_speed_10m[pHIdx] : valW;
+      const pkG = (hPeak.wind_gusts_10m && hPeak.wind_gusts_10m[pHIdx] !== undefined) ? hPeak.wind_gusts_10m[pHIdx] : valG;
+
+      let pointWind, pointGusts;
+      if (hPeak !== h) {
+        pointWind = Math.round(valW * (1 - eleWeight) + pkW * eleWeight);
+        pointGusts = Math.round(valG * (1 - eleWeight) + pkG * eleWeight);
+      } else {
+        const altitudeWindFactor = 1 + Math.max(0, (m.ele - baseElevation) / 2000) * 0.5;
+        pointWind = Math.round(valW * altitudeWindFactor);
+        pointGusts = Math.round(valG * altitudeWindFactor);
+      }
+      const pointDir = (eleWeight > 0.5 && hPeak.wind_direction_10m && hPeak.wind_direction_10m[pHIdx] !== undefined)
+        ? hPeak.wind_direction_10m[pHIdx]
+        : ((h.wind_direction_10m && h.wind_direction_10m[hIdx] !== undefined) ? h.wind_direction_10m[hIdx] : 220);
 
       // Strecken-Kursrichtung (Bearing) am Wegpunkt berechnen
       const pIdx = m.index !== undefined ? m.index : 0;
@@ -4326,13 +4572,15 @@ export const MicroEngine = {
       }
 
       // Niederschlag & Frost
-      const precip = (h.precipitation && h.precipitation[hIdx] !== undefined) ? h.precipitation[hIdx] : 0;
-      const pop = (h.precipitation_probability && h.precipitation_probability[hIdx] !== undefined) ? h.precipitation_probability[hIdx] : 0;
-      const freezingLevel = (h.freezing_level_height && h.freezing_level_height[hIdx] !== undefined) ? h.freezing_level_height[hIdx] : 2600;
-      const code = (h.weather_code && h.weather_code[hIdx] !== undefined) ? h.weather_code[hIdx] : 1;
-      const hTimePt = (h.time && h.time[hIdx]) ? new Date(h.time[hIdx]) : null;
-      const isDayAtPt = (h.is_day && h.is_day[hIdx] !== undefined)
-        ? h.is_day[hIdx] === 1
+      const srcH = (eleWeight > 0.5 && hPeak !== h) ? hPeak : h;
+      const srcIdx = (eleWeight > 0.5 && hPeak !== h) ? pHIdx : hIdx;
+      const precip = (srcH.precipitation && srcH.precipitation[srcIdx] !== undefined) ? srcH.precipitation[srcIdx] : 0;
+      const pop = (srcH.precipitation_probability && srcH.precipitation_probability[srcIdx] !== undefined) ? srcH.precipitation_probability[srcIdx] : 0;
+      const freezingLevel = (srcH.freezing_level_height && srcH.freezing_level_height[srcIdx] !== undefined) ? srcH.freezing_level_height[srcIdx] : 2600;
+      const code = (srcH.weather_code && srcH.weather_code[srcIdx] !== undefined) ? srcH.weather_code[srcIdx] : 1;
+      const hTimePt = (srcH.time && srcH.time[srcIdx]) ? new Date(srcH.time[srcIdx]) : null;
+      const isDayAtPt = (srcH.is_day && srcH.is_day[srcIdx] !== undefined)
+        ? srcH.is_day[srcIdx] === 1
         : (hTimePt && !isNaN(hTimePt.getTime()) ? (hTimePt.getHours() >= 6 && hTimePt.getHours() <= 20) : true);
 
       const isSnow = m.ele >= freezingLevel || pointTemp <= 0.5;
@@ -4386,11 +4634,9 @@ export const MicroEngine = {
       else if (idx === milestones.length - 1) label = 'Zielankunft';
       else if (m.ele === parsedGPX.maxElevationM) label = 'Scheitelpunkt / Pass';
 
-      const eaws = this.computeWaypointAvalancheScale(m, h, hIdx, pointTemp, pointGusts, freezingLevel, avalancheReport);
-
       return {
         ...m,
-        ...eaws,
+        _hIdx: srcIdx,
         label,
         arrivalTimeStr: `${arrHoursStr} Uhr`,
         arrivalDateStr,
@@ -4413,6 +4659,47 @@ export const MicroEngine = {
         isSnow
       };
     });
+
+    // Berechne den Live-Lawinenlagebericht exakt für diese GPX-Route, Wegpunkte & Gipfel-/Tal-Daten
+    const avalancheReport = this.computeAvalancheReport(
+      peakPoint.lat,
+      peakPoint.lon,
+      peakPoint.ele,
+      {
+        hourly: hPeak,
+        peakHourly: hPeak,
+        peakCurrent: peakPkg ? peakPkg.current : null,
+        valleyHourly: h,
+        valleyElevation: minEle,
+        peakElevation: peakPoint.ele
+      },
+      {
+        referenceTimeMs: startTimeMs,
+        minElevation: minEle,
+        maxElevation: peakPoint.ele,
+        waypoints: preMilestones,
+        slopeStats
+      }
+    );
+
+    // Berechne wegpunkt-spezifische EAWS-Skalawerte (1–5) & synchronisiere Tour-Gesamtstufe
+    let maxWaypointEaws = avalancheReport.dangerLevel;
+    const enrichedMilestones = preMilestones.map(m => {
+      const eaws = this.computeWaypointAvalancheScale(m, hPeak, m._hIdx, m.tempC, m.gustsKmH, m.freezingLevelM, avalancheReport);
+      if (eaws.avalancheLevel > maxWaypointEaws) maxWaypointEaws = eaws.avalancheLevel;
+      const { _hIdx, ...cleanM } = m;
+      return {
+        ...cleanM,
+        ...eaws
+      };
+    });
+
+    if (maxWaypointEaws > avalancheReport.dangerLevel) {
+      const topMeta = this.getEawsScaleMeta(maxWaypointEaws);
+      avalancheReport.dangerLevel = topMeta.level;
+      avalancheReport.dangerTitle = `${topMeta.level} - ${topMeta.label}`;
+      avalancheReport.dangerColor = topMeta.color;
+    }
 
     const hazards = this.analyzeRouteHazards(enrichedMilestones, category);
 

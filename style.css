@@ -17875,6 +17875,37 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   backdrop-filter: blur(16px);
 }
 
+.skitour-live-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.skitour-live-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.skitour-live-btn:hover {
+  background: rgba(56, 189, 248, 0.26);
+}
+
+.skitour-live-btn.is-loading {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
 .skitour-eaws-hero-banner {
   display: flex;
   align-items: center;
@@ -18036,7 +18067,7 @@ body.sports-map-fullscreen-active #sports-map-card > .card-header {
   padding: 10px 12px;
 }
 
-.srd-sector-card strong {
+.srd-sector-card > strong {
   display: block;
   font-size: 13.5px;
   color: #ffffff;

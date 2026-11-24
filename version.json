@@ -1,5 +1,5 @@
 {
-  "version": "2.38.1",
-  "build": "20261124-2002",
-  "notes": "Add per-waypoint EAWS avalanche danger scale values (1-5) across Skitour map pills, popups, elevation profile and waypoint table"
+  "version": "2.38.2",
+  "build": "20261124-2010",
+  "notes": "Live multi-waypoint GPX avalanche & snow report synchronization (valley+peak Open-Meteo elevation query, 72h snowfall window, wind-lee rose, dynamic firn curve)"
 }

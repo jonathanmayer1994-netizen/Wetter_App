@@ -108,6 +108,19 @@ def run_skitour_suite():
         assert "Stufe" in eaws_title, f"EAWS title must contain Stufe, got: {eaws_title}"
         print(f"✓ EAWS Badge rendered: Stufe {eaws_num} ('{eaws_title}')")
 
+        # Check Regional Agency & Exact GPX Route Sync
+        agency_tag = page.inner_text("#skitour-agency-tag")
+        assert "LWD" in agency_tag or "SLF" in agency_tag, f"Agency tag must dynamically reflect route region, got: {agency_tag}"
+        assert "1.513" in agency_tag and "2.875" in agency_tag, f"Agency tag must display exact GPX elevation range (1.513-2.875m), got: {agency_tag}"
+        assert "Live" in agency_tag, f"Agency tag must display Live timestamp, got: {agency_tag}"
+        assert page.is_visible("#skitour-live-refresh-btn"), "Live refresh button must be visible"
+        print(f"✓ Dynamic Route Agency & Live Tag verified: '{agency_tag}'")
+
+        # Check Auto-Diagnosed Primary Sector (no static placeholder)
+        auto_sec_name = page.inner_text("#skitour-sector-name")
+        assert auto_sec_name != "Nord- & Nordosthänge" and ("Kritisch" in auto_sec_name or "Günstiger" in auto_sec_name), f"Primary sector diagnosis must auto-update for GPX route, got: {auto_sec_name}"
+        print(f"✓ Auto-Diagnosed Route Sector verified: '{auto_sec_name}'")
+
         # Check Vector Danger Rose SVG
         assert page.is_visible("#skitour-danger-rose-svg"), "Vector danger rose SVG must be visible"
         page.click("#st-rose-n", force=True)
@@ -116,11 +129,11 @@ def run_skitour_suite():
         assert "Nord" in sec_name or "N" in sec_name, f"Selected sector name must update, got: {sec_name}"
         print(f"✓ Vector Danger Rose interactive click verified: '{sec_name}'")
 
-        # Check Firn-Fenster Timeline
+        # Check Firn-Fenster / Powder Timeline
         firn_pill = page.inner_text("#skitour-firn-window-pill")
-        assert "Firn-Fenster" in firn_pill or "Fenster" in firn_pill, f"Firn window pill must be populated, got: {firn_pill}"
+        assert any(k in firn_pill for k in ["Firn-Fenster", "Fenster", "Pulver", "nass"]), f"Firn/Powder window pill must be populated dynamically, got: {firn_pill}"
         assert page.locator(".firn-track-hour").count() >= 10, "Firn timeline track must render hours"
-        print(f"✓ Firn-Fenster timeline verified: '{firn_pill}'")
+        print(f"✓ Firn/Pulver-Fenster timeline verified: '{firn_pill}'")
 
         # Check Schnee- & Neuschnee-Dossier
         fresh_snow = page.inner_text("#st-freshsnow-val")
@@ -174,6 +187,22 @@ def run_skitour_suite():
         map_screenshot_path = "/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_skitour_map_waypoints.png"
         map_card.screenshot(path=map_screenshot_path)
         print(f"📸 Captured Skitour Map Waypoints artifact: {map_screenshot_path}")
+
+        # 8. TEST 7: Custom GPX Upload & Live Refresh Sync
+        print("\n--- TEST 7: Custom GPX Route & Live Refresh Sync ---")
+        custom_gpx = '''<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><name>Ifersguntalpe Skitour</name><trkseg>
+<trkpt lat="47.3450" lon="10.1250"><ele>1180</ele></trkpt>
+<trkpt lat="47.3380" lon="10.1120"><ele>1650</ele></trkpt>
+<trkpt lat="47.3310" lon="10.0980"><ele>2014</ele></trkpt>
+<trkpt lat="47.3450" lon="10.1250"><ele>1180</ele></trkpt>
+</trkseg></trk></gpx>'''
+        page.set_input_files("#sports-file-input", files=[{"name": "Ifersguntalpe.gpx", "mimeType": "application/gpx+xml", "buffer": custom_gpx.encode("utf-8")}])
+        page.wait_for_function("() => document.getElementById('skitour-agency-tag') && document.getElementById('skitour-agency-tag').innerText.includes('2.014')", timeout=10000)
+        custom_tag = page.inner_text("#skitour-agency-tag")
+        assert "1.180" in custom_tag and "2.014" in custom_tag, f"Dashboard must immediately reflect custom GPX elevation span (1.180-2.014), got: {custom_tag}"
+        page.click("#skitour-live-refresh-btn", force=True)
+        page.wait_for_timeout(500)
+        print(f"✓ Custom GPX Live Adaptation verified: '{custom_tag}'")
 
         context.close()
         browser.close()

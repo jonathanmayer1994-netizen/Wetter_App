@@ -415,6 +415,43 @@ export function setAthleteCategory(cat) {
 
   updateSportPaceBadges();
   recomputeSportsTimeline();
+
+  // Wenn Skitour aktiviert wird & noch keine frischen Multi-Wegpunkt-Daten (Tal+Gipfel+72h) geladen wurden: Live nachladen
+  if (cat === 'skitour' && state.sports.parsedGPX) {
+    const cacheAge = Date.now() - (state.sports.lastLiveFetchMs || 0);
+    if (!state.sports.cachedPeakForecast || cacheAge > 5 * 60 * 1000) {
+      refreshLiveSkitourForecast(false);
+    }
+  }
+}
+
+export async function refreshLiveSkitourForecast(forceRefresh = true) {
+  if (!state.sports.parsedGPX) return;
+  const btn = document.getElementById('skitour-live-refresh-btn');
+  if (btn) {
+    btn.classList.add('is-loading');
+    btn.innerText = '⏳ Lädt...';
+  }
+  try {
+    const parsed = state.sports.parsedGPX;
+    const startPt = parsed.points[0];
+    const pkg = await fetchHourlyForRoute(startPt.lat, startPt.lon, parsed, forceRefresh);
+    if (pkg && pkg.valley) {
+      state.sports.cachedForecast = pkg.valley;
+      state.sports.cachedPeakForecast = pkg.peak || null;
+      state.sports.lastLiveFetchMs = pkg.fetchedAtMs || Date.now();
+    } else if (pkg) {
+      state.sports.cachedForecast = pkg;
+      state.sports.cachedPeakForecast = null;
+      state.sports.lastLiveFetchMs = Date.now();
+    }
+    recomputeSportsTimeline();
+  } finally {
+    if (btn) {
+      btn.classList.remove('is-loading');
+      btn.innerText = '🔄 Live';
+    }
+  }
 }
 
 export function setupSportsTab() {
@@ -755,7 +792,7 @@ export function setupSportsTab() {
   // Initialisiere Pace-Badges auf den Cards & Pills
   updateSportPaceBadges();
 
-  // Alpine Referenz-Routen (Presets / Demos: 1 Berg, 1 Rad)
+  // Alpine Referenz-Routen (Presets / Demos: 1 Berg, 1 Rad, 1 Skitour)
   const routePresets = document.querySelectorAll('.sports-route-preset');
   routePresets.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -764,6 +801,14 @@ export function setupSportsTab() {
       loadSportsPresetTour(btn.dataset.tour);
     });
   });
+
+  // Live-Aktualisierungs-Button im Skitouren-Cockpit
+  const liveRefreshBtn = document.getElementById('skitour-live-refresh-btn');
+  if (liveRefreshBtn) {
+    liveRefreshBtn.addEventListener('click', () => {
+      refreshLiveSkitourForecast(true);
+    });
+  }
 
   // GPX File Upload & Drag'n'Drop (Schlank & Prominent oben platziert)
   const browseBtn = document.getElementById('sports-browse-btn');
@@ -1022,28 +1067,96 @@ export async function loadSportsCustomGPX(gpxXml, fileName) {
   await loadAndComputeSportsTour(gpxXml, state.sports.gpxName);
 }
 
-export async function fetchHourlyForRoute(lat, lon) {
-  const cacheKey = `${lat.toFixed(2)},${lon.toFixed(2)}`;
-  if (state.sports.cachedForecasts[cacheKey]) {
-    return state.sports.cachedForecasts[cacheKey];
+export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefresh = false) {
+  const startPt = (parsedGPX && parsedGPX.points && parsedGPX.points.length > 0)
+    ? parsedGPX.points[0]
+    : { lat, lon, ele: 1000 };
+
+  let peakPt = startPt;
+  if (parsedGPX && parsedGPX.points && parsedGPX.points.length > 1) {
+    for (const pt of parsedGPX.points) {
+      if ((pt.ele || 0) > (peakPt.ele || 0)) peakPt = pt;
+    }
   }
 
+  const cacheKey = `${startPt.lat.toFixed(2)},${startPt.lon.toFixed(2)}|${peakPt.lat.toFixed(2)},${peakPt.lon.toFixed(2)}@${Math.round(peakPt.ele || 0)}`;
+  const cachedEntry = state.sports.cachedForecasts[cacheKey];
+  const LIVE_TTL_MS = 5 * 60 * 1000;
+  if (!forceRefresh && cachedEntry && cachedEntry.valley && (Date.now() - (cachedEntry.fetchedAtMs || 0)) < LIVE_TTL_MS) {
+    return cachedEntry;
+  }
+
+  const hourlyVars = 'temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height,snowfall,snow_depth,cloud_cover';
+  const currentVars = 'temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,snowfall,snow_depth,cloud_cover';
+
+  const hasDistinctPeak = peakPt !== startPt && (
+    Math.abs((peakPt.ele || 0) - (startPt.ele || 0)) >= 120 ||
+    Math.abs(peakPt.lat - startPt.lat) >= 0.015 ||
+    Math.abs(peakPt.lon - startPt.lon) >= 0.015
+  );
+
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height,snowfall,snow_depth,cloud_cover&forecast_days=7&timezone=auto`;
-    const data = await resilientFetch(url, { ttlMs: 30 * 60 * 1000, persist: true });
+    if (hasDistinctPeak) {
+      const lats = `${Number(startPt.lat).toFixed(3)},${Number(peakPt.lat).toFixed(3)}`;
+      const lons = `${Number(startPt.lon).toFixed(3)},${Number(peakPt.lon).toFixed(3)}`;
+      const eles = `${Math.round(startPt.ele || 800)},${Math.round(peakPt.ele || 2000)}`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&elevation=${eles}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=5&timezone=auto`;
+      const res = await resilientFetch(url, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh });
+      const items = Array.isArray(res) ? res : (res && res.hourly ? [res] : []);
+      if (items.length >= 2 && items[0].hourly && items[1].hourly) {
+        items[0].hourly._modelElevation = items[0].elevation !== undefined ? items[0].elevation : startPt.ele;
+        items[1].hourly._modelElevation = items[1].elevation !== undefined ? items[1].elevation : peakPt.ele;
+        const pkg = {
+          valley: items[0].hourly,
+          peak: {
+            hourly: items[1].hourly,
+            current: items[1].current || null,
+            elevation: items[1].elevation !== undefined ? items[1].elevation : peakPt.ele
+          },
+          fetchedAtMs: Date.now()
+        };
+        state.sports.cachedForecasts[cacheKey] = pkg;
+        return pkg;
+      }
+    }
+
+    // Fallback / Single-Point Live Query (mit past_days=3 & exakter Wegpunkthöhe)
+    const targetPt = peakPt || startPt;
+    const eleParam = targetPt.ele !== undefined ? `&elevation=${Math.round(targetPt.ele)}` : '';
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(targetPt.lat).toFixed(3)}&longitude=${Number(targetPt.lon).toFixed(3)}${eleParam}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=5&timezone=auto`;
+    const data = await resilientFetch(url, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh });
     if (data && data.hourly && data.hourly.time && data.hourly.time.length > 0) {
-      state.sports.cachedForecasts[cacheKey] = data.hourly;
-      return data.hourly;
+      data.hourly._modelElevation = data.elevation !== undefined ? data.elevation : targetPt.ele;
+      const pkg = {
+        valley: data.hourly,
+        peak: {
+          hourly: data.hourly,
+          current: data.current || null,
+          elevation: data.elevation !== undefined ? data.elevation : targetPt.ele
+        },
+        fetchedAtMs: Date.now()
+      };
+      state.sports.cachedForecasts[cacheKey] = pkg;
+      return pkg;
     }
   } catch (err) {
     console.warn('Live route forecast fetch failed, using state fallback:', err);
   }
 
   if (state.weatherData && state.weatherData.hourly) {
-    return state.weatherData.hourly;
+    return {
+      valley: state.weatherData.hourly,
+      peak: { hourly: state.weatherData.hourly, current: state.weatherData.current || null, elevation: peakPt.ele },
+      fetchedAtMs: Date.now()
+    };
   }
 
-  return generateSyntheticSportsHourly();
+  const synth = generateSyntheticSportsHourly();
+  return {
+    valley: synth,
+    peak: { hourly: synth, current: null, elevation: peakPt.ele },
+    fetchedAtMs: Date.now()
+  };
 }
 
 export function generateSyntheticSportsHourly() {
@@ -1148,8 +1261,16 @@ export async function loadAndComputeSportsTour(gpxXml, tourName) {
 
   state.sports.parsedGPX = parsed;
   const startPt = parsed.points[0];
-  const hourly = await fetchHourlyForRoute(startPt.lat, startPt.lon);
-  state.sports.cachedForecast = hourly;
+  const forecastPkg = await fetchHourlyForRoute(startPt.lat, startPt.lon, parsed, false);
+  if (forecastPkg && forecastPkg.valley) {
+    state.sports.cachedForecast = forecastPkg.valley;
+    state.sports.cachedPeakForecast = forecastPkg.peak || null;
+    state.sports.lastLiveFetchMs = forecastPkg.fetchedAtMs || Date.now();
+  } else {
+    state.sports.cachedForecast = forecastPkg;
+    state.sports.cachedPeakForecast = null;
+    state.sports.lastLiveFetchMs = Date.now();
+  }
 
   const heroTitleEl = document.getElementById('sports-active-tour-title');
   const heroSubEl = document.getElementById('sports-active-tour-sub');
@@ -1231,6 +1352,17 @@ export function renderSkitourDashboard(timeline) {
     : MicroEngine.computeAvalancheReport(loc.lat, loc.lon, loc.elevation, state.weatherData, null);
   if (!av) return;
 
+  // 0. Regionaler Lawinenwarndienst, exakte Routen-Höhenspanne & Live-Zeitstempel
+  const agencyTag = document.getElementById('skitour-agency-tag');
+  if (agencyTag) {
+    const shortAgency = (av.stationAgency || 'EAWS / LWD').split('(')[0].trim();
+    const minM = av.minElevationM ? av.minElevationM.toLocaleString('de-DE') : '—';
+    const maxM = av.maxElevationM ? av.maxElevationM.toLocaleString('de-DE') : Math.round(loc.elevation).toLocaleString('de-DE');
+    const liveStr = av.stationTime || 'Live';
+    agencyTag.innerText = `${shortAgency} • ${minM}–${maxM} m • ${liveStr}`;
+    agencyTag.title = `${av.stationAgency} (${av.stationName}) – Live-Abfrage für die geladenen GPX-Wegpunkte`;
+  }
+
   // 1. EAWS Badge
   const badge = document.getElementById('skitour-eaws-badge');
   const num = document.getElementById('skitour-eaws-num');
@@ -1254,7 +1386,8 @@ export function renderSkitourDashboard(timeline) {
     titleEl.innerText = `Stufe ${av.dangerLevel} (${av.dangerTitle.replace(/^[0-9]\s*-\s*/, '')}) • Vormittags Stufe ${av.morningDangerLevel}, nachmittags Stufe ${av.afternoonDangerLevel}`;
   }
   if (elevEl) {
-    elevEl.innerHTML = `Gefahr vor allem über <strong>${av.criticalElevation.toLocaleString('de-DE')} m</strong> • Kernproblem: <strong>${av.problems[0] ? av.problems[0].name : 'Triebschnee'}</strong>`;
+    const windNote = av.windFromSector ? ` • Kammwind aus ${av.windFromSector} (Lee: ${av.primarySector || 'NO'})` : '';
+    elevEl.innerHTML = `Gefahr vor allem über <strong>${av.criticalElevation.toLocaleString('de-DE')} m</strong> • Kernproblem: <strong>${av.problems[0] ? av.problems[0].name : 'Triebschnee'}</strong>${windNote}`;
   }
   if (patternEl && av.dangerPattern) {
     patternEl.innerText = `⚠️ ${av.dangerPattern.name}`;
@@ -1274,16 +1407,33 @@ export function renderSkitourDashboard(timeline) {
   };
 
   const aspectDetails = {
-    'N': { name: 'Nordhang', icon: '❄️', steep: '> 30°', text: 'Kritisch im Triebschnee. Geringe Zusatzbelastung reicht oft zur Schneebrettauslösung.' },
-    'NO': { name: 'Nordosthang', icon: '❄️', steep: '> 32°', text: 'Kammnahe Rinnen und Mulden stark mit Einwehungen verfüllt.' },
-    'O': { name: 'Osthang', icon: '💨', steep: '> 30°', text: 'Leehang mit frischen Triebschneepaketen. Geländekanten meiden.' },
-    'SO': { name: 'Südosthang', icon: '☀️', steep: '> 35°', text: 'Tageserwärmung schwächt die Schneedecke ab dem Vormittag.' },
-    'S': { name: 'Südhang', icon: '☀️', steep: '> 35°', text: 'Nassschnee- und Gleitschneerutsche an steilen Sonnenhängen.' },
-    'SW': { name: 'Südwesthang', icon: '🌤️', steep: '> 34°', text: 'Windverblasene Rücken oft hart gefroren, Rinnen triebschneebelastet.' },
-    'W': { name: 'Westhang', icon: '💨', steep: '> 30°', text: 'Windseitige Grate abgeblasen (Harsch/Eis), Rinnen heikel.' },
+    'N': { name: 'Nordhang', icon: '❄️', steep: '> 30°', text: 'Schattig und kalt; Altschneeschwäche & Triebschneepakete beachten.' },
+    'NO': { name: 'Nordosthang', icon: '❄️', steep: '> 30°', text: 'Kammnahe Rinnen und Mulden stark mit Einwehungen verfüllt.' },
+    'O': { name: 'Osthang', icon: '💨', steep: '> 30°', text: 'Typischer Leehang bei West-/Nordwestwind. Geländekanten meiden.' },
+    'SO': { name: 'Südosthang', icon: '☀️', steep: '> 34°', text: 'Frühe Sonneneinstrahlung; tageszeitliche Erwärmung beachten.' },
+    'S': { name: 'Südhang', icon: '☀️', steep: '> 35°', text: 'Nassschnee- und Gleitschneerutsche bei tageszeitlicher Erwärmung.' },
+    'SW': { name: 'Südwesthang', icon: '🌤️', steep: '> 34°', text: 'Nachmittags höchste Einstrahlung; Triebschnee auf abgeblasener Unterlage.' },
+    'W': { name: 'Westhang', icon: '💨', steep: '> 30°', text: 'Windseitige Grate abgeblasen (Harsch/Eis), Rinnen je nach Anströmung heikel.' },
     'NW': { name: 'Nordwesthang', icon: '❄️', steep: '> 30°', text: 'Schattig und kalt. Ungünstiger Altschneeaufbau in Hochlagen.' }
   };
 
+  const applyRoseSectorDiagnosis = (asp, path) => {
+    document.querySelectorAll('.st-rose-sec').forEach(p => p.classList.remove('selected-sector'));
+    if (path) path.classList.add('selected-sector');
+    const isCritical = av.criticalAspects.includes(asp);
+    const det = aspectDetails[asp];
+    const secName = document.getElementById('skitour-sector-name');
+    const secDesc = document.getElementById('skitour-sector-desc');
+    const isLeeTarget = asp === av.primarySector;
+    if (secName && det) {
+      secName.innerText = `${det.icon} ${det.name} (${asp}): ${isCritical ? '⚠️ Kritisch' : '✅ Günstiger'}${isLeeTarget ? ' • Haupt-Leehang' : ''}`;
+    }
+    if (secDesc && det) {
+      secDesc.innerHTML = `Kritische Steilheit: <strong>${det.steep}</strong> • Windrichtung: <strong>${av.windFromSector || 'W'}</strong><br>${det.text}`;
+    }
+  };
+
+  const defaultSector = av.primarySector || av.criticalAspects[0] || 'NO';
   Object.entries(aspectMapping).forEach(([secId, asp]) => {
     const path = document.getElementById(secId);
     if (path) {
@@ -1294,15 +1444,10 @@ export function renderSkitourDashboard(timeline) {
       } else {
         path.classList.add('danger-low');
       }
-      path.onclick = () => {
-        document.querySelectorAll('.st-rose-sec').forEach(p => p.classList.remove('selected-sector'));
-        path.classList.add('selected-sector');
-        const det = aspectDetails[asp];
-        const secName = document.getElementById('skitour-sector-name');
-        const secDesc = document.getElementById('skitour-sector-desc');
-        if (secName && det) secName.innerText = `${det.icon} ${det.name} (${asp}): ${isCritical ? '⚠️ Kritisch' : '✅ Günstiger'}`;
-        if (secDesc && det) secDesc.innerHTML = `Kritische Steilheit: <strong>${det.steep}</strong><br>${det.text}`;
-      };
+      path.onclick = () => applyRoseSectorDiagnosis(asp, path);
+      if (asp === defaultSector) {
+        applyRoseSectorDiagnosis(asp, path);
+      }
     }
   });
 
@@ -1324,7 +1469,7 @@ export function renderSkitourDashboard(timeline) {
   const firnTrack = document.getElementById('firn-timeline-track');
 
   if (firnPill && firn) {
-    firnPill.innerText = `⭐ Firn-Fenster: ${firn.firnWindowStart} – ${firn.firnWindowEnd} Uhr`;
+    firnPill.innerText = firn.firnBadgeText || `⭐ Firn-Fenster: ${firn.firnWindowStart} – ${firn.firnWindowEnd} Uhr`;
   }
   if (firnDesc && firn) {
     firnDesc.innerHTML = `Nächtliche Ausstrahlung: <strong>${firn.nightCoolingRating}%</strong> • <em>${firn.crustStability}</em>`;
@@ -1351,14 +1496,15 @@ export function renderSkitourDashboard(timeline) {
   if (freshProg) freshProg.innerText = `Prognose nächste 24h: +${av.prognosis24hCm || 0} cm`;
   if (totalSnow) totalSnow.innerText = `Tal ${av.snowDepthValleyCm} cm / Berg ${av.snowDepthPeakCm} cm`;
   if (snowline) {
-    const slM = Math.max(800, loc.elevation - Math.round(av.snowDepthValleyCm * 15));
-    snowline.innerText = `Fahrbare Schneegrenze: ab ~${slM} m`;
+    const slM = av.skiableSnowlineM || Math.max(800, loc.elevation - Math.round(av.snowDepthValleyCm * 15));
+    snowline.innerText = `Fahrbare Schneegrenze: ab ~${slM.toLocaleString('de-DE')} m`;
   }
   if (densityVal) densityVal.innerText = `${av.densityKgM3} kg/m³ (${av.qualityClass})`;
   if (sweVal) sweVal.innerText = `Wasserwert SWE: ${av.sweMm} mm`;
   if (layerVal) {
     layerVal.innerText = av.thermalLayerSeverity === 'danger' ? '⚠️ Kritisch' : (av.thermalLayerSeverity === 'good' ? '✅ Günstig' : 'Normal');
     layerVal.className = `ssg-val ${av.thermalLayerSeverity === 'danger' ? 'text-red' : 'text-accent'}`;
+    layerVal.title = av.thermalLayerPattern || '';
   }
   if (critFresh) critFresh.innerText = `Krit. Neuschneemenge: ${av.criticalFreshSnowThresholdCm} cm (${av.criticalExceeded ? '⚠️ Erreicht' : 'Unterschritten'})`;
 
@@ -1419,7 +1565,8 @@ export function recomputeSportsTimeline() {
       mountainAscentHmH: state.sports.mountainAscentHmH,
       skitourSpeedKmH: state.sports.skitourSpeedKmH,
       skitourAscentHmH: state.sports.skitourAscentHmH,
-      skitourDescentKmH: state.sports.skitourDescentKmH
+      skitourDescentKmH: state.sports.skitourDescentKmH,
+      peakForecast: state.sports.cachedPeakForecast || null
     }
   );
 
