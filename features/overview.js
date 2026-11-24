@@ -1938,6 +1938,7 @@ export function render10DayForecast(daily, hourly) {
       extendedItems.forEach(el => {
         el.classList.toggle('is-collapsed', !willExpand);
       });
+      syncDailyColumnWidths();
     };
 
     toggleBtn.addEventListener('click', handleToggle);
@@ -1952,6 +1953,51 @@ export function render10DayForecast(daily, hourly) {
 
   // Single-commit atomic DOM update (Task 4b)
   container.replaceChildren(fragment);
+  requestAnimationFrame(() => {
+    syncDailyColumnWidths();
+  });
+}
+
+let resizeDailySyncAttached = false;
+
+/**
+ * Dynamically synchronizes daily table column widths based on actual measured content.
+ * Guarantees zero clipping of sun/moon hours or sunset timestamps on any system font rendering,
+ * while expanding the condition text column flexibly with zero dead whitespace before temperature.
+ */
+export function syncDailyColumnWidths() {
+  if (typeof window === 'undefined') return;
+  const container = document.getElementById('daily-forecast-list');
+  const card = document.querySelector('.daily-card');
+  if (!container || !card) return;
+
+  if (!resizeDailySyncAttached) {
+    resizeDailySyncAttached = true;
+    window.addEventListener('resize', () => {
+      requestAnimationFrame(syncDailyColumnWidths);
+    }, { passive: true });
+  }
+
+  // On mobile screens (<= 768px), layout is flex column deck
+  if (window.innerWidth <= 768) return;
+
+  const rows = container.querySelectorAll('.daily-interactive-row');
+  if (!rows.length) return;
+
+  let maxSun = 0;
+  rows.forEach(row => {
+    // Only measure visible elements (uncollapsed)
+    if (row.offsetParent !== null) {
+      const sunCell = row.querySelector('.daily-sun-cell');
+      if (sunCell) {
+        const w = sunCell.scrollWidth;
+        if (w > maxSun) maxSun = w;
+      }
+    }
+  });
+
+  const finalSunW = Math.max(265, Math.ceil(maxSun) + 6);
+  card.style.setProperty('--daily-col-sun', `${finalSunW}px`);
 }
 
 // =============================================================================

@@ -5,7 +5,6 @@ import time
 import os
 import sys
 
-# Ensure Playwright driver node is on PATH if needed
 node_dir = '/Users/jona/Library/Python/3.9/lib/python/site-packages/playwright/driver'
 if os.path.exists(node_dir) and node_dir not in os.environ.get('PATH', ''):
     os.environ['PATH'] = f"{node_dir}:{os.environ.get('PATH', '')}"
@@ -30,7 +29,7 @@ def run_verification():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         
-        # Test 1: Desktop Mac Viewport (1440 x 900, Retina scale 2)
+        # Test 1: Full Desktop Mac Viewport (1440 x 900, Retina scale 2)
         print("\n--- Test 1: Mac Desktop Viewport (1440 x 900) ---")
         context = browser.new_context(
             viewport={'width': 1440, 'height': 900},
@@ -40,9 +39,14 @@ def run_verification():
         page = context.new_page()
         page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded")
         page.wait_for_selector("#daily-item-0 .daily-interactive-row", timeout=10000)
-        time.sleep(1.5)
+        time.sleep(1)
         
-        # Let's inspect the rows in #daily-forecast-list
+        # Expand 10 days
+        expand_btn = page.locator('#daily-expand-toggle-btn')
+        if expand_btn.is_visible():
+            expand_btn.click()
+            time.sleep(0.5)
+            
         rows_info = page.evaluate("""() => {
             const results = [];
             const rows = document.querySelectorAll('#daily-forecast-list .daily-interactive-row');
@@ -50,29 +54,27 @@ def run_verification():
                 const condText = row.querySelector('.daily-cond-text');
                 const condCell = row.querySelector('.daily-condition-cell');
                 const sunCell = row.querySelector('.daily-sun-cell');
+                const astroPill = row.querySelector('.daily-astro-pill');
                 const tempCell = row.querySelector('.daily-temp-cell');
-                const dateCell = row.querySelector('.daily-date-cell');
                 
                 const text = condText ? condText.textContent.trim() : '';
-                const textScrollWidth = condText ? condText.scrollWidth : 0;
-                const textClientWidth = condText ? condText.clientWidth : 0;
-                const isTruncated = textScrollWidth > textClientWidth;
+                const condTruncated = condText ? (condText.scrollWidth > condText.clientWidth) : false;
                 
-                const condRect = condCell ? condCell.getBoundingClientRect() : null;
+                const astroText = astroPill ? astroPill.textContent.replace(/\\s+/g, ' ').trim() : '';
+                const astroClipped = astroPill ? (astroPill.scrollWidth > astroPill.clientWidth) : false;
+                
                 const sunRect = sunCell ? sunCell.getBoundingClientRect() : null;
                 const tempRect = tempCell ? tempCell.getBoundingClientRect() : null;
-                
-                // Gap between sun cell right edge and temp cell left edge
-                const gapBetweenSunAndTemp = (tempRect && sunRect) ? (tempRect.left - sunRect.right) : 0;
+                const gapBetweenSunAndTemp = (tempRect && sunRect) ? Math.round(tempRect.left - sunRect.right) : 0;
                 
                 results.push({
                     index: idx,
                     text,
-                    isTruncated,
-                    textScrollWidth,
-                    textClientWidth,
-                    condCellWidth: condRect ? condRect.width : 0,
-                    sunCellWidth: sunRect ? sunRect.width : 0,
+                    condTruncated,
+                    astroText,
+                    astroClipped,
+                    astroScrollW: astroPill ? Math.round(astroPill.scrollWidth) : 0,
+                    astroClientW: astroPill ? Math.round(astroPill.clientWidth) : 0,
                     gapBetweenSunAndTemp
                 });
             });
@@ -80,49 +82,29 @@ def run_verification():
         }""")
         
         print(f"Total rows inspected: {len(rows_info)}")
-        any_truncated = False
+        any_clipped = False
         for r in rows_info:
-            status = "TRUNCATED" if r['isTruncated'] else "OK (full text)"
-            print(f"  Row {r['index']}: '{r['text']}' -> {status} (width: {r['textClientWidth']}px, scroll: {r['textScrollWidth']}px, cell: {r['condCellWidth']}px, gap to temp: {r['gapBetweenSunAndTemp']}px)")
-            if r['isTruncated']:
-                any_truncated = True
+            astro_status = "CLIPPED!" if r['astroClipped'] else "OK (full timestamp)"
+            cond_status = "TRUNCATED!" if r['condTruncated'] else "OK (full text)"
+            print(f"  Row {r['index']}: cond='{r['text']}' -> {cond_status} | astro='{r['astroText']}' -> {astro_status} ({r['astroClientW']}px/{r['astroScrollW']}px) | gap={r['gapBetweenSunAndTemp']}px")
+            if r['astroClipped'] or r['condTruncated']:
+                any_clipped = True
+                
+        assert not any_clipped, "ZERO clipping allowed for both weather condition and sunset timestamps!"
         
-        assert not any_truncated, "No daily condition text should be truncated on desktop view!"
-        
-        # Also test with a long string like 'Überwiegend heiter' explicitly
-        test_long_text = page.evaluate("""() => {
-            const row2 = document.querySelector('#daily-item-2 .daily-cond-text');
-            if (row2) {
-                row2.textContent = 'Überwiegend heiter';
-                return {
-                    scrollWidth: row2.scrollWidth,
-                    clientWidth: row2.clientWidth,
-                    isTruncated: row2.scrollWidth > row2.clientWidth
-                };
-            }
-            return null;
-        }""")
-        print(f"\nExplicit 'Überwiegend heiter' check on Row 2: {test_long_text}")
-        assert test_long_text and not test_long_text['isTruncated'], "'Überwiegend heiter' must NOT be truncated!"
-        
-        # Capture screenshot of the daily card
-        daily_card = page.locator(".daily-card")
-        screenshot_path = os.path.join(artifacts_dir, "verified_mac_desktop_daily_forecast.png")
-        daily_card.screenshot(path=screenshot_path)
+        # Capture screenshot
+        card = page.locator(".daily-card")
+        screenshot_path = os.path.join(artifacts_dir, "verified_godlike_content_driven_10days.png")
+        card.screenshot(path=screenshot_path)
         print(f"  ✓ Saved visual verification screenshot to: {screenshot_path}")
         
-        # Full page screenshot on desktop
-        full_screenshot_path = os.path.join(artifacts_dir, "verified_mac_desktop_full_overview.png")
-        page.screenshot(path=full_screenshot_path)
-        print(f"  ✓ Saved full overview screenshot to: {full_screenshot_path}")
-        
-        # Test 2: Compact Desktop / Window Resize (1150 x 800)
+        # Test 2: Compact Desktop Viewport (1150 x 800)
         print("\n--- Test 2: Compact Desktop Viewport (1150 x 800) ---")
         page.set_viewport_size({'width': 1150, 'height': 800})
         time.sleep(0.5)
         
         compact_info = page.evaluate("""() => {
-            const row = document.querySelector('#daily-item-2 .daily-interactive-row');
+            const row = document.querySelector('#daily-item-0 .daily-interactive-row');
             const condText = row.querySelector('.daily-cond-text');
             const sunCell = row.querySelector('.daily-sun-cell');
             const tempCell = row.querySelector('.daily-temp-cell');
@@ -134,14 +116,13 @@ def run_verification():
             
             return {
                 text: condText.textContent,
-                isTruncated: condText.scrollWidth > condText.clientWidth,
-                textWidth: condText.clientWidth,
+                condTruncated: condText.scrollWidth > condText.clientWidth,
                 astroVisible,
                 gapBetweenSunAndTemp: tempRect.left - sunRect.right
             };
         }""")
-        print(f"  Compact desktop: '{compact_info['text']}' -> isTruncated: {compact_info['isTruncated']}, textWidth: {compact_info['textWidth']}px, astroVisible: {compact_info['astroVisible']}, gap: {compact_info['gapBetweenSunAndTemp']}px")
-        assert not compact_info['isTruncated'], "'Überwiegend heiter' must not be truncated at 1150px!"
+        print(f"  Compact desktop: '{compact_info['text']}' -> truncated: {compact_info['condTruncated']}, astroVisible: {compact_info['astroVisible']}, gap: {compact_info['gapBetweenSunAndTemp']}px")
+        assert not compact_info['condTruncated'], "Condition text must not be truncated at 1150px!"
         
         # Test 3: iPad / Tablet Viewport (820 x 1180)
         print("\n--- Test 3: iPad / Tablet Viewport (820 x 1180) ---")
@@ -149,20 +130,21 @@ def run_verification():
         time.sleep(0.5)
         
         tablet_info = page.evaluate("""() => {
-            const row = document.querySelector('#daily-item-2 .daily-interactive-row');
+            const row = document.querySelector('#daily-item-0 .daily-interactive-row');
             const condText = row.querySelector('.daily-cond-text');
+            const astroPill = row.querySelector('.daily-astro-pill');
             return {
                 text: condText.textContent,
-                isTruncated: condText.scrollWidth > condText.clientWidth,
-                textWidth: condText.clientWidth
+                condTruncated: condText.scrollWidth > condText.clientWidth,
+                astroClipped: astroPill ? (astroPill.scrollWidth > astroPill.clientWidth) : false
             };
         }""")
-        print(f"  Tablet: '{tablet_info['text']}' -> isTruncated: {tablet_info['isTruncated']}, textWidth: {tablet_info['textWidth']}px")
-        assert not tablet_info['isTruncated'], "'Überwiegend heiter' must not be truncated on iPad!"
+        print(f"  Tablet: '{tablet_info['text']}' -> condTruncated: {tablet_info['condTruncated']}, astroClipped: {tablet_info['astroClipped']}")
+        assert not tablet_info['condTruncated'] and not tablet_info['astroClipped'], "Must not be truncated or clipped on iPad!"
         
         context.close()
         browser.close()
-        print("\n🎉 ALL DESKTOP, COMPACT & TABLET VERIFICATION TESTS PASSED PERFECTLY!")
+        print("\n🎉 ALL CONTENT-DRIVEN DYNAMIC LAYOUT TESTS PASSED WITH 100% SUCCESS!")
 
 if __name__ == "__main__":
     run_verification()

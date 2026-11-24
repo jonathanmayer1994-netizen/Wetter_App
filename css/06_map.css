@@ -3730,13 +3730,13 @@
    ========================================================================== */
 @media (max-width: 1024px) {
   .daily-table-header {
-    grid-template-columns: 82px minmax(180px, 1fr) 85px 225px 75px 20px;
+    grid-template-columns: 82px minmax(170px, 1fr) 85px var(--daily-col-sun, 260px) 75px 20px;
     gap: 6px;
     padding: 8px 10px 10px 10px;
   }
 
   .daily-interactive-row {
-    grid-template-columns: 82px minmax(180px, 1fr) 85px 225px 75px 20px;
+    grid-template-columns: 82px minmax(170px, 1fr) 85px var(--daily-col-sun, 260px) 75px 20px;
     gap: 6px;
     padding: 10px 10px;
   }

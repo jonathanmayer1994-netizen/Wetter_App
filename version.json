@@ -1,5 +1,5 @@
 {
-  "version": "2.37.6",
-  "build": "20261124-1440",
-  "notes": "Harmonize desktop daily forecast grid: flexible 1fr weather condition column to prevent text clipping and eliminate dead whitespace before temperature"
+  "version": "2.37.7",
+  "build": "20261124-1510",
+  "notes": "Dynamic content-driven daily forecast columns with unclipped sunrise/sunset timestamps and laser-aligned layout"
 }
