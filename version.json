@@ -1,5 +1,5 @@
 {
-  "version": "2.41.0",
-  "build": "20261124-2038",
-  "notes": "Harmonize weather forecast & avalanche/snow report across Overview, Mountain, and Skitour tabs; expose rich snow/fresh-snow/quality details on Mountain tab and exact official LLB scores in Overview hourly & daily timelines"
+  "version": "2.41.1",
+  "build": "20261124-2043",
+  "notes": "Fix Mountain avalanche card HTML nesting for snow quality/SWE pill and widen 10-day snow/avalanche progression strip across full card width"
 }

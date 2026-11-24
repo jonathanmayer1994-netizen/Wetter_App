@@ -12415,6 +12415,7 @@ body.is-scrolling .radar-floating-controls {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .av-problems-list {
@@ -18444,7 +18445,14 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
 .av-metrics-rich .av-metric-pill {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.av-metrics-rich .ssg-top-row {
+  width: 100%;
 }
 
 .av-metrics-rich .amp-sub {
@@ -18453,8 +18461,8 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
 }
 
 .av-10day-strip-wrap {
-  margin-top: 10px;
-  padding: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
   border-radius: 10px;
   background: rgba(15, 23, 42, 0.48);
   border: 1px solid rgba(255, 255, 255, 0.08);
