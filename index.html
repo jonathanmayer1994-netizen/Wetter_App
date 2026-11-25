@@ -3340,6 +3340,23 @@
   </div>
 
   <!-- =================================================================== -->
+  <!-- OVERLAY: EMPFANGS- / VERBINDUNGSFEHLER BEI SCHWACHEM NETZ -->
+  <!-- =================================================================== -->
+  <div class="connection-error-overlay" id="connection-error-overlay" style="display:none;" role="alertdialog" aria-modal="true" aria-labelledby="ceo-title" aria-describedby="ceo-desc">
+    <div class="connection-error-card glass-card">
+      <div class="ceo-icon" aria-hidden="true">📡</div>
+      <div class="ceo-badge" id="ceo-badge">Verbindung unterbrochen</div>
+      <h2 class="ceo-title" id="ceo-title">Aktuell können die Daten nicht geladen werden</h2>
+      <p class="ceo-desc" id="ceo-desc">Die Internetverbindung ist momentan zu schwach oder der Wetterdienst nicht erreichbar. Bitte prüfe deinen Empfang und versuche es erneut.</p>
+      <div class="ceo-meta" id="ceo-meta" style="display:none;"></div>
+      <div class="ceo-actions">
+        <button type="button" class="ceo-btn-primary" id="ceo-retry-btn">🔄 Erneut versuchen</button>
+        <button type="button" class="ceo-btn-secondary" id="ceo-dismiss-btn">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
   <!-- MODAL: APPLE SPOTLIGHT GLOBAL QUICK-SEARCH (CMD+K) -->
   <!-- =================================================================== -->
   <div class="spotlight-overlay" id="spotlight-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Apple Spotlight Schnellsuche">

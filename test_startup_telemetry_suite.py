@@ -193,6 +193,46 @@ def run_startup_telemetry_tests():
         # Test 12: TelemetryEngine in sw.js STATIC_ASSETS
         has_te_in_sw = "./core/telemetryEngine.js" in sw_content
         report("sw.js STATIC_ASSETS caches ./core/telemetryEngine.js", has_te_in_sw)
+
+        # Test 13: sw.js renders styled German fallback page instead of raw 'Offline' text
+        has_styled_sw_fallback = (
+            "Aktuell können die Daten nicht geladen werden" in sw_content
+            and "createOfflineFallbackPageResponse" in sw_content
+            and "new Response('Offline'" not in sw_content
+        )
+        report("sw.js replaces bare 'Offline' text with styled HTML fallback", has_styled_sw_fallback)
+
+        # Test 14: In-App Connection Error Overlay appears cleanly over iPhone 375px screen when APIs are offline without cache
+        ctx_off = browser.new_context(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True, service_workers="block")
+        page_off = ctx_off.new_page()
+        page_off.route("**/*", lambda route: route.abort("internetdisconnected") if "127.0.0.1" not in route.request.url and "localhost" not in route.request.url else route.continue_())
+        page_off.goto(f"http://127.0.0.1:{port}/index.html", wait_until="domcontentloaded", timeout=15000)
+        page_off.wait_for_selector("#connection-error-overlay", state="visible", timeout=12000)
+        ceo_title = page_off.inner_text("#ceo-title")
+        ceo_overflow = page_off.evaluate("() => document.documentElement.scrollWidth > window.innerWidth")
+        page_off.screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_iphone_offline_overlay.png")
+        ctx_off.close()
+        report(
+            "In-App offline connection overlay renders cleanly on iPhone 375px",
+            "Aktuell können die Daten nicht geladen werden" in ceo_title and not ceo_overflow
+        )
+
+        # Test 15: Verify sw.js fallback HTML response renders cleanly over iPhone 375px
+        ctx_sw = browser.new_context(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True, service_workers="block")
+        page_sw = ctx_sw.new_page()
+        import re
+        m_sw = re.search(r"function createOfflineFallbackPageResponse\(\)\s*\{\s*const html = `(.*?)`;", sw_content, re.S)
+        assert m_sw, "createOfflineFallbackPageResponse must return template HTML"
+        page_sw.set_content(m_sw.group(1))
+        page_sw.wait_for_timeout(150)
+        sw_title = page_sw.inner_text("h1")
+        sw_overflow = page_sw.evaluate("() => document.documentElement.scrollWidth > window.innerWidth")
+        page_sw.screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_iphone_sw_offline_page.png")
+        ctx_sw.close()
+        report(
+            "Service Worker offline fallback page renders cleanly on iPhone 375px",
+            "Aktuell können die Daten nicht geladen werden" in sw_title and not sw_overflow
+        )
         
         browser.close()
         

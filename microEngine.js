@@ -456,6 +456,7 @@ export const MicroEngine = {
     // Daher lassen wir den 10-Tage-Forecast nahtlos auf Best-Match laufen.
 
     let raw = null;
+    let lastPrimaryErr = null;
     try {
       raw = await resilientFetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
         ttlMs: 30 * 60 * 1000, // 30 Minuten L1/L2 Cache (spart massive Open-Meteo Quota)
@@ -465,6 +466,7 @@ export const MicroEngine = {
       });
     } catch (primaryErr) {
       if (primaryErr?.name === 'AbortError') throw primaryErr;
+      lastPrimaryErr = primaryErr;
       console.warn('[MicroEngine] Open-Meteo nicht verfügbar, aktiviere Multi-Provider Live-Fallback:', primaryErr?.message || primaryErr);
     }
 
@@ -482,6 +484,9 @@ export const MicroEngine = {
         return fallbackRaw;
       }
       if (!raw) {
+        if (lastPrimaryErr && lastPrimaryErr.status !== 429 && !lastPrimaryErr.isCircuitOpen) {
+          throw lastPrimaryErr;
+        }
         throw new HttpStatusError(429, 'Wetter-API Limit erreicht & Fallback offline', { url: 'https://api.open-meteo.com' });
       }
     }

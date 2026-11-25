@@ -409,6 +409,7 @@ export async function loadLocation(loc, options = {}) {
 
     TelemetryEngine.recordApiLatency(performance.now() - t0);
     TelemetryEngine.finishProgress(true);
+    hideConnectionErrorOverlay();
 
     return { ok: true, refreshedAt: state.lastWeatherLoadedAt };
   } catch (err) {
@@ -428,6 +429,7 @@ export async function loadLocation(loc, options = {}) {
     const locKey = `${validLoc.lat.toFixed(3)}_${validLoc.lon.toFixed(3)}`;
     const cached = await WeatherTourCache.getCachedWeather(locKey);
     if (cached?.weatherData) {
+      hideConnectionErrorOverlay();
       state.weatherData = cached.weatherData;
       if (cached.microData) state.microData = { ...cached.microData, weatherRaw: cached.weatherData };
       renderOverviewTab();
@@ -445,11 +447,20 @@ export async function loadLocation(loc, options = {}) {
       return { ok: false, isRateLimit, retryAfterMs: err?.retryAfterMs || 0, usedCache: true };
     } else {
       const cond = document.getElementById('hero-condition-text');
+      const shortMsg = isRateLimit
+        ? `Open-Meteo Rate-Limit / Cooldown aktiv${retryWaitLabel ? ` (~${retryWaitLabel})` : ''}`
+        : (err?.isTimeout ? 'Zeitüberschreitung: Keine Verbindung zum Wetterdienst' : 'Verbindungsfehler beim Laden der Daten');
       if (cond) {
-        cond.innerText = isRateLimit
-          ? `Open-Meteo Rate-Limit / Cooldown aktiv${retryWaitLabel ? ` (~${retryWaitLabel})` : ''}`
-          : (err?.isTimeout ? 'Zeitüberschreitung: Keine Verbindung zum Wetterdienst' : 'Verbindungsfehler beim Laden der Daten');
+        cond.innerText = shortMsg;
       }
+      showConnectionErrorOverlay({
+        badge: isRateLimit ? 'Dienst-Pause (Limit)' : (navigator.onLine === false ? 'Offline / Kein Empfang' : 'Verbindung unterbrochen'),
+        title: 'Aktuell können die Daten nicht geladen werden',
+        desc: isRateLimit
+          ? `Der Wetterdienst begrenzt aktuell die Anfragen${retryWaitLabel ? ` (noch ca. ${retryWaitLabel})` : ''}. Bitte versuche es gleich erneut.`
+          : `Für „${validLoc.name}“ konnten aktuell wegen schwachem Empfang oder fehlender Verbindung keine Wetterdaten geladen werden.`,
+        meta: navigator.onLine === false ? 'Netzwerkstatus: Offline – warte auf Empfang' : shortMsg
+      });
       return { ok: false, isRateLimit, retryAfterMs: err?.retryAfterMs || 0, usedCache: false };
     }
   }
@@ -474,6 +485,68 @@ window.loadNamedMountain = (name) => {
   }
 };
 
+let _connOverlayBound = false;
+
+export function hideConnectionErrorOverlay() {
+  const ov = document.getElementById('connection-error-overlay');
+  if (ov) ov.style.display = 'none';
+}
+
+export function showConnectionErrorOverlay({ badge, title, desc, meta } = {}) {
+  const ov = document.getElementById('connection-error-overlay');
+  if (!ov) return;
+  const badgeEl = document.getElementById('ceo-badge');
+  const titleEl = document.getElementById('ceo-title');
+  const descEl = document.getElementById('ceo-desc');
+  const metaEl = document.getElementById('ceo-meta');
+  if (badgeEl && badge) badgeEl.innerText = badge;
+  if (titleEl && title) titleEl.innerText = title;
+  if (descEl && desc) descEl.innerText = desc;
+  if (metaEl) {
+    if (meta) {
+      metaEl.style.display = 'block';
+      metaEl.innerText = meta;
+    } else {
+      metaEl.style.display = 'none';
+    }
+  }
+  ov.style.display = 'flex';
+}
+
+function setupConnectionErrorOverlay() {
+  if (_connOverlayBound) return;
+  _connOverlayBound = true;
+  const retryBtn = document.getElementById('ceo-retry-btn');
+  const dismissBtn = document.getElementById('ceo-dismiss-btn');
+  const ov = document.getElementById('connection-error-overlay');
+  if (retryBtn) {
+    retryBtn.addEventListener('click', async () => {
+      retryBtn.disabled = true;
+      const origTxt = retryBtn.innerText;
+      retryBtn.innerText = '⏳ Versuche erneut...';
+      try {
+        await loadLocation(state.currentLocation, { forceRefresh: true });
+      } finally {
+        retryBtn.disabled = false;
+        retryBtn.innerText = origTxt;
+      }
+    });
+  }
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => hideConnectionErrorOverlay());
+  }
+  if (ov) {
+    ov.addEventListener('click', (e) => {
+      if (e.target === ov) hideConnectionErrorOverlay();
+    });
+  }
+  window.addEventListener('online', () => {
+    if (ov && ov.style.display !== 'none') {
+      loadLocation(state.currentLocation, { forceRefresh: true });
+    }
+  });
+}
+
 // Global Bindings for Tests & Cross-Domain Callbacks
 window.state = state;
 window.switchTab = switchTab;
@@ -489,12 +562,15 @@ window.openNotificationModal = openNotificationModal;
 window.AlpineStorage = AlpineStorage;
 window.toggleFavoriteLocation = toggleFavoriteLocation;
 window.persistFavorites = persistFavorites;
+window.showConnectionErrorOverlay = showConnectionErrorOverlay;
+window.hideConnectionErrorOverlay = hideConnectionErrorOverlay;
 
 // =============================================================================
 // MAIN INITIALIZATION
 // =============================================================================
 function startApp() {
   TelemetryEngine.init();
+  setupConnectionErrorOverlay();
   initScrollOptimizer();
   state.canvasEngine = new BackgroundCanvasEngine('weather-canvas');
   initSearchHandlers({ onLoadLocation: loadLocation, onRenderOverview: renderOverviewTab, onRenderAdaptiveTab2: renderAdaptiveTab2 });
@@ -515,8 +591,8 @@ function startApp() {
   setupMeteogramControls();
   setupGPXInspector();
   setupWebcamModal();
-  setupSportsTab();
-  initLeafletMap();
+  try { setupSportsTab(); } catch (e) { console.warn('Sports Tab Setup skipped:', e); }
+  try { initLeafletMap(); } catch (e) { console.warn('Leaflet Map Init skipped (offline):', e); }
   setupSourcesQuickNav();
   setupExpertModeToggle();
   initBentoSheets();

@@ -1,5 +1,5 @@
 {
-  "version": "2.41.3",
-  "build": "20261124-2130",
-  "notes": "Fix global scroll-to-top jump on focusout/click across entire app, prevent unintended vertical scroll on horizontal scrollers & modals, and make Firn timeline hours interactively clickable"
+  "version": "2.41.4",
+  "build": "20261125-1750",
+  "notes": "Replace raw plaintext Service Worker 'Offline' screen with full-screen Glassmorphism connection error UI and add in-app connection error overlay on failed network loads"
 }

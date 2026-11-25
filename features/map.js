@@ -106,7 +106,7 @@ export function syncMeteoSwissHudControls() {
 
 export function initLeafletMap() {
   const mapElem = document.getElementById('interactive-map');
-  if (!mapElem) return;
+  if (!mapElem || typeof L === 'undefined') return;
 
   // 1. Initialisiere Leaflet mit voller Touch- & Maus-Zoomunterstützung (bis Stufe 20)
   state.map.instance = L.map('interactive-map', {

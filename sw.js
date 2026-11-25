@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.41.3';
-const CACHE_NAME = `best-weather-v2.41.3-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.41.4';
+const CACHE_NAME = `best-weather-v2.41.4-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
@@ -134,13 +134,142 @@ async function precacheAssetList(urls) {
           const res = await fetchWithTimeout(fetchUrl, reqInit, 4500);
           if (res && res.status === 200) {
             await cache.put(asset, res);
+            return;
           }
         } catch (err) {
           console.warn('[ServiceWorker] Precache Notice:', asset, err);
         }
+        // Rettung aus vorhandenem Cache falls Update bei schlechtem Empfang erfolgt
+        try {
+          const legacyCached = await caches.match(asset, { ignoreSearch: true });
+          if (legacyCached && legacyCached.status === 200) {
+            await cache.put(asset, legacyCached.clone());
+          }
+        } catch (_) { }
       })
     );
   }
+}
+
+function createOfflineFallbackPageResponse() {
+  const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1329">
+  <title>Best Weather – Aktuell keine Verbindung</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: max(24px, env(safe-area-inset-top, 24px)) 20px max(24px, env(safe-area-inset-bottom, 24px));
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      color: #f8fafc;
+      background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.18), transparent 55%),
+                  linear-gradient(180deg, #0b1329 0%, #0f1c2e 55%, #09111e 100%);
+    }
+    .offline-card {
+      width: 100%;
+      max-width: 420px;
+      padding: 30px 24px;
+      border-radius: 26px;
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .offline-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      display: grid;
+      place-items: center;
+      font-size: 32px;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 8px 24px rgba(56, 189, 248, 0.18);
+    }
+    .offline-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      color: #fde68a;
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+    h1 {
+      font-size: 20px;
+      line-height: 1.28;
+      font-weight: 750;
+      color: #ffffff;
+    }
+    p {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      max-width: 34ch;
+    }
+    .offline-btn {
+      margin-top: 6px;
+      width: 100%;
+      padding: 13px 18px;
+      border: none;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+      cursor: pointer;
+    }
+    .offline-btn:active { transform: scale(0.98); }
+    .offline-hint {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <main class="offline-card" role="alert">
+    <div class="offline-icon" aria-hidden="true">📡</div>
+    <span class="offline-pill">Schlechter Empfang oder Offline</span>
+    <h1>Aktuell können die Daten nicht geladen werden</h1>
+    <p>Die Verbindung ist momentan zu schwach oder unterbrochen. Bitte prüfe dein Netz und versuche es erneut.</p>
+    <button type="button" class="offline-btn" onclick="window.location.reload()">🔄 Erneut laden</button>
+    <div class="offline-hint" id="offline-auto-hint">Lädt automatisch neu, sobald wieder Empfang besteht.</div>
+  </main>
+  <script>
+    window.addEventListener('online', function () {
+      var hint = document.getElementById('offline-auto-hint');
+      if (hint) hint.textContent = 'Empfang wiederhergestellt – lade App neu...';
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
 }
 
 async function precacheFreshAssets() {
@@ -299,8 +428,15 @@ self.addEventListener('fetch', (event) => {
 
   if (isCodeOrMarkup) {
     const bustUrl = appendBustParam(req.url, '_sw', activeBustToken);
+    const networkFetchPromise = fetch(bustUrl, { cache: 'no-store' }).then((networkRes) => {
+      if (networkRes && networkRes.status === 200) {
+        const clone = networkRes.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+      }
+      return networkRes;
+    });
 
-    // Fast-Race Promise: Max. 1200ms Timeout bei instabilem Netz / Funkloch
+    // Fast-Race Promise: Max. 1200ms Timeout bei instabilem Netz / Funkloch wenn Cache existiert
     const raceNetwork = new Promise((resolve, reject) => {
       let settled = false;
       const timer = setTimeout(() => {
@@ -310,15 +446,11 @@ self.addEventListener('fetch', (event) => {
         }
       }, 1200);
 
-      fetch(bustUrl, { cache: 'no-store' })
+      networkFetchPromise
         .then((networkRes) => {
           if (!settled) {
             settled = true;
             clearTimeout(timer);
-            if (networkRes && networkRes.status === 200) {
-              const clone = networkRes.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
-            }
             resolve(networkRes);
           }
         })
@@ -332,14 +464,28 @@ self.addEventListener('fetch', (event) => {
     });
 
     event.respondWith(
-      raceNetwork.catch(async () => {
+      raceNetwork.catch(async (raceErr) => {
         const cached = await caches.match(req, { ignoreSearch: true });
         if (cached) return cached;
         if (req.mode === 'navigate') {
           const indexFallback = await caches.match('./index.html', { ignoreSearch: true });
           if (indexFallback) return indexFallback;
         }
-        return new Response('Offline', { status: 503, statusText: 'Offline' });
+        // Kein Cache vorhanden: Bei bloßem 1.2s-Timeout langsamen Empfang bis 6.5s abwarten statt voreilig abzubrechen
+        if (raceErr && raceErr.message === 'SW_NETWORK_TIMEOUT_FAST_RACE') {
+          try {
+            const slowRes = await Promise.race([
+              networkFetchPromise,
+              new Promise((_, rej) => setTimeout(() => rej(new Error('SW_SLOW_NETWORK_TIMEOUT')), 6500))
+            ]);
+            if (slowRes) return slowRes;
+          } catch (_) { }
+        }
+        const acceptsHtml = req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/') || (req.headers.get('accept') || '').includes('text/html');
+        if (acceptsHtml) {
+          return createOfflineFallbackPageResponse();
+        }
+        return new Response('', { status: 503, statusText: 'Service Unavailable' });
       })
     );
     return;
@@ -362,7 +508,10 @@ self.addEventListener('fetch', (event) => {
             const imgFallback = await caches.match('./apple-touch-icon.png', { ignoreSearch: true });
             if (imgFallback) return imgFallback;
           }
-          return new Response('Offline', { status: 503, statusText: 'Offline' });
+          if (req.mode === 'navigate') {
+            return createOfflineFallbackPageResponse();
+          }
+          return new Response('', { status: 503, statusText: 'Service Unavailable' });
         });
 
       return cachedRes || fetchPromise;
