@@ -235,9 +235,10 @@ export const AlpineStorage = {
   },
 
   /**
-   * Holt die gecachten Wetterdaten (bevorzugt passend zum Standort, niemals komplett abgelaufene Vergangenheits-Snapshots wie z. B. vor 10 Tagen)
+   * Holt die gecachten Wetterdaten (bevorzugt passend zum Standort, niemals komplett abgelaufene Vergangenheits-Snapshots).
+   * Bei strictMatch=true und gesetztem locKey werden bei Cache-Miss KEINE fremden Standorte zurückgegeben.
    */
-  async getCachedWeather(locKey = null) {
+  async getCachedWeather(locKey = null, { strictMatch = false } = {}) {
     const fallbackLocal = () => {
       try {
         const raw = localStorage.getItem('alpine_offline_weather');
@@ -245,6 +246,9 @@ export const AlpineStorage = {
         const parsed = JSON.parse(raw);
         if (!isWeatherCacheValidForToday(parsed)) {
           try { localStorage.removeItem('alpine_offline_weather'); } catch (_) {}
+          return null;
+        }
+        if (strictMatch && locKey && parsed?.id && parsed.id !== locKey) {
           return null;
         }
         return parsed;
@@ -267,6 +271,10 @@ export const AlpineStorage = {
                 return;
               }
               try { store.delete(req.result.id); } catch (_) {}
+            }
+            if (strictMatch) {
+              resolve(fallbackLocal());
+              return;
             }
             // Fallback: zeitlich neuesten GÜLTIGEN Eintrag wählen (ohne abgelaufene Altlasten)
             let newest = null;

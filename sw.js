@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.41.4';
-const CACHE_NAME = `best-weather-v2.41.4-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.42.0';
+const CACHE_NAME = `best-weather-v2.42.0-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
@@ -21,14 +21,6 @@ const STATIC_ASSETS = [
   './index.html',
   './version.json',
   './style.css',
-  './css/01_variables.css',
-  './css/02_base.css',
-  './css/03_overview.css',
-  './css/04_mountain.css',
-  './css/05_verification.css',
-  './css/06_map.css',
-  './css/07_sports.css',
-  './css/08_responsive.css',
   './app.js',
   './microEngine.js',
   './storage.js',
@@ -37,6 +29,7 @@ const STATIC_ASSETS = [
   './background.worker.js',
   './physics.worker.js',
   './core/telemetryEngine.js',
+  './core/domUtils.js',
   './core/appUpdater.js',
   './core/dispatcher.js',
   './core/state.js',
@@ -70,8 +63,8 @@ const STATIC_ASSETS = [
   './favicon.png',
   './icon-192.png',
   './icon-512.png',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  './vendor/leaflet/leaflet.css',
+  './vendor/leaflet/leaflet.js',
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'
 ];
 
@@ -80,7 +73,10 @@ const CORE_PRECACHE_ASSETS = [
   './index.html',
   './version.json',
   './style.css',
+  './vendor/leaflet/leaflet.css',
+  './vendor/leaflet/leaflet.js',
   './app.js',
+  './core/domUtils.js',
   './core/appUpdater.js',
   './manifest.json',
   './logo.png'
@@ -525,35 +521,12 @@ self.addEventListener('fetch', (event) => {
 const NOTIF_IDB_NAME = 'best-weather-db';
 const NOTIF_IDB_STORE = 'notifications';
 const NOTIF_RETENTION_MS = 24 * 60 * 60 * 1000;
+let _swNotifDbPromise = null;
 
-function getNotifFromIndexedDB(id) {
-  if (!id || typeof indexedDB === 'undefined') return Promise.resolve(null);
-  return new Promise((resolve) => {
-    try {
-      const req = indexedDB.open(NOTIF_IDB_NAME, 1);
-      req.onsuccess = (e) => {
-        const db = e.target.result;
-        try {
-          if (!db.objectStoreNames.contains(NOTIF_IDB_STORE)) return resolve(null);
-          const tx = db.transaction([NOTIF_IDB_STORE], 'readonly');
-          const store = tx.objectStore(NOTIF_IDB_STORE);
-          const getReq = store.get(id);
-          getReq.onsuccess = () => resolve(getReq.result || null);
-          getReq.onerror = () => resolve(null);
-        } catch (_) {
-          resolve(null);
-        }
-      };
-      req.onerror = () => resolve(null);
-    } catch (_) {
-      resolve(null);
-    }
-  });
-}
-
-function saveNotifToIndexedDB(record) {
-  if (typeof indexedDB === 'undefined') return Promise.resolve();
-  return new Promise((resolve) => {
+function getSwNotifDB() {
+  if (_swNotifDbPromise) return _swNotifDbPromise;
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  _swNotifDbPromise = new Promise((resolve) => {
     try {
       const req = indexedDB.open(NOTIF_IDB_NAME, 1);
       req.onupgradeneeded = (e) => {
@@ -566,72 +539,102 @@ function saveNotifToIndexedDB(record) {
       };
       req.onsuccess = (e) => {
         const db = e.target.result;
-        try {
-          const tx = db.transaction([NOTIF_IDB_STORE], 'readwrite');
-          const store = tx.objectStore(NOTIF_IDB_STORE);
-          const getReq = store.get(record.id);
-          getReq.onsuccess = () => {
-            const existing = getReq.result;
-            // Wenn der Nutzer diesen Bericht bereits gelesen hat, behalte read: true bei!
-            if (existing && existing.read) {
-              record.read = true;
-            }
-            store.put(record);
-          };
-          getReq.onerror = () => {
-            store.put(record);
-          };
+        db.onversionchange = () => {
+          try { db.close(); } catch (_) {}
+          _swNotifDbPromise = null;
+        };
+        db.onclose = () => {
+          _swNotifDbPromise = null;
+        };
+        resolve(db);
+      };
+      req.onerror = () => {
+        _swNotifDbPromise = null;
+        resolve(null);
+      };
+    } catch (_) {
+      _swNotifDbPromise = null;
+      resolve(null);
+    }
+  });
+  return _swNotifDbPromise;
+}
 
-          // 24h Pruning alter Meldungen
-          const index = store.index('timestamp');
-          const cutoff = Date.now() - NOTIF_RETENTION_MS;
-          const range = IDBKeyRange.upperBound(cutoff);
-          const curReq = index.openCursor(range);
-          curReq.onsuccess = (ev) => {
-            const cursor = ev.target.result;
-            if (cursor) {
-              cursor.delete();
-              cursor.continue();
-            }
-          };
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => resolve();
-        } catch (_) {
-          resolve();
+async function getNotifFromIndexedDB(id) {
+  if (!id) return null;
+  const db = await getSwNotifDB();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      if (!db.objectStoreNames.contains(NOTIF_IDB_STORE)) return resolve(null);
+      const tx = db.transaction([NOTIF_IDB_STORE], 'readonly');
+      const store = tx.objectStore(NOTIF_IDB_STORE);
+      const getReq = store.get(id);
+      getReq.onsuccess = () => resolve(getReq.result || null);
+      getReq.onerror = () => resolve(null);
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
+
+async function saveNotifToIndexedDB(record) {
+  const db = await getSwNotifDB();
+  if (!db) return;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction([NOTIF_IDB_STORE], 'readwrite');
+      const store = tx.objectStore(NOTIF_IDB_STORE);
+      const getReq = store.get(record.id);
+      getReq.onsuccess = () => {
+        const existing = getReq.result;
+        if (existing && existing.read) {
+          record.read = true;
+        }
+        store.put(record);
+      };
+      getReq.onerror = () => {
+        store.put(record);
+      };
+      const index = store.index('timestamp');
+      const cutoff = Date.now() - NOTIF_RETENTION_MS;
+      const range = IDBKeyRange.upperBound(cutoff);
+      const curReq = index.openCursor(range);
+      curReq.onsuccess = (ev) => {
+        const cursor = ev.target.result;
+        if (cursor) {
+          cursor.delete();
+          cursor.continue();
         }
       };
-      req.onerror = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
     } catch (_) {
       resolve();
     }
   });
 }
 
-function markNotifReadInIndexedDB(id) {
-  if (!id || typeof indexedDB === 'undefined') return Promise.resolve();
+async function markNotifReadInIndexedDB(id) {
+  if (!id) return;
+  const db = await getSwNotifDB();
+  if (!db) return;
   return new Promise((resolve) => {
     try {
-      const req = indexedDB.open(NOTIF_IDB_NAME, 1);
-      req.onsuccess = (e) => {
-        const db = e.target.result;
-        try {
-          const tx = db.transaction([NOTIF_IDB_STORE], 'readwrite');
-          const store = tx.objectStore(NOTIF_IDB_STORE);
-          const getReq = store.get(id);
-          getReq.onsuccess = () => {
-            const item = getReq.result;
-            if (item) {
-              item.read = true;
-              store.put(item);
-            }
-          };
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => resolve();
-        } catch (_) {
-          resolve();
+      const tx = db.transaction([NOTIF_IDB_STORE], 'readwrite');
+      const store = tx.objectStore(NOTIF_IDB_STORE);
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const item = getReq.result;
+        if (item) {
+          item.read = true;
+          store.put(item);
         }
       };
-      req.onerror = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
     } catch (_) {
       resolve();
     }

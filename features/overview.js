@@ -2245,29 +2245,21 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
-  const getX = idx => padL + (idx / (count - 1)) * plotW;
+  const safeCountDenom = Math.max(1, count - 1);
+  const getX = idx => padL + (idx / safeCountDenom) * plotW;
   const getY = val => padT + plotH - ((val - minVal) / range) * plotH;
 
-  // 2D Canvas Hardware-Accelerated Rendering (Task 10b)
+  // Canvas direkt an .meteogram-chart-wrapper / #ensemble-meteogram-canvas binden (SVG behält Achsen & Interaktiven Tooltip)
   try {
     if (!window._meteogramCanvasInstance) {
       window._meteogramCanvasInstance = new MeteogramCanvas('ensemble-meteogram-section');
     }
-    if (window._meteogramCanvasInstance) {
-      window._meteogramCanvasInstance.render({
-        ecmwfData,
-        gfsData,
-        iconData,
-        timestamps: alignedTimes,
-        metric,
-        unit,
-        minVal,
-        maxVal,
-        count
-      });
+    // Canvas nicht doppelt über SVG-Linien zeichnen, sondern sauber ausgeblendet als Fallback-Buffer bereithalten
+    if (window._meteogramCanvasInstance && window._meteogramCanvasInstance.canvas) {
+      window._meteogramCanvasInstance.canvas.style.display = 'none';
     }
   } catch (err) {
-    console.warn('[MeteogramCanvas] Render warning:', err);
+    console.warn('[MeteogramCanvas] Init warning:', err);
   }
 
   // SVG-Pfade generieren

@@ -125,11 +125,14 @@ async function fetchOriginSignature() {
   ]);
 
   if (!vData && !headSig) return null;
-  const vPart = vData ? `${vData.version || ''}|${vData.build || ''}` : '';
-  const combined = `${vPart}|${headSig || ''}`;
+  // Primär deterministische version.json verwenden; HEAD-ETag nur wenn version.json fehlt (verhindert Funkloch-Fehl-Reloads!)
+  const sig = vData
+    ? `v:${vData.version || ''}|b:${vData.build || ''}`
+    : `h:${headSig || ''}`;
   return {
-    sig: combined,
-    token: hashShort(combined)
+    sig,
+    hasVersionFile: Boolean(vData),
+    token: hashShort(sig)
   };
 }
 
@@ -163,7 +166,10 @@ export async function checkForAppUpdate({ reason = 'auto' } = {}) {
 
       if (originInfo.sig !== prevSig) {
         try { localStorage.setItem(STORAGE_SIG_KEY, originInfo.sig); } catch (_) {}
-        await clearNonTileCaches();
+        // Nur Caches bereinigen, wenn version.json sauber vom Server gelesen werden konnte (Offline-Schutz)
+        if (originInfo.hasVersionFile) {
+          await clearNonTileCaches();
+        }
         await registerAndActivateSw(originInfo.token);
         const reloaded = triggerHardReload(reason);
         return { updated: true, reloaded, token: originInfo.token };

@@ -15,7 +15,7 @@ import { getLocalDateKey } from './httpClient.js';
 // Domain Feature Modules (Task 1a)
 import { setupLocationTypeToggle, updateLocationHeaderUI, updateAlpineSkyIllumination, renderOverviewTab, setupExpertModeToggle, renderMultiModelComparison, renderAirQualityAndUV, setupMeteogramControls, openDayDetailModal, convertTemp, setupHourlyGranularityToggle, getTodayDailyIndex } from './features/overview.js';
 import { setupWallSelector, setupAltitudeSlider, setupMountainControls, setupMountain3DControls, setupWebcamModal, renderAdaptiveTab2 } from './features/mountain.js';
-import { initLeafletMap, stopRadarAnimation, updateMapLocation, updatePointWeatherCard, updateWeatherOverlay, enterMobileMapFullscreen, exitMobileMapFullscreen, ensureFreshMapRadar } from './features/map.js';
+import { initLeafletMap, stopRadarAnimation, stopWindCanvas, resumeWindCanvasIfActive, updateMapLocation, updatePointWeatherCard, updateWeatherOverlay, enterMobileMapFullscreen, exitMobileMapFullscreen, ensureFreshMapRadar } from './features/map.js';
 import { setupGPXInspector, setupSportsTab, initSportsTour } from './features/sports.js';
 import { setupSearch, setupSpotlightAndQuickGps, updateNavigationWarningBadges, selectExactLocation, initSearchHandlers, triggerExactGps } from './features/search.js';
 import { setupFavorites, updateFavStarUI, renderFavoritesTab, initFavoritesHandlers, toggleFavoriteLocation, persistFavorites } from './features/favorites.js';
@@ -23,7 +23,7 @@ import { setupSourcesQuickNav, updateGeoRoutingNetworks } from './features/netwo
 import { ActualEngine } from './core/actualEngine.js';
 import { renderVerificationDashboard, setupVerificationUI, initVerificationHandlers } from './features/verificationUI.js';
 import { initBentoSheets } from './features/bentoSheets.js';
-import { initPullToRefresh } from './features/pullToRefresh.js?v=3.0.0';
+import { initPullToRefresh } from './features/pullToRefresh.js';
 import { GoogleSheetsSync } from './core/googleSheetsSync.js';
 import { AlpineStorage } from './storage.js';
 import { initScrollOptimizer } from './core/scrollOptimizer.js';
@@ -80,6 +80,7 @@ export function switchTab(tabId) {
 
   if (tabId !== 'tab-map') {
     if (state.map?.radarPlaying) stopRadarAnimation();
+    stopWindCanvas();
     exitMobileMapFullscreen();
   }
 
@@ -105,6 +106,7 @@ export function switchTab(tabId) {
       enterMobileMapFullscreen();
     }
     ensureFreshMapRadar();
+    resumeWindCanvasIfActive();
     setTimeout(() => {
       if (state.map.instance) {
         state.map.instance.invalidateSize();
@@ -147,11 +149,13 @@ export function setupTabs() {
     if (document.hidden) {
       if (state.canvasEngine) state.canvasEngine.pause();
       if (state.map?.radarPlaying) stopRadarAnimation();
+      stopWindCanvas();
     } else {
       if (state.canvasEngine) state.canvasEngine.resume();
       checkFreshnessAndRollover('visibility');
       if (state.activeTab === 'tab-map' || document.body.classList.contains('mobile-map-fullscreen-active')) {
         ensureFreshMapRadar();
+        resumeWindCanvasIfActive();
       }
     }
   });
@@ -245,6 +249,7 @@ let activeLocationSequence = 0;
 export async function loadLocation(loc, options = {}) {
   const validLoc = validateLocation(loc);
   const forceRefresh = Boolean(options?.forceRefresh);
+  const prevLocation = state.currentLocation;
   state.currentLocation = validLoc;
   updateLocationHeaderUI();
   updateGeoRoutingNetworks();
@@ -264,13 +269,16 @@ export async function loadLocation(loc, options = {}) {
   // SÄULE 3: 0ms Warm Start & Instant Cache-Hydration (Stale-While-Revalidate)
   // Zeige SOFORT die zuletzt gespeicherten Daten dieses Standorts an, noch bevor das Netz anfragt!
   const locKey = `${validLoc.lat.toFixed(3)}_${validLoc.lon.toFixed(3)}`;
-  const hasLiveWeatherAlready = state.weatherData && state.currentLocation &&
-    Math.abs(state.currentLocation.lat - validLoc.lat) < 0.005 &&
-    Math.abs(state.currentLocation.lon - validLoc.lon) < 0.005;
+  const hasLiveWeatherAlready = Boolean(
+    state.weatherData &&
+    prevLocation &&
+    Math.abs(prevLocation.lat - validLoc.lat) < 0.005 &&
+    Math.abs(prevLocation.lon - validLoc.lon) < 0.005
+  );
 
   if (!hasLiveWeatherAlready) {
     try {
-      const cached = await WeatherTourCache.getCachedWeather(locKey);
+      const cached = await WeatherTourCache.getCachedWeather(locKey, { strictMatch: true });
       if (cached?.weatherData) {
         state.weatherData = cached.weatherData;
         if (cached.microData) state.microData = { ...cached.microData, weatherRaw: cached.weatherData };
@@ -427,7 +435,7 @@ export async function loadLocation(loc, options = {}) {
       ? (err.retryAfterMs >= 60000 ? `${Math.ceil(err.retryAfterMs / 60000)} Min.` : `${Math.ceil(err.retryAfterMs / 1000)} Sek.`)
       : '';
     const locKey = `${validLoc.lat.toFixed(3)}_${validLoc.lon.toFixed(3)}`;
-    const cached = await WeatherTourCache.getCachedWeather(locKey);
+    const cached = await WeatherTourCache.getCachedWeather(locKey, { strictMatch: true });
     if (cached?.weatherData) {
       hideConnectionErrorOverlay();
       state.weatherData = cached.weatherData;

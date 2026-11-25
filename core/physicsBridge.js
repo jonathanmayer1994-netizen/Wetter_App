@@ -14,7 +14,7 @@ class PhysicsBridge {
   init() {
     if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
       try {
-        this.worker = new Worker('./physics.worker.js?v=2.3.1');
+        this.worker = new Worker('./physics.worker.js');
         this.worker.onmessage = (e) => {
           const { id, status, data, error } = e.data || {};
           const handler = this.pending.get(id);
@@ -25,7 +25,15 @@ class PhysicsBridge {
           }
         };
         this.worker.onerror = (err) => {
-          console.warn('[PhysicsBridge] Worker runtime issue:', err);
+          console.warn('[PhysicsBridge] Worker runtime issue, rejecting pending & switching to sync fallback:', err);
+          for (const [, handler] of this.pending.entries()) {
+            try { handler.reject(new Error('Physics worker failed')); } catch (_) {}
+          }
+          this.pending.clear();
+          if (this.worker) {
+            try { this.worker.terminate(); } catch (_) {}
+            this.worker = null;
+          }
         };
       } catch (err) {
         console.warn('[PhysicsBridge] Physics worker unsupported, falling back to synchronous:', err);

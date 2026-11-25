@@ -12,6 +12,7 @@
 
 import { AlpineStorage } from '../storage.js';
 import { state } from '../core/state.js';
+import { escapeHtml, validateHttpsUrl } from '../core/domUtils.js';
 import {
   saveNotification,
   getNotifications,
@@ -49,9 +50,9 @@ export const SCHEDULE_PRESETS = {
     key: 'eco',
     name: 'Eco (05:00–22:00 Uhr, 100% Free-Tier Safe)',
     cron: '0 5,7,8,10,12,14,16,17,18,19,20,21 * * *',
-    runsPerDay: 13,
-    monthlyMinutes: 130,
-    description: '13 Läufe/Tag verteilt auf 05:00 bis 21:00 Uhr. 22:00–05:00 Uhr Pause (~130 Compute-Min./Monat).'
+    runsPerDay: 12,
+    monthlyMinutes: 120,
+    description: '12 Läufe/Tag verteilt auf 05:00 bis 21:00 Uhr. 22:00–05:00 Uhr Pause (~120 Compute-Min./Monat).'
   },
   hourly: {
     key: 'hourly',
@@ -246,12 +247,22 @@ export function getActiveBackendMode() {
   return authMode === 'disconnected' ? 'local-only' : `gitlab-${authMode}`;
 }
 
+function normalizeValidatedGitLabHost(rawHost) {
+  const valid = validateHttpsUrl(rawHost || 'https://gitlab.com');
+  if (!valid) {
+    throw new Error('Ungültige GitLab-Host-URL. Es sind ausschließlich https://-URLs erlaubt.');
+  }
+  return valid.origin;
+}
+
+let _refreshTokenPromise = null;
+
 /**
  * Startet den offiziellen GitLab OAuth 2.0 + PKCE Flow (1-Tipp Anmeldung via Face ID / Touch ID)
  */
 export async function startGitLabOAuthLogin() {
   readFormValues();
-  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const host = normalizeValidatedGitLabHost(currentGitLab.host);
   const clientId = (currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '').trim();
   const projectId = getEffectiveProjectId();
 
@@ -331,7 +342,8 @@ export async function handleGitLabOAuthCallback() {
     return { handled: true, error: 'OAuth-Anmeldung abgelaufen (>15 Min.). Bitte erneut anmelden.' };
   }
 
-  const tokenUrl = `${pkce.host}/oauth/token`;
+  const validHost = normalizeValidatedGitLabHost(pkce.host);
+  const tokenUrl = `${validHost}/oauth/token`;
   const body = new URLSearchParams({
     client_id: pkce.clientId,
     code,
@@ -380,48 +392,57 @@ export async function handleGitLabOAuthCallback() {
 }
 
 /**
- * Erneuert ein ablaufendes GitLab OAuth Access Token lautlos über das Refresh Token
+ * Erneuert ein ablaufendes GitLab OAuth Access Token lautlos über das Refresh Token (Mutex-gesichert)
  */
 export async function refreshGitLabOAuthToken() {
+  if (_refreshTokenPromise) return _refreshTokenPromise;
   if (!currentOAuth || !currentOAuth.refreshToken) {
     throw new Error('GitLab-Sitzung abgelaufen. Bitte kurz erneut mit GitLab verbinden.');
   }
 
-  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const host = normalizeValidatedGitLabHost(currentGitLab.host);
   const clientId = (currentGitLab.clientId || DEFAULT_GITLAB_OAUTH.clientId || '').trim();
   if (!clientId) {
     throw new Error('GitLab OAuth Client ID fehlt für Token-Erneuerung.');
   }
 
-  const body = new URLSearchParams({
-    client_id: clientId,
-    refresh_token: currentOAuth.refreshToken,
-    grant_type: 'refresh_token',
-    redirect_uri: getOAuthRedirectUri()
-  });
+  _refreshTokenPromise = (async () => {
+    const body = new URLSearchParams({
+      client_id: clientId,
+      refresh_token: currentOAuth.refreshToken,
+      grant_type: 'refresh_token',
+      redirect_uri: getOAuthRedirectUri()
+    });
 
-  const res = await fetch(`${host}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString()
-  });
+    const res = await fetch(`${host}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
 
-  if (!res.ok) {
-    disconnectGitLabOAuth();
-    throw new Error(`GitLab OAuth Refresh fehlgeschlagen (${res.status}). Bitte erneut verbinden.`);
+    if (!res.ok) {
+      disconnectGitLabOAuth();
+      throw new Error(`GitLab OAuth Refresh fehlgeschlagen (${res.status}). Bitte erneut verbinden.`);
+    }
+
+    const tokenData = await res.json();
+    currentOAuth = {
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token || currentOAuth.refreshToken,
+      expiresAt: Date.now() + ((Number(tokenData.expires_in) || 7200) * 1000),
+      tokenType: tokenData.token_type || 'Bearer',
+      scope: tokenData.scope || currentOAuth.scope || 'api',
+      connectedAt: currentOAuth.connectedAt || Date.now()
+    };
+    saveNotificationState();
+    return currentOAuth;
+  })();
+
+  try {
+    return await _refreshTokenPromise;
+  } finally {
+    _refreshTokenPromise = null;
   }
-
-  const tokenData = await res.json();
-  currentOAuth = {
-    accessToken: tokenData.access_token,
-    refreshToken: tokenData.refresh_token || currentOAuth.refreshToken,
-    expiresAt: Date.now() + ((Number(tokenData.expires_in) || 7200) * 1000),
-    tokenType: tokenData.token_type || 'Bearer',
-    scope: tokenData.scope || currentOAuth.scope || 'api',
-    connectedAt: currentOAuth.connectedAt || Date.now()
-  };
-  saveNotificationState();
-  return currentOAuth;
 }
 
 /**
@@ -440,7 +461,7 @@ export function disconnectGitLabOAuth() {
  * Zentraler GitLab REST API Client mit automatischem OAuth PKCE Refresh & PAT-Fallback
  */
 async function gitlabApiFetch(apiPath, options = {}, allowRetry = true) {
-  const host = (currentGitLab.host || 'https://gitlab.com').trim().replace(/\/+$/, '');
+  const host = normalizeValidatedGitLabHost(currentGitLab.host);
   const authMode = getGitLabAuthMode();
 
   if (authMode === 'disconnected') {
@@ -504,10 +525,10 @@ export function loadNotificationState() {
   const savedGitLab = AlpineStorage.safeGetItem(STORAGE_KEYS.GITLAB, null);
   if (savedGitLab) {
     currentGitLab = { ...DEFAULT_GITLAB, ...savedGitLab };
-    if (DEFAULT_GITLAB_OAUTH.clientId) {
+    if (!String(currentGitLab.clientId || '').trim() && DEFAULT_GITLAB_OAUTH.clientId) {
       currentGitLab.clientId = DEFAULT_GITLAB_OAUTH.clientId;
     }
-    if (DEFAULT_GITLAB_OAUTH.projectId) {
+    if (!String(currentGitLab.projectId || '').trim() && DEFAULT_GITLAB_OAUTH.projectId) {
       currentGitLab.projectId = DEFAULT_GITLAB_OAUTH.projectId;
     }
   }
@@ -1365,15 +1386,6 @@ function discardNotificationChanges() {
   updateUnsavedIndicator();
 }
 
-function escapeHtml(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 /**
  * Aktualisiert den blauen Ungelesen-Punkt an der Glocke im App-Header
  */
@@ -1436,12 +1448,12 @@ export async function renderNotificationFeed(highlightId = null) {
     const highlightClass = notif.id === highlightId ? 'is-highlighted' : '';
 
     return `
-      <article class="notif-feed-card ${unreadClass} ${highlightClass}" data-notif-id="${notif.id}">
+      <article class="notif-feed-card ${unreadClass} ${highlightClass}" data-notif-id="${escapeHtml(notif.id)}">
         <div class="notif-feed-card-header">
-          <span class="notif-feed-badge ${meta.className}">
-            <span aria-hidden="true">${meta.icon}</span> ${meta.label}
+          <span class="notif-feed-badge ${escapeHtml(meta.className)}">
+            <span aria-hidden="true">${escapeHtml(meta.icon)}</span> ${escapeHtml(meta.label)}
           </span>
-          <time class="notif-feed-time">${timeStr}</time>
+          <time class="notif-feed-time">${escapeHtml(timeStr)}</time>
         </div>
         <div class="notif-feed-title">${escapeHtml(notif.title)}</div>
         <div class="notif-feed-body">${escapeHtml(notif.body)}</div>
@@ -1471,6 +1483,7 @@ export async function renderNotificationFeed(highlightId = null) {
 }
 
 let currentActiveView = 'feed';
+let _activeHighlightNotifId = null;
 
 /**
  * Wechselt zwischen 'feed' (24h Mitteilungszentrale) und 'settings' (Alarm- & Taktungsregeln)
@@ -1940,11 +1953,12 @@ export function initNotifications() {
       const newQuery = urlParams.toString();
       const newUrl = window.location.pathname + (newQuery ? '?' + newQuery : '') + window.location.hash;
       window.history.replaceState({}, '', newUrl);
-      setTimeout(() => {
+      setTimeout(async () => {
         openNotificationModal('feed');
         if (targetNotifId) {
-          markNotificationAsRead(targetNotifId);
-          renderNotificationFeed(targetNotifId);
+          _activeHighlightNotifId = targetNotifId;
+          await markNotificationAsRead(targetNotifId);
+          await renderNotificationFeed(targetNotifId);
         }
       }, 350);
     }
@@ -1952,12 +1966,13 @@ export function initNotifications() {
 
   // Service Worker Messages (App bereits im Hintergrund oder Vordergrund geöffnet)
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', (event) => {
+    navigator.serviceWorker.addEventListener('message', async (event) => {
       if (event.data?.type === 'NOTIFICATION_OPENED') {
         openNotificationModal('feed');
         if (event.data.notifId) {
-          markNotificationAsRead(event.data.notifId);
-          renderNotificationFeed(event.data.notifId);
+          _activeHighlightNotifId = event.data.notifId;
+          await markNotificationAsRead(event.data.notifId);
+          await renderNotificationFeed(event.data.notifId);
         }
       }
     });
@@ -1966,7 +1981,7 @@ export function initNotifications() {
   // Globales Event bei neuer Nachricht
   if (typeof window !== 'undefined') {
     window.addEventListener('best-weather:notif-updated', () => {
-      renderNotificationFeed();
+      renderNotificationFeed(_activeHighlightNotifId);
       updateHeaderUnreadBadge();
     });
   }

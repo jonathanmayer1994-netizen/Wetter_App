@@ -346,7 +346,7 @@ export function renderVerificationDashboard() {
             <div class="ved-grid">
               <div class="ved-card">
                 <strong>Kalman Bias-Decay (0–12h)</strong>
-                <p>Aktiver Bias von <b>${tempDeltaFormatted}</b> wird mit einer alpinen Halbwertszeit von $\\tau = 4.0\\,\\text{h}$ kontinuierlich in die nächsten Stunden hineingerechnet.</p>
+                <p>Aktiver Bias von <b>${tempDeltaFormatted}</b> wird mit einer alpinen Halbwertszeit von <i>τ</i> = 4,0 h kontinuierlich in die nächsten Stunden hineingerechnet.</p>
               </div>
               <div class="ved-card">
                 <strong>Bayesian Model Averaging (BMA)</strong>
@@ -469,7 +469,8 @@ export function renderVerificationSVG(history) {
 
 function setupChartHoverTooltip(svg) {
   const tooltip = document.getElementById('vfy-tooltip');
-  if (!tooltip) return;
+  if (!tooltip || !svg || svg._hoverListenersBound) return;
+  svg._hoverListenersBound = true;
 
   svg.addEventListener('pointermove', (e) => {
     const dot = e.target.closest('.vfy-interactive-dot');

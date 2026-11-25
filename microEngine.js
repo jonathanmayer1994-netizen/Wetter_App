@@ -4517,14 +4517,7 @@ export const MicroEngine = {
   },
 
   calculateHaversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // Erdradius in Metern
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return this.calculateHaversineDistanceKm(lat1, lon1, lat2, lon2) * 1000;
   },
 
   /**
@@ -6258,22 +6251,8 @@ export const MicroEngine = {
   },
 
   /**
-   * Stull (2011) Feuchtkugeltemperatur T_w (°C) — präzise für alpine Phasengrenzen
-   */
-  computeWetBulbTemp(tempC, rhPct = 85) {
-    const T = Number.isFinite(tempC) ? tempC : 5;
-    const RH = Math.max(5, Math.min(100, Number.isFinite(rhPct) ? rhPct : 85));
-    const tw = T * Math.atan(0.151977 * Math.sqrt(RH + 8.313659))
-      + Math.atan(T + RH)
-      - Math.atan(RH - 1.676331)
-      + 0.00391838 * Math.pow(RH, 1.5) * Math.atan(0.023101 * RH)
-      - 4.686035;
-    return Math.round(tw * 10) / 10;
-  },
-
-  /**
    * Thermodynamische Niederschlagsphasen-Klassifikation (Regen / Schneeregen / Schnee)
-   * Kombiniert Feuchtkugeltemperatur T_w, Modell-Nullgradgrenze (freezing_level_height),
+   * Kombiniert barometrisch korrigierte Feuchtkugeltemperatur T_w, Modell-Nullgradgrenze (freezing_level_height),
    * NWP-Schneewasseräquivalent und WMO-Codes inkl. Subgrid-Gipfelkorrektur.
    */
   classifyPrecipPhase({
@@ -6286,7 +6265,8 @@ export const MicroEngine = {
     freezingLevelM = null,
     wCode = 0
   }) {
-    const wetBulbC = this.computeWetBulbTemp(tempC, rhPct);
+    const pressureHpa = 1013.25 * Math.pow(Math.max(0.2, 1 - (2.25577e-5 * elevation)), 5.25588);
+    const wetBulbC = this.computeWetBulbTemp(tempC, rhPct, pressureHpa);
     const smooth01 = (v) => {
       const c = Math.max(0, Math.min(1, v));
       return c * c * (3 - 2 * c);

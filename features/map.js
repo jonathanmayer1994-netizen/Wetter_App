@@ -165,6 +165,11 @@ export function initLeafletMap() {
   // Entprellt (200ms), damit Doppel-Tipp / Doppel-Klick zum Reinzommen nicht als Standortwahl missverstanden wird
   let mapClickTimer = null;
   state.map.instance.on('click', (e) => {
+    // Wenn Overlay-Legende offen ist, schließt der Kartenklick nur die Legende statt einen Ortswechsel auszulösen
+    if (state.map?.legendVisible) {
+      closeMapLegend();
+      return;
+    }
     if (mapClickTimer) {
       clearTimeout(mapClickTimer);
       mapClickTimer = null;
@@ -679,7 +684,6 @@ export function setMapBaseLayer(baseKey) {
   const isRetina = (typeof window !== 'undefined' && window.devicePixelRatio >= 1.5);
   const options = {
     ...conf.options,
-    crossOrigin: true,
     keepBuffer: 8,
     updateWhenZooming: true,
     updateWhenIdle: false
@@ -719,7 +723,6 @@ export function setMapBaseLayer(baseKey) {
       pane: hsPane,
       maxNativeZoom: 16,
       maxZoom: conf.options.maxZoom || 20,
-      crossOrigin: true,
       keepBuffer: 6,
       className: 'ms-hillshade-tile'
     });
@@ -736,7 +739,6 @@ export function setMapBaseLayer(baseKey) {
       opacity: resolvedKey === 'osm-dark' ? 0.46 : 0.38,
       maxNativeZoom: 16,
       maxZoom: conf.options.maxZoom || 20,
-      crossOrigin: true,
       keepBuffer: 6,
       className: 'ms-top-relief-tile'
     });
@@ -754,7 +756,6 @@ export function setMapBaseLayer(baseKey) {
       subdomains: ['a', 'b', 'c', 'd'],
       maxNativeZoom: resolvedKey === 'osm-dark' ? 19 : 18,
       maxZoom: conf.options.maxZoom || 20,
-      crossOrigin: true,
       className: 'ms-labels-tile'
     };
     if (conf.labelsUrl.includes('{r}')) {
@@ -2966,7 +2967,11 @@ const WeatherCanvasEngine = {
 
     const self = this;
     function animLoop() {
-      if (self.activeOverlay !== 'wind') return;
+      // Akku- & CPU-Schutz: Keine 60-FPS-Windsimulation auf inaktiven Tabs oder minimierter App
+      if (self.activeOverlay !== 'wind' || state.activeTab !== 'tab-map' || (typeof document !== 'undefined' && document.hidden)) {
+        self.animId = null;
+        return;
+      }
       const liveStations = (self._windStations && self._windStations.length) ? self._windStations : stations;
 
       // Erhalte die darunterliegende OSM-Karte 100% transparent sichtbar!
@@ -5076,6 +5081,12 @@ export function stopWindCanvas() {
   WeatherCanvasEngine.stopAnimation();
 }
 
+export function resumeWindCanvasIfActive() {
+  if (state.activeTab === 'tab-map' && state.map?.activeOverlay === 'wind' && !(typeof document !== 'undefined' && document.hidden)) {
+    updateWeatherOverlay();
+  }
+}
+
 /**
  * Interpoliert die Wetterdaten aller alpinen Wetterstationen stufenlos für beliebige Minuten-Offsets.
  */
@@ -5192,6 +5203,7 @@ export function realignRadarTimelineTimestamps(nowMs = Date.now()) {
 
   for (let i = 0; i < frames.length; i++) {
     const f = frames[i];
+    delete f._cachedSummary;
     if (f.minuteOffset !== undefined) {
       f.timestampMs = nowMs + f.minuteOffset * 60000;
       f.time = Math.floor(f.timestampMs / 1000);
@@ -6434,6 +6446,12 @@ export function stepRadar(delta) {
 export function updateMapLocation() {
   if (!state.map.instance) return;
   const loc = state.currentLocation;
+  const frames = state.map?.unifiedRadarFrames;
+  if (Array.isArray(frames)) {
+    for (let i = 0; i < frames.length; i++) {
+      if (frames[i]) delete frames[i]._cachedSummary;
+    }
+  }
   // Zoomlevel niemals automatisch verändern: Zoom erfolgt ausschließlich manuell (Pinch/Mac-Controls/Zoom-Buttons)
   state.map.instance.panTo([loc.lat, loc.lon], { animate: true });
   if (state.map.marker) {

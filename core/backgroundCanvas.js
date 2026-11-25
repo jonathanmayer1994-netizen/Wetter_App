@@ -37,6 +37,14 @@ export class BackgroundCanvasEngine {
       try {
         const offscreen = this.canvas.transferControlToOffscreen();
         this.worker = new Worker('./background.worker.js');
+        this.worker.onerror = (err) => {
+          console.warn('[BackgroundCanvas] Worker runtime error, disabling worker animation:', err);
+          if (this.worker) {
+            try { this.worker.terminate(); } catch (_) {}
+            this.worker = null;
+          }
+          this.useWorker = false;
+        };
         this.worker.postMessage({
           action: 'init',
           payload: {

@@ -114,18 +114,19 @@ export const ActualEngine = {
       this.applyUserGroundTruthAdjustment(cur, h, userReport);
     }
 
-    // 10. Erstelle den vollständigen Verifikations- & Kalibrierungs-Payload
+    const hasRealStation = Boolean(groundTruth && !groundTruth.isSyntheticGroundTruth);
     const payload = {
       timestamp: new Date().toISOString(),
       locationKey: VerificationStore.getLocationKey(lat, lon),
-      verified: !!groundTruth,
+      verified: hasRealStation,
       groundTruthStation: groundTruth ? {
         name: groundTruth.stationName,
         network: groundTruth.network,
         distanceKm: groundTruth.distanceKm,
         elevation: groundTruth.stationElevation,
         elevationDiff: groundTruth.stationElevation ? Math.round(elevation - groundTruth.stationElevation) : 0,
-        recordedAtStr: groundTruth.timestamp ? new Date(groundTruth.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'Live'
+        recordedAtStr: groundTruth.timestamp ? new Date(groundTruth.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'Live',
+        isSynthetic: Boolean(groundTruth.isSyntheticGroundTruth)
       } : null,
       liveDelta,
       modelEvaluation,
@@ -162,16 +163,16 @@ export const ActualEngine = {
       };
     }
 
-    // Fallback: Wenn keine direkte Bodenstation erreichbar ist, synthetisiere aus den
-    // letzten historischen Reanalyse-/Nowcast-Messwerten von Open-Meteo past_hours
+    // Fallback: Wenn keine direkte Bodenstation erreichbar ist, ehrlich als Modell-/Nowcast-Konsens kennzeichnen
     if (weatherRaw && weatherRaw.current && typeof weatherRaw.current.temperature_2m === 'number') {
       return {
         timestamp: weatherRaw.current.time || new Date().toISOString(),
-        source: 'Hochaufgelöste Satelliten- & Radar-Nowcast Analyse',
+        source: 'Modell- & Nowcast-Konsens (keine Bodenstation in Reichweite)',
         network: 'DWD / ECMWF IFS-Analysis',
-        stationName: 'Satelliten-/Radar-Ground-Truth',
+        stationName: 'Nowcast-Konsens (ohne Station)',
         stationElevation: Math.round(elevation),
         distanceKm: 0.0,
+        isSyntheticGroundTruth: true,
         temp: weatherRaw.current.temperature_2m,
         apparentTemp: weatherRaw.current.apparent_temperature || weatherRaw.current.temperature_2m,
         windSpeed: weatherRaw.current.wind_speed_10m || 0,
@@ -543,24 +544,37 @@ export const ActualEngine = {
     if (!userReport || !current) return;
 
     const cond = userReport.condition;
+    // Ermittle aktuelle Stundenposition statt Mitternacht [0]
+    let nowIdx = 0;
+    if (hourly && Array.isArray(hourly.time) && hourly.time.length > 0) {
+      const nowMs = Date.now();
+      let bestDiff = Infinity;
+      for (let i = 0; i < hourly.time.length; i++) {
+        const diff = Math.abs(new Date(hourly.time[i]).getTime() - nowMs);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          nowIdx = i;
+        }
+      }
+    }
 
     if (cond === 'rain') {
       current.weather_code = 61; // Regen / Schauer
       current.precipitation = Math.max(0.8, current.precipitation || 0);
-      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[0] !== undefined) {
-        hourly.precipitation_probability[0] = Math.max(90, hourly.precipitation_probability[0]);
+      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[nowIdx] !== undefined) {
+        hourly.precipitation_probability[nowIdx] = Math.max(90, hourly.precipitation_probability[nowIdx]);
       }
     } else if (cond === 'thunderstorm') {
       current.weather_code = 95; // Alpingewitter / Starkregen
       current.precipitation = Math.max(2.5, current.precipitation || 0);
-      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[0] !== undefined) {
-        hourly.precipitation_probability[0] = Math.max(95, hourly.precipitation_probability[0]);
+      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[nowIdx] !== undefined) {
+        hourly.precipitation_probability[nowIdx] = Math.max(95, hourly.precipitation_probability[nowIdx]);
       }
     } else if (cond === 'snow') {
       current.weather_code = 71; // Schneefall
       current.precipitation = Math.max(1.0, current.precipitation || 0);
-      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[0] !== undefined) {
-        hourly.precipitation_probability[0] = Math.max(85, hourly.precipitation_probability[0]);
+      if (hourly && hourly.precipitation_probability && hourly.precipitation_probability[nowIdx] !== undefined) {
+        hourly.precipitation_probability[nowIdx] = Math.max(85, hourly.precipitation_probability[nowIdx]);
       }
     } else if (cond === 'fog') {
       current.weather_code = 45; // Nebel / Inversion

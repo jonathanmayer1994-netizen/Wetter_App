@@ -5,7 +5,7 @@
  */
 
 import { GoogleSheetsSync } from '../core/googleSheetsSync.js';
-import { checkForAppUpdate } from '../core/appUpdater.js?v=3.0.0';
+import { checkForAppUpdate } from '../core/appUpdater.js';
 
 let startX = 0;
 let startY = 0;
@@ -79,7 +79,10 @@ export function initPullToRefresh({ onRefreshWeather, onRefreshSync } = {}) {
       'gpx-modal-overlay',
       'webcam-modal-overlay',
       'cloud-sync-modal',
-      'spotlight-modal-overlay'
+      'spotlight-modal-overlay',
+      'notif-modal-overlay',
+      'telemetry-diag-modal',
+      'connection-error-overlay'
     ];
     for (const id of overlayIds) {
       const el = document.getElementById(id);

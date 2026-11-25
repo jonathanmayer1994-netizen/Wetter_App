@@ -30,17 +30,18 @@ export function initScrollOptimizer() {
     document.body.classList.remove('is-scrolling');
   };
 
+  const appLayout = document.querySelector('.app-layout');
   window.addEventListener('scroll', onScrollStart, { passive: true });
-  window.addEventListener('touchmove', onScrollStart, { passive: true });
 
   if ('onscrollend' in window) {
     window.addEventListener('scrollend', onScrollEnd, { passive: true });
+    if (appLayout) appLayout.addEventListener('scrollend', onScrollEnd, { passive: true });
   }
 
-  // Also bind to any scrollable panes (appLayout, drawers)
-  const appLayout = document.querySelector('.app-layout');
+  // Nur tatsächliches Container-/Fenster-Scrollen entkoppeln (kein Fehltrigger beim Karten-Panning oder Slider-Drag)
   if (appLayout) {
     appLayout.addEventListener('scroll', onScrollStart, { passive: true });
+    appLayout.addEventListener('touchmove', onScrollStart, { passive: true });
   }
 }
 

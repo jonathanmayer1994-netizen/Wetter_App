@@ -1235,35 +1235,58 @@ export function generateSyntheticSportsHourly() {
   };
 }
 
+let _gpxWorkerSingleton = null;
+let _gpxWorkerReqId = 0;
+const _gpxWorkerPending = new Map();
+
+function getGpxWorkerSingleton() {
+  if (_gpxWorkerSingleton) return _gpxWorkerSingleton;
+  if (typeof Worker === 'undefined') return null;
+  try {
+    _gpxWorkerSingleton = new Worker('./gpx.worker.js');
+    _gpxWorkerSingleton.onmessage = (e) => {
+      const { id, status, data } = e.data || {};
+      const entry = _gpxWorkerPending.get(id);
+      if (entry) {
+        _gpxWorkerPending.delete(id);
+        entry.resolve(status === 'success' ? data : null);
+      }
+    };
+    _gpxWorkerSingleton.onerror = () => {
+      for (const [, entry] of _gpxWorkerPending.entries()) {
+        try { entry.resolve(null); } catch (_) {}
+      }
+      _gpxWorkerPending.clear();
+      try { _gpxWorkerSingleton.terminate(); } catch (_) {}
+      _gpxWorkerSingleton = null;
+    };
+    return _gpxWorkerSingleton;
+  } catch (_) {
+    _gpxWorkerSingleton = null;
+    return null;
+  }
+}
+
 export async function parseGPXAsync(gpxXml) {
-  if (typeof Worker !== 'undefined') {
+  const worker = getGpxWorkerSingleton();
+  if (worker) {
     try {
-      return await new Promise((resolve) => {
-        const worker = new Worker('./gpx.worker.js');
+      const res = await new Promise((resolve) => {
+        const id = ++_gpxWorkerReqId;
         const timeout = setTimeout(() => {
-          worker.terminate();
-          resolve(MicroEngine.parseGPXData(gpxXml));
+          _gpxWorkerPending.delete(id);
+          resolve(null);
         }, 2500);
-
-        worker.onmessage = (e) => {
-          clearTimeout(timeout);
-          worker.terminate();
-          if (e.data && e.data.status === 'success') {
-            resolve(e.data.data);
-          } else {
-            resolve(MicroEngine.parseGPXData(gpxXml));
+        _gpxWorkerPending.set(id, {
+          resolve: (val) => {
+            clearTimeout(timeout);
+            resolve(val);
           }
-        };
-
-        worker.onerror = () => {
-          clearTimeout(timeout);
-          worker.terminate();
-          resolve(MicroEngine.parseGPXData(gpxXml));
-        };
-
-        worker.postMessage({ action: 'parseGPX', payload: { xmlString: gpxXml } });
+        });
+        worker.postMessage({ id, action: 'parseGPX', payload: { xmlString: gpxXml } });
       });
-    } catch (e) { }
+      if (res) return res;
+    } catch (_) {}
   }
   return MicroEngine.parseGPXData(gpxXml);
 }

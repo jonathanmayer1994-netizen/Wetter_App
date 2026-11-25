@@ -49,7 +49,7 @@ export function updateGeoRoutingNetworks() {
   } else if (lat < 47.05 && lat >= 45.8 && lon >= 10.4 && lon <= 12.6) {
     if (netSuedtirol) netSuedtirol.style.borderColor = 'var(--ios-cyan)';
     if (routingBadge) routingBadge.innerText = 'Geo-Routing: Open Data Hub Südtirol aktiv';
-  } else if (lon < 10.2 && lat >= 45.5 && lat <= 47.8) {
+  } else if (lat >= 45.75 && lat <= 47.85 && lon >= 5.9 && lon <= 10.6) {
     if (netSlf) netSlf.style.borderColor = 'var(--ios-cyan)';
     if (routingBadge) routingBadge.innerText = 'Geo-Routing: SLF IMIS Schweiz aktiv';
   } else {

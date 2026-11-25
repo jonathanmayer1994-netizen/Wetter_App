@@ -21,8 +21,8 @@ export const WeatherTourCache = {
     return AlpineStorage.safeGetItem(this.LOCATION_KEY, null);
   },
 
-  async getCachedWeather(locKey = null) {
-    return await AlpineStorage.getCachedWeather(locKey);
+  async getCachedWeather(locKey = null, options = {}) {
+    return await AlpineStorage.getCachedWeather(locKey, options);
   },
 
   async saveTour(tourName, gpxXml, parsedGPX, timeline, stats) {

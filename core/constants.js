@@ -142,7 +142,6 @@ export const BASE_LAYERS = {
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     fallbackUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
     hillshadeUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
-    topReliefUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
     options: {
       subdomains: ['a', 'b', 'c'],
       maxNativeZoom: 17,

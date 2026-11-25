@@ -179,33 +179,53 @@ function loadQuotaStats() {
   }
 }
 
-function saveQuotaStats(stats) {
+let _quotaStatsMem = null;
+let _quotaFlushTimer = null;
+
+function flushQuotaStats() {
+  _quotaFlushTimer = null;
+  if (!_quotaStatsMem) return;
   const ls = getStorage();
   if (!ls) return;
   try {
-    ls.setItem(STATS_STORAGE_KEY, JSON.stringify(stats));
+    ls.setItem(STATS_STORAGE_KEY, JSON.stringify(_quotaStatsMem));
   } catch (_) {}
 }
 
+function saveQuotaStats(stats, immediate = false) {
+  _quotaStatsMem = stats;
+  if (immediate) {
+    if (_quotaFlushTimer) {
+      clearTimeout(_quotaFlushTimer);
+      _quotaFlushTimer = null;
+    }
+    flushQuotaStats();
+    return;
+  }
+  if (!_quotaFlushTimer) {
+    _quotaFlushTimer = setTimeout(flushQuotaStats, 1500);
+  }
+}
+
 function bumpStat(field, delta = 1, extra = null) {
-  const stats = loadQuotaStats();
+  const stats = _quotaStatsMem || loadQuotaStats();
   stats[field] = (stats[field] || 0) + delta;
   if (extra && typeof extra === 'object') {
     Object.assign(stats, extra);
   }
-  saveQuotaStats(stats);
+  saveQuotaStats(stats, false);
 }
 
 export function getApiQuotaStats() {
-  return loadQuotaStats();
+  return _quotaStatsMem ? { ..._quotaStatsMem } : loadQuotaStats();
 }
 
 export function recordExternalNetworkCall(url, costEstimate = 1, meta = null) {
-  const stats = loadQuotaStats();
+  const stats = _quotaStatsMem || loadQuotaStats();
   stats.networkCalls = (stats.networkCalls || 0) + 1;
   stats.estimatedCost = Math.round(((stats.estimatedCost || 0) + (Number(costEstimate) || 1)) * 100) / 100;
   if (meta && typeof meta === 'object') Object.assign(stats, meta);
-  saveQuotaStats(stats);
+  saveQuotaStats(stats, false);
 }
 
 // =============================================================================
@@ -395,7 +415,12 @@ export function getRateLimitBucket(url) {
       ? location.origin
       : 'https://localhost';
     const parsed = new URL(rawStr, base);
-    return (parsed.hostname || 'default').toLowerCase();
+    const host = (parsed.hostname || 'default').toLowerCase();
+    // Open-Meteo Elevation (/v1/elevation) getrennt von Forecast (/v1/forecast) bucketing
+    if (host.includes('open-meteo.com') && parsed.pathname.includes('/elevation')) {
+      return `${host}:elevation`;
+    }
+    return host;
   } catch (_) {
     return 'default';
   }
@@ -669,8 +694,8 @@ export async function resilientFetch(url, options = {}) {
     );
   }
 
-  // 4. In-Flight Request Deduplication: Identische parallele Anfragen teilen sich das Promise (bei forceRefresh frisch laden)
-  if (!cancelCategory && !forceRefresh && inFlightRequests.has(key)) {
+  // 4. In-Flight Request Deduplication: Nur Requests ohne eigenes AbortSignal teilen dasselbe Promise
+  if (!cancelCategory && !forceRefresh && !options.signal && inFlightRequests.has(key)) {
     return inFlightRequests.get(key);
   }
 

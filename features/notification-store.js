@@ -3,17 +3,23 @@
  * Shared IndexedDB Store across Service Worker (Background Push) and PWA UI Window.
  */
 
+import { getLocalCalendarDateKey } from '../core/domUtils.js';
+
 const DB_NAME = 'best-weather-db';
 const DB_VERSION = 1;
 const STORE_NAME = 'notifications';
 const RETENTION_MS = 24 * 60 * 60 * 1000; // 24 Stunden
 
+let _notifDbPromise = null;
+
 /**
- * Öffnet die IndexedDB mit Migration & ObjectStore Erstellung
+ * Öffnet die IndexedDB als langlebige Singleton-Verbindung mit Migration & Close-Schutz
  */
 export function openNotifDB() {
-  return new Promise((resolve, reject) => {
+  if (_notifDbPromise) return _notifDbPromise;
+  _notifDbPromise = new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
+      _notifDbPromise = null;
       return reject(new Error('IndexedDB wird von diesem Browser nicht unterstützt'));
     }
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -25,13 +31,27 @@ export function openNotifDB() {
         store.createIndex('read', 'read', { unique: false });
       }
     };
-    request.onsuccess = (e) => resolve(e.target.result);
-    request.onerror = (e) => reject(e.target.error);
+    request.onsuccess = (e) => {
+      const db = e.target.result;
+      db.onversionchange = () => {
+        try { db.close(); } catch (_) {}
+        _notifDbPromise = null;
+      };
+      db.onclose = () => {
+        _notifDbPromise = null;
+      };
+      resolve(db);
+    };
+    request.onerror = (e) => {
+      _notifDbPromise = null;
+      reject(e.target.error);
+    };
   });
+  return _notifDbPromise;
 }
 
 /**
- * Bereinigt alte Mitteilungen (> 24h)
+ * Bereinigt alte Mitteilungen (> 24h) und wartet sauber auf tx.oncomplete
  */
 async function pruneOldRecords(db) {
   return new Promise((resolve) => {
@@ -47,11 +67,11 @@ async function pruneOldRecords(db) {
         if (cursor) {
           cursor.delete();
           cursor.continue();
-        } else {
-          resolve();
         }
       };
-      req.onerror = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
     } catch (_) {
       resolve();
     }
@@ -101,9 +121,10 @@ export async function saveNotification(entry) {
     await new Promise((resolve, reject) => {
       const tx = db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      const putReq = store.put(record);
-      putReq.onsuccess = () => resolve();
-      putReq.onerror = (e) => reject(e.target.error);
+      store.put(record);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+      tx.onabort = (e) => reject(e.target.error);
     });
 
     if (typeof window !== 'undefined') {
@@ -129,6 +150,7 @@ export async function getNotifications() {
       const tx = db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const req = store.getAll();
+      let deduplicated = [];
       req.onsuccess = () => {
         const list = req.result || [];
         const cutoff = Date.now() - RETENTION_MS;
@@ -136,16 +158,13 @@ export async function getNotifications() {
           .filter((item) => item.timestamp >= cutoff)
           .sort((a, b) => b.timestamp - a.timestamp);
 
-        // Intelligente Deduplizierung: Mehrfache Tagesberichte am selben Kalendertag
-        // werden zu einem einzigen Eintrag zusammengefasst (überflüssige Duplikate bereinigt)
         const seenBriefingDates = new Set();
-        const deduplicated = [];
         const toDeleteIds = [];
 
         for (const item of valid) {
           const isBriefing = item.type === 'briefing' || String(item.tag || '').includes('briefing');
           if (isBriefing) {
-            const dateStr = item.data?.dateString || new Date(item.timestamp).toISOString().slice(0, 10);
+            const dateStr = item.data?.dateString || getLocalCalendarDateKey(item.timestamp);
             if (seenBriefingDates.has(dateStr)) {
               toDeleteIds.push(item.id);
               continue;
@@ -159,10 +178,12 @@ export async function getNotifications() {
           for (const delId of toDeleteIds) {
             try { store.delete(delId); } catch (_) {}
           }
+        } else {
+          resolve(deduplicated);
         }
-
-        resolve(deduplicated);
       };
+      tx.oncomplete = () => resolve(deduplicated);
+      tx.onerror = () => resolve(deduplicated);
       req.onerror = () => resolve([]);
     });
   } catch (err) {
@@ -188,9 +209,10 @@ export async function markNotificationAsRead(id) {
           item.read = true;
           store.put(item);
         }
-        resolve();
       };
-      getReq.onerror = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
     });
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('best-weather:notif-updated'));
@@ -217,11 +239,11 @@ export async function markAllNotificationsAsRead() {
             cursor.update(item);
           }
           cursor.continue();
-        } else {
-          resolve();
         }
       };
-      req.onerror = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
     });
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('best-weather:notif-updated'));
@@ -238,9 +260,10 @@ export async function clearAllNotifications() {
     await new Promise((resolve) => {
       const tx = db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.clear();
-      req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
     });
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('best-weather:notif-updated'));

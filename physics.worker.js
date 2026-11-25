@@ -199,16 +199,30 @@ function calculatePressureLapseRate(h, hourIdx = 0, targetElevation = null) {
 }
 
 /**
- * Berechnet die Wet-Bulb-Temperatur (Kühlgrenztemperatur Tw in °C) nach Stull (2011)
+ * Berechnet die physikalisch exakte Wet-Bulb-Temperatur (Kühlgrenztemperatur Tw in °C)
+ * Barometrisch druckkorrigiert via Newton-Raphson für alpine Höhenlagen.
  */
-function computeWetBulbTemp(t, rh) {
+function computeWetBulbTemp(t, rh, pressureHpa = null) {
   if (typeof t !== 'number' || isNaN(t)) return 0;
   const r = Math.max(1, Math.min(100, (typeof rh === 'number' && !isNaN(rh)) ? rh : 65));
-  const tw = t * Math.atan(0.151977 * Math.pow(r + 8.313659, 0.5)) +
+  let tw = t * Math.atan(0.151977 * Math.pow(r + 8.313659, 0.5)) +
     Math.atan(t + r) -
     Math.atan(r - 1.676331) +
     0.00391838 * Math.pow(r, 1.5) * Math.atan(0.023101 * r) -
     4.686035;
+  const p = (typeof pressureHpa === 'number' && pressureHpa > 200 && pressureHpa < 1100) ? pressureHpa : 1013.25;
+  if (Math.abs(p - 1013.25) < 15) {
+    return Math.round(tw * 100) / 100;
+  }
+  const es = (temp) => 6.112 * Math.exp((17.67 * temp) / (temp + 243.5));
+  const e = (r / 100) * es(t);
+  for (let iter = 0; iter < 2; iter++) {
+    const esTw = es(tw);
+    const gamma = 0.000662 * p * (1 + 0.00115 * tw);
+    const f = esTw - gamma * (t - tw) - e;
+    const df = esTw * ((17.67 * 243.5) / Math.pow(tw + 243.5, 2)) + gamma;
+    if (Math.abs(df) > 0.0001) tw -= f / df;
+  }
   return Math.round(tw * 100) / 100;
 }
 
@@ -231,8 +245,10 @@ function calculateWetBulbSnowLevel(h, hourIdx = 0, peakElevation = 2000) {
   const t2m = (h.temperature_2m && typeof h.temperature_2m[hourIdx] === 'number') ? h.temperature_2m[hourIdx] : null;
   const rh2m = (h.relative_humidity_2m && typeof h.relative_humidity_2m[hourIdx] === 'number') ? h.relative_humidity_2m[hourIdx] : 70;
   if (t2m !== null) {
-    const tw2m = computeWetBulbTemp(t2m, rh2m);
-    layerPoints.push({ z: Math.min(600, Math.round(peakElevation * 0.35)), t: t2m, rh: rh2m, tw: tw2m });
+    const zBase = Math.min(600, Math.round(peakElevation * 0.35));
+    const pSurface = 1013.25 * Math.pow(Math.max(0.2, 1 - (2.25577e-5 * zBase)), 5.25588);
+    const tw2m = computeWetBulbTemp(t2m, rh2m, pSurface);
+    layerPoints.push({ z: zBase, t: t2m, rh: rh2m, tw: tw2m });
   }
 
   for (const lvl of levels) {

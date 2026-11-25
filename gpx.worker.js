@@ -5,7 +5,7 @@
  */
 
 self.onmessage = function (e) {
-  const { action, payload } = e.data;
+  const { id, action, payload } = e.data || {};
 
   if (action === 'parseGPX') {
     try {
@@ -36,11 +36,11 @@ self.onmessage = function (e) {
 
       // Post message with transferable buffers
       self.postMessage(
-        { status: 'success', action: 'parseGPX', data: parsed },
+        { id, status: 'success', action: 'parseGPX', data: parsed },
         [lats.buffer, lons.buffer, eles.buffer, dists.buffer]
       );
     } catch (err) {
-      self.postMessage({ status: 'error', action: 'parseGPX', error: err.message });
+      self.postMessage({ id, status: 'error', action: 'parseGPX', error: err.message });
     }
   }
 };
@@ -60,26 +60,33 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Perpendicular distance in 2D coordinates for RDP
+ * Echter geometrischer Senkrecht-Abstand (in Metern) im (lat, lon)-Raum für Douglas-Peucker,
+ * damit Serpentinen auf der Karte sauber erhalten bleiben.
  */
 function perpendicularDistance(pt, lineStart, lineEnd) {
-  const dx = lineEnd.distFromStartKm - lineStart.distFromStartKm;
-  const dy = lineEnd.ele - lineStart.ele;
+  const latScale = 111320;
+  const meanLatRad = ((lineStart.lat + lineEnd.lat) * 0.5) * (Math.PI / 180);
+  const lonScale = 111320 * Math.cos(meanLatRad);
 
-  if (dx === 0 && dy === 0) {
-    const px = pt.distFromStartKm - lineStart.distFromStartKm;
-    const py = pt.ele - lineStart.ele;
-    return Math.sqrt(px * px + py * py);
+  const ax = lineStart.lon * lonScale;
+  const ay = lineStart.lat * latScale;
+  const bx = lineEnd.lon * lonScale;
+  const by = lineEnd.lat * latScale;
+  const px = pt.lon * lonScale;
+  const py = pt.lat * latScale;
+
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+
+  if (lenSq === 0) {
+    return Math.hypot(px - ax, py - ay);
   }
 
-  const t = ((pt.distFromStartKm - lineStart.distFromStartKm) * dx + (pt.ele - lineStart.ele) * dy) / (dx * dx + dy * dy);
-  const clampedT = Math.max(0, Math.min(1, t));
-  const projX = lineStart.distFromStartKm + clampedT * dx;
-  const projY = lineStart.ele + clampedT * dy;
-
-  const diffX = (pt.distFromStartKm - projX) * 1000; // in meters
-  const diffY = pt.ele - projY; // in meters
-  return Math.sqrt(diffX * diffX + diffY * diffY);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  const projX = ax + t * dx;
+  const projY = ay + t * dy;
+  return Math.hypot(px - projX, py - projY);
 }
 
 /**
@@ -111,15 +118,27 @@ function rdpDecimate(points, epsilon = 8.0) {
 
 function parseGPXFast(xmlString) {
   const trkpts = [];
-  const trkptRegex = /<trkpt\s+[^>]*lat=["']([^"']+)["'][^>]*lon=["']([^"']+)["'][^>]*>([\s\S]*?)<\/trkpt>/gi;
+  // Unterstützt beliebige Attributreihenfolge (lat/lon oder lon/lat) sowie self-closing <trkpt .../>
+  const trkptRegex = /<trkpt\b([^>]*?)(?:\/>|>([\s\S]*?)<\/trkpt>)/gi;
+  const latAttrRegex = /\blat=["']([^"']+)["']/i;
+  const lonAttrRegex = /\blon=["']([^"']+)["']/i;
   const eleRegex = /<ele>([^<]+)<\/ele>/i;
   let match;
+  let lastValidEle = 500;
 
   while ((match = trkptRegex.exec(xmlString)) !== null) {
-    const lat = parseFloat(match[1]);
-    const lon = parseFloat(match[2]);
-    const eleMatch = eleRegex.exec(match[3]);
-    const ele = eleMatch ? parseFloat(eleMatch[1]) : 1000;
+    const attrs = match[1] || '';
+    const inner = match[2] || '';
+    const latMatch = latAttrRegex.exec(attrs);
+    const lonMatch = lonAttrRegex.exec(attrs);
+    if (!latMatch || !lonMatch) continue;
+    const lat = parseFloat(latMatch[1]);
+    const lon = parseFloat(lonMatch[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const eleMatch = eleRegex.exec(inner);
+    const parsedEle = eleMatch ? parseFloat(eleMatch[1]) : NaN;
+    const ele = Number.isFinite(parsedEle) ? parsedEle : lastValidEle;
+    lastValidEle = ele;
     trkpts.push({ lat, lon, ele });
   }
 

@@ -7,6 +7,7 @@
 import { state } from './state.js';
 import { AlpineStorage } from '../storage.js';
 import { renderFavoritesTab, updateFavStarUI } from '../features/favorites.js';
+import { validateHttpsUrl } from './domUtils.js';
 
 const STORAGE_URL_KEY = 'best_weather_gsheets_url';
 const STORAGE_LAST_SYNC_KEY = 'best_weather_gsheets_last_sync';
@@ -138,15 +139,23 @@ export function mapRowToFavorite(row) {
   };
 }
 
+const ALLOWED_GSHEETS_HOSTS = ['script.google.com', 'docs.google.com'];
+
 /**
- * Führt JSONP Request aus (bypasst CORS vollständig)
+ * Führt JSONP Request aus (bypasst CORS vollständig — strikt nur für validierte Google Apps Script Origins)
  */
 function fetchJsonp(url, action = 'get_all', timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
+    const validUrl = validateHttpsUrl(url, ['script.google.com']);
+    if (!validUrl) {
+      return reject(new Error('Ungültige JSONP URL (nur https://script.google.com erlaubt)'));
+    }
     const callbackName = 'gsheets_cb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
     const script = document.createElement('script');
-    const separator = url.includes('?') ? '&' : '?';
-    script.src = `${url}${separator}callback=${callbackName}&action=${encodeURIComponent(action)}&_t=${Date.now()}`;
+    validUrl.searchParams.set('callback', callbackName);
+    validUrl.searchParams.set('action', String(action || 'get_all'));
+    validUrl.searchParams.set('_t', String(Date.now()));
+    script.src = validUrl.toString();
     script.async = true;
 
     const timer = setTimeout(() => {
@@ -198,9 +207,12 @@ export const GoogleSheetsSync = {
   },
 
   isConnected() {
-    const url = this.getUrl();
-    if (!url) return false;
-    return url.includes('script.google.com/macros/s/') || url.includes('docs.google.com/spreadsheets/d/');
+    const raw = this.getUrl();
+    const u = validateHttpsUrl(raw, ALLOWED_GSHEETS_HOSTS);
+    if (!u) return false;
+    if (u.hostname === 'script.google.com') return u.pathname.includes('/macros/s/');
+    if (u.hostname === 'docs.google.com') return u.pathname.includes('/spreadsheets/d/');
+    return false;
   },
 
   /**
@@ -269,10 +281,11 @@ export const GoogleSheetsSync = {
         } catch (_) {}
       }
 
-      // VARIATION D: JSONP Callback Fallback (funktioniert auch bei strikten CORS Beschränkungen)
-      if (!rawData && url.includes('script.google.com')) {
+      // VARIATION D: JSONP Callback Fallback (nur verifiziertes script.google.com)
+      const parsedUrl = validateHttpsUrl(url, ['script.google.com']);
+      if (!rawData && parsedUrl) {
         try {
-          rawData = await fetchJsonp(url, 'get_all', 4000);
+          rawData = await fetchJsonp(parsedUrl.toString(), 'get_all', 4000);
         } catch (_) {}
       }
 

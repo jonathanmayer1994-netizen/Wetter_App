@@ -63,6 +63,9 @@ export const TelemetryEngine = {
 
   startProgress(stage = 'init') {
     if (!this._progressBar) this.init();
+    this._progressSeq = (this._progressSeq || 0) + 1;
+    if (this._finishHideTimer) { clearTimeout(this._finishHideTimer); this._finishHideTimer = null; }
+    if (this._finishResetTimer) { clearTimeout(this._finishResetTimer); this._finishResetTimer = null; }
     if (this._progressBar) {
       this._progressBar.classList.add('is-active');
     }
@@ -81,12 +84,15 @@ export const TelemetryEngine = {
 
   finishProgress(success = true) {
     this.setProgress(100);
-    setTimeout(() => {
-      if (this._progressBar) {
+    const seq = ++this._progressSeq || 1;
+    if (this._finishHideTimer) clearTimeout(this._finishHideTimer);
+    if (this._finishResetTimer) clearTimeout(this._finishResetTimer);
+    this._finishHideTimer = setTimeout(() => {
+      if (this._progressBar && seq === this._progressSeq && this._activeProgress >= 100) {
         this._progressBar.classList.remove('is-active');
       }
-      setTimeout(() => {
-        if (this._progressFill) {
+      this._finishResetTimer = setTimeout(() => {
+        if (this._progressFill && seq === this._progressSeq && this._activeProgress >= 100) {
           this._progressFill.style.width = '0%';
         }
       }, 300);
@@ -94,7 +100,10 @@ export const TelemetryEngine = {
 
     if (success) {
       const rttStr = this._lastRttMs > 0 ? `${this._lastRttMs}ms` : 'Live';
-      this.updatePillState('online', `5G • ${rttStr}`);
+      const netType = (typeof navigator !== 'undefined' && navigator.connection?.effectiveType)
+        ? navigator.connection.effectiveType.toUpperCase()
+        : 'Online';
+      this.updatePillState('online', `${netType} • ${rttStr}`);
     }
   },
 
@@ -104,12 +113,15 @@ export const TelemetryEngine = {
       this._lastSpeedMbps = Math.round((dataSizeBytes * 8) / (durationMs / 1000) / 10000) / 100;
     }
     const rtt = this._lastRttMs;
+    const netLabel = (typeof navigator !== 'undefined' && navigator.connection?.effectiveType)
+      ? navigator.connection.effectiveType.toUpperCase()
+      : (rtt < 180 ? 'Schnell' : (rtt < 600 ? 'Mittel' : 'Langsam'));
     if (rtt < 180) {
-      this.updatePillState('online', `5G • ${rtt}ms`);
+      this.updatePillState('online', `${netLabel} • ${rtt}ms`);
     } else if (rtt < 600) {
-      this.updatePillState('warning', `3G • ${rtt}ms`);
+      this.updatePillState('warning', `${netLabel} • ${rtt}ms`);
     } else {
-      this.updatePillState('slow', `Edge • ${rtt}ms`);
+      this.updatePillState('slow', `${netLabel} • ${rtt}ms`);
     }
   },
 
@@ -156,6 +168,9 @@ export const TelemetryEngine = {
       modal = document.createElement('div');
       modal.id = 'telemetry-diag-modal';
       modal.className = 'telemetry-diag-modal';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-label', 'Netzwerk- und Lade-Diagnose');
       modal.innerHTML = `
         <div class="tdm-card">
           <div class="tdm-header">
@@ -196,6 +211,11 @@ export const TelemetryEngine = {
       });
       modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.classList.remove('is-open');
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('is-open')) {
+          modal.classList.remove('is-open');
+        }
       });
       const refBtn = modal.querySelector('#tdm-refresh-btn');
       if (refBtn) {

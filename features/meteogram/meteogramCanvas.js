@@ -9,22 +9,23 @@ export class MeteogramCanvas {
     this.container = document.getElementById(containerId);
     if (!this.container) return;
 
-    // Check if canvas already exists or create one
-    let canvas = this.container.querySelector('canvas.meteogram-canvas');
+    // Nutze vorhandenes Canvas (.ensemble-meteogram-canvas / .meteogram-canvas) statt ein zweites außerhalb anzuhängen
+    let canvas = this.container.querySelector('canvas.ensemble-meteogram-canvas, canvas.meteogram-canvas');
     if (!canvas) {
+      const wrapper = this.container.querySelector('.meteogram-chart-wrapper') || this.container;
       canvas = document.createElement('canvas');
       canvas.className = 'meteogram-canvas';
       canvas.style.width = '100%';
       canvas.style.height = '100%';
       canvas.style.display = 'block';
-      this.container.appendChild(canvas);
+      wrapper.appendChild(canvas);
     }
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
   }
 
   render(data) {
-    if (!this.canvas || !this.ctx || !data) return;
+    if (!this.canvas || !this.ctx || !data || !data.count || data.count < 2) return;
 
     const {
       ecmwfData,
@@ -58,7 +59,8 @@ export class MeteogramCanvas {
     const plotH = cssHeight - padT - padB;
     const range = Math.max(1, maxVal - minVal);
 
-    const getX = (i) => padL + (i / (count - 1)) * plotW;
+    const safeDenom = Math.max(1, count - 1);
+    const getX = (i) => padL + (i / safeDenom) * plotW;
     const getY = (val) => padT + plotH - ((val - minVal) / range) * plotH;
 
     // Clear background
@@ -91,9 +93,11 @@ export class MeteogramCanvas {
     const todayDateStr = new Date().toDateString();
     ctx.textAlign = 'center';
     for (let i = 0; i < count; i += 24) {
+      if (!timestamps || !timestamps[i]) continue;
       const x = getX(i);
       const date = new Date(timestamps[i]);
-      const isActualToday = !isNaN(date.getTime()) && date.toDateString() === todayDateStr;
+      if (isNaN(date.getTime())) continue;
+      const isActualToday = date.toDateString() === todayDateStr;
       const dayName = daysMap[date.getDay()];
       const dateNum = date.getDate();
 

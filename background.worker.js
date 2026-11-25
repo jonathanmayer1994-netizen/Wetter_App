@@ -159,8 +159,10 @@ self.onmessage = function (e) {
   if (action === 'init') {
     canvas = payload.canvas;
     ctx = canvas.getContext('2d', { alpha: true });
-    width = payload.width;
-    height = payload.height;
+    width = Math.max(1, payload.width || 300);
+    height = Math.max(1, payload.height || 150);
+    canvas.width = width;
+    canvas.height = height;
     currentMode = payload.currentMode || 'clear-day';
     isDay = payload.isDay !== undefined ? payload.isDay : true;
     reducedMotion = payload.reducedMotion || false;

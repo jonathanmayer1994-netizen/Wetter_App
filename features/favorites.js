@@ -13,6 +13,7 @@ const STORAGE_KEY = 'best_weather_favorites_v4';
 
 let onSelectLocationCallback = null;
 let onSwitchTabCallback = null;
+let _favoritesSetupDone = false;
 
 export function initFavoritesHandlers({ onSelectLocation, onSwitchTab }) {
   onSelectLocationCallback = onSelectLocation;
@@ -36,6 +37,11 @@ export function persistFavorites(favorites) {
 export function setupFavorites(options = {}) {
   if (options.onSelectLocation) onSelectLocationCallback = options.onSelectLocation;
   if (options.onSwitchTab) onSwitchTabCallback = options.onSwitchTab;
+  if (_favoritesSetupDone) {
+    renderFavoritesTab();
+    return;
+  }
+  _favoritesSetupDone = true;
 
   const addBtn = document.getElementById('add-current-favorite-btn');
   const favToggle = document.getElementById('fav-toggle-btn');
@@ -115,11 +121,6 @@ export function setupFavorites(options = {}) {
   }
 
   GoogleSheetsSync.updateStatusUI();
-  // Vollautomatischer Sync im Hintergrund
-  if (GoogleSheetsSync.isConnected()) {
-    GoogleSheetsSync.pullAll();
-  }
-
   renderFavoritesTab();
 }
 
@@ -203,10 +204,12 @@ export function renderFavoritesTab() {
     const card = document.createElement('div');
     card.className = 'favorite-card';
     const typeIcon = fav.isMountain ? '🏔️' : '🏙️';
+    const eleNum = Number(fav.elevation);
+    const eleStr = Number.isFinite(eleNum) ? `${Math.round(eleNum).toLocaleString('de-DE')} m` : '—';
     card.innerHTML = `
       <div class="fav-info">
         <div class="fav-name">${typeIcon} ${escapeHtml(fav.name)}</div>
-        <div class="fav-meta">Höhe: ${fav.elevation.toLocaleString('de-DE')} m • ${escapeHtml(fav.country || '')}</div>
+        <div class="fav-meta">Höhe: ${eleStr} • ${escapeHtml(fav.country || '')}</div>
       </div>
       <div class="fav-actions">
         <button class="fav-del-btn" title="Löschen" aria-label="Favorit löschen">✕</button>
