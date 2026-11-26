@@ -6251,12 +6251,29 @@ export const MicroEngine = {
           : `✅ Munter Reduktionsmethode erfüllt (${isSmallGroup ? 'Kleingruppe mit Abstand' : 'Einzelhang-Limit'}: max. ${maxSlopeDeg}° bei Stufe ${avalancheReport.dangerLevel})`)
     };
 
-    // Aufstiegs- vs. Abfahrts-Split + Harscheisen-, Whiteout-, Packlisten- & Startzeit-Optimierer
-    const peakDistKm = peakPoint.distFromStartKm || 0;
-    const ascentWps = enrichedMilestones.filter(m => (m.distFromStartKm || 0) <= peakDistKm + 0.05);
-    const descentWps = enrichedMilestones.filter(m => (m.distFromStartKm || 0) >= peakDistKm - 0.05);
-    const ascentDurH = peakPoint.cumulativeHours || (cumulativeHours * 0.72);
-    const descentDurH = Math.max(0.15, cumulativeHours - ascentDurH);
+    // Aufstiegs- vs. Abfahrts-Analyse über alle echten Routen-Segmente (unterstützt auch Touren mit mehreren Gegenanstiegen/Abfahrten)
+    let ascentDurH = 0;
+    let descentDurH = 0;
+    for (let i = 1; i < timedPoints.length; i++) {
+      const dtH = (timedPoints[i].cumulativeHours || 0) - (timedPoints[i - 1].cumulativeHours || 0);
+      const dz = (timedPoints[i].ele || 0) - (timedPoints[i - 1].ele || 0);
+      if (dz > 0) ascentDurH += dtH;
+      else descentDurH += dtH;
+    }
+    if (ascentDurH <= 0 && descentDurH <= 0) {
+      ascentDurH = peakPoint.cumulativeHours || (cumulativeHours * 0.72);
+      descentDurH = Math.max(0.15, cumulativeHours - ascentDurH);
+    }
+
+    const isMilestoneClimbing = (m) => {
+      const mIdx = typeof m.index === 'number' ? m.index : timedPoints.findIndex(tp => Math.abs((tp.distFromStartKm || 0) - (m.distFromStartKm || 0)) < 0.05);
+      if (mIdx <= 0) return true;
+      const winPrev = timedPoints[Math.max(0, mIdx - 3)];
+      const winNext = timedPoints[Math.min(timedPoints.length - 1, mIdx + 3)];
+      return (winNext.ele - winPrev.ele) >= -3;
+    };
+    const ascentWps = enrichedMilestones.filter(isMilestoneClimbing);
+    const descentWps = enrichedMilestones.filter(w => !isMilestoneClimbing(w));
     const formatHmDuration = (hrs) => {
       const hInt = Math.floor(hrs);
       const mInt = Math.round((hrs - hInt) * 60);

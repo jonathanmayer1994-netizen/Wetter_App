@@ -486,7 +486,38 @@ def run_skitour_suite():
 
         page.click("#sports-map-close-btn", force=True)
         page.wait_for_timeout(200)
-        print("✓ Map-Integrated Elevation Profile (Inline, Fullscreen, Mouse Hover Scrubbing, Sport-Specific HUD & Collapse) verified!")
+
+        # Verify 2-peak / double-ascent GPX detects Aufstieg -> Abfahrt -> Aufstieg -> Abfahrt accurately without cryptic (S)/(NO) suffixes
+        double_peak_gpx = '''<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><name>DoublePeak Skitour</name><trkseg>
+<trkpt lat="47.20000" lon="10.12000"><ele>1200</ele></trkpt>
+<trkpt lat="47.20800" lon="10.12000"><ele>1600</ele></trkpt>
+<trkpt lat="47.21600" lon="10.12000"><ele>2060</ele></trkpt>
+<trkpt lat="47.22400" lon="10.12000"><ele>1750</ele></trkpt>
+<trkpt lat="47.23200" lon="10.12000"><ele>1550</ele></trkpt>
+<trkpt lat="47.24000" lon="10.12000"><ele>1850</ele></trkpt>
+<trkpt lat="47.24800" lon="10.12000"><ele>2020</ele></trkpt>
+<trkpt lat="47.25600" lon="10.12000"><ele>1650</ele></trkpt>
+<trkpt lat="47.26400" lon="10.12000"><ele>1250</ele></trkpt>
+</trkseg></trk></gpx>'''
+        page.set_input_files("#sports-file-input", files=[{"name": "DoublePeak.gpx", "mimeType": "application/gpx+xml", "buffer": double_peak_gpx.encode("utf-8")}])
+        page.wait_for_function("() => document.getElementById('skitour-agency-tag') && document.getElementById('skitour-agency-tag').innerText.includes('2.060')", timeout=10000)
+        page.wait_for_timeout(200)
+        c_box = page.locator("#smed-chart-wrap").bounding_box()
+        assert c_box
+        def hover_pct(f):
+            page.mouse.move(c_box["x"] + 42 + (c_box["width"] - 54) * f, c_box["y"] + c_box["height"] / 2)
+            page.wait_for_timeout(80)
+            return page.inner_text("#smed-metric"), (page.inner_text("#smed-extra") if page.is_visible("#smed-extra") else "")
+        m1, ex1 = hover_pct(0.15)
+        m2, _ = hover_pct(0.42)
+        m3, _ = hover_pct(0.66)
+        m4, _ = hover_pct(0.90)
+        assert "Aufstieg" in m1, f"Expected Aufstieg on climb 1, got {m1}"
+        assert "Abfahrt" in m2, f"Expected Abfahrt on descent 1, got {m2}"
+        assert "Aufstieg" in m3, f"Expected Aufstieg on second climb, got {m3}"
+        assert "Abfahrt" in m4, f"Expected Abfahrt on descent 2, got {m4}"
+        assert "(Limit" not in ex1, f"No cryptic Limit suffix allowed, got {ex1}"
+        print("✓ Map-Integrated Elevation Profile (Inline, Fullscreen, Double-Ascent Phase Detection, Clean Labels & Collapse) verified!")
 
         context.close()
         browser.close()

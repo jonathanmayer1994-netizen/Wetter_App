@@ -1084,8 +1084,11 @@ export function setupSportsTab() {
     }
   };
 
-  // Window Resize: Scrubber & HUD Position neu synchronisieren
+  // Window Resize: Karte + Profil + Scrubber synchronisieren
   window.addEventListener('resize', () => {
+    if (state.sports && state.sports.map) {
+      state.sports.map.invalidateSize({ animate: false, pan: false });
+    }
     if (state.sports && state.sports.timeline) {
       renderSportsMapElevationProfile(state.sports.timeline);
       if (state.sports.scrubberKm !== undefined) {
@@ -1844,9 +1847,9 @@ export function renderSkitourDashboard(timeline) {
     const optBtn = document.getElementById('st-optimal-start-btn');
     const gearEl = document.getElementById('skitour-gear-chips');
 
-    if (ascEl) ascEl.innerText = `${pa.ascentDurationStr} • Gipfel ${pa.summitArrivalStr}`;
+    if (ascEl) ascEl.innerText = `${pa.ascentDurationStr} • Höchster Punkt ${pa.summitArrivalStr}`;
     if (crampEl) crampEl.innerText = pa.cramponText || '';
-    if (descEl) descEl.innerText = `${pa.descentDurationStr} (Abfahrt ${pa.dominantDescentAspect || 'NO'})`;
+    if (descEl) descEl.innerText = `${pa.descentDurationStr} Abfahrt`;
     if (qualEl) qualEl.innerText = pa.descentSnowQuality || '';
     if (whiteEl && timeline.whiteoutAnalysis) {
       whiteEl.innerText = timeline.whiteoutAnalysis.summary;
@@ -2622,32 +2625,8 @@ function drawSportsMapProfileCanvas(timeline) {
     drawRefLine(fl, 'rgba(96, 165, 250, 0.85)', `❄️ 0°-Grenze ${Math.round(fl)}m`, true);
   }
 
-  // Skitour: Vertikaler Aufstiegs-/Abfahrts-Split am Gipfel (unten im Plot, kollisionsfrei zum Gipfel-Pin & Tooltip)
-  if (cat === 'skitour' && timeline.peakKm > 0.15 && timeline.peakKm < totalDist - 0.15) {
-    const xPk = Math.round(getX(timeline.peakKm)) + 0.5;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(xPk, padT);
-    ctx.lineTo(xPk, padT + plotH);
-    ctx.stroke();
-    ctx.font = '600 9px Plus Jakarta Sans, sans-serif';
-    ctx.fillStyle = 'rgba(226, 232, 240, 0.82)';
-    ctx.textBaseline = 'bottom';
-    const labelY = padT + plotH - 4;
-    if (xPk - padL > 75) {
-      ctx.textAlign = 'right';
-      ctx.fillText('🧗 Aufstieg', xPk - 6, labelY);
-    }
-    if ((W - padR) - xPk > 75) {
-      ctx.textAlign = 'left';
-      const asp = timeline.phaseAnalysis?.dominantDescentAspect || '';
-      ctx.fillText(`⛷️ Abfahrt${asp ? ` (${asp})` : ''}`, xPk + 6, labelY);
-    }
-    ctx.restore();
-  }
+  // (Kein starrer Einfach-Gipfel-Split bei Skitouren, da Touren mehrere Anstiege/Abfahrten haben können –
+  // die Profilkurve und das Live-HUD zeigen jeden Aufstieg und jede Abfahrt direkt am Streckenpunkt.)
 
   // 5. Farbcodierte Höhenprofil-Linie je nach Sportart
   ctx.lineWidth = 2.6;
@@ -3042,10 +3021,10 @@ export function openSportsMapFullscreen() {
   document.body.classList.add('sports-map-fullscreen-active');
   document.body.style.overflow = 'hidden';
 
-  setTimeout(() => {
+  const syncFsMap = (fit) => {
     if (state.sports.map) {
-      state.sports.map.invalidateSize();
-      if (state.sports.routeLine) {
+      state.sports.map.invalidateSize({ animate: false, pan: false });
+      if (fit && state.sports.routeLine) {
         state.sports.map.fitBounds(state.sports.routeLine.getBounds(), {
           padding: [60, 60],
           maxZoom: 15
@@ -3056,7 +3035,10 @@ export function openSportsMapFullscreen() {
       renderSportsMapElevationProfile(state.sports.timeline);
       updateSportsScrubber(state.sports.scrubberKm || 0);
     }
-  }, 80);
+  };
+  requestAnimationFrame(() => syncFsMap(true));
+  setTimeout(() => syncFsMap(true), 80);
+  setTimeout(() => syncFsMap(false), 260);
 }
 
 export function closeSportsMapFullscreen() {
@@ -3066,10 +3048,10 @@ export function closeSportsMapFullscreen() {
   document.body.classList.remove('sports-map-fullscreen-active');
   document.body.style.overflow = '';
 
-  setTimeout(() => {
+  const syncCloseMap = (fit) => {
     if (state.sports.map) {
-      state.sports.map.invalidateSize();
-      if (state.sports.routeLine) {
+      state.sports.map.invalidateSize({ animate: false, pan: false });
+      if (fit && state.sports.routeLine) {
         state.sports.map.fitBounds(state.sports.routeLine.getBounds(), {
           padding: [25, 25]
         });
@@ -3079,7 +3061,10 @@ export function closeSportsMapFullscreen() {
       renderSportsMapElevationProfile(state.sports.timeline);
       updateSportsScrubber(state.sports.scrubberKm || 0);
     }
-  }, 80);
+  };
+  requestAnimationFrame(() => syncCloseMap(true));
+  setTimeout(() => syncCloseMap(true), 80);
+  setTimeout(() => syncCloseMap(false), 260);
 }
 
 export function renderSportsMap(timeline) {
@@ -3092,6 +3077,20 @@ export function renderSportsMap(timeline) {
       attributionControl: false,
       maxZoom: 19
     }).setView([timeline.timedPoints[0].lat, timeline.timedPoints[0].lon], 11);
+
+    // Garantiert nahtlose Leaflet-Größensync (verhindert graue Streifen am unteren Kartenrand bei Mac-Zoom/Fullscreen)
+    if (!container.dataset.mapRoBound && typeof ResizeObserver !== 'undefined') {
+      container.dataset.mapRoBound = '1';
+      let rafId = 0;
+      const ro = new ResizeObserver(() => {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          if (state.sports.map) state.sports.map.invalidateSize({ animate: false, pan: false });
+        });
+      });
+      ro.observe(container);
+    }
 
     // Hochauflösende Alpin-Topokarte mit Geländerelief & Höhenlinien (OpenTopoMap)
     const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
@@ -3656,9 +3655,8 @@ export function updateSportsScrubber(km, opts = {}) {
   if (smedMet) {
     if (cat === 'skitour') {
       const slopeVal = closestPt.slopeDeg ? `${closestPt.slopeDeg}°` : `${Math.round(Math.abs(curGrad))}%`;
-      const aspVal = closestPt.terrainAspectSector ? ` (${closestPt.terrainAspectSector})` : '';
-      const phaseTxt = (timeline.peakKm && clampedKm > timeline.peakKm + 0.1) ? 'Abfahrt' : 'Aufstieg';
-      smedMet.innerText = `📐 ${slopeVal}${aspVal} • ${phaseTxt}`;
+      const phaseTxt = curGrad > 1.5 ? 'Aufstieg' : (curGrad < -1.5 ? 'Abfahrt' : 'Flach');
+      smedMet.innerText = `📐 ${slopeVal} • ${phaseTxt}`;
       smedMet.style.background = (closestPt.slopeDeg || 0) >= 35 ? 'rgba(249, 115, 22, 0.24)' : ((closestPt.slopeDeg || 0) >= 30 ? 'rgba(234, 179, 8, 0.20)' : 'rgba(34, 197, 94, 0.18)');
       smedMet.style.color = (closestPt.slopeDeg || 0) >= 35 ? '#fdba74' : ((closestPt.slopeDeg || 0) >= 30 ? '#fef08a' : '#86efac');
     } else {
@@ -3676,7 +3674,9 @@ export function updateSportsScrubber(km, opts = {}) {
       smedExt.style.display = 'inline-flex';
       smedExt.style.background = closestMs.avalancheColor;
       smedExt.style.color = closestMs.avalancheTextColor;
-      smedExt.innerText = `${closestMs.exceedsMunterLimit ? '⚠️ ' : ''}${closestMs.avalancheLevel}/5${closestMs.grmLimitDeg ? ` (Limit ${closestMs.grmLimitDeg}°)` : ''}`;
+      smedExt.innerText = closestMs.exceedsMunterLimit && closestMs.grmLimitDeg
+        ? `⚠️ Stufe ${closestMs.avalancheLevel}/5 • Über ${closestMs.grmLimitDeg}°`
+        : `Lawinenstufe ${closestMs.avalancheLevel}/5`;
     } else if (cat === 'bike' && closestMs.relWindBadge) {
       smedExt.style.display = 'inline-flex';
       smedExt.style.background = 'rgba(255, 255, 255, 0.09)';
