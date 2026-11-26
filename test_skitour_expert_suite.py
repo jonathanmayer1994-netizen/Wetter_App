@@ -345,6 +345,74 @@ def run_skitour_suite():
         assert y_st_day >= 1500 and rect_after and abs(rect_after["y"] - rect_before["y"]) <= 5, f"10-day row shifted or jumped! scrollY={y_st_day}, dy={rect_after['y'] - rect_before['y'] if rect_after else 'none'}"
         print(f"✓ Zero scroll-to-top jumps verified across Overview (y={y_ov}), Mountain (y={y_mtn}), Skitour Firn/Rose (y={y_firn}->{y_st_rose}) & 10-Day Row (y={y_st_day}, dy={rect_after['y'] - rect_before['y']:.1f}px)")
 
+        # 13. TEST 12: Skitour Pro Features (Model Consensus, Aspect-Firn, Phases, Munter Toggle, Emergency, Slope Overlay, 7-Zone Router)
+        print("\n--- TEST 12: Skitour Pro Features & Pan-Alpine NWP Routing ---")
+        assert page.is_visible("#skitour-model-consensus-pill"), "Model consensus pill must be visible"
+        assert page.is_visible("#skitour-aspect-firn-grid"), "Aspect-firn 4-cell grid must be visible"
+        assert len(page.inner_text("#afg-s").strip()) > 2, "South aspect firn cell must be populated"
+
+        assert page.is_visible("#skitour-phase-card"), "Phase analysis card must be visible"
+        assert "h" in page.inner_text("#st-phase-ascent") and "min" in page.inner_text("#st-phase-descent"), "Ascent & descent split must be shown"
+        assert page.locator("#skitour-gear-chips .st-gear-chip").count() >= 2, "Gear checklist must render dynamic chips"
+
+        opt_btn = page.locator("#st-optimal-start-btn")
+        assert opt_btn.is_visible(), "Optimal start advisor button must be visible"
+        opt_start_val = opt_btn.get_attribute("data-start-time")
+        opt_btn.click(force=True)
+        page.wait_for_timeout(150)
+        assert page.eval_on_selector("#sports-time-input", "el => el.value") == opt_start_val, f"Clicking optimal start must set time input to {opt_start_val}"
+
+        # Munter Group Toggle
+        munter_btn = page.locator("#st-munter-group-toggle")
+        assert munter_btn.is_visible(), "Munter group toggle must be visible"
+        txt_before = munter_btn.inner_text()
+        munter_btn.click(force=True)
+        page.wait_for_timeout(150)
+        txt_after = munter_btn.inner_text()
+        assert txt_before != txt_after, f"Munter toggle must switch state, got {txt_before} -> {txt_after}"
+        munter_btn.click(force=True)
+
+        # Steep Slope Map Overlay Toggle
+        slope_btn = page.locator("#sports-slope-overlay-btn")
+        assert slope_btn.is_visible(), "Slope overlay toggle must be visible on skitour map"
+        slope_btn.click(force=True)
+        page.wait_for_timeout(250)
+        assert slope_btn.get_attribute("aria-pressed") == "true", "Slope overlay button must activate aria-pressed"
+
+        # Offline Emergency Modal
+        page.click("#skitour-emergency-btn", force=True)
+        page.wait_for_timeout(150)
+        assert page.is_visible("#skitour-emergency-modal"), "Emergency modal must open"
+        em_txt = page.inner_text("#skitour-emergency-modal")
+        assert "140" in em_txt and "1414" in em_txt and "112" in em_txt and "N," in em_txt, "Emergency modal must display alpine rescue numbers & WGS84 coordinates"
+        page.click("#skitour-emergency-close", force=True)
+        page.wait_for_timeout(100)
+        assert not page.is_visible("#skitour-emergency-modal"), "Emergency modal must close cleanly"
+
+        # Verify all 7 Pan-Alpine NWP sub-regions route to distinct optimal models
+        subregions = page.evaluate("""() => {
+            const pts = [
+                { name: 'FR', lat: 45.92, lon: 6.87, ele: 3200 },
+                { name: 'CH', lat: 46.02, lon: 7.75, ele: 3000 },
+                { name: 'BY', lat: 47.42, lon: 10.28, ele: 2200 },
+                { name: 'AT_W', lat: 47.12, lon: 11.12, ele: 2800 },
+                { name: 'IT', lat: 46.54, lon: 12.13, ele: 2600 },
+                { name: 'AT_O', lat: 47.64, lon: 15.83, ele: 1900 },
+                { name: 'SI', lat: 46.38, lon: 13.84, ele: 2400 }
+            ];
+            return pts.map(p => ({
+                name: p.name,
+                subRegionKey: MicroEngine.getRegionalModelPriority(p.lat, p.lon, p.ele).subRegionKey,
+                models: MicroEngine.getRegionalModelPriority(p.lat, p.lon, p.ele).modelsToQuery
+            }));
+        }""")
+        keys = [r["subRegionKey"] for r in subregions]
+        assert len(set(keys)) == 7, f"Expected 7 distinct Alpine NWP sub-regions, got: {subregions}"
+        assert "meteofrance_arome_france" in subregions[0]["models"], "FR must prioritize AROME France"
+        assert "meteoswiss_icon_ch1" in subregions[1]["models"], "CH must prioritize ICON-CH1"
+        assert "italia_meteo_arpae_icon_2i" in subregions[4]["models"], "IT must prioritize ARPAE ICON-2I"
+        print(f"✓ Skitour Pro Cockpit, Slope Overlay, Emergency Card & 7-Zone Pan-Alpine NWP Router verified ({', '.join(keys)})")
+
         context.close()
         browser.close()
         print("\n==========================================")

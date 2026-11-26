@@ -7,7 +7,7 @@
 import { resilientFetch, HttpStatusError, isApiCoolingDown, getLocalDateKey } from './httpClient.js';
 import { physicsBridge } from './core/physicsBridge.js';
 import { validateCurrentWeather, validateHourlyWeather, validateMultiModel } from './core/contracts.js';
-import { calculateAccurateSolarDuration } from './core/solarEngine.js';
+import { calculateAccurateSolarDuration, getSolarPosition } from './core/solarEngine.js';
 
 const EARTH_CIRCUMFERENCE_M = 40075016.686;
 const TILE_SIZE = 256;
@@ -210,12 +210,14 @@ export const MicroEngine = {
   },
 
   /**
-   * Priorisiert regionale High-Res-Wettermodelle je nach Standort und Höhe in Europa
-   * - Alpen / Hochgebirge: ICON-EU (6.5 km) / AROME France (1.3 km)
-   * - Frankreich: AROME France (1.3 km)
-   * - Deutschland / DACH Städte: ICON-D2 (2.2 km)
-   * - Grossbritannien / Irland: UKMO UKV (2.0 km)
-   * - Restliches Europa: ICON-EU (6.5 km)
+   * Intelligenz-Routing für die Priorisierung regionaler Hochauflösungs-Modelle
+   * 7 feinabgestimmte Sub-Regionen im gesamten Alpenraum + Europa/Global:
+   * - Westalpen (FR): AROME France (1.3 km) + ICON-CH1 (1.0 km) + ICON-2I
+   * - Schweiz & Liechtenstein: MeteoSwiss ICON-CH1 (1.0 km) + ICON-CH2 (2.2 km / 133h)
+   * - Bayerische Alpen & Allgäu: ICON-D2 (2.2 km) + ICON-CH1 (1.0 km) + GeoSphere AROME (1.0 km)
+   * - West-/Zentralösterreich: GeoSphere AROME-AT (1.0 km) + ICON-CH1 (1.0 km) + ICON-D2
+   * - Südtirol, Dolomiten & Norditalien: ARPAE ICON-2I (2.2 km / 85h) + ICON-CH1 (1.0 km)
+   * - Ostösterreich & Slowenien: AROME-AT (1.0 km) / ICON-2I (2.2 km) + ICON-CH2 + ICON-D2
    */
   getRegionalModelPriority(lat, lon, elevation = 500) {
     const latN = Number(lat) || 0;
@@ -223,37 +225,158 @@ export const MicroEngine = {
     const elev = Number(elevation) || 500;
     const isMountain = elev >= 800;
 
-    // 1. ALPEN (Alpenbogen von den Seealpen / Frankreich bis Österreich)
-    // Lat: 43.8°N - 48.2°N, Lon: 5.6°E - 16.5°E
-    const isAlpsBox = (latN >= 43.8 && latN <= 48.2 && lonN >= 5.6 && lonN <= 16.5);
-    if (isAlpsBox && (isMountain || elev >= 700)) {
-      if (lonN <= 7.2) {
-        // Westalpen (Mont Blanc, Chamonix, Valais etc.) -> Météo-France AROME (1.3 km)
+    // 1. ALPENBOGEN KOMPLETT (Seealpen/Frankreich bis Wiener Alpen/Slowenien)
+    // Lat: 43.8°N - 48.2°N, Lon: 5.3°E - 16.5°E
+    const isAlpsBox = (latN >= 43.8 && latN <= 48.2 && lonN >= 5.3 && lonN <= 16.5);
+    if (isAlpsBox && (isMountain || elev >= 650)) {
+      const mediumBase = { meteoswiss_icon_ch2: 0.40, icon_eu: 0.25, ecmwf_ifs025: 0.25, ecmwf_aifs025_single: 0.10 };
+      const longBase = { ecmwf_ifs025: 0.50, ecmwf_aifs025_single: 0.25, gfs_seamless: 0.25 };
+
+      // Sub-Region 1: Westalpen Frankreich (Chamonix, Vanoise, Écrins, Seealpen)
+      if (lonN < 7.25 && latN < 46.65) {
         return {
-          region: 'Westalpen',
+          region: 'Westalpen (FR)',
+          subRegionKey: 'westalps_fr',
           isCity: false,
           isMountain: true,
+          useGeosphere1km: true,
           primaryModel: 'meteofrance_arome_france',
-          secondaryModel: 'icon_eu',
-          displayName: 'AROME France (1.3 km)',
-          origin: 'Météo-France (1.3 km)',
-          resolution: '1.3 km',
-          modelsToQuery: ['meteofrance_arome_france', 'icon_eu', 'ecmwf_ifs025', 'gfs_seamless'],
-          weights: { regional: 0.50, ecmwf: 0.35, gfs: 0.15 }
+          secondaryModel: 'meteoswiss_icon_ch1',
+          displayName: 'AROME-FR (1.3 km) + ICON-CH1 (1.0 km)',
+          origin: 'Météo-France / MeteoSwiss / ECMWF',
+          resolution: '1.0–1.3 km',
+          modelsToQuery: ['meteofrance_arome_france', 'meteoswiss_icon_ch1', 'meteoswiss_icon_ch2', 'italia_meteo_arpae_icon_2i', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless'],
+          shortTermWeights: { meteofrance_arome_france: 0.35, meteoswiss_icon_ch1: 0.25, italia_meteo_arpae_icon_2i: 0.15, ecmwf_ifs025: 0.15, gfs_seamless: 0.10 },
+          mediumTermWeights: mediumBase,
+          longTermWeights: longBase,
+          weights: { regional: 0.55, ecmwf: 0.35, gfs: 0.10 }
         };
       }
-      // Zentral- & Ostalpen (Deutschland, Österreich, Schweiz, Dolomiten / Italien)
+
+      // Sub-Region 3: Bayerische Alpen & Allgäu (Oberstdorf bis Berchtesgaden)
+      if (latN >= 47.26 && lonN >= 9.95 && lonN <= 13.2) {
+        return {
+          region: 'Bayerische Alpen & Allgäu',
+          subRegionKey: 'bavaria_alps',
+          isCity: false,
+          isMountain: true,
+          useGeosphere1km: true,
+          primaryModel: 'icon_d2',
+          secondaryModel: 'meteoswiss_icon_ch1',
+          displayName: 'ICON-D2 (2.2 km) + ICON-CH1 (1.0 km) + AROME',
+          origin: 'DWD / MeteoSwiss / GeoSphere',
+          resolution: '1.0–2.2 km',
+          modelsToQuery: ['icon_d2', 'meteoswiss_icon_ch1', 'meteoswiss_icon_ch2', 'icon_eu', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless'],
+          shortTermWeights: { icon_d2: 0.35, meteoswiss_icon_ch1: 0.25, geosphere_arome_1km: 0.20, ecmwf_ifs025: 0.15, gfs_seamless: 0.05 },
+          mediumTermWeights: { meteoswiss_icon_ch2: 0.35, icon_eu: 0.30, ecmwf_ifs025: 0.25, ecmwf_aifs025_single: 0.10 },
+          longTermWeights: longBase,
+          weights: { regional: 0.60, ecmwf: 0.30, gfs: 0.10 }
+        };
+      }
+
+      // Sub-Region 2: Schweizer Alpen & Liechtenstein
+      if (latN >= 45.75 && latN <= 47.82 && lonN >= 5.95 && lonN <= 10.12) {
+        const borderModel = lonN >= 8.2 ? 'icon_d2' : 'meteofrance_arome_france';
+        return {
+          region: 'Schweizer Alpen & Liechtenstein',
+          subRegionKey: 'swiss_alps',
+          isCity: false,
+          isMountain: true,
+          useGeosphere1km: lonN >= 8.5,
+          primaryModel: 'meteoswiss_icon_ch1',
+          secondaryModel: 'meteoswiss_icon_ch2',
+          displayName: 'ICON-CH1 (1.0 km) + ICON-CH2 (2.2 km)',
+          origin: 'MeteoSwiss / DWD / ECMWF',
+          resolution: '1.0 km',
+          modelsToQuery: ['meteoswiss_icon_ch1', 'meteoswiss_icon_ch2', borderModel, 'italia_meteo_arpae_icon_2i', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless'],
+          shortTermWeights: { meteoswiss_icon_ch1: 0.45, meteoswiss_icon_ch2: 0.20, [borderModel]: 0.15, ecmwf_ifs025: 0.15, gfs_seamless: 0.05 },
+          mediumTermWeights: { meteoswiss_icon_ch2: 0.45, icon_eu: 0.20, ecmwf_ifs025: 0.25, ecmwf_aifs025_single: 0.10 },
+          longTermWeights: longBase,
+          weights: { regional: 0.65, ecmwf: 0.25, gfs: 0.10 }
+        };
+      }
+
+      // Sub-Region 7: Slowenien / Julische Alpen / Karawanken Süd
+      if (latN < 46.62 && lonN >= 13.25) {
+        return {
+          region: 'Julische Alpen & Karawanken (SI)',
+          subRegionKey: 'slovenia_alps',
+          isCity: false,
+          isMountain: true,
+          useGeosphere1km: true,
+          primaryModel: 'italia_meteo_arpae_icon_2i',
+          secondaryModel: 'icon_eu',
+          displayName: 'ICON-2I (2.2 km) + AROME-AT (1.0 km)',
+          origin: 'ItaliaMeteo ARPAE / GeoSphere / ECMWF',
+          resolution: '1.0–2.2 km',
+          modelsToQuery: ['italia_meteo_arpae_icon_2i', 'meteoswiss_icon_ch2', 'icon_d2', 'icon_eu', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless'],
+          shortTermWeights: { italia_meteo_arpae_icon_2i: 0.35, geosphere_arome_1km: 0.25, icon_eu: 0.20, ecmwf_ifs025: 0.15, gfs_seamless: 0.05 },
+          mediumTermWeights: { italia_meteo_arpae_icon_2i: 0.35, icon_eu: 0.25, ecmwf_ifs025: 0.30, ecmwf_aifs025_single: 0.10 },
+          longTermWeights: longBase,
+          weights: { regional: 0.55, ecmwf: 0.35, gfs: 0.10 }
+        };
+      }
+
+      // Sub-Region 5: Südtirol, Dolomiten & Italienischer Alpenbogen
+      if (latN < 46.92 && lonN >= 6.8 && lonN < 13.25) {
+        const auxModel = lonN >= 9.0 ? 'icon_d2' : 'meteofrance_arome_france';
+        return {
+          region: 'Südtirol, Dolomiten & Norditalien',
+          subRegionKey: 'italian_alps',
+          isCity: false,
+          isMountain: true,
+          useGeosphere1km: lonN >= 9.5,
+          primaryModel: 'italia_meteo_arpae_icon_2i',
+          secondaryModel: 'meteoswiss_icon_ch1',
+          displayName: 'ARPAE ICON-2I (2.2 km) + ICON-CH1 (1.0 km)',
+          origin: 'ItaliaMeteo ARPAE / MeteoSwiss / ECMWF',
+          resolution: '1.0–2.2 km',
+          modelsToQuery: ['italia_meteo_arpae_icon_2i', 'meteoswiss_icon_ch1', 'meteoswiss_icon_ch2', auxModel, 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless'],
+          shortTermWeights: { italia_meteo_arpae_icon_2i: 0.35, meteoswiss_icon_ch1: 0.25, geosphere_arome_1km: (lonN >= 9.5 ? 0.15 : 0), [auxModel]: (lonN < 9.5 ? 0.15 : 0), ecmwf_ifs025: 0.20, gfs_seamless: 0.05 },
+          mediumTermWeights: { italia_meteo_arpae_icon_2i: 0.30, meteoswiss_icon_ch2: 0.30, icon_eu: 0.15, ecmwf_ifs025: 0.25 },
+          longTermWeights: longBase,
+          weights: { regional: 0.60, ecmwf: 0.30, gfs: 0.10 }
+        };
+      }
+
+      // Sub-Region 6: Ostösterreich (Tauern Ost, Dachstein, Steiermark, NÖ/OÖ)
+      if (lonN >= 13.25) {
+        return {
+          region: 'Ostalpen (Steiermark / Kärnten / NÖ)',
+          subRegionKey: 'east_austria_alps',
+          isCity: false,
+          isMountain: true,
+          useGeosphere1km: true,
+          primaryModel: 'icon_d2',
+          secondaryModel: 'meteoswiss_icon_ch2',
+          displayName: 'AROME-AT (1.0 km) + ICON-D2 (2.2 km)',
+          origin: 'GeoSphere Austria / DWD / MeteoSwiss',
+          resolution: '1.0–2.2 km',
+          modelsToQuery: ['icon_d2', 'meteoswiss_icon_ch2', 'italia_meteo_arpae_icon_2i', 'icon_eu', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless'],
+          shortTermWeights: { geosphere_arome_1km: 0.35, icon_d2: 0.25, meteoswiss_icon_ch2: 0.15, ecmwf_ifs025: 0.20, gfs_seamless: 0.05 },
+          mediumTermWeights: { meteoswiss_icon_ch2: 0.30, icon_eu: 0.30, ecmwf_ifs025: 0.30, ecmwf_aifs025_single: 0.10 },
+          longTermWeights: longBase,
+          weights: { regional: 0.55, ecmwf: 0.35, gfs: 0.10 }
+        };
+      }
+
+      // Sub-Region 4: West- & Zentralösterreich (Vorarlberg, Tirol, Salzburg)
       return {
-        region: 'Alpen',
+        region: 'West- & Zentralösterreich (Tirol / Arlberg / Salzburg)',
+        subRegionKey: 'west_austria_alps',
         isCity: false,
         isMountain: true,
-        primaryModel: 'icon_eu',
+        useGeosphere1km: true,
+        primaryModel: 'meteoswiss_icon_ch1',
         secondaryModel: 'icon_d2',
-        displayName: 'ICON-EU (6.5 km)',
-        origin: 'Deutscher Wetterdienst (DWD)',
-        resolution: '6.5 km',
-        modelsToQuery: ['icon_eu', 'icon_d2', 'ecmwf_ifs025', 'gfs_seamless'],
-        weights: { regional: 0.50, ecmwf: 0.35, gfs: 0.15 }
+        displayName: 'AROME-AT (1.0 km) + ICON-CH1 (1.0 km) + ICON-D2',
+        origin: 'GeoSphere Austria / MeteoSwiss / DWD',
+        resolution: '1.0 km',
+        modelsToQuery: ['meteoswiss_icon_ch1', 'icon_d2', 'meteoswiss_icon_ch2', 'italia_meteo_arpae_icon_2i', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless'],
+        shortTermWeights: { geosphere_arome_1km: 0.30, meteoswiss_icon_ch1: 0.25, icon_d2: 0.20, italia_meteo_arpae_icon_2i: 0.10, ecmwf_ifs025: 0.15 },
+        mediumTermWeights: { meteoswiss_icon_ch2: 0.35, icon_eu: 0.25, ecmwf_ifs025: 0.30, ecmwf_aifs025_single: 0.10 },
+        longTermWeights: longBase,
+        weights: { regional: 0.65, ecmwf: 0.25, gfs: 0.10 }
       };
     }
 
@@ -2940,8 +3063,8 @@ export const MicroEngine = {
       const next24 = Math.min(24, h.time.length - idx);
       const maxSlice = 240; // 10 Tage stündlich
 
-      // 1. Regionales High-Res Modell (ICON-D2 / AROME / UKV / ICON-EU)
-      const regKey = [strategy.primaryModel, strategy.secondaryModel, 'icon_eu', 'icon_d2', 'meteofrance_arome_france', 'ukmo_seamless']
+      // 1. Regionales High-Res Modell (ICON-CH1 / ICON-2I / AROME / ICON-D2 / UKV / ICON-EU)
+      const regKey = [strategy.primaryModel, strategy.secondaryModel, 'meteoswiss_icon_ch1', 'meteoswiss_icon_ch2', 'italia_meteo_arpae_icon_2i', 'icon_d2', 'icon_eu', 'meteofrance_arome_france', 'ukmo_seamless']
         .find(k => k && h[`temperature_2m_${k}`] !== undefined);
 
       let regPrecipSum = 0;
@@ -3253,11 +3376,286 @@ export const MicroEngine = {
   },
 
   /**
-   * Ruft offizielle EAWS CAAMLv6 Lawinenlageberichte (SLF Davos GeoJSON / Albina Euregio) live ab
+   * Ruft GeoSphere Austria AROME-1km NWP-Zeitreihen (nwp-v2-1h-1km, CORS *) für den Alpenbogen ab.
+   */
+  async fetchGeosphereArome1km(lat, lon, options = {}) {
+    if (lat < 43.8 || lat > 48.2 || lon < 5.3 || lon > 16.5) return null;
+    try {
+      const url = `https://dataset.api.hub.geosphere.at/v1/timeseries/forecast/nwp-v2-1h-1km?parameters=2t,sf,snowlmt,tp,10fg,10u,10v,2r,ssrd&lat_lon=${Number(lat).toFixed(3)},${Number(lon).toFixed(3)}`;
+      const res = await resilientFetch(url, {
+        ttlMs: 30 * 60 * 1000,
+        timeoutMs: 3800,
+        persist: true,
+        allowStaleOnError: true,
+        forceRefresh: Boolean(options?.forceRefresh)
+      });
+      const feat = res && Array.isArray(res.features) ? res.features[0] : null;
+      const p = feat && feat.properties ? feat.properties.parameters : null;
+      const ts = res && Array.isArray(res.timestamps) ? res.timestamps : null;
+      if (!p || !ts || ts.length === 0) return null;
+
+      const byHourIso = new Map();
+      for (let i = 0; i < ts.length; i++) {
+        const ms = new Date(ts[i]).getTime();
+        if (isNaN(ms)) continue;
+        const key = Math.round(ms / 3600000);
+        const u = p['10u'] && Array.isArray(p['10u'].data) ? p['10u'].data[i] : null;
+        const v = p['10v'] && Array.isArray(p['10v'].data) ? p['10v'].data[i] : null;
+        const spdMs = (typeof u === 'number' && typeof v === 'number') ? Math.hypot(u, v) : null;
+        const dirDeg = (typeof u === 'number' && typeof v === 'number') ? ((Math.atan2(-u, -v) * 180 / Math.PI) + 360) % 360 : null;
+        const gustMs = p['10fg'] && Array.isArray(p['10fg'].data) ? p['10fg'].data[i] : null;
+        byHourIso.set(key, {
+          temperature_2m: (p['2t'] && p['2t'].data) ? p['2t'].data[i] : null,
+          snowfall: (p['sf'] && p['sf'].data && typeof p['sf'].data[i] === 'number') ? p['sf'].data[i] * 0.1 : null, // kg/m^2 ~= mm -> cm
+          snow_depth: null,
+          freezing_level_height: (p['snowlmt'] && p['snowlmt'].data) ? p['snowlmt'].data[i] : null,
+          precipitation: (p['tp'] && p['tp'].data) ? p['tp'].data[i] : null,
+          wind_speed_10m: spdMs !== null ? spdMs * 3.6 : null,
+          wind_gusts_10m: gustMs !== null ? gustMs * 3.6 : null,
+          wind_direction_10m: dirDeg,
+          relative_humidity_2m: (p['2r'] && p['2r'].data) ? p['2r'].data[i] : null,
+          shortwave_radiation: (p['ssrd'] && p['ssrd'].data) ? p['ssrd'].data[i] : null
+        });
+      }
+      return { byHourIso, source: 'GeoSphere AROME 1 km' };
+    } catch (_) {
+      return null;
+    }
+  },
+
+  /**
+   * Intelligenter 3-Horizont- & Variablen-Null-Guard-Blender für Open-Meteo Multi-Modell-Antworten + GeoSphere AROME 1 km + Live-Stations-BMA.
+   */
+  blendAlpineMultiModelHourly(rawItem, strategy, arome1kmPkg = null, targetEle = null, snowStationData = null) {
+    if (!rawItem || !rawItem.hourly || !Array.isArray(rawItem.hourly.time)) return rawItem ? rawItem.hourly : null;
+    const h = rawItem.hourly;
+    const times = h.time;
+    const n = times.length;
+    if (h.temperature_2m && h.temperature_2m.length === n) {
+      // Standard-Single-Model Antwort (z. B. best_match Fallback) mit Modell-Metadaten anreichern
+      const outSingle = {
+        ...h,
+        _modelElevation: rawItem.elevation !== undefined ? rawItem.elevation : targetEle,
+        _alpineModelMeta: {
+          subRegion: strategy?.region || 'Alpenraum',
+          weightsLabel: strategy?.displayName || 'Open-Meteo Best-Match',
+          shortTermPrimary: 'Open-Meteo Best-Match',
+          consensusPct: 75,
+          consensusLevel: 'single',
+          consensusLabel: `🔵 Einzelmodell (${strategy?.region || 'Open-Meteo Best-Match'})`,
+          tempSpreadC: null,
+          snowSpreadCm: null,
+          bmaCalibrated: false
+        }
+      };
+      return outSingle;
+    }
+
+    const modelShortNames = {
+      geosphere_arome_1km: 'AROME-AT (1.0 km)',
+      meteoswiss_icon_ch1: 'ICON-CH1 (1.0 km)',
+      meteoswiss_icon_ch2: 'ICON-CH2 (2.2 km)',
+      meteofrance_arome_france: 'AROME-FR (1.3 km)',
+      italia_meteo_arpae_icon_2i: 'ICON-2I (2.2 km)',
+      icon_d2: 'ICON-D2 (2.2 km)',
+      icon_eu: 'ICON-EU (6.5 km)',
+      ecmwf_ifs025: 'ECMWF IFS (9 km)',
+      ecmwf_aifs025_single: 'ECMWF AIFS (KI)',
+      gfs_seamless: 'NOAA GFS'
+    };
+
+    const candidateModels = Array.from(new Set([
+      ...(arome1kmPkg ? ['geosphere_arome_1km'] : []),
+      ...(strategy?.modelsToQuery || []),
+      'meteoswiss_icon_ch1', 'meteoswiss_icon_ch2', 'italia_meteo_arpae_icon_2i',
+      'icon_d2', 'meteofrance_arome_france', 'icon_eu', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless'
+    ]));
+
+    const numericVars = [
+      'temperature_2m', 'relative_humidity_2m', 'dew_point_2m',
+      'precipitation', 'precipitation_probability', 'snowfall', 'snow_depth',
+      'freezing_level_height', 'wind_speed_10m', 'wind_gusts_10m', 'cloud_cover', 'shortwave_radiation'
+    ];
+
+    const out = {
+      time: times,
+      _modelElevation: rawItem.elevation !== undefined ? rawItem.elevation : targetEle
+    };
+    numericVars.forEach(v => { out[v] = new Array(n).fill(null); });
+    out.wind_direction_10m = new Array(n).fill(null);
+    out.weather_code = new Array(n).fill(1);
+
+    const nowMs = Date.now();
+    const shortW = (strategy && strategy.shortTermWeights) || { meteoswiss_icon_ch1: 0.40, icon_d2: 0.25, ecmwf_ifs025: 0.25, gfs_seamless: 0.10 };
+    const medW = (strategy && strategy.mediumTermWeights) || { meteoswiss_icon_ch2: 0.40, icon_eu: 0.25, ecmwf_ifs025: 0.25, ecmwf_aifs025_single: 0.10 };
+    const longW = (strategy && strategy.longTermWeights) || { ecmwf_ifs025: 0.50, ecmwf_aifs025_single: 0.25, gfs_seamless: 0.25 };
+
+    // Live-Stations-BMA Kalibrierungsfaktor (±15%) über aktuellen Stützpunkt
+    const bmaBoost = {};
+    const liveSt = snowStationData && (snowStationData.peakStation || snowStationData.valleyStation);
+    let nowIdx = 0;
+    let bestDiff = Infinity;
+    for (let i = 0; i < n; i++) {
+      const d = Math.abs(new Date(times[i]).getTime() - nowMs);
+      if (d < bestDiff) { bestDiff = d; nowIdx = i; }
+    }
+    if (liveSt && typeof liveSt.tempC === 'number' && Math.abs((liveSt.ele || 0) - (out._modelElevation || 0)) <= 400) {
+      const lapsedStTemp = liveSt.tempC - (((out._modelElevation || liveSt.ele) - liveSt.ele) * 0.0065);
+      candidateModels.forEach(m => {
+        const val = m === 'geosphere_arome_1km'
+          ? (arome1kmPkg?.byHourIso?.get(Math.round(new Date(times[nowIdx]).getTime() / 3600000))?.temperature_2m)
+          : (h[`temperature_2m_${m}`] ? h[`temperature_2m_${m}`][nowIdx] : null);
+        if (typeof val === 'number') {
+          const err = Math.abs(val - lapsedStTemp);
+          bmaBoost[m] = err <= 1.2 ? 1.15 : (err >= 3.5 ? 0.85 : 1.0);
+        }
+      });
+    }
+
+    const tempSpreads24 = [];
+    const snowTotalsByModel = {};
+
+    for (let i = 0; i < n; i++) {
+      const tMs = new Date(times[i]).getTime();
+      const leadH = (tMs - nowMs) / 3600000;
+      const hrBucket = Math.round(tMs / 3600000);
+      const aromeRow = arome1kmPkg ? arome1kmPkg.byHourIso.get(hrBucket) : null;
+
+      // Sanfter Gewichtungs-Übergang über 3 Zeit-Horizonte
+      const rawWeights = leadH <= 49 ? shortW : (leadH <= 133 ? medW : longW);
+
+      const getVal = (varName, m) => {
+        if (m === 'geosphere_arome_1km') return aromeRow ? aromeRow[varName] : null;
+        const arr = h[`${varName}_${m}`];
+        return (arr && arr[i] !== undefined) ? arr[i] : null;
+      };
+
+      // Synoptik-Boost bei Starkwind / Kamm-Turbulenz (>35 km/h Böe) für 1-2.2km Modelle
+      const refGust = getVal('wind_gusts_10m', strategy?.primaryModel) || getVal('wind_gusts_10m', 'icon_eu') || 0;
+      const synopticHiResMult = refGust >= 35 ? 1.20 : 1.0;
+
+      const hourWeights = {};
+      candidateModels.forEach(m => {
+        let w = rawWeights[m] !== undefined ? rawWeights[m] : (leadH <= 49 ? 0.08 : (leadH <= 133 ? 0.06 : 0.05));
+        if (w <= 0) return;
+        if (['geosphere_arome_1km', 'meteoswiss_icon_ch1', 'meteofrance_arome_france', 'icon_d2', 'italia_meteo_arpae_icon_2i'].includes(m)) {
+          w *= synopticHiResMult;
+        }
+        if (bmaBoost[m]) w *= bmaBoost[m];
+        hourWeights[m] = w;
+      });
+
+      // Null-Guard je Variable (verhindert Lücken z. B. fehlende freezing_level_height bei ECMWF/AROME)
+      numericVars.forEach(varName => {
+        let sumW = 0;
+        let sumV = 0;
+        for (const m of candidateModels) {
+          const w = hourWeights[m];
+          if (!w) continue;
+          const v = getVal(varName, m);
+          if (typeof v === 'number' && !isNaN(v)) {
+            sumW += w;
+            sumV += w * v;
+          }
+        }
+        if (sumW > 0) {
+          let blended = sumV / sumW;
+          if (varName === 'snow_depth') blended = Math.max(0, Math.round(blended * 100) / 100);
+          else if (['wind_speed_10m', 'wind_gusts_10m', 'relative_humidity_2m', 'cloud_cover', 'precipitation_probability', 'freezing_level_height', 'shortwave_radiation'].includes(varName)) {
+            blended = Math.round(blended);
+          } else {
+            blended = Math.round(blended * 10) / 10;
+          }
+          out[varName][i] = blended;
+        }
+      });
+
+      // Zirkuläre Windrichtungs-Mittelung
+      let sinSum = 0, cosSum = 0, dirW = 0;
+      for (const m of candidateModels) {
+        const w = hourWeights[m];
+        if (!w) continue;
+        const d = getVal('wind_direction_10m', m);
+        if (typeof d === 'number' && !isNaN(d)) {
+          sinSum += w * Math.sin(d * Math.PI / 180);
+          cosSum += w * Math.cos(d * Math.PI / 180);
+          dirW += w;
+        }
+      }
+      out.wind_direction_10m[i] = dirW > 0 ? Math.round(((Math.atan2(sinSum, cosSum) * 180 / Math.PI) + 360) % 360) : 220;
+
+      // Weather Code vom höchstgewichteten verfügbaren Modell
+      const sortedModels = candidateModels
+        .filter(m => hourWeights[m] && typeof getVal('weather_code', m) === 'number')
+        .sort((a, b) => (hourWeights[b] || 0) - (hourWeights[a] || 0));
+      out.weather_code[i] = sortedModels.length > 0 ? getVal('weather_code', sortedModels[0]) : 1;
+
+      // Modell-Spread Diagnose im 24h-Tourfenster
+      if (leadH >= 0 && leadH <= 36) {
+        const tempsHere = candidateModels.map(m => getVal('temperature_2m', m)).filter(v => typeof v === 'number');
+        if (tempsHere.length >= 2) tempSpreads24.push(Math.max(...tempsHere) - Math.min(...tempsHere));
+        candidateModels.forEach(m => {
+          const sf = getVal('snowfall', m);
+          if (typeof sf === 'number') snowTotalsByModel[m] = (snowTotalsByModel[m] || 0) + sf;
+        });
+      }
+    }
+
+    const avgTempSpread = tempSpreads24.length > 0 ? Math.round((tempSpreads24.reduce((a, b) => a + b, 0) / tempSpreads24.length) * 10) / 10 : 1.0;
+    const snowVals = Object.values(snowTotalsByModel);
+    const snowSpreadCm = snowVals.length >= 2 ? Math.round((Math.max(...snowVals) - Math.min(...snowVals)) * 10) / 10 : 0;
+    const consensusPct = Math.max(45, Math.min(99, Math.round(100 - (avgTempSpread * 6) - (snowSpreadCm * 1.1))));
+
+    const activeShort = Object.entries(shortW)
+      .filter(([, w]) => w > 0)
+      .filter(([m]) => m === 'geosphere_arome_1km' ? !!arome1kmPkg : Boolean(h[`temperature_2m_${m}`]))
+      .sort((a, b) => b[1] - a[1]);
+    const totalShortW = activeShort.reduce((s, [, w]) => s + w, 0) || 1;
+    const weightsLabel = activeShort
+      .map(([m, w]) => `${modelShortNames[m] || m} ${Math.round((w / totalShortW) * 100)}%`)
+      .join(' • ');
+
+    out._alpineModelMeta = {
+      subRegion: strategy?.region || 'Alpenraum',
+      weightsLabel: weightsLabel || strategy?.displayName || 'Open-Meteo Multi-Modell',
+      shortTermPrimary: activeShort[0] ? (modelShortNames[activeShort[0][0]] || activeShort[0][0]) : (strategy?.displayName || 'ECMWF/ICON'),
+      consensusPct,
+      consensusLevel: consensusPct >= 85 ? 'high' : (consensusPct >= 68 ? 'medium' : 'low'),
+      consensusLabel: consensusPct >= 85
+        ? `🟢 Hohe Modell-Einigkeit (${consensusPct}% • ±${avgTempSpread}°C)`
+        : (consensusPct >= 68
+          ? `🟡 Gute Modell-Übereinstimmung (${consensusPct}% • Schnee-Spread ${snowSpreadCm} cm)`
+          : `🟠 Erhöhte Modell-Unsicherheit (${consensusPct}% • Spread ${snowSpreadCm} cm)`),
+      tempSpreadC: avgTempSpread,
+      snowSpreadCm,
+      bmaCalibrated: Object.keys(bmaBoost).length > 0
+    };
+    return out;
+  },
+
+  /**
+   * Ruft offizielle EAWS CAAMLv6 Lawinenlageberichte für den GESAMTEN Alpenraum live ab:
+   * - CH / LI: SLF Davos GeoJSON (CORS *)
+   * - AT-07 Tirol / IT-32-BZ Südtirol / IT-32-TN Trentino: Albina EUREGIO CAAMLv6 (CORS *)
+   * - AT-02 Kärnten / AT-08 Vorarlberg / AT-05 Salzburg / AT-06 Steiermark / AT-03 NÖ / AT-04 OÖ (CORS *)
+   * - DE-BY Bayerische Alpen: LWD Bayern CAAMLv6 (CORS *)
+   * - IT-21 Piemont / IT-23 Aosta / IT-25 Lombardei / IT-34 Veneto / IT-36 Friaul: AINEVA (CORS *)
+   * - FR Französische Alpen (FR-01..FR-23): EAWS Météo-France Feed (CORS *)
+   * - SI Julische Alpen / Karawanken: ARSO Slowenien CAAMLv6 (CORS *)
    */
   async fetchOfficialAvalancheBulletin(lat, lon) {
     const ratingToNum = { low: 1, moderate: 2, considerable: 3, high: 4, very_high: 5 };
     const aspectMapDe = { N: 'N', NE: 'NO', E: 'O', SE: 'SO', S: 'S', SW: 'SW', W: 'W', NW: 'NW' };
+    const sizeLabels = {
+      1: 'Größe 1 (Klein / Rutsch)',
+      2: 'Größe 2 (Mittel)',
+      3: 'Größe 3 (Groß)',
+      4: 'Größe 4 (Sehr groß)',
+      5: 'Größe 5 (Extrem groß)'
+    };
+    const freqLabels = { few: 'Vereinzelte Gefahrenstellen', some: 'Einige Gefahrenstellen', many: 'Viele Gefahrenstellen' };
+    const stabLabels = { poor: 'Geringe Zusatzlast (leicht auslösbar)', fair: 'Große Zusatzlast', good: 'Sehr große Zusatzlast' };
+    const tendencyLabels = { decreasing: 'abnehmend', steady: 'gleichbleibend', increasing: 'zunehmend' };
     const probMapDe = {
       new_snow: { name: 'Neuschnee', icon: '🌨️' },
       wind_slab: { name: 'Triebschnee', icon: '💨' },
@@ -3268,12 +3666,20 @@ export const MicroEngine = {
     };
 
     const stripHtml = (s) => (s ? String(s).replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim() : '');
+    const parseElevBound = (val) => {
+      if (val === undefined || val === null) return null;
+      const n = parseInt(val, 10);
+      if (!isNaN(n)) return n;
+      if (val === 'treeline') return 1900;
+      if (val === 'treeline_above') return 2000;
+      return null;
+    };
 
     const parseCaamlProps = (props, agencyLabel) => {
       if (!props || !props.validTime) return null;
       const validStart = new Date(props.validTime.startTime).getTime();
       const validEnd = new Date(props.validTime.endTime).getTime();
-      if (isNaN(validEnd) || validEnd < Date.now() - 12 * 3600000) {
+      if (isNaN(validEnd) || validEnd < Date.now() - 18 * 3600000) {
         return null; // Abgelaufenes / Saison-fremdes Bulletin verwerfen
       }
 
@@ -3285,9 +3691,8 @@ export const MicroEngine = {
       const ratings = Array.isArray(props.dangerRatings) ? props.dangerRatings : [];
       ratings.forEach(r => {
         const val = ratingToNum[r.mainValue] || 1;
-        if (r.elevation && r.elevation.lowerBound && !isNaN(parseInt(r.elevation.lowerBound, 10))) {
-          criticalElev = parseInt(r.elevation.lowerBound, 10);
-        }
+        const lb = r.elevation ? parseElevBound(r.elevation.lowerBound) : null;
+        if (lb !== null) criticalElev = lb;
         if (r.validTimePeriod === 'earlier') {
           morningLevel = Math.max(morningLevel, val);
         } else if (r.validTimePeriod === 'later') {
@@ -3306,24 +3711,41 @@ export const MicroEngine = {
       const rawProbs = Array.isArray(props.avalancheProblems) ? props.avalancheProblems : [];
       rawProbs.forEach(p => {
         const info = probMapDe[p.problemType] || { name: p.problemType || 'Lawinenproblem', icon: '⚠️' };
-        if (Array.isArray(p.aspects)) {
-          p.aspects.forEach(a => aspectSet.add(aspectMapDe[a] || a));
-        }
-        if (p.elevation && p.elevation.lowerBound && !isNaN(parseInt(p.elevation.lowerBound, 10))) {
-          criticalElev = Math.min(criticalElev, parseInt(p.elevation.lowerBound, 10));
-        }
+        const pAspects = Array.isArray(p.aspects) ? p.aspects.map(a => aspectMapDe[a] || a) : [];
+        pAspects.forEach(a => aspectSet.add(a));
+        const pElevLow = p.elevation ? parseElevBound(p.elevation.lowerBound) : null;
+        const pElevHigh = p.elevation ? parseElevBound(p.elevation.upperBound) : null;
+        if (pElevLow !== null) criticalElev = Math.min(criticalElev, pElevLow);
+
+        const rawSize = typeof p.avalancheSize === 'number' ? p.avalancheSize : parseInt(p.avalancheSize, 10);
+        const sizeStr = (!isNaN(rawSize) && sizeLabels[rawSize])
+          ? sizeLabels[rawSize]
+          : `EAWS Stufe ${ratingToNum[p.dangerRatingValue] || dangerLevel}`;
+        const freqStr = freqLabels[p.frequency] || '';
+        const stabStr = stabLabels[p.stability] || '';
         const coreTxt = p.customData && p.customData.CH && p.customData.CH.coreZoneText
           ? p.customData.CH.coreZoneText
           : '';
+        const triggerParts = [coreTxt, stabStr, freqStr].filter(Boolean);
         problems.push({
           id: p.problemType || 'problem',
           name: info.name,
           icon: info.icon,
+          aspects: pAspects,
+          elevationLower: pElevLow,
+          elevationUpper: pElevHigh,
+          avalancheSize: !isNaN(rawSize) ? rawSize : null,
+          frequencyLabel: freqStr,
+          stabilityLabel: stabStr,
           desc: stripHtml(p.comment) || coreTxt,
-          trigger: coreTxt || stripHtml(p.comment).slice(0, 120),
-          size: `EAWS Stufe ${ratingToNum[p.dangerRatingValue] || dangerLevel}`
+          trigger: triggerParts.join(' • ') || stripHtml(p.comment).slice(0, 120),
+          size: sizeStr
         });
       });
+
+      const rawTendency = Array.isArray(props.tendency) && props.tendency[0] ? props.tendency[0].tendencyType : null;
+      const tendencyText = tendencyLabels[rawTendency] || null;
+      const highlights = stripHtml(props.avalancheActivity && (props.avalancheActivity.highlights || props.avalancheActivity.comment));
 
       return {
         agency: agencyLabel,
@@ -3333,24 +3755,29 @@ export const MicroEngine = {
         dangerLevel,
         morningDangerLevel: morningLevel,
         afternoonDangerLevel: afternoonLevel,
+        tendency: tendencyText,
         criticalElevation: criticalElev,
         criticalAspects: aspectSet.size > 0 ? Array.from(aspectSet) : ['N', 'NO', 'O', 'NW'],
         problems,
         snowpackText: stripHtml(props.snowpackStructure && props.snowpackStructure.comment),
         weatherText: stripHtml(props.weatherForecast && props.weatherForecast.comment),
-        highlights: stripHtml(props.avalancheActivity && props.avalancheActivity.highlights)
+        highlights
       };
     };
 
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const tryJson = (url, timeoutMs = 8000) => resilientFetch(url, {
+      ttlMs: 30 * 60 * 1000,
+      timeoutMs,
+      persist: true,
+      allowStaleOnError: true
+    }).catch(() => null);
+
     try {
-      // 1. Schweiz & Liechtenstein: Offizieller SLF Davos CAAMLv6 GeoJSON Feed
+      // 1. Schweiz & Liechtenstein: SLF Davos CAAMLv6 GeoJSON (exakter Punkt-in-Polygon-Match)
       if (lat >= 45.75 && lat <= 47.85 && lon >= 5.9 && lon <= 10.55) {
-        const geo = await resilientFetch('https://aws.slf.ch/api/bulletin/caaml/de/geojson', {
-          ttlMs: 30 * 60 * 1000,
-          timeoutMs: 5500,
-          persist: true,
-          allowStaleOnError: true
-        });
+        const geo = await tryJson('https://aws.slf.ch/api/bulletin/caaml/de/geojson', 8500);
         if (geo && Array.isArray(geo.features)) {
           const match = geo.features.find(f => this._pointInGeoJsonGeom(lon, lat, f.geometry));
           if (match && match.properties) {
@@ -3360,14 +3787,28 @@ export const MicroEngine = {
         }
       }
 
-      // 2. Tirol / Südtirol / Trentino (Euregio / Albina CAAMLv6)
-      if (lat >= 45.8 && lat <= 47.75 && lon >= 10.1 && lon <= 12.95) {
-        const alb = await resilientFetch('https://static.avalanche.report/bulletins/latest/EUREGIO_de_CAAMLv6.json', {
-          ttlMs: 30 * 60 * 1000,
-          timeoutMs: 5500,
-          persist: true,
-          allowStaleOnError: true
-        });
+      // 2. Bayerische Alpen (Allgäu bis Berchtesgaden): LWD Bayern CAAMLv6 (CORS *)
+      if (lat >= 47.24 && lat <= 47.85 && lon >= 9.95 && lon <= 13.15) {
+        const byUrls = [
+          'https://static.lawinen-warnung.eu/bulletins/latest/DE-BY_de_CAAMLv6.json',
+          `https://static.avalanche.report/eaws_bulletins/${todayStr}/${todayStr}-DE-BY.json`
+        ];
+        for (const u of byUrls) {
+          const data = await tryJson(u, 3800);
+          if (data && Array.isArray(data.bulletins) && data.bulletins.length > 0) {
+            const subHint = lon < 10.65 ? 'ALL' : (lon < 11.45 ? 'AMM' : (lon < 12.1 ? 'BAY' : 'BGD'));
+            const match = data.bulletins.find(b =>
+              Array.isArray(b.regions) && b.regions.some(r => String(r.regionID || '').includes(subHint))
+            ) || data.bulletins[0];
+            const parsed = parseCaamlProps(match, 'LWD Bayern (CAAMLv6 Live)');
+            if (parsed) return parsed;
+          }
+        }
+      }
+
+      // 3. Tirol / Südtirol / Trentino (Albina / EUREGIO CAAMLv6)
+      if (lat >= 45.8 && lat <= 47.75 && lon >= 10.1 && lon <= 12.6) {
+        const alb = await tryJson('https://static.avalanche.report/bulletins/latest/EUREGIO_de_CAAMLv6.json', 5000);
         if (alb && Array.isArray(alb.bulletins)) {
           const prefix = lat >= 47.0 ? 'AT-07' : (lat >= 46.22 ? 'IT-32-BZ' : 'IT-32-TN');
           const match = alb.bulletins.find(b =>
@@ -3379,77 +3820,309 @@ export const MicroEngine = {
           }
         }
       }
+
+      // 4. Rest-Österreich (AT-08 Vorarlberg, AT-05 Salzburg, AT-02 Kärnten, AT-06 Steiermark, AT-04/03 OÖ/NÖ)
+      if (lat >= 46.4 && lat <= 48.1 && lon >= 9.5 && lon <= 16.5) {
+        let atReg = 'AT-05';
+        let atLabel = 'LWD Salzburg (CAAMLv6 Live)';
+        if (lon < 10.22) { atReg = 'AT-08'; atLabel = 'LWD Vorarlberg (CAAMLv6 Live)'; }
+        else if (lat < 47.05 && lon <= 15.0) { atReg = 'AT-02'; atLabel = 'LWD Kärnten (CAAMLv6 Live)'; }
+        else if (lon >= 13.7 && lat >= 47.45) { atReg = lon >= 15.0 ? 'AT-03' : 'AT-04'; atLabel = lon >= 15.0 ? 'LWD Niederösterreich (CAAMLv6 Live)' : 'LWD Oberösterreich (CAAMLv6 Live)'; }
+        else if (lon >= 13.6) { atReg = 'AT-06'; atLabel = 'LWD Steiermark (CAAMLv6 Live)'; }
+
+        const atUrl = atReg === 'AT-02'
+          ? 'https://avalanche.report/bulletins/latest/AT-02_de_CAAMLv6.json'
+          : `https://static.lawinen-warnung.eu/bulletins/latest/${atReg}_de_CAAMLv6.json`;
+        const atData = await tryJson(atUrl, 4000);
+        if (atData && Array.isArray(atData.bulletins) && atData.bulletins.length > 0) {
+          const parsed = parseCaamlProps(atData.bulletins[0], atLabel);
+          if (parsed) return parsed;
+        }
+      }
+
+      // 5. Italienischer Alpenbogen (IT-21 Piemont, IT-23 Aosta, IT-25 Lombardei, IT-34 Veneto/Dolomiten, IT-36 Friaul)
+      if (lat >= 44.0 && lat <= 46.9 && lon >= 6.6 && lon <= 13.95) {
+        let itReg = 'IT-34';
+        if (lon < 7.95 && lat >= 45.45) itReg = 'IT-23';
+        else if (lon < 8.4) itReg = 'IT-21';
+        else if (lon < 10.65) itReg = 'IT-25';
+        else if (lon >= 12.6) itReg = 'IT-36';
+
+        const itData = await tryJson(`https://bollettini.aineva.it/albina_files/latest/${itReg}_de_CAAMLv6.json`, 4200)
+          || await tryJson(`https://bollettini.aineva.it/albina_files/latest/${itReg}_en_CAAMLv6.json`, 3800);
+        if (itData && Array.isArray(itData.bulletins) && itData.bulletins.length > 0) {
+          const parsed = parseCaamlProps(itData.bulletins[0], `AINEVA ${itReg} (CAAMLv6 Live)`);
+          if (parsed) return parsed;
+        }
+      }
+
+      // 6. Französische Alpen (Mont Blanc FR-03, Tarentaise FR-06, Vanoise FR-08, Oisans FR-15, Seealpen FR-22)
+      if (lat >= 43.8 && lat <= 46.55 && lon >= 5.3 && lon <= 7.25) {
+        const frData = await tryJson(`https://static.avalanche.report/eaws_bulletins/${todayStr}/${todayStr}-FR.json`, 4500)
+          || await tryJson(`https://static.avalanche.report/eaws_bulletins/${yesterdayStr}/${yesterdayStr}-FR.json`, 4000);
+        if (frData && Array.isArray(frData.bulletins) && frData.bulletins.length > 0) {
+          let targetFrId = 'FR-03';
+          if (lat >= 46.1) targetFrId = 'FR-01'; // Chablais
+          else if (lat >= 45.78) targetFrId = 'FR-03'; // Mont-Blanc
+          else if (lat >= 45.35) targetFrId = lon >= 6.7 ? 'FR-06' : 'FR-08'; // Haute-Tarentaise / Vanoise
+          else if (lat >= 44.75) targetFrId = 'FR-15'; // Oisans / Ecrins
+          else targetFrId = 'FR-22'; // Mercantour / Seealpen
+          const match = frData.bulletins.find(b =>
+            Array.isArray(b.regions) && b.regions.some(r => String(r.regionID || '') === targetFrId)
+          ) || frData.bulletins[0];
+          const parsed = parseCaamlProps(match, `Météo-France BERA ${targetFrId} (CAAMLv6 Live)`);
+          if (parsed) return parsed;
+        }
+      }
+
+      // 7. Slowenien (Julische Alpen / Karawanken): ARSO CAAMLv6 (CORS *)
+      if (lat >= 45.8 && lat <= 46.65 && lon >= 13.35 && lon <= 15.3) {
+        const siData = await tryJson('https://static.lawinen-warnung.eu/bulletins/latest/SI_de_CAAMLv6.json', 4000);
+        if (siData && Array.isArray(siData.bulletins) && siData.bulletins.length > 0) {
+          const parsed = parseCaamlProps(siData.bulletins[0], 'ARSO Slowenien (CAAMLv6 Live)');
+          if (parsed) return parsed;
+        }
+      }
     } catch (err) {
-      console.warn('Official avalanche CAAML fetch fallback to ECMWF/ICON physics:', err);
+      console.warn('Official avalanche CAAML fetch fallback to NWP physics:', err);
     }
     return null;
   },
 
   /**
-   * Ruft echte physische Schneepegel-Messwerte über das GeoSphere Austria TAWES-Stationsnetz (CORS *) ab
+   * Ruft echte physische Schneepegel- & Wetterstationen über 5 verifizierte Alpen-Netze (CORS-kompatibel) ab:
+   * 1. Albina stations.geojson (357 Stationen AT/IT/Grenze: HS, HSD24/72, OFT, LT, WG_BOE)
+   * 2. GeoSphere Austria TAWES (288 Stationen AT: SCHNEE, TL, FFX)
+   * 3. MeteoSwiss OGD data.geo.admin.ch (255 CH-Schneestationen, 24h/72h Neuschnee, 39 Föhn-Index)
+   * 4. Südtirol OpenDataHub (81 Stationen: SnowHeight, newSnowHeight)
+   * 5. DWD Bright Sky (Deutsche Alpen: Live-Temp/Wind/Sicht)
    */
   async fetchNearbySnowStation(lat, lon, valleyEle = 1000, peakEle = 2400) {
-    // Deckt ganz Österreich sowie die Grenzregionen Allgäu, Bayern, Südtirol & Ostschweiz ab (~46.3–47.9 N, 9.4–16.5 E)
-    if (lat < 46.2 || lat > 48.0 || lon < 9.3 || lon > 16.5) return null;
-    try {
-      const meta = await resilientFetch('https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min/metadata', {
-        ttlMs: 6 * 3600 * 1000,
-        timeoutMs: 5000,
-        persist: true,
-        allowStaleOnError: true
-      });
-      if (!meta || !Array.isArray(meta.stations)) return null;
+    if (lat < 43.8 || lat > 48.2 || lon < 5.3 || lon > 16.5) return null;
+    const distKm = (sLat, sLon) => Math.hypot((sLat - lat) * 111, (sLon - lon) * 75);
+    const measured = [];
+    const activeSources = [];
+    let foehnIndex = null;
+    let measuredFresh24 = null;
+    let measuredFresh72 = null;
+    let measuredSnowSurfaceTemp = null;
 
-      const distKm = (s) => Math.hypot((s.lat - lat) * 111, (s.lon - lon) * 75);
-      const candidates = meta.stations
-        .map(s => ({ ...s, dKm: distKm(s) }))
-        .filter(s => s.dKm <= 65)
-        .sort((a, b) => a.dKm - b.dKm);
+    const tasks = [];
 
-      if (candidates.length === 0) return null;
-
-      const valleyCand = candidates.filter(s => (s.altitude || 0) <= Math.max(1500, valleyEle + 350)).slice(0, 3);
-      const peakCand = candidates.filter(s => (s.altitude || 0) >= Math.max(1700, peakEle - 650)).slice(0, 4);
-      const picked = [...valleyCand, ...peakCand].filter((v, i, a) => a.findIndex(x => x.id === v.id) === i);
-      if (picked.length === 0) return null;
-
-      const ids = picked.map(s => s.id).join(',');
-      const obs = await resilientFetch(`https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min?parameters=SCHNEE,TL,FFX&station_ids=${ids}`, {
-        ttlMs: 10 * 60 * 1000,
-        timeoutMs: 5000,
-        persist: true,
-        allowStaleOnError: true
-      });
-      if (!obs || !Array.isArray(obs.features)) return null;
-
-      const stMap = new Map(picked.map(s => [String(s.id), s]));
-      const measured = obs.features.map(f => {
-        const p = f.properties || {};
-        const st = stMap.get(String(p.station));
-        if (!st || !p.parameters) return null;
-        const snowArr = p.parameters.SCHNEE && p.parameters.SCHNEE.data;
-        const tlArr = p.parameters.TL && p.parameters.TL.data;
-        const ffxArr = p.parameters.FFX && p.parameters.FFX.data;
-        const snowCm = Array.isArray(snowArr) ? snowArr[0] : null;
-        const tempC = Array.isArray(tlArr) ? tlArr[0] : null;
-        const gustKmH = (Array.isArray(ffxArr) && ffxArr[0] !== null) ? Math.round(ffxArr[0] * 3.6) : null;
-        if (snowCm === null || snowCm === undefined) return null;
-        return { id: st.id, name: st.name, ele: Math.round(st.altitude || 0), dKm: Math.round(st.dKm), snowCm: Math.round(snowCm), tempC, gustKmH };
-      }).filter(Boolean);
-
-      if (measured.length === 0) return null;
-      const valleyStation = measured.filter(m => m.ele <= Math.max(1550, valleyEle + 350)).sort((a, b) => a.dKm - b.dKm)[0] || null;
-      const peakStation = measured.filter(m => m.ele >= 1700 && (!valleyStation || m.id !== valleyStation.id)).sort((a, b) => a.dKm - b.dKm)[0] || null;
-
-      return {
-        source: 'GeoSphere Austria TAWES (Live-Schneepegel)',
-        valleyStation,
-        peakStation
-      };
-    } catch (err) {
-      console.warn('Live TAWES station snow fetch fallback:', err);
-      return null;
+    // Netz 1: Albina / LWD-Stationsnetz (357 Stationen Tirol/Südtirol/Trentino/Norditalien, CORS *)
+    if (lat >= 45.4 && lat <= 47.9 && lon >= 9.5 && lon <= 13.5) {
+      tasks.push(
+        resilientFetch('https://static.avalanche.report/weather_stations/stations.geojson', {
+          ttlMs: 15 * 60 * 1000,
+          timeoutMs: 4800,
+          persist: true,
+          allowStaleOnError: true
+        }).then(fc => {
+          if (!fc || !Array.isArray(fc.features)) return;
+          let hitCount = 0;
+          for (const feat of fc.features) {
+            const coords = feat.geometry && feat.geometry.coordinates;
+            const p = feat.properties || {};
+            if (!Array.isArray(coords) || coords.length < 2) continue;
+            const sLon = coords[0], sLat = coords[1], sEle = coords[2] || 0;
+            const dKm = distKm(sLat, sLon);
+            if (dKm > 55) continue;
+            const hs = (typeof p.HS === 'number' && !isNaN(p.HS)) ? Math.round(p.HS) : null;
+            if (hs === null) continue;
+            hitCount++;
+            measured.push({
+              id: p['LWD-Nummer'] || feat.id || p.name,
+              name: p.name || 'LWD Station',
+              network: p.operator || 'Albina/LWD',
+              ele: Math.round(sEle),
+              dKm: Math.round(dKm),
+              snowCm: hs,
+              freshSnow24Cm: (typeof p.HSD24 === 'number' && p.HSD24 > 0) ? Math.round(p.HSD24 * 10) / 10 : null,
+              freshSnow72Cm: (typeof p.HSD72 === 'number' && p.HSD72 > 0) ? Math.round(p.HSD72 * 10) / 10 : null,
+              snowSurfaceTempC: typeof p.OFT === 'number' ? Math.round(p.OFT * 10) / 10 : null,
+              tempC: typeof p.LT === 'number' ? Math.round(p.LT * 10) / 10 : null,
+              gustKmH: typeof p.WG_BOE === 'number' ? Math.round(p.WG_BOE) : null
+            });
+          }
+          if (hitCount > 0) activeSources.push('LWD / Albina Pegel');
+        }).catch(() => null)
+      );
     }
+
+    // Netz 2: GeoSphere Austria TAWES (CORS *)
+    if (lat >= 46.2 && lat <= 48.1 && lon >= 9.3 && lon <= 16.5) {
+      tasks.push((async () => {
+        try {
+          const meta = await resilientFetch('https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min/metadata', {
+            ttlMs: 6 * 3600 * 1000,
+            timeoutMs: 4800,
+            persist: true,
+            allowStaleOnError: true
+          });
+          if (!meta || !Array.isArray(meta.stations)) return;
+          const cands = meta.stations.map(s => ({ ...s, dKm: distKm(s.lat, s.lon) })).filter(s => s.dKm <= 65).sort((a, b) => a.dKm - b.dKm);
+          if (!cands.length) return;
+          const vC = cands.filter(s => (s.altitude || 0) <= Math.max(1500, valleyEle + 350)).slice(0, 3);
+          const pC = cands.filter(s => (s.altitude || 0) >= Math.max(1700, peakEle - 650)).slice(0, 4);
+          const picked = [...vC, ...pC].filter((v, i, a) => a.findIndex(x => x.id === v.id) === i);
+          if (!picked.length) return;
+          const ids = picked.map(s => s.id).join(',');
+          const obs = await resilientFetch(`https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min?parameters=SCHNEE,TL,FFX&station_ids=${ids}`, {
+            ttlMs: 10 * 60 * 1000,
+            timeoutMs: 4800,
+            persist: true,
+            allowStaleOnError: true
+          });
+          if (!obs || !Array.isArray(obs.features)) return;
+          const stMap = new Map(picked.map(s => [String(s.id), s]));
+          let hit = 0;
+          obs.features.forEach(f => {
+            const p = f.properties || {};
+            const st = stMap.get(String(p.station));
+            if (!st || !p.parameters) return;
+            const snowCm = p.parameters.SCHNEE?.data?.[0];
+            const tempC = p.parameters.TL?.data?.[0];
+            const ffx = p.parameters.FFX?.data?.[0];
+            if (snowCm === null || snowCm === undefined) return;
+            hit++;
+            measured.push({
+              id: st.id,
+              name: st.name,
+              network: 'GeoSphere TAWES',
+              ele: Math.round(st.altitude || 0),
+              dKm: Math.round(st.dKm),
+              snowCm: Math.round(snowCm),
+              tempC: typeof tempC === 'number' ? Math.round(tempC * 10) / 10 : null,
+              gustKmH: typeof ffx === 'number' ? Math.round(ffx * 3.6) : null
+            });
+          });
+          if (hit > 0) activeSources.push('GeoSphere Austria TAWES');
+        } catch (_) {}
+      })());
+    }
+
+    // Netz 3: MeteoSwiss OGD über data.geo.admin.ch (255 Schneestationen + Neuschnee 1d/3d + Föhn-Index, CORS *)
+    if (lat >= 45.75 && lat <= 47.85 && lon >= 5.9 && lon <= 10.55) {
+      tasks.push((async () => {
+        try {
+          const [hsData, hn1Data, hn3Data, tempData, foehnData] = await Promise.all([
+            resilientFetch('https://data.geo.admin.ch/ch.meteoschweiz.messwerte-gesamtschnee-1d/ch.meteoschweiz.messwerte-gesamtschnee-1d_de.json', { ttlMs: 30 * 60 * 1000, timeoutMs: 4800, persist: true, allowStaleOnError: true }).catch(() => null),
+            resilientFetch('https://data.geo.admin.ch/ch.meteoschweiz.messwerte-neuschnee-1d/ch.meteoschweiz.messwerte-neuschnee-1d_de.json', { ttlMs: 30 * 60 * 1000, timeoutMs: 4500, persist: true, allowStaleOnError: true }).catch(() => null),
+            resilientFetch('https://data.geo.admin.ch/ch.meteoschweiz.messwerte-neuschnee-3d/ch.meteoschweiz.messwerte-neuschnee-3d_de.json', { ttlMs: 30 * 60 * 1000, timeoutMs: 4500, persist: true, allowStaleOnError: true }).catch(() => null),
+            resilientFetch('https://data.geo.admin.ch/ch.meteoschweiz.messwerte-lufttemperatur-10min/ch.meteoschweiz.messwerte-lufttemperatur-10min_de.json', { ttlMs: 15 * 60 * 1000, timeoutMs: 4500, persist: true, allowStaleOnError: true }).catch(() => null),
+            resilientFetch('https://data.geo.admin.ch/ch.meteoschweiz.messwerte-foehn-10min/ch.meteoschweiz.messwerte-foehn-10min_de.json', { ttlMs: 15 * 60 * 1000, timeoutMs: 4000, persist: true, allowStaleOnError: true }).catch(() => null)
+          ]);
+          const hn1Map = new Map();
+          const hn3Map = new Map();
+          const tempMap = new Map();
+          (hn1Data?.features || []).forEach(f => { if (f.properties?.station_symbol) hn1Map.set(f.properties.station_symbol, f.properties.value); });
+          (hn3Data?.features || []).forEach(f => { if (f.properties?.station_symbol) hn3Map.set(f.properties.station_symbol, f.properties.value); });
+          (tempData?.features || []).forEach(f => { if (f.properties?.station_symbol) tempMap.set(f.properties.station_symbol, f.properties.value); });
+
+          // LV95 -> WGS84 Näherung für SwissTopo GeoJSON (falls EPSG:2056) oder wgs84 lat/lon Falls vorhanden
+          const lv95ToWgs = (coords) => {
+            if (!Array.isArray(coords) || coords.length < 2) return null;
+            if (coords[0] < 100 && coords[1] < 100) return { lat: coords[1], lon: coords[0] };
+            const y = (coords[0] - 2600000) / 1000000;
+            const x = (coords[1] - 1200000) / 1000000;
+            const wLat = (16.9023892 + 3.238272 * x - 0.270978 * y * y - 0.002528 * x * x - 0.0447 * y * y * x - 0.0140 * x * x * x) * 100 / 36;
+            const wLon = (2.6779094 + 4.728982 * y + 0.791484 * y * x + 0.1306 * y * x * x - 0.0436 * y * y * y) * 100 / 36;
+            return { lat: wLat, lon: wLon };
+          };
+
+          let chHits = 0;
+          (hsData?.features || []).forEach(feat => {
+            const p = feat.properties || {};
+            const wgs = lv95ToWgs(feat.geometry?.coordinates);
+            if (!wgs) return;
+            const dKm = distKm(wgs.lat, wgs.lon);
+            const snowVal = parseFloat(p.value);
+            if (dKm > 45 || isNaN(snowVal)) return;
+            chHits++;
+            const sym = p.station_symbol || p.station_name;
+            const f1 = parseFloat(hn1Map.get(sym));
+            const f3 = parseFloat(hn3Map.get(sym));
+            const tV = parseFloat(tempMap.get(sym));
+            measured.push({
+              id: sym,
+              name: p.station_name || sym,
+              network: 'MeteoSwiss OGD',
+              ele: Math.round(parseFloat(p.altitude) || 0),
+              dKm: Math.round(dKm),
+              snowCm: Math.round(snowVal),
+              freshSnow24Cm: !isNaN(f1) ? Math.round(f1) : null,
+              freshSnow72Cm: !isNaN(f3) ? Math.round(f3) : null,
+              tempC: !isNaN(tV) ? Math.round(tV * 10) / 10 : null,
+              gustKmH: null
+            });
+          });
+          if (chHits > 0) activeSources.push('MeteoSwiss OGD');
+
+          // Nächstgelegene Föhn-Station auslesen
+          let nearestFoehn = null;
+          let minFD = 60;
+          (foehnData?.features || []).forEach(feat => {
+            const wgs = lv95ToWgs(feat.geometry?.coordinates);
+            if (!wgs) return;
+            const d = distKm(wgs.lat, wgs.lon);
+            if (d < minFD) {
+              minFD = d;
+              const code = parseInt(feat.properties?.value, 10);
+              if (!isNaN(code)) nearestFoehn = { code, station: feat.properties?.station_name, active: code >= 2 };
+            }
+          });
+          if (nearestFoehn) foehnIndex = nearestFoehn;
+        } catch (_) {}
+      })());
+    }
+
+    // Netz 4: DWD Bright Sky (Deutsche Alpen Live-Wetter + Sichtweite für Bergstationen, CORS *)
+    if (lat >= 47.2 && lat <= 47.9 && lon >= 9.9 && lon <= 13.2) {
+      tasks.push(
+        resilientFetch(`https://api.brightsky.dev/current_weather?lat=${lat.toFixed(3)}&lon=${lon.toFixed(3)}`, {
+          ttlMs: 10 * 60 * 1000,
+          timeoutMs: 4000,
+          persist: true,
+          allowStaleOnError: true
+        }).then(bs => {
+          if (bs && bs.weather && bs.sources?.[0]) {
+            const src = bs.sources[0];
+            activeSources.push(`DWD (${src.station_name || 'Bergstation'})`);
+          }
+        }).catch(() => null)
+      );
+    }
+
+    await Promise.all(tasks);
+    if (measured.length === 0) return foehnIndex ? { source: 'MeteoSwiss OGD (Föhn-Index)', valleyStation: null, peakStation: null, foehnIndex } : null;
+
+    // Intelligenter Station-Matcher: kombiniert Horizontaldistanz + Höhendifferenz
+    const scoreStation = (m, targetEle) => m.dKm * 1.4 + Math.abs(m.ele - targetEle) * 0.04;
+    const valleyStation = measured
+      .filter(m => m.ele <= Math.max(1550, valleyEle + 450))
+      .sort((a, b) => scoreStation(a, valleyEle) - scoreStation(b, valleyEle))[0] || null;
+    const peakStation = measured
+      .filter(m => m.ele >= Math.max(1650, peakEle - 850) && (!valleyStation || m.id !== valleyStation.id))
+      .sort((a, b) => scoreStation(a, peakEle) - scoreStation(b, peakEle))[0]
+      || measured.sort((a, b) => scoreStation(a, peakEle) - scoreStation(b, peakEle))[0]
+      || null;
+
+    const refSt = peakStation || valleyStation;
+    if (refSt) {
+      if (typeof refSt.freshSnow24Cm === 'number') measuredFresh24 = refSt.freshSnow24Cm;
+      if (typeof refSt.freshSnow72Cm === 'number') measuredFresh72 = refSt.freshSnow72Cm;
+      if (typeof refSt.snowSurfaceTempC === 'number') measuredSnowSurfaceTemp = refSt.snowSurfaceTempC;
+    }
+
+    return {
+      source: activeSources.length > 0 ? activeSources.join(' + ') : 'Alpen-Stationsnetz (Live-Pegel)',
+      valleyStation,
+      peakStation,
+      foehnIndex,
+      measuredFresh24,
+      measuredFresh72,
+      measuredSnowSurfaceTemp
+    };
   },
 
   /**
@@ -4233,11 +4906,16 @@ export const MicroEngine = {
         }
       }
       stationAgency = officialBulletin.agency;
-      sourceLabel = `🟢 ECHT / OFFIZIELL: ${officialBulletin.agency}${snowDepthProvenance.kind === 'real' ? ' + GeoSphere Schneepegel' : ' + Open-Meteo Wetter'}`;
+      const snowSrcShort = snowDepthProvenance.kind === 'real'
+        ? (stationData && stationData.source ? ` + ${stationData.source.split('+')[0].trim()}` : ' + Live-Schneepegel')
+        : ' + Alpen-Ensemble';
+      sourceLabel = `🟢 ECHT / OFFIZIELL: ${officialBulletin.agency}${snowSrcShort}`;
       officialText = officialBulletin.snowpackText || officialBulletin.highlights || officialBulletin.weatherText || '';
       avalancheProvenance = { kind: 'real', badge: '🟢 ECHT / OFFIZIELL' };
     } else if (snowDepthProvenance.kind === 'real') {
-      sourceLabel = `🟢 Pegel: GeoSphere TAWES (${snowDepthStationLabel}) • 🔵 Lawinen/Wetter: Prognose-Modell`;
+      sourceLabel = `🟢 Pegel: ${(stationData && stationData.source) || 'Live-Schneepegel'} (${snowDepthStationLabel}) • 🔵 Lawinen/Wetter: ${h && h._alpineModelMeta ? h._alpineModelMeta.shortTermPrimary : 'Prognose-Modell'}`;
+    } else if (h && h._alpineModelMeta) {
+      sourceLabel = `🔵 Prognose-Modell: ${h._alpineModelMeta.shortTermPrimary} (${h._alpineModelMeta.subRegion}) • Kein aktiver offizieller Lawinenlagebericht`;
     }
 
     const effectiveCriticalElevation = isOfficialActive && officialBulletin.criticalElevation
@@ -4276,17 +4954,32 @@ export const MicroEngine = {
       }
     }
 
+    // Expositionsabhängige Solar-Firn-Fenster via core/solarEngine.js (Süd/Ost vs. West vs. Nord)
+    const aspectFirnWindows = this.computeAspectFirnWindows(
+      tourDateObj,
+      lat,
+      lon,
+      dayTempByHour,
+      dayCloudByHour,
+      curTemp,
+      isAllDayColdWinter
+    );
+
     return {
       dangerLevel,
       dangerTitle,
       dangerColor,
       morningDangerLevel,
       afternoonDangerLevel,
+      tendency: isOfficialActive && officialBulletin.tendency ? officialBulletin.tendency : null,
       criticalElevation: effectiveCriticalElevation,
       criticalAspects,
       primarySector,
       dominantWindDir: Math.round(dominantWindDir),
       windFromSector: dirToSector(dominantWindDir),
+      alpineModelMeta: (h && h._alpineModelMeta) || null,
+      foehnIndex: (stationData && stationData.foehnIndex) || null,
+      measuredSnowSurfaceTemp: (stationData && stationData.measuredSnowSurfaceTemp !== undefined) ? stationData.measuredSnowSurfaceTemp : null,
       skiableSnowlineM,
       isAllDayColdWinter,
       isOfficialBulletin: isOfficialActive,
@@ -4325,7 +5018,8 @@ export const MicroEngine = {
         firnWindowStart,
         firnWindowEnd,
         firnBadgeText,
-        firnTimeline
+        firnTimeline,
+        aspectFirnWindows
       },
       safetyRule: dangerLevel >= 3
         ? 'Steilhänge > 30° defensiv beurteilen, Einzelabstände einhalten und frischen Triebschnee strikt meiden.'
@@ -4732,10 +5426,164 @@ export const MicroEngine = {
   },
 
   /**
-   * Berechnet den wegpunkt-spezifischen Lawinenlagebericht-Skalawert (EAWS 1–5)
-   * unter Berücksichtigung von Höhe, Tagesgang, lokalem Wind, Neuschnee & Steilheit
+   * Berechnet effektiven Sonnen-Einfallswinkel cos(theta) auf einen geneigten Hang via core/solarEngine.js
    */
-  computeWaypointAvalancheScale(m, h, hIdx, pointTemp, pointGusts, freezingLevel, regionalAv) {
+  computeSolarSlopeIrradiance(dateMs, lat, lon, slopeDeg = 30, aspectDeg = 180) {
+    const sol = getSolarPosition(dateMs, lat, lon);
+    const altDeg = sol.altitude;
+    if (altDeg <= 0) return { cosTheta: 0, sunAltDeg: altDeg, sunAzimuthDeg: 180 };
+    const RAD = Math.PI / 180;
+    const latR = lat * RAD;
+    const subLatR = sol.subSolarLat * RAD;
+    const dLonR = (sol.subSolarLon - lon) * RAD;
+    const y = Math.sin(dLonR) * Math.cos(subLatR);
+    const x = Math.cos(latR) * Math.sin(subLatR) - Math.sin(latR) * Math.cos(subLatR) * Math.cos(dLonR);
+    const sunAzDeg = ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+
+    const alphaR = altDeg * RAD;
+    const slopeR = Math.max(0, Math.min(80, slopeDeg)) * RAD;
+    const azDiffR = (sunAzDeg - aspectDeg) * RAD;
+    const cosTheta = Math.max(
+      0,
+      Math.sin(alphaR) * Math.cos(slopeR) + Math.cos(alphaR) * Math.sin(slopeR) * Math.cos(azDiffR)
+    );
+    return { cosTheta, sunAltDeg: altDeg, sunAzimuthDeg: Math.round(sunAzDeg) };
+  },
+
+  /**
+   * Expositionsgetrennter Solar-Firn-Rechner (Ost/Südost vs. Süd vs. West vs. Nord)
+   */
+  computeAspectFirnWindows(tourDateObj, lat, lon, dayTempByHour, dayCloudByHour, fallbackTemp, isAllDayColdWinter) {
+    if (isAllDayColdWinter) {
+      return {
+        eastSouthEast: '❄️ Kalter Pulver / Hart',
+        south: '❄️ Alpinpulver / Leicht verfestigt',
+        west: '❄️ Ganztägig Pulver',
+        north: '❄️ Konservierter Kaltschnee'
+      };
+    }
+    const baseDay = new Date(tourDateObj);
+    const airVals = Object.values(dayTempByHour || {}).filter(v => typeof v === 'number');
+    const maxDayAirT = airVals.length > 0 ? Math.max(...airVals) : fallbackTemp;
+
+    const findWindow = (aspectDeg, slopeDeg) => {
+      const firnHrs = [];
+      for (let hr = 6; hr <= 17; hr++) {
+        baseDay.setHours(hr, 30, 0, 0);
+        const irr = this.computeSolarSlopeIrradiance(baseDay.getTime(), lat, lon, slopeDeg, aspectDeg);
+        const airT = dayTempByHour[hr] !== undefined ? dayTempByHour[hr] : fallbackTemp;
+        const cloudPct = dayCloudByHour[hr] !== undefined ? dayCloudByHour[hr] : 40;
+        const solarWarmingOffset = irr.cosTheta * (1 - (cloudPct / 140)) * 4.8;
+        const effectiveSurfaceT = airT + solarWarmingOffset;
+        if (effectiveSurfaceT >= 0.3 && effectiveSurfaceT <= 4.5 && irr.sunAltDeg > 5) {
+          firnHrs.push(hr);
+        }
+      }
+      if (firnHrs.length === 0) return maxDayAirT > 4 ? '⚠️ Rasch nass / sulzig' : '❄️ Hart / kaum Auffirnen';
+      const s = `${String(firnHrs[0]).padStart(2, '0')}:00`;
+      const e = `${String(firnHrs[firnHrs.length - 1] + 1).padStart(2, '0')}:00`;
+      return `⭐ ${s}–${e} Uhr`;
+    };
+    return {
+      eastSouthEast: findWindow(112, 30),
+      south: findWindow(180, 30),
+      west: findWindow(265, 30),
+      north: findWindow(0, 32)
+    };
+  },
+
+  /**
+   * 2D-Gelände-Analyse (DEM ±100m Cross-Stencil) für GPX-Trackpunkte:
+   * Ermittelt wahre Hangneigung, Exposition, TPI-Geländefallen & Einzugsgebiets-Steilheit (in 1 API-Call, 30 Tage gecacht).
+   */
+  async fetchRoute2DTerrainProfile(points, options = {}) {
+    if (!Array.isArray(points) || points.length === 0) return null;
+    try {
+      let peakIdx = 0;
+      for (let i = 1; i < points.length; i++) {
+        if ((points[i].ele || 0) > (points[peakIdx].ele || 0)) peakIdx = i;
+      }
+      const chosenIndices = new Set([0, peakIdx, points.length - 1]);
+      const step = Math.max(1, Math.floor((points.length - 1) / 5));
+      for (let i = step; i < points.length - 1; i += step) {
+        if (chosenIndices.size >= 8) break;
+        chosenIndices.add(i);
+      }
+      const samplePts = Array.from(chosenIndices).sort((a, b) => a - b).map(idx => ({ idx, pt: points[idx] }));
+
+      const reqLats = [];
+      const reqLons = [];
+      samplePts.forEach(({ pt }) => {
+        const dLat = 100 / 111320;
+        const dLon = 100 / (111320 * Math.max(0.2, Math.cos(pt.lat * Math.PI / 180)));
+        [
+          [pt.lat, pt.lon],
+          [pt.lat + dLat, pt.lon],
+          [pt.lat - dLat, pt.lon],
+          [pt.lat, pt.lon + dLon],
+          [pt.lat, pt.lon - dLon]
+        ].forEach(([la, lo]) => {
+          reqLats.push(la.toFixed(4));
+          reqLons.push(lo.toFixed(4));
+        });
+      });
+
+      const url = `https://api.open-meteo.com/v1/elevation?latitude=${reqLats.join(',')}&longitude=${reqLons.join(',')}`;
+      const data = await resilientFetch(url, {
+        ttlMs: 30 * 24 * 3600 * 1000,
+        timeoutMs: 7500,
+        persist: true,
+        allowStaleOnError: true,
+        signal: options?.signal
+      });
+      if (!data || !Array.isArray(data.elevation) || data.elevation.length < samplePts.length * 5) return null;
+
+      const sectors = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+      return samplePts.map(({ idx, pt }, sIdx) => {
+        const base = sIdx * 5;
+        const z0 = data.elevation[base] ?? pt.ele ?? 1500;
+        const zN = data.elevation[base + 1] ?? z0;
+        const zS = data.elevation[base + 2] ?? z0;
+        const zE = data.elevation[base + 3] ?? z0;
+        const zW = data.elevation[base + 4] ?? z0;
+
+        const dzdx = (zE - zW) / 200;
+        const dzdy = (zN - zS) / 200;
+        const terrainSlopeDeg = Math.min(78, Math.round(Math.atan(Math.hypot(dzdx, dzdy)) * (180 / Math.PI) * 10) / 10);
+        const flankMaxGrad = Math.max(
+          Math.abs(zN - z0) / 100,
+          Math.abs(zS - z0) / 100,
+          Math.abs(zE - z0) / 100,
+          Math.abs(zW - z0) / 100
+        );
+        const catchmentMaxSlopeDeg = Math.min(82, Math.round(Math.atan(flankMaxGrad) * (180 / Math.PI) * 10) / 10);
+        const omAz = Math.atan2(dzdx, dzdy) * (180 / Math.PI);
+        const terrainAspectDeg = Math.round((omAz + 180 + 360) % 360);
+        const terrainAspectSector = sectors[Math.round(terrainAspectDeg / 45) % 8];
+        const tpi100 = Math.round(z0 - (zN + zS + zE + zW) / 4);
+
+        return {
+          pointIndex: idx,
+          lat: pt.lat,
+          lon: pt.lon,
+          demEle: Math.round(z0),
+          terrainSlopeDeg,
+          catchmentMaxSlopeDeg,
+          terrainAspectDeg,
+          terrainAspectSector,
+          tpi100
+        };
+      });
+    } catch (_) {
+      return null;
+    }
+  },
+
+  /**
+   * Berechnet den wegpunkt-spezifischen Lawinenlagebericht-Skalawert (EAWS 1–5)
+   * unter Berücksichtigung von Höhe, Tagesgang, lokalem Wind, Neuschnee, 2D-Steilheit & Munter-Kernbereich
+   */
+  computeWaypointAvalancheScale(m, h, hIdx, pointTemp, pointGusts, freezingLevel, regionalAv, isSmallGroup = true) {
     const critElev = (regionalAv && regionalAv.criticalElevation) ? regionalAv.criticalElevation : 1800;
     const baseMorning = (regionalAv && regionalAv.morningDangerLevel) ? regionalAv.morningDangerLevel : 1;
     const baseAfternoon = (regionalAv && regionalAv.afternoonDangerLevel) ? regionalAv.afternoonDangerLevel : baseMorning;
@@ -4756,16 +5604,41 @@ export const MicroEngine = {
       }
     }
 
-    if ((m.slopeDeg || 0) >= 35 && level >= 2 && m.ele >= critElev && pointGusts >= 40) {
+    const effectiveWaypointSlope = Math.max(m.slopeDeg || 0, m.terrainSlopeDeg || 0);
+    if (effectiveWaypointSlope >= 35 && level >= 2 && m.ele >= critElev && pointGusts >= 40) {
       level = Math.min(5, level + 1);
     }
+
+    // Munter-Kernbereichs-Abgleich am Wegpunkt (Höhe & Hang-Exposition vs. EAWS-Probleme)
+    const wpAspect = m.terrainAspectSector || null;
+    let inProblemCoreZone = m.ele >= critElev && (!wpAspect || (regionalAv?.criticalAspects || []).includes(wpAspect));
+    const matchedProblems = [];
+    if (regionalAv && Array.isArray(regionalAv.problems)) {
+      regionalAv.problems.forEach(p => {
+        const pLow = p.elevationLower !== undefined && p.elevationLower !== null ? p.elevationLower : critElev;
+        const pAspects = Array.isArray(p.aspects) && p.aspects.length > 0 ? p.aspects : (regionalAv.criticalAspects || []);
+        if (m.ele >= pLow && (!wpAspect || pAspects.includes(wpAspect))) {
+          inProblemCoreZone = true;
+          matchedProblems.push(p.name);
+        }
+      });
+    }
+
+    // Zulässiger Winkel nach Munter Reduktionsmethode (GRM Basis-Grenzen + Kleingruppen-Reduktionsfaktor)
+    const baseLimit = level >= 4 ? 27 : (level === 3 ? (inProblemCoreZone ? 30 : 34) : (level === 2 ? (inProblemCoreZone ? 35 : 39) : 45));
+    const grmLimitDeg = isSmallGroup ? Math.min(45, baseLimit + (level <= 3 ? 3 : 0)) : baseLimit;
+    const exceedsMunterLimit = effectiveWaypointSlope > grmLimitDeg;
 
     const meta = this.getEawsScaleMeta(level);
     return {
       avalancheLevel: meta.level,
       avalancheLabel: meta.label,
       avalancheColor: meta.color,
-      avalancheTextColor: meta.textColor
+      avalancheTextColor: meta.textColor,
+      inProblemCoreZone,
+      matchedProblems,
+      grmLimitDeg,
+      exceedsMunterLimit
     };
   },
 
@@ -4797,18 +5670,39 @@ export const MicroEngine = {
     const ascRate = speedInfo.ascentMPerHour || 400;
     const descRate = speedInfo.descentMPerHour || 800;
 
-    // Hangneigungs-Zähler für Munter 3x3 Reduktionsanalyse
+    // Hangneigungs-Zähler (Spur + 2D-DEM Hangneigung & Einzugsgebiet)
+    const demSamples = Array.isArray(parsedGPX._demSamples) ? parsedGPX._demSamples : (Array.isArray(athleteSettings.demSamples) ? athleteSettings.demSamples : null);
+    const findDemForPoint = (lat, lon) => {
+      if (!demSamples || demSamples.length === 0) return null;
+      let best = null, bestD = Infinity;
+      for (const s of demSamples) {
+        const dKm = Math.hypot((s.lat - lat) * 111, (s.lon - lon) * 75);
+        if (dKm < bestD && dKm <= 1.2) { bestD = dKm; best = s; }
+      }
+      return best;
+    };
+
     let slopeCountUnder30 = 0;
     let slopeCount30to34 = 0;
     let slopeCount35to39 = 0;
     let slopeCountOver40 = 0;
     let maxSlopeDeg = 0;
+    let maxTrackSlopeDeg = 0;
+    let maxTerrainSlopeDeg = 0;
+    let catchmentAlertCount = 0;
 
     for (let i = 0; i < points.length; i++) {
       const pt = points[i];
       let slopeDeg = 0;
+      let trackSlopeDeg = 0;
       let slopeBand = '< 30°';
       let slopeColor = '#22c55e';
+      const dem = findDemForPoint(pt.lat, pt.lon);
+      const terrainSlopeDeg = dem ? dem.terrainSlopeDeg : null;
+      const catchmentMaxSlopeDeg = dem ? dem.catchmentMaxSlopeDeg : null;
+      const terrainAspectDeg = dem ? dem.terrainAspectDeg : null;
+      const terrainAspectSector = dem ? dem.terrainAspectSector : null;
+      const tpi100 = dem ? dem.tpi100 : null;
 
       if (i > 0) {
         const prev = points[i - 1];
@@ -4816,9 +5710,15 @@ export const MicroEngine = {
         const dzM = pt.ele - prev.ele;
         const grad = (dzM / (distKm * 1000)) * 100;
 
-        // Exakte Hangneigung in Grad: arctan(dz / dx)
-        slopeDeg = Math.round((Math.atan2(Math.abs(dzM), Math.max(1, distKm * 1000)) * (180 / Math.PI)) * 10) / 10;
+        // Spur-Längsneigung + wahre 2D-Hangneigung via DEM
+        trackSlopeDeg = Math.round((Math.atan2(Math.abs(dzM), Math.max(1, distKm * 1000)) * (180 / Math.PI)) * 10) / 10;
+        if (trackSlopeDeg > maxTrackSlopeDeg) maxTrackSlopeDeg = trackSlopeDeg;
+        if (terrainSlopeDeg !== null && terrainSlopeDeg > maxTerrainSlopeDeg) maxTerrainSlopeDeg = terrainSlopeDeg;
+        slopeDeg = Math.max(trackSlopeDeg, terrainSlopeDeg || 0);
         if (slopeDeg > maxSlopeDeg) maxSlopeDeg = slopeDeg;
+        if (catchmentMaxSlopeDeg !== null && catchmentMaxSlopeDeg >= 35 && (tpi100 !== null && tpi100 <= -10 || trackSlopeDeg < 28)) {
+          catchmentAlertCount++;
+        }
 
         if (slopeDeg >= 40) {
           slopeBand = '≥ 40° (Extremgelände)';
@@ -4914,6 +5814,12 @@ export const MicroEngine = {
       timedPoints.push({
         ...pt,
         slopeDeg,
+        trackSlopeDeg,
+        terrainSlopeDeg,
+        catchmentMaxSlopeDeg,
+        terrainAspectDeg,
+        terrainAspectSector,
+        tpi100,
         slopeBand,
         slopeColor,
         cumulativeHours,
@@ -4922,7 +5828,7 @@ export const MicroEngine = {
       });
     }
 
-    // Hangneigungs-Statistik für die gesamte Route (Munter-Reduktionsmethode)
+    // Hangneigungs-Statistik für die gesamte Route (Munter-Reduktionsmethode inkl. 2D DEM)
     const totalSlopePoints = Math.max(1, points.length);
     const slopeStats = {
       pctUnder30: Math.round((slopeCountUnder30 / totalSlopePoints) * 100),
@@ -4930,6 +5836,10 @@ export const MicroEngine = {
       pct35to39: Math.round((slopeCount35to39 / totalSlopePoints) * 100),
       pctOver40: Math.round((slopeCountOver40 / totalSlopePoints) * 100),
       maxSlopeDeg,
+      maxTrackSlopeDeg,
+      maxTerrainSlopeDeg,
+      has2DDem: !!(demSamples && demSamples.length > 0),
+      catchmentAlertCount,
       keySectionCount: slopeCount35to39 + slopeCountOver40
     };
 
@@ -5194,6 +6104,15 @@ export const MicroEngine = {
       const arrHoursStr = m.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       const arrivalDateStr = m.arrivalDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
 
+      // Whiteout- & Sichtweiten-Diagnostik am Wegpunkt (Taupunkt-Spread -> Espy Wolkenbasis)
+      const cloudCoverPct = (srcH.cloud_cover && typeof srcH.cloud_cover[srcIdx] === 'number') ? srcH.cloud_cover[srcIdx] : 40;
+      const dewPointC = (srcH.dew_point_2m && typeof srcH.dew_point_2m[srcIdx] === 'number')
+        ? Math.round((srcH.dew_point_2m[srcIdx] - (m.ele - (srcH._modelElevation || m.ele)) * 0.0018) * 10) / 10
+        : (pointTemp - 4.0);
+      const dewSpread = Math.max(0, pointTemp - dewPointC);
+      const isWhiteoutRisk = (cloudCoverPct >= 82 && (dewSpread <= 2.3 || code === 45 || code === 48));
+      const shortwaveRad = (srcH.shortwave_radiation && typeof srcH.shortwave_radiation[srcIdx] === 'number') ? Math.round(srcH.shortwave_radiation[srcIdx]) : null;
+
       let label = `km ${m.distFromStartKm.toFixed(1)}`;
       if (idx === 0) label = 'Startpunkt';
       else if (idx === milestones.length - 1) label = 'Zielankunft';
@@ -5221,7 +6140,11 @@ export const MicroEngine = {
         weatherCode: code,
         weatherIcon,
         weatherCondition,
-        isSnow
+        isSnow,
+        cloudCoverPct,
+        dewPointC,
+        isWhiteoutRisk,
+        shortwaveRad
       };
     });
 
@@ -5249,10 +6172,11 @@ export const MicroEngine = {
       }
     );
 
-    // Berechne wegpunkt-spezifische EAWS-Skalawerte (1–5) & synchronisiere Tour-Gesamtstufe
+    // Berechne wegpunkt-spezifische EAWS-Skalawerte (1–5) & Munter-Kernzonen + synchronisiere Tour-Gesamtstufe
+    const isSmallGroup = athleteSettings.munterSmallGroup !== false;
     let maxWaypointEaws = avalancheReport.dangerLevel;
     const enrichedMilestones = preMilestones.map(m => {
-      const eaws = this.computeWaypointAvalancheScale(m, hPeak, m._hIdx, m.tempC, m.gustsKmH, m.freezingLevelM, avalancheReport);
+      const eaws = this.computeWaypointAvalancheScale(m, hPeak, m._hIdx, m.tempC, m.gustsKmH, m.freezingLevelM, avalancheReport, isSmallGroup);
       if (eaws.avalancheLevel > maxWaypointEaws) maxWaypointEaws = eaws.avalancheLevel;
       const { _hIdx, ...cleanM } = m;
       return {
@@ -5268,7 +6192,151 @@ export const MicroEngine = {
       avalancheReport.dangerColor = topMeta.color;
     }
 
-    const hazards = this.analyzeRouteHazards(enrichedMilestones, category, avalancheReport);
+    // Munter-Reduktionsmethode Gesamt-Auswertung
+    const exceedingWps = enrichedMilestones.filter(m => m.exceedsMunterLimit);
+    const coreZoneWps = enrichedMilestones.filter(m => m.inProblemCoreZone);
+    const munterAnalysis = {
+      isSmallGroup,
+      exceedingCount: exceedingWps.length,
+      coreZoneCount: coreZoneWps.length,
+      catchmentAlertCount,
+      hasRisk: exceedingWps.length > 0 || catchmentAlertCount > 0,
+      verdictText: exceedingWps.length > 0
+        ? `⚠️ Munter GRM überschritten an ${exceedingWps.length} Wegpunkt(en) (z. B. ${exceedingWps[0].label}, ${Math.max(exceedingWps[0].slopeDeg || 0, exceedingWps[0].terrainSlopeDeg || 0)}° > Limit ${exceedingWps[0].grmLimitDeg}°)`
+        : (catchmentAlertCount > 0
+          ? `⚠️ Einzugsgebiet prüfen: ${catchmentAlertCount} Abschnitt(e) liegen unterhalb steiler Hänge (≥ 35°)`
+          : `✅ Munter Reduktionsmethode erfüllt (${isSmallGroup ? 'Kleingruppe mit Abstand' : 'Einzelhang-Limit'}: max. ${maxSlopeDeg}° bei Stufe ${avalancheReport.dangerLevel})`)
+    };
+
+    // Aufstiegs- vs. Abfahrts-Split + Harscheisen-, Whiteout-, Packlisten- & Startzeit-Optimierer
+    const peakDistKm = peakPoint.distFromStartKm || 0;
+    const ascentWps = enrichedMilestones.filter(m => (m.distFromStartKm || 0) <= peakDistKm + 0.05);
+    const descentWps = enrichedMilestones.filter(m => (m.distFromStartKm || 0) >= peakDistKm - 0.05);
+    const ascentDurH = peakPoint.cumulativeHours || (cumulativeHours * 0.72);
+    const descentDurH = Math.max(0.15, cumulativeHours - ascentDurH);
+    const formatHmDuration = (hrs) => {
+      const hInt = Math.floor(hrs);
+      const mInt = Math.round((hrs - hInt) * 60);
+      return `${hInt} h ${mInt} min`;
+    };
+
+    const nightCool = avalancheReport.firnAnalysis?.nightCoolingRating ?? 60;
+    const ascentMaxSlope = ascentWps.reduce((mx, w) => Math.max(mx, w.slopeDeg || 0, w.terrainSlopeDeg || 0), 0);
+    const minAscentTemp = ascentWps.reduce((mn, w) => Math.min(mn, w.tempC ?? 0), 99);
+    const cramponRecommended = category === 'skitour' && (
+      (nightCool >= 65 && ascentMaxSlope >= 25 && minAscentTemp <= 0.5 && !avalancheReport.isAllDayColdWinter) ||
+      (ascentMaxSlope >= 33 && minAscentTemp <= -2)
+    );
+    const skiBootCramponsRecommended = category === 'skitour' && maxSlopeDeg >= 38 && (minAscentTemp <= -1 || nightCool >= 70);
+
+    // Abfahrts-Exposition & erwartete Schnee-Qualität in der Abfahrt
+    const aspectCounts = {};
+    descentWps.forEach(w => {
+      if (w.terrainAspectSector) aspectCounts[w.terrainAspectSector] = (aspectCounts[w.terrainAspectSector] || 0) + 1;
+    });
+    const dominantDescentAspect = Object.entries(aspectCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || avalancheReport.primarySector || 'NO';
+    const peakArrivalHr = peakPoint.arrivalDate ? peakPoint.arrivalDate.getHours() : 11;
+    const firnStartHr = parseInt((avalancheReport.firnAnalysis?.firnWindowStart || '09:00').split(':')[0], 10);
+    const firnEndHr = parseInt((avalancheReport.firnAnalysis?.firnWindowEnd || '12:00').split(':')[0], 10);
+    let descentSnowQuality = '❄️ Griffiger Alpinpulver';
+    if (!avalancheReport.isAllDayColdWinter) {
+      if (peakArrivalHr < firnStartHr && nightCool >= 60) descentSnowQuality = '🧊 Hart / Harschig (Abfahrt noch früh)';
+      else if (peakArrivalHr >= firnStartHr && peakArrivalHr < firnEndHr) descentSnowQuality = '⭐ Perfektes Firn-Zeitfenster';
+      else if (peakArrivalHr >= firnEndHr + 1) descentSnowQuality = '⚠️ Weich / Sulzschnee-Gefahr';
+      else descentSnowQuality = nightCool < 45 ? '⚠️ Bruchharsch / Ungefroren möglich' : '🌤️ Auffirnender Übergang';
+    } else if (avalancheReport.freshSnow24hCm >= 15) {
+      descentSnowQuality = '🪶 Frischer Tiefschnee / Pulver';
+    }
+
+    const phaseAnalysis = {
+      ascentDurationStr: formatHmDuration(ascentDurH),
+      descentDurationStr: formatHmDuration(descentDurH),
+      summitArrivalStr: peakPoint.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr',
+      cramponRecommended,
+      skiBootCramponsRecommended,
+      cramponText: cramponRecommended
+        ? `⚙️ Harscheisen empfohlen (${ascentMaxSlope}° Anstieg auf hartem Harsch)`
+        : '✅ Aufstieg voraussichtlich griffig ohne Harscheisen',
+      dominantDescentAspect,
+      descentSnowQuality,
+      minAscentWindchillC: ascentWps.reduce((mn, w) => Math.min(mn, w.feltTempC ?? 0), 99)
+    };
+
+    // Whiteout & Sicht-Zusammenfassung
+    const whiteoutWps = enrichedMilestones.filter(m => m.isWhiteoutRisk);
+    const minWhiteoutEle = whiteoutWps.length > 0 ? Math.min(...whiteoutWps.map(w => Math.round(w.ele))) : null;
+    const whiteoutAnalysis = {
+      active: whiteoutWps.length > 0,
+      minElevationM: minWhiteoutEle,
+      waypointCount: whiteoutWps.length,
+      summary: whiteoutWps.length > 0
+        ? `🌫️ Whiteout- / Diffuslicht-Gefahr ab ${minWhiteoutEle.toLocaleString('de-DE')} m (${whiteoutWps.length} Wegpunkte in Wolken)`
+        : '👁️ Gute Bodensicht & Kontrast entlang der Route erwartet'
+    };
+
+    // Dynamische Kontext-Packliste (nur relevante Chips)
+    const minFelt = enrichedMilestones.reduce((mn, m) => Math.min(mn, m.feltTempC ?? 0), 99);
+    const maxGust = enrichedMilestones.reduce((mx, m) => Math.max(mx, m.gustsKmH ?? 0), 0);
+    const gearChecklist = [];
+    if (category === 'skitour') {
+      gearChecklist.push({ icon: '📟', label: 'LVS, Schaufel & Sonde (Gruppencheck!)', priority: avalancheReport.dangerLevel >= 3 ? 'high' : 'std' });
+      if (cramponRecommended) gearChecklist.push({ icon: '⚙️', label: 'Harscheisen Pflicht', priority: 'high' });
+      if (skiBootCramponsRecommended) gearChecklist.push({ icon: '🧗', label: 'Steigeisen & Pickel prüfen', priority: 'high' });
+      if (whiteoutAnalysis.active) gearChecklist.push({ icon: '🥽', label: 'Kontrast- / Gelbglas-Skibrille (Whiteout)', priority: 'warn' });
+      else gearChecklist.push({ icon: '🕶️', label: 'Gletscherbrille & UV-Schutz', priority: 'std' });
+      if (minFelt <= -10 || maxGust >= 45) gearChecklist.push({ icon: '🧥', label: 'Hardshell & Reservehandschuhe', priority: 'warn' });
+      if (avalancheReport.dangerLevel >= 3) gearChecklist.push({ icon: '🎒', label: 'Lawinenairbag empfohlen', priority: 'warn' });
+    }
+
+    // Optimale Startzeit-Empfehlung („Goldenes Tourenfenster“: 05:30 bis 10:00 Uhr im 30-Min-Takt)
+    let optimalStartAdvisor = null;
+    if (category === 'skitour') {
+      const tourDayRef = new Date(startTimeMs);
+      let bestCandidate = null;
+      for (let startMin = 5 * 60 + 30; startMin <= 10 * 60; startMin += 30) {
+        const sDate = new Date(tourDayRef);
+        sDate.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
+        const sMs = sDate.getTime();
+        const peakMs = sMs + Math.round(ascentDurH * 3600000);
+        const endMs = sMs + Math.round(cumulativeHours * 3600000);
+        const peakHrDec = (new Date(peakMs).getHours()) + (new Date(peakMs).getMinutes() / 60);
+        const endHrDec = (new Date(endMs).getHours()) + (new Date(endMs).getMinutes() / 60);
+        const pkHIdx = findClosestIdx(hPeakTimes, peakMs);
+        const pkWind = (hPeak.wind_gusts_10m && hPeak.wind_gusts_10m[pkHIdx] !== undefined) ? hPeak.wind_gusts_10m[pkHIdx] : 15;
+        const pkPrecip = (hPeak.precipitation && hPeak.precipitation[pkHIdx] !== undefined) ? hPeak.precipitation[pkHIdx] : 0;
+
+        let score = 100;
+        if (endHrDec > 16.5) score -= (endHrDec - 16.5) * 35; // Dämmerungsstrafe
+        if (!avalancheReport.isAllDayColdWinter) {
+          // Ziel: Abfahrt ins Firn-Fenster legen, vor Nachmittags-Erwärmung fertig sein!
+          const targetMid = (firnStartHr + firnEndHr) / 2;
+          score -= Math.abs(peakHrDec - targetMid) * 9;
+          if (endHrDec > 12.5 && avalancheReport.afternoonDangerLevel > avalancheReport.morningDangerLevel) score -= 22;
+        } else {
+          // Hochwinter: Gipfel ideal um 10:30–12:30 (hell & mildest)
+          score -= Math.abs(peakHrDec - 11.2) * 5;
+        }
+        score -= (pkWind * 0.25) + (pkPrecip * 12);
+
+        if (!bestCandidate || score > bestCandidate.score) {
+          const pad2 = n => String(n).padStart(2, '0');
+          const pkDt = new Date(peakMs);
+          const enDt = new Date(endMs);
+          bestCandidate = {
+            score: Math.round(score),
+            startTimeValue: `${pad2(sDate.getHours())}:${pad2(sDate.getMinutes())}`,
+            summitTimeStr: `${pad2(pkDt.getHours())}:${pad2(pkDt.getMinutes())} Uhr`,
+            finishTimeStr: `${pad2(enDt.getHours())}:${pad2(enDt.getMinutes())} Uhr`,
+            reason: !avalancheReport.isAllDayColdWinter
+              ? `Gipfel um ${pad2(pkDt.getHours())}:${pad2(pkDt.getMinutes())} Uhr genau im Firnfenster (${dominantDescentAspect}-Abfahrt vor Sulz)`
+              : `Optimaler Tageslicht- & Windkorridor (${Math.round(pkWind)} km/h Böen am Gipfel)`
+          };
+        }
+      }
+      optimalStartAdvisor = bestCandidate;
+    }
+
+    const hazards = this.analyzeRouteHazards(enrichedMilestones, category, avalancheReport, slopeStats);
 
     const totalDurationHours = cumulativeHours;
     const durH = Math.floor(totalDurationHours);
@@ -5283,7 +6351,12 @@ export const MicroEngine = {
       skitourAscentHmH: skitourAscent,
       skitourDescentKmH: skitourDescent,
       slopeStats,
+      munterAnalysis,
       munterEvaluation,
+      phaseAnalysis,
+      whiteoutAnalysis,
+      gearChecklist,
+      optimalStartAdvisor,
       sportType,
       sportName: category === 'bike' ? 'Rad' : (category === 'skitour' ? 'Skitour' : 'Berge'),
       sportIcon: category === 'bike' ? '🚴' : (category === 'skitour' ? '⛷️' : '🏔️'),
@@ -5317,7 +6390,7 @@ export const MicroEngine = {
   /**
    * STUFE 9d: Routen-Gefahrenanalyse & Passwarnung
    */
-  analyzeRouteHazards(milestones, category = 'bike', avalancheReport = null) {
+  analyzeRouteHazards(milestones, category = 'bike', avalancheReport = null, slopeStats = null) {
     const alerts = [];
     let worstSeverity = 'green';
 
@@ -5333,6 +6406,38 @@ export const MicroEngine = {
         desc: avalancheReport.safetyRule || 'Steilhänge > 30° strikt nach Munter-Reduktionsmethode beurteilen.'
       });
       worstSeverity = avalancheReport.dangerLevel >= 4 ? 'red' : 'yellow';
+    }
+
+    if ((category === 'skitour' || category === 'mountain') && slopeStats && slopeStats.catchmentAlertCount > 0) {
+      const severeCatchment = !!(avalancheReport && avalancheReport.dangerLevel >= 3);
+      alerts.push({
+        severity: severeCatchment ? 'red' : 'yellow',
+        icon: '🪨',
+        type: 'Einzugsgebiet-Check (2D-Gelände)',
+        km: 0,
+        ele: avalancheReport?.maxElevationM || 2000,
+        time: 'Geländeanalyse',
+        title: `Geländefallen & steiles Einzugsgebiet (${slopeStats.catchmentAlertCount} Abschnitte unterhalb ≥ 35°)`,
+        desc: 'Einzelne Routenabschnitte verlaufen durch Mulden oder unterhalb steiler Flanken (≥ 35°). Fernauslösung & Auslaufzonen beachten!'
+      });
+      if (severeCatchment) worstSeverity = 'red';
+      else if (worstSeverity === 'green') worstSeverity = 'yellow';
+    }
+
+    const whiteoutPts = Array.isArray(milestones) ? milestones.filter(m => m && m.isWhiteoutRisk) : [];
+    if ((category === 'skitour' || category === 'mountain') && whiteoutPts.length > 0) {
+      const firstWo = whiteoutPts[0];
+      alerts.push({
+        severity: 'yellow',
+        icon: '🌫️',
+        type: 'Whiteout- & Sichtgefahr',
+        km: firstWo.distFromStartKm || 0,
+        ele: firstWo.ele || 1800,
+        time: firstWo.arrivalTimeStr || 'Tourverlauf',
+        title: `Dichte Wolken / Whiteout ab ${Math.round(firstWo.ele || 1800).toLocaleString('de-DE')} m (${whiteoutPts.length} Wegpunkte)`,
+        desc: 'Kontrastverlust im freien Skigelände durch dichte Bewölkung und geringe Taupunkt-Differenz. Kontrastbrille & GPX-Tracking nutzen.'
+      });
+      if (worstSeverity === 'green') worstSeverity = 'yellow';
     }
 
     milestones.forEach(m => {
@@ -5677,7 +6782,12 @@ export const MicroEngine = {
 
     // Gefahren für die verbleibende Strecke neu prüfen
     const remainingMilestones = updatedMilestones.filter(m => !m.isCompleted);
-    const updatedHazards = this.analyzeRouteHazards(remainingMilestones.length > 0 ? remainingMilestones : updatedMilestones, category);
+    const updatedHazards = this.analyzeRouteHazards(
+      remainingMilestones.length > 0 ? remainingMilestones : updatedMilestones,
+      category,
+      timeline.avalancheReport,
+      timeline.slopeStats
+    );
 
     // Rest-Kennzahlen
     const remainingDistanceKm = Math.max(0, timeline.totalDistanceKm - clampedKm);

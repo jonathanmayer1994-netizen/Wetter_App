@@ -4705,9 +4705,9 @@ body.is-scrolling .radar-floating-controls {
 }
 
 /* Ausklappbare Drawer für Hintergrunddetails */
-.alpine-drawer {
+.alpine-drawer:not(.glass-card) {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 10px;
+  padding-top: 0;
   margin-top: 12px;
 }
 
@@ -4715,23 +4715,50 @@ body.is-scrolling .radar-floating-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
   font-size: 12px;
   font-weight: 700;
   color: var(--ios-cyan);
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  padding: 6px 4px;
-  border-radius: 8px;
+  list-style: none;
+  padding: 12px 10px;
+  border-radius: 10px;
   transition: background 0.15s ease;
 }
 
 .alpine-drawer-summary:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.alpine-drawer-summary::-webkit-details-marker {
+.alpine-drawer-summary::-webkit-details-marker,
+.alpine-drawer-summary::marker {
   display: none;
+  content: '';
+}
+
+/* Vollflächige Klick- & Hover-Fläche für eigenständige Glass-Card-Drawer */
+details.glass-card.alpine-drawer {
+  padding: 0 !important;
+}
+
+details.glass-card.alpine-drawer > .alpine-drawer-summary {
+  margin: 0 !important;
+  padding: 18px 20px !important;
+  border-radius: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+details.glass-card.alpine-drawer[open] > .alpine-drawer-summary {
+  border-radius: 20px 20px 0 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+details.glass-card.alpine-drawer > .alpine-drawer-summary:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .alpine-drawer[open] .drawer-arrow {
@@ -4745,6 +4772,10 @@ body.is-scrolling .radar-floating-controls {
 
 .alpine-drawer-body {
   padding-top: 10px;
+}
+
+details.glass-card.alpine-drawer > .alpine-drawer-body {
+  padding: 14px 20px 18px;
 }
 
 .alpine-details-grid {
@@ -14039,13 +14070,36 @@ body.is-scrolling .radar-floating-controls {
   }
 
   /* Compact iPhone Studio & Metrics Tuning */
-  .alpine-drawer-summary {
+  .alpine-drawer:not(.glass-card) .alpine-drawer-summary {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
     flex-wrap: nowrap !important;
-    padding: 8px 10px !important;
+    padding: 10px 8px !important;
+  }
+
+  details.glass-card.alpine-drawer {
+    padding: 0 !important;
+  }
+
+  details.glass-card.alpine-drawer > .alpine-drawer-summary {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+    margin: 0 !important;
+    padding: 15px 14px !important;
+    border-radius: 18px !important;
+  }
+
+  details.glass-card.alpine-drawer[open] > .alpine-drawer-summary {
+    border-radius: 18px 18px 0 0 !important;
+  }
+
+  details.glass-card.alpine-drawer > .alpine-drawer-body {
+    padding: 12px 14px 14px !important;
   }
 
   .alpine-drawer-summary .card-title {
@@ -15098,8 +15152,11 @@ body.is-scrolling .radar-floating-controls {
 }
 
 @media (max-width: 768px) {
-  .sports-waypoints-card {
+  .sports-waypoints-card:not(.alpine-drawer) {
     padding: 12px 10px !important;
+  }
+  details.glass-card.sports-waypoints-card.alpine-drawer > .alpine-drawer-body {
+    padding: 10px 10px 12px !important;
   }
 
   .swt-card-header {
@@ -17652,26 +17709,14 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
 }
 
 /* Alpine Drawer styling enhancements for Sports Setup & Waypoints */
-.sports-setup-drawer,
-.sports-waypoints-drawer {
-  transition: all 0.25s ease;
-  border-radius: 16px;
+.sports-setup-card.alpine-drawer,
+.sports-waypoints-card.alpine-drawer {
+  transition: background 0.25s ease, border-color 0.25s ease;
 }
 
-.sports-setup-drawer[open],
-.sports-waypoints-drawer[open] {
+.sports-setup-card.alpine-drawer[open],
+.sports-waypoints-card.alpine-drawer[open] {
   border-color: rgba(10, 132, 255, 0.35);
-}
-
-.sports-setup-drawer .alpine-drawer-summary,
-.sports-waypoints-drawer .alpine-drawer-summary {
-  padding: 10px 12px;
-  border-radius: 12px;
-}
-
-.sports-setup-drawer .alpine-drawer-summary:hover,
-.sports-waypoints-drawer .alpine-drawer-summary:hover {
-  background: rgba(255, 255, 255, 0.06);
 }
 
 @media (max-width: 600px) {
@@ -18998,6 +19043,349 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
 .mvb-icon {
   font-size: 18px;
   flex-shrink: 0;
+}
+
+/* SKITOUR EXPERTEN-ELEMENTE (KONSENS, ASPECT-FIRN, PHASEN, PACKLISTE, MUNTER-TOGGLE, NOTFALL) */
+.skitour-model-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.st-model-consensus-pill,
+.st-tendency-pill,
+.st-foehn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.st-model-consensus-pill {
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.st-tendency-pill {
+  background: rgba(148, 163, 184, 0.16);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.st-foehn-pill {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+.aspect-firn-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.afg-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.afg-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.afg-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.skitour-phase-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 13px 14px;
+  margin-bottom: 16px;
+}
+
+.spc-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.spc-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  color: #ffffff;
+}
+
+.st-optimal-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fef08a;
+  background: rgba(234, 179, 8, 0.18);
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.st-optimal-start-btn:hover {
+  background: rgba(234, 179, 8, 0.3);
+}
+
+.spc-split-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.spc-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.spc-box-label {
+  font-size: 10.5px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.spc-box-val {
+  font-size: 13px;
+  color: #f8fafc;
+}
+
+.spc-box-sub {
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.spc-whiteout-row {
+  font-size: 11.5px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  margin-bottom: 9px;
+}
+
+.spc-whiteout-row.is-warn {
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+}
+
+.skitour-gear-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.st-gear-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.st-gear-chip.prio-high {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+}
+
+.st-gear-chip.prio-warn {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fde68a;
+}
+
+.sssc-badges-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sssc-catchment-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  border-radius: 999px;
+  padding: 2.5px 8px;
+}
+
+.st-munter-group-toggle {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.st-munter-group-toggle.active {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #4ade80;
+}
+
+.skitour-emergency-btn,
+.sports-slope-overlay-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.skitour-emergency-btn {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.sports-slope-overlay-btn {
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.sports-slope-overlay-btn.active {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.24);
+  border-color: rgba(245, 158, 11, 0.55);
+}
+
+.emergency-modal-card {
+  max-width: 480px;
+}
+
+.em-coords-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  margin-bottom: 12px;
+}
+
+.em-box-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-transform: uppercase;
+}
+
+.em-coords-main {
+  font-size: 17px;
+  font-family: var(--font-mono);
+  color: #ffffff;
+}
+
+.em-coords-sub {
+  font-size: 11.5px;
+  color: #cbd5e1;
+}
+
+.em-numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.em-call-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  text-decoration: none;
+  color: inherit;
+}
+
+.em-country {
+  font-size: 10.5px;
+  color: #fecaca;
+}
+
+.em-num {
+  font-size: 20px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: #ffffff;
+}
+
+.em-sub {
+  font-size: 10.5px;
+  color: #e2e8f0;
+}
+
+.em-checklist-note {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+@media (max-width: 768px) {
+  .aspect-firn-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .spc-split-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {

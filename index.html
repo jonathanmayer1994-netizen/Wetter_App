@@ -1619,6 +1619,7 @@
                 <span>Routenverlauf</span>
               </div>
               <div class="sports-map-header-actions">
+                <button type="button" class="sports-slope-overlay-btn" id="sports-slope-overlay-btn" style="display: none;" aria-pressed="false" title="Steilgelände ≥ 30° (Gelb/Orange/Rot) auf Karte ein-/ausblenden">📐 Steilgelände</button>
                 <button type="button" class="sports-map-fullscreen-btn" id="sports-map-fullscreen-btn" title="Vollbildmodus öffnen" aria-label="Vollbildmodus öffnen">
                   <svg class="sm-fs-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 3 21 3 21 9"></polyline>
@@ -1651,6 +1652,7 @@
               </div>
               <div class="skitour-live-actions">
                 <span class="card-tag" id="skitour-agency-tag">EAWS / Albina / LWD</span>
+                <button type="button" class="skitour-emergency-btn" id="skitour-emergency-btn" title="Offline-Notfallkarte mit Koordinaten &amp; Alpiner Bergrettung öffnen">🆘 Notfall</button>
                 <button type="button" class="skitour-live-btn" id="skitour-live-refresh-btn" title="Aktuelle Wegpunkt- &amp; Schneedaten live für die GPX-Route laden">🔄 Live</button>
               </div>
             </div>
@@ -1668,6 +1670,11 @@
                 </div>
                 <div class="skitour-eaws-sub" id="skitour-eaws-elev">Gefahr vor allem über <strong>2.000 m</strong> • Kernproblem: <strong>Triebschnee</strong></div>
                 <div class="skitour-pattern-badge" id="skitour-pattern-badge">⚠️ GM 4: Kalt auf Warm / Triebschnee</div>
+                <div class="skitour-model-meta-row" id="skitour-model-meta-row">
+                  <span class="st-model-consensus-pill" id="skitour-model-consensus-pill" style="display: none;"></span>
+                  <span class="st-tendency-pill" id="skitour-tendency-pill" style="display: none;"></span>
+                  <span class="st-foehn-pill" id="skitour-foehn-pill" style="display: none;"></span>
+                </div>
               </div>
             </div>
 
@@ -1743,6 +1750,24 @@
               <div class="firn-timeline-track" id="firn-timeline-track">
                 <!-- Dynamisch erzeugte Stundenbalken -->
               </div>
+              <div class="aspect-firn-grid" id="skitour-aspect-firn-grid" style="display: none;">
+                <div class="afg-cell">
+                  <span class="afg-label">Ost / Südost</span>
+                  <strong class="afg-val" id="afg-ese">—</strong>
+                </div>
+                <div class="afg-cell">
+                  <span class="afg-label">Süd</span>
+                  <strong class="afg-val" id="afg-s">—</strong>
+                </div>
+                <div class="afg-cell">
+                  <span class="afg-label">West</span>
+                  <strong class="afg-val" id="afg-w">—</strong>
+                </div>
+                <div class="afg-cell">
+                  <span class="afg-label">Nord / Schatten</span>
+                  <strong class="afg-val" id="afg-n">—</strong>
+                </div>
+              </div>
             </div>
 
             <!-- SCHNEE- & NEUSCHNEE-DOSSIER GRID -->
@@ -1781,6 +1806,31 @@
               </div>
             </div>
 
+            <!-- AUFSTIEG / ABFAHRT SPLIT, HARSCHEISEN, WHITEOUT & STARTZEIT-OPTIMIERER -->
+            <div class="skitour-phase-card" id="skitour-phase-card" style="display: none;">
+              <div class="spc-top-row">
+                <div class="spc-title">
+                  <span>🧭</span>
+                  <strong>Touren-Phasen, Sicht &amp; Ausrüstung</strong>
+                </div>
+                <button type="button" class="st-optimal-start-btn" id="st-optimal-start-btn" style="display: none;" title="Empfohlene Startuhrzeit direkt übernehmen">⭐ Optimaler Start</button>
+              </div>
+              <div class="spc-split-grid">
+                <div class="spc-box">
+                  <span class="spc-box-label">Aufstieg &amp; Gipfel</span>
+                  <strong class="spc-box-val" id="st-phase-ascent">—</strong>
+                  <span class="spc-box-sub" id="st-phase-crampon">—</span>
+                </div>
+                <div class="spc-box">
+                  <span class="spc-box-label">Abfahrt &amp; Schneequalität</span>
+                  <strong class="spc-box-val" id="st-phase-descent">—</strong>
+                  <span class="spc-box-sub" id="st-phase-quality">—</span>
+                </div>
+              </div>
+              <div class="spc-whiteout-row" id="st-whiteout-row">👁️ Sichtweiten-Diagnose wird berechnet...</div>
+              <div class="skitour-gear-chips" id="skitour-gear-chips"></div>
+            </div>
+
             <!-- GPX ROUTEN-HANGNEIGUNG & MUNTER-SCAN -->
             <div class="skitour-slope-scan-card" id="skitour-slope-scan-card">
               <div class="sssc-header">
@@ -1789,7 +1839,10 @@
                   <strong>GPX-Hangneigungsanalyse (Munter 3x3 Check)</strong>
                   <span class="st-prov-badge prov-real" id="st-slope-prov-badge">🟢 ECHT (GPX-Track)</span>
                 </div>
-                <span class="sssc-max-badge" id="st-max-slope-badge">Max: 34°</span>
+                <div class="sssc-badges-right">
+                  <span class="sssc-catchment-badge" id="st-catchment-badge" style="display: none;"></span>
+                  <span class="sssc-max-badge" id="st-max-slope-badge">Max: 34°</span>
+                </div>
               </div>
               
               <div class="slope-spectrum-bar">
@@ -1809,9 +1862,10 @@
               <div class="munter-verdict-box" id="munter-verdict-box">
                 <span class="mvb-icon" id="mvb-icon">⚡</span>
                 <div class="mvb-text" id="mvb-text">
-                  <strong>Munter 3x3 Sicherheits-Check:</strong>
+                  <strong>Munter Reduktionsmethode Check:</strong>
                   <span id="st-munter-text">Route quert Steilhänge bis 34°. Bei Stufe 2 gut machbar mit Entlastungsabständen im Aufstieg.</span>
                 </div>
+                <button type="button" class="st-munter-group-toggle active" id="st-munter-group-toggle" aria-pressed="true" title="Zwischen Kleingruppe mit Entlastungsabstand (+3°) und Großgruppe / ohne Abstand umschalten">Kleingruppe</button>
               </div>
             </div>
 
@@ -3334,6 +3388,51 @@
           <a id="webcam-official-link" href="#" onclick="if(this.getAttribute('href')==='#') return false;" target="_blank" rel="noopener noreferrer" class="action-btn" style="display:none; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);">🏔️ Offizielle Gipfel-Livecam</a>
           <a id="webcam-external-link" href="#" target="_blank" rel="noopener noreferrer" class="action-btn">🔗 Auf bergfex.de ansehen</a>
           <button type="button" class="action-btn action-btn-secondary" id="webcam-modal-close-action" aria-label="Webcam schließen">✕ Schließen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL: ALPINE OFFLINE-NOTFALLKARTE (SKITOUR / BERG)                 -->
+  <!-- =================================================================== -->
+  <div class="modal-overlay" id="skitour-emergency-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="stem-title">
+    <div class="modal-card emergency-modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="stem-title">🆘 Alpine Notfallkarte (Offline-fähig)</div>
+        <button type="button" class="modal-close-btn" id="skitour-emergency-close" aria-label="Notfallkarte schließen">✕</button>
+      </div>
+      <div class="modal-body emergency-modal-body">
+        <div class="em-coords-box">
+          <span class="em-box-label">Aktuelle / Routen-Position (WGS84 &amp; UTM)</span>
+          <strong class="em-coords-main" id="em-coords-wgs84">—</strong>
+          <span class="em-coords-sub" id="em-coords-dms">—</span>
+          <span class="em-coords-sub" id="em-coords-ele">Höhe: — m • Nächster Talort: —</span>
+        </div>
+        <div class="em-numbers-grid">
+          <a href="tel:140" class="em-call-card">
+            <span class="em-country">Österreich</span>
+            <strong class="em-num">140</strong>
+            <span class="em-sub">Bergrettung</span>
+          </a>
+          <a href="tel:1414" class="em-call-card">
+            <span class="em-country">Schweiz</span>
+            <strong class="em-num">1414</strong>
+            <span class="em-sub">Rega Rettungsflugwacht</span>
+          </a>
+          <a href="tel:112" class="em-call-card">
+            <span class="em-country">Europaweit (DE/IT/FR/SI)</span>
+            <strong class="em-num">112</strong>
+            <span class="em-sub">Euronotruf / Alpin</span>
+          </a>
+          <a href="tel:118" class="em-call-card">
+            <span class="em-country">Italien / Südtirol</span>
+            <strong class="em-num">118</strong>
+            <span class="em-sub">Bergrettung (CNSAS)</span>
+          </a>
+        </div>
+        <div class="em-checklist-note">
+          <strong>Was im Notruf melden:</strong> Wer meldet? Was ist passiert? Wo genau (Koordinaten &amp; Höhe oben)? Wie viele Verletzte / Verschüttete? Wetter &amp; Landebedingungen für Hubschrauber!
         </div>
       </div>
     </div>
