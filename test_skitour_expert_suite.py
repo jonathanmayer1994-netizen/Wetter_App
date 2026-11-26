@@ -426,6 +426,68 @@ def run_skitour_suite():
         assert "italia_meteo_arpae_icon_2i" in subregions[4]["models"], "IT must prioritize ARPAE ICON-2I"
         print(f"✓ Skitour Pro Cockpit, Slope Overlay, Emergency Card & 7-Zone Pan-Alpine NWP Router verified ({', '.join(keys)})")
 
+        # 14. TEST 13: Map-Integrated Elevation Profile (Inline + Fullscreen + Mouse/Touch Scrubbing + Per-Sport Details)
+        print("\n--- TEST 13: Map-Integrated Elevation Profile (Normal & Fullscreen) ---")
+        assert page.query_selector("#sports-chart-wrapper") is None, "Legacy #sports-chart-wrapper must stay removed"
+        dock = page.locator("#sports-map-elevation-dock")
+        dock.scroll_into_view_if_needed()
+        page.wait_for_timeout(200)
+        assert dock.is_visible(), "Map elevation dock must be visible below map"
+        map_box = page.locator("#sports-map-stage").bounding_box()
+        dock_box = dock.bounding_box()
+        assert map_box and dock_box and dock_box["y"] >= map_box["y"] + map_box["height"] - 2, f"Dock must sit directly below map: map={map_box}, dock={dock_box}"
+
+        # Hover/Move across elevation profile (mouse without clicking) -> moves scrubber + map marker + HUD
+        chart_box = page.locator("#smed-chart-wrap").bounding_box()
+        assert chart_box and chart_box["width"] > 200
+        latlng_before = page.evaluate("() => window.state.sports.scrubberMarker?.getLatLng()")
+        page.mouse.move(chart_box["x"] + chart_box["width"] * 0.55, chart_box["y"] + chart_box["height"] * 0.5)
+        page.wait_for_timeout(150)
+        latlng_after = page.evaluate("() => window.state.sports.scrubberMarker?.getLatLng()")
+        assert latlng_after and (abs(latlng_after["lat"] - latlng_before["lat"]) > 1e-4 or abs(latlng_after["lng"] - latlng_before["lng"]) > 1e-4), "Mouse hover on profile must move GPX marker on map"
+        smed_pos_txt = page.inner_text("#smed-pos")
+        smed_met_txt = page.inner_text("#smed-metric")
+        assert "km" in smed_pos_txt and "m" in smed_pos_txt and "°" in smed_met_txt, f"Skitour profile HUD must show km, m and slope angle, got pos={smed_pos_txt}, met={smed_met_txt}"
+        assert page.is_visible("#scrubber-map-live-pill"), "Moving map pin must show live mini-badge"
+
+        # Verify sport-specific legend & HUD switching across Rad -> Berge -> Skitour
+        page.locator('.sports-route-preset[data-tour="allgaeu-radtour"]').click(force=True)
+        page.wait_for_function("() => window.state && window.state.sports && window.state.sports.category === 'bike' && document.getElementById('smed-legend')?.innerText.includes('Abfahrt')", timeout=8000)
+        page.wait_for_timeout(150)
+        assert "%" in page.inner_text("#smed-metric"), f"Bike profile HUD must show % grade, got: {page.inner_text('#smed-metric')}"
+
+        page.locator('.sports-route-preset[data-tour="skitour-sellrain"]').click(force=True)
+        page.wait_for_function("() => window.state && window.state.sports && window.state.sports.category === 'skitour' && document.getElementById('smed-legend')?.innerText.includes('<30°')", timeout=8000)
+        page.wait_for_timeout(200)
+
+        # Capture inline map + elevation profile screenshot
+        page.locator("#sports-map-card").scroll_into_view_if_needed()
+        page.wait_for_timeout(200)
+        chart_box = page.locator("#smed-chart-wrap").bounding_box()
+        page.mouse.move(chart_box["x"] + chart_box["width"] * 0.45, chart_box["y"] + chart_box["height"] * 0.5)
+        page.wait_for_timeout(150)
+        page.locator("#sports-map-card").screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_map_with_elevation_inline.png")
+
+        # Test Fullscreen Mode with Elevation Profile Dock + Collapse toggle
+        page.click("#sports-map-fullscreen-btn", force=True)
+        page.wait_for_timeout(250)
+        assert page.eval_on_selector("#sports-map-wrapper", "el => el.classList.contains('sports-map-fullscreen')")
+        fs_map_box = page.locator("#sports-map-stage").bounding_box()
+        fs_dock_box = dock.bounding_box()
+        assert fs_dock_box and fs_dock_box["y"] >= fs_map_box["y"] + fs_map_box["height"] - 2 and fs_dock_box["y"] + fs_dock_box["height"] <= 902, f"Fullscreen dock must stay at bottom of viewport: map={fs_map_box}, dock={fs_dock_box}"
+        page.screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_map_with_elevation_fullscreen.png")
+
+        page.click("#smed-collapse-btn", force=True)
+        page.wait_for_timeout(120)
+        assert dock.evaluate("el => el.classList.contains('is-collapsed')") and not page.is_visible("#smed-chart-wrap"), "Collapse button must hide chart canvas in fullscreen"
+        page.click("#smed-collapse-btn", force=True)
+        page.wait_for_timeout(120)
+        assert not dock.evaluate("el => el.classList.contains('is-collapsed')") and page.is_visible("#smed-chart-wrap")
+
+        page.click("#sports-map-close-btn", force=True)
+        page.wait_for_timeout(200)
+        print("✓ Map-Integrated Elevation Profile (Inline, Fullscreen, Mouse Hover Scrubbing, Sport-Specific HUD & Collapse) verified!")
+
         context.close()
         browser.close()
         print("\n==========================================")

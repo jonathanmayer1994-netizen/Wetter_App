@@ -1086,10 +1086,80 @@ export function setupSportsTab() {
 
   // Window Resize: Scrubber & HUD Position neu synchronisieren
   window.addEventListener('resize', () => {
-    if (state.sports && state.sports.timeline && state.sports.scrubberKm !== undefined) {
-      updateSportsScrubber(state.sports.scrubberKm);
+    if (state.sports && state.sports.timeline) {
+      renderSportsMapElevationProfile(state.sports.timeline);
+      if (state.sports.scrubberKm !== undefined) {
+        updateSportsScrubber(state.sports.scrubberKm);
+      }
     }
   });
+
+  // Interaktives Karten-Höhenprofil (Touch-Ziehen, Maus-Hover ohne Klicken & Einklappen)
+  const mapChartWrap = document.getElementById('smed-chart-wrap');
+  const mapDock = document.getElementById('sports-map-elevation-dock');
+  const mapCollapseBtn = document.getElementById('smed-collapse-btn');
+
+  if (mapCollapseBtn && mapDock) {
+    mapCollapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const collapsed = mapDock.classList.toggle('is-collapsed');
+      mapCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      mapCollapseBtn.innerText = collapsed ? '▴ Profil' : '▾ Profil';
+      setTimeout(() => {
+        if (state.sports.map) state.sports.map.invalidateSize();
+        if (!collapsed && state.sports.timeline) {
+          renderSportsMapElevationProfile(state.sports.timeline);
+          updateSportsScrubber(state.sports.scrubberKm || 0);
+        }
+      }, 40);
+    });
+  }
+
+  if (mapChartWrap) {
+    let isDraggingProfile = false;
+    const scrubAtClientX = (clientX) => {
+      const tl = state.sports.timeline;
+      if (!tl) return;
+      const rect = mapChartWrap.getBoundingClientRect();
+      if (!rect.width) return;
+      const m = state.sports._mapProfileMetrics;
+      const padL = m ? m.padL : 42;
+      const plotW = m ? Math.max(10, m.plotW) : Math.max(10, rect.width - 52);
+      const localX = (clientX - rect.left) - padL;
+      const pct = Math.max(0, Math.min(1, localX / plotW));
+      const km = pct * Math.max(0.1, tl.totalDistanceKm || 0);
+      updateSportsScrubber(km, { fromProfile: true });
+      if (state.sports.trackingActive) {
+        updateInFlightProgress(km);
+      }
+    };
+
+    mapChartWrap.addEventListener('pointerdown', (e) => {
+      isDraggingProfile = true;
+      try { mapChartWrap.setPointerCapture(e.pointerId); } catch (_) { }
+      scrubAtClientX(e.clientX);
+    });
+
+    mapChartWrap.addEventListener('pointermove', (e) => {
+      if (isDraggingProfile || e.pointerType === 'mouse') {
+        scrubAtClientX(e.clientX);
+      }
+    });
+
+    const endDrag = () => { isDraggingProfile = false; };
+    mapChartWrap.addEventListener('pointerup', endDrag);
+    mapChartWrap.addEventListener('pointercancel', endDrag);
+
+    mapChartWrap.addEventListener('keydown', (e) => {
+      const tl = state.sports.timeline;
+      if (!tl) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const step = (tl.totalDistanceKm || 1) * 0.025 * (e.key === 'ArrowRight' ? 1 : -1);
+        updateSportsScrubber((state.sports.scrubberKm || 0) + step, { fromProfile: true });
+      }
+    });
+  }
 }
 
 export async function initSportsTour() {
@@ -2226,6 +2296,8 @@ export function renderSportsElevationProfile(timeline) {
   const peakMs = timeline.milestones ? timeline.milestones.find(m => m.ele === timeline.maxElevationM) : null;
   timeline.peakKm = peakMs ? peakMs.distFromStartKm : (timeline.totalDistanceKm / 2);
 
+  renderSportsMapElevationProfile(timeline);
+
   const svg = document.getElementById('sports-elevation-svg');
   if (!svg) return;
 
@@ -2313,6 +2385,345 @@ export function renderSportsElevationProfile(timeline) {
     <line id="svg-scrubber-line" x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#ffd166" stroke-width="2" stroke-dasharray="3 3" opacity="0.9" />
     <circle id="svg-scrubber-dot" cx="${padL}" cy="${getY(pts[0].ele)}" r="6" fill="#ffd166" stroke="#ffffff" stroke-width="2" />
   `;
+}
+
+function getProfileSegmentStyle(pt, gradPct, category) {
+  if (category === 'skitour') {
+    const deg = pt.slopeDeg || 0;
+    if (deg >= 40) return '#ef4444';
+    if (deg >= 35) return '#f97316';
+    if (deg >= 30) return '#eab308';
+    return '#22c55e';
+  }
+  if (category === 'bike') {
+    if (gradPct < -4) return '#2dd4bf';
+    if (gradPct < 3) return '#38bdf8';
+    if (gradPct < 7) return '#eab308';
+    if (gradPct < 11) return '#f97316';
+    return '#ef4444';
+  }
+  // Berge / Wandern / Trailrun
+  if (gradPct < -12) return '#30d158';
+  if (gradPct <= 12) return '#38bdf8';
+  if (gradPct <= 25) return '#eab308';
+  return '#f97316';
+}
+
+export function renderSportsMapElevationProfile(timeline) {
+  const dock = document.getElementById('sports-map-elevation-dock');
+  const wrap = document.getElementById('smed-chart-wrap');
+  const canvas = document.getElementById('sports-map-elevation-canvas');
+  const legendEl = document.getElementById('smed-legend');
+  if (!dock || !wrap || !canvas || !timeline || !Array.isArray(timeline.timedPoints) || timeline.timedPoints.length < 2) {
+    if (dock) dock.style.display = 'none';
+    return;
+  }
+  dock.style.display = 'flex';
+
+  // ResizeObserver einmalig anbinden (für Normal <-> Vollbild & Window-Resize)
+  if (!wrap.dataset.roBound && typeof ResizeObserver !== 'undefined') {
+    wrap.dataset.roBound = '1';
+    const ro = new ResizeObserver(() => {
+      if (state.sports && state.sports.timeline) {
+        drawSportsMapProfileCanvas(state.sports.timeline);
+        updateSportsScrubber(state.sports.scrubberKm || 0);
+      }
+    });
+    ro.observe(wrap);
+  }
+
+  // Sportart-spezifische Kompakte Legende aktualisieren
+  if (legendEl) {
+    const cat = timeline.category || 'mountain';
+    if (cat === 'skitour') {
+      legendEl.innerHTML = [
+        ['#22c55e', '<30°'],
+        ['#eab308', '30–34°'],
+        ['#f97316', '35–39°'],
+        ['#ef4444', '≥40°']
+      ].map(([c, lbl]) => `<span class="smed-leg-item"><span class="smed-leg-dot" style="background:${c}"></span>${lbl}</span>`).join('');
+    } else if (cat === 'bike') {
+      legendEl.innerHTML = [
+        ['#2dd4bf', 'Abfahrt'],
+        ['#38bdf8', '<3%'],
+        ['#eab308', '3–6%'],
+        ['#f97316', '7–10%'],
+        ['#ef4444', '≥11%']
+      ].map(([c, lbl]) => `<span class="smed-leg-item"><span class="smed-leg-dot" style="background:${c}"></span>${lbl}</span>`).join('');
+    } else {
+      legendEl.innerHTML = [
+        ['#30d158', 'Abstieg'],
+        ['#38bdf8', 'Pfad'],
+        ['#eab308', '>12%'],
+        ['#f97316', '>25%']
+      ].map(([c, lbl]) => `<span class="smed-leg-item"><span class="smed-leg-dot" style="background:${c}"></span>${lbl}</span>`).join('');
+    }
+  }
+
+  drawSportsMapProfileCanvas(timeline);
+}
+
+function drawSportsMapProfileCanvas(timeline) {
+  const wrap = document.getElementById('smed-chart-wrap');
+  const canvas = document.getElementById('sports-map-elevation-canvas');
+  if (!wrap || !canvas || !timeline || !Array.isArray(timeline.timedPoints) || timeline.timedPoints.length < 2) return;
+
+  const rect = wrap.getBoundingClientRect();
+  const W = Math.max(240, Math.round(rect.width));
+  const H = Math.max(70, Math.round(rect.height));
+  if (W <= 0 || H <= 0) return;
+
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const pts = timeline.timedPoints;
+  const totalDist = Math.max(0.1, timeline.totalDistanceKm || pts[pts.length - 1].distFromStartKm || 1);
+  const rawMin = timeline.minElevationM !== undefined ? timeline.minElevationM : Math.min(...pts.map(p => p.ele));
+  const rawMax = timeline.maxElevationM !== undefined ? timeline.maxElevationM : Math.max(...pts.map(p => p.ele));
+  const padEle = Math.max(30, Math.round((rawMax - rawMin) * 0.12));
+  const minZ = Math.max(0, Math.floor((rawMin - padEle) / 25) * 25);
+  const maxZ = Math.ceil((rawMax + padEle) / 25) * 25;
+  const rangeZ = Math.max(40, maxZ - minZ);
+
+  const padL = 42;
+  const padR = 12;
+  const padT = 14;
+  const padB = 16;
+  const plotW = Math.max(40, W - padL - padR);
+  const plotH = Math.max(30, H - padT - padB);
+
+  const getX = (km) => padL + (Math.max(0, Math.min(totalDist, km)) / totalDist) * plotW;
+  const getY = (ele) => padT + plotH - ((ele - minZ) / rangeZ) * plotH;
+
+  // Segment-Steigung in % (mind. 15 m Horizontalbasis für stabile Steigungsfarbe & HUD)
+  const segGrades = new Float32Array(pts.length);
+  for (let i = 1; i < pts.length; i++) {
+    let win = i - 1;
+    while (win > 0 && ((pts[i].distFromStartKm || 0) - (pts[win].distFromStartKm || 0)) < 0.015) {
+      win--;
+    }
+    const dxM = Math.max(15, ((pts[i].distFromStartKm || 0) - (pts[win].distFromStartKm || 0)) * 1000);
+    const dzM = pts[i].ele - pts[win].ele;
+    segGrades[i] = Math.round((dzM / dxM) * 1000) / 10;
+  }
+
+  state.sports._mapProfileMetrics = {
+    W, H, padL, padR, padT, padB, plotW, plotH, minZ, maxZ, rangeZ, totalDist, segGrades, timeline
+  };
+
+  // 1. Dezentes Höhen-Grid & Achsenbeschriftung
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  [0, 0.5, 1].forEach((f, idx) => {
+    const y = Math.round(padT + plotH * (1 - f)) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+    const zVal = Math.round(minZ + rangeZ * f);
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
+    ctx.font = '600 9px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = idx === 2 ? 'top' : (idx === 0 ? 'bottom' : 'middle');
+    ctx.fillText(`${zVal}m`, padL - 5, idx === 2 ? y - 2 : (idx === 0 ? y + 2 : y));
+  });
+
+  // Distanz-Labels unten
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.78)';
+  ctx.font = '600 9px JetBrains Mono, monospace';
+  ctx.textBaseline = 'bottom';
+  ctx.textAlign = 'left';
+  ctx.fillText('0 km', padL, H - 2);
+  ctx.textAlign = 'center';
+  ctx.fillText(`${(totalDist / 2).toFixed(1)} km`, padL + plotW / 2, H - 2);
+  ctx.textAlign = 'right';
+  ctx.fillText(`${totalDist.toFixed(1)} km`, W - padR, H - 2);
+
+  const cat = timeline.category || 'mountain';
+  const av = timeline.avalancheReport;
+
+  // 2. Whiteout-/Nebel-Höhenband (Berge & Skitour)
+  if ((cat === 'skitour' || cat === 'mountain') && timeline.whiteoutAnalysis?.active && timeline.whiteoutAnalysis.minElevationM) {
+    const woEle = timeline.whiteoutAnalysis.minElevationM;
+    if (woEle < maxZ) {
+      const yWo = Math.max(padT, Math.min(padT + plotH, getY(woEle)));
+      ctx.fillStyle = 'rgba(203, 213, 225, 0.08)';
+      ctx.fillRect(padL, padT, plotW, yWo - padT);
+    }
+  }
+
+  // 3. Flächen-Verlauf unter der Höhenkurve
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(getX(pts[0].distFromStartKm), padT + plotH);
+  for (let i = 0; i < pts.length; i++) {
+    ctx.lineTo(getX(pts[i].distFromStartKm), getY(pts[i].ele));
+  }
+  ctx.lineTo(getX(pts[pts.length - 1].distFromStartKm), padT + plotH);
+  ctx.closePath();
+  const fillGrad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+  fillGrad.addColorStop(0, cat === 'skitour' ? 'rgba(56, 189, 248, 0.28)' : 'rgba(0, 140, 255, 0.30)');
+  fillGrad.addColorStop(1, 'rgba(15, 23, 42, 0.04)');
+  ctx.fillStyle = fillGrad;
+  ctx.fill();
+
+  // Niederschlags-Schattierung für Rad & Berge
+  if (cat !== 'skitour' && Array.isArray(timeline.milestones) && timeline.milestones.length > 1) {
+    ctx.clip();
+    const ms = timeline.milestones;
+    for (let i = 0; i < ms.length; i++) {
+      if ((ms[i].precipMm || 0) >= 0.3 || ms[i].weatherCode >= 95) {
+        const x0 = getX(i === 0 ? 0 : (ms[i - 1].distFromStartKm + ms[i].distFromStartKm) / 2);
+        const x1 = getX(i === ms.length - 1 ? totalDist : (ms[i].distFromStartKm + ms[i + 1].distFromStartKm) / 2);
+        ctx.fillStyle = ms[i].weatherCode >= 95 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(56, 189, 248, 0.22)';
+        ctx.fillRect(x0, padT, Math.max(4, x1 - x0), plotH);
+      }
+    }
+  }
+  ctx.restore();
+
+  // 4. Sportartspezifische alpine Referenzlinien
+  const drawRefLine = (eleM, color, labelTxt, alignRight = true) => {
+    if (typeof eleM !== 'number' || eleM <= minZ || eleM >= maxZ) return;
+    const y = Math.round(getY(eleM)) + 0.5;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+    ctx.font = '700 9px Plus Jakarta Sans, sans-serif';
+    const tw = ctx.measureText(labelTxt).width;
+    const tx = alignRight ? W - padR - 6 : padL + 6;
+    const bx = alignRight ? tx - tw - 6 : tx - 3;
+    const by = Math.max(padT, y - 13);
+    ctx.fillStyle = 'rgba(9, 14, 24, 0.82)';
+    ctx.fillRect(bx, by, tw + 9, 12);
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = alignRight ? 'right' : 'left';
+    ctx.fillText(labelTxt, tx, by + 1);
+    ctx.restore();
+  };
+
+  if (cat === 'skitour' && av) {
+    drawRefLine(av.criticalElevation, 'rgba(245, 158, 11, 0.9)', `⚠️ Kernhöhe ${Math.round(av.criticalElevation)}m`, true);
+    drawRefLine(av.skiableSnowlineM, 'rgba(56, 189, 248, 0.85)', `❄️ Schneegrenze ${Math.round(av.skiableSnowlineM)}m`, false);
+  } else if (cat === 'mountain' && Array.isArray(timeline.milestones) && timeline.milestones.length > 0) {
+    const fl = timeline.milestones[Math.floor(timeline.milestones.length / 2)].freezingLevelM;
+    drawRefLine(fl, 'rgba(96, 165, 250, 0.85)', `❄️ 0°-Grenze ${Math.round(fl)}m`, true);
+  }
+
+  // Skitour: Vertikaler Aufstiegs-/Abfahrts-Split am Gipfel (unten im Plot, kollisionsfrei zum Gipfel-Pin & Tooltip)
+  if (cat === 'skitour' && timeline.peakKm > 0.15 && timeline.peakKm < totalDist - 0.15) {
+    const xPk = Math.round(getX(timeline.peakKm)) + 0.5;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(xPk, padT);
+    ctx.lineTo(xPk, padT + plotH);
+    ctx.stroke();
+    ctx.font = '600 9px Plus Jakarta Sans, sans-serif';
+    ctx.fillStyle = 'rgba(226, 232, 240, 0.82)';
+    ctx.textBaseline = 'bottom';
+    const labelY = padT + plotH - 4;
+    if (xPk - padL > 75) {
+      ctx.textAlign = 'right';
+      ctx.fillText('🧗 Aufstieg', xPk - 6, labelY);
+    }
+    if ((W - padR) - xPk > 75) {
+      ctx.textAlign = 'left';
+      const asp = timeline.phaseAnalysis?.dominantDescentAspect || '';
+      ctx.fillText(`⛷️ Abfahrt${asp ? ` (${asp})` : ''}`, xPk + 6, labelY);
+    }
+    ctx.restore();
+  }
+
+  // 5. Farbcodierte Höhenprofil-Linie je nach Sportart
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([]);
+  for (let i = 1; i < pts.length; i++) {
+    ctx.strokeStyle = getProfileSegmentStyle(pts[i], segGrades[i], cat);
+    ctx.beginPath();
+    ctx.moveTo(getX(pts[i - 1].distFromStartKm), getY(pts[i - 1].ele));
+    ctx.lineTo(getX(pts[i].distFromStartKm), getY(pts[i].ele));
+    ctx.stroke();
+  }
+
+  // 6. Wegpunkt-Dots (EAWS/Munter bei Skitour, Wind/Gewitter bei Rad/Berg) & Gipfel-Marker
+  let peakPt = pts[0];
+  for (const p of pts) {
+    if (p.ele > peakPt.ele) peakPt = p;
+  }
+
+  if (Array.isArray(timeline.milestones)) {
+    const wide = W >= 640;
+    timeline.milestones.forEach((m, idx) => {
+      if (idx === 0 || idx === timeline.milestones.length - 1) return;
+      const mx = getX(m.distFromStartKm);
+      const my = getY(m.ele);
+      let dotFill = '#38bdf8';
+      let warnRing = false;
+      if (cat === 'skitour' && m.avalancheColor) {
+        dotFill = m.avalancheColor;
+        warnRing = !!(m.exceedsMunterLimit || m.inProblemCoreZone);
+      } else if (m.weatherCode >= 95 || m.gustsKmH >= 50) {
+        dotFill = '#ef4444';
+        warnRing = true;
+      } else if (cat === 'bike' && m.relWindType === 'headwind' && m.relWindKmH >= 20) {
+        dotFill = '#f97316';
+      }
+      if (warnRing) {
+        ctx.beginPath();
+        ctx.arc(mx, my, 5.5, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(mx, my, 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = dotFill;
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      if (wide && m.weatherCode >= 95) {
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('⚡', mx, my - 6);
+      }
+    });
+  }
+
+  // Gipfel-Highlight-Pin
+  const px = getX(peakPt.distFromStartKm);
+  const py = getY(peakPt.ele);
+  ctx.beginPath();
+  ctx.arc(px, py, 4.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffd166';
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = '#fef08a';
+  ctx.font = '700 9.5px Plus Jakarta Sans, sans-serif';
+  ctx.textAlign = px > W - 65 ? 'right' : (px < padL + 45 ? 'left' : 'center');
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(`🏔️ ${Math.round(peakPt.ele)}m`, px, Math.max(11, py - 5));
 }
 
 export function renderSportsWaypointsTable(timeline) {
@@ -2641,6 +3052,10 @@ export function openSportsMapFullscreen() {
         });
       }
     }
+    if (state.sports.timeline) {
+      renderSportsMapElevationProfile(state.sports.timeline);
+      updateSportsScrubber(state.sports.scrubberKm || 0);
+    }
   }, 80);
 }
 
@@ -2659,6 +3074,10 @@ export function closeSportsMapFullscreen() {
           padding: [25, 25]
         });
       }
+    }
+    if (state.sports.timeline) {
+      renderSportsMapElevationProfile(state.sports.timeline);
+      updateSportsScrubber(state.sports.scrubberKm || 0);
     }
   }, 80);
 }
@@ -2899,7 +3318,7 @@ export function renderSportsMap(timeline) {
         : (timeline.category === 'skitour' || timeline.sportType === 'ski_touring' || timeline.sportType === 'skimo' ? '⛷️' : '🥾')));
   const scrubberIcon = L.divIcon({
     className: 'sports-scrubber-map-marker',
-    html: `<div class="scrubber-pin-static">${athleteIcon}</div>`,
+    html: `<div class="scrubber-pin-wrap"><div class="scrubber-live-pill" id="scrubber-map-live-pill" style="display:none;"></div><div class="scrubber-pin-static">${athleteIcon}</div></div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18]
   });
@@ -3024,7 +3443,7 @@ export async function renderSportsSlopeOverlay(timeline) {
   } catch (_) {}
 }
 
-export function updateSportsScrubber(km) {
+export function updateSportsScrubber(km, opts = {}) {
   const timeline = state.sports.timeline;
   if (!timeline || !timeline.timedPoints || timeline.timedPoints.length === 0) return;
 
@@ -3043,14 +3462,16 @@ export function updateSportsScrubber(km) {
     sliderTotal.innerText = `${totalDist.toFixed(1)} km`;
   }
 
-  // Finde nächsten berechneten Punkt
+  // Finde nächsten berechneten Punkt inkl. Index
   let closestPt = timeline.timedPoints[0];
+  let closestPtIdx = 0;
   let minDiff = Infinity;
   for (let i = 0; i < timeline.timedPoints.length; i++) {
     const diff = Math.abs(timeline.timedPoints[i].distFromStartKm - clampedKm);
     if (diff < minDiff) {
       minDiff = diff;
       closestPt = timeline.timedPoints[i];
+      closestPtIdx = i;
     }
   }
 
@@ -3198,9 +3619,93 @@ export function updateSportsScrubber(km) {
     svgDot.setAttribute('cy', y.toFixed(1));
   }
 
-  // Map Marker synchronisieren
+  // Map Marker + Live-Mini-Badge synchronisieren
   if (state.sports.scrubberMarker) {
     state.sports.scrubberMarker.setLatLng([closestPt.lat, closestPt.lon]);
+    const livePinPill = document.getElementById('scrubber-map-live-pill');
+    if (livePinPill) {
+      const cat = timeline.category || 'mountain';
+      const eawsTxt = (cat === 'skitour' && closestMs.avalancheLevel) ? ` • ~${closestMs.avalancheLevel}/5` : '';
+      livePinPill.innerText = `${Math.round(closestPt.ele).toLocaleString('de-DE')} m • ${closestMs.tempC}°${eawsTxt}`;
+      livePinPill.style.display = 'block';
+    }
+    if (opts && opts.fromProfile && state.sports.map && document.getElementById('sports-map-wrapper')?.classList.contains('sports-map-fullscreen')) {
+      const b = state.sports.map.getBounds();
+      if (b && !b.pad(-0.08).contains([closestPt.lat, closestPt.lon])) {
+        state.sports.map.panTo([closestPt.lat, closestPt.lon], { animate: false });
+      }
+    }
+  }
+
+  // Karten-Höhenprofil-Dock: Fadenkreuz & sportartspezifische Live-HUD synchronisieren
+  const pm = state.sports._mapProfileMetrics;
+  const chLine = document.getElementById('smed-crosshair-line');
+  const chDot = document.getElementById('smed-crosshair-dot');
+  const chTip = document.getElementById('smed-crosshair-tooltip');
+  const smedPos = document.getElementById('smed-pos');
+  const smedMet = document.getElementById('smed-metric');
+  const smedWea = document.getElementById('smed-weather');
+  const smedExt = document.getElementById('smed-extra');
+
+  const curGrad = (pm && pm.segGrades && pm.segGrades[closestPtIdx] !== undefined) ? pm.segGrades[closestPtIdx] : 0;
+  const cat = timeline.category || 'mountain';
+
+  if (smedPos) {
+    smedPos.innerText = `📍 km ${closestPt.distFromStartKm.toFixed(1)} • ${Math.round(closestPt.ele).toLocaleString('de-DE')} m`;
+  }
+  if (smedMet) {
+    if (cat === 'skitour') {
+      const slopeVal = closestPt.slopeDeg ? `${closestPt.slopeDeg}°` : `${Math.round(Math.abs(curGrad))}%`;
+      const aspVal = closestPt.terrainAspectSector ? ` (${closestPt.terrainAspectSector})` : '';
+      const phaseTxt = (timeline.peakKm && clampedKm > timeline.peakKm + 0.1) ? 'Abfahrt' : 'Aufstieg';
+      smedMet.innerText = `📐 ${slopeVal}${aspVal} • ${phaseTxt}`;
+      smedMet.style.background = (closestPt.slopeDeg || 0) >= 35 ? 'rgba(249, 115, 22, 0.24)' : ((closestPt.slopeDeg || 0) >= 30 ? 'rgba(234, 179, 8, 0.20)' : 'rgba(34, 197, 94, 0.18)');
+      smedMet.style.color = (closestPt.slopeDeg || 0) >= 35 ? '#fdba74' : ((closestPt.slopeDeg || 0) >= 30 ? '#fef08a' : '#86efac');
+    } else {
+      const gSign = curGrad > 0 ? `+${curGrad.toFixed(0)}` : `${curGrad.toFixed(0)}`;
+      smedMet.innerText = `${curGrad >= 0 ? '↗' : '↘'} ${gSign}%`;
+      smedMet.style.background = Math.abs(curGrad) >= 10 ? 'rgba(249, 115, 22, 0.22)' : 'rgba(56, 189, 248, 0.16)';
+      smedMet.style.color = Math.abs(curGrad) >= 10 ? '#fdba74' : '#7dd3fc';
+    }
+  }
+  if (smedWea) {
+    smedWea.innerText = `⏱️ ${arrStr} Uhr • ${closestMs.weatherIcon} ${closestMs.tempC}°C • 💨 ${closestMs.windKmH} km/h`;
+  }
+  if (smedExt) {
+    if (cat === 'skitour' && closestMs.avalancheLevel) {
+      smedExt.style.display = 'inline-flex';
+      smedExt.style.background = closestMs.avalancheColor;
+      smedExt.style.color = closestMs.avalancheTextColor;
+      smedExt.innerText = `${closestMs.exceedsMunterLimit ? '⚠️ ' : ''}${closestMs.avalancheLevel}/5${closestMs.grmLimitDeg ? ` (Limit ${closestMs.grmLimitDeg}°)` : ''}`;
+    } else if (cat === 'bike' && closestMs.relWindBadge) {
+      smedExt.style.display = 'inline-flex';
+      smedExt.style.background = 'rgba(255, 255, 255, 0.09)';
+      smedExt.style.color = '#f8fafc';
+      smedExt.innerText = closestMs.descentWindchillC <= 5 && curGrad < -3
+        ? `🥶 Abfahrt ${closestMs.descentWindchillC}°C`
+        : closestMs.relWindBadge;
+    } else if (cat === 'mountain' && closestMs.isSnow) {
+      smedExt.style.display = 'inline-flex';
+      smedExt.style.background = 'rgba(56, 189, 248, 0.18)';
+      smedExt.style.color = '#bae6fd';
+      smedExt.innerText = '❄️ Frostzone';
+    } else {
+      smedExt.style.display = 'none';
+    }
+  }
+
+  if (pm && chLine && chDot && chTip) {
+    const cx = pm.padL + (Math.max(0, Math.min(pm.totalDist, clampedKm)) / pm.totalDist) * pm.plotW;
+    const cy = pm.padT + pm.plotH - ((closestPt.ele - pm.minZ) / pm.rangeZ) * pm.plotH;
+    chLine.style.display = 'block';
+    chLine.style.left = `${cx.toFixed(1)}px`;
+    chDot.style.display = 'block';
+    chDot.style.left = `${cx.toFixed(1)}px`;
+    chDot.style.top = `${cy.toFixed(1)}px`;
+    chTip.style.display = 'block';
+    chTip.innerText = `${Math.round(closestPt.ele)} m • ${arrStr}`;
+    const tipLeft = Math.max(pm.padL + 2, Math.min(pm.W - 96, cx - 42));
+    chTip.style.left = `${tipLeft.toFixed(1)}px`;
   }
 
   // Wegpunkt-Zeile in Tabelle hervorheben (ohne Seiten-Scroll-Jump auf Mobile)

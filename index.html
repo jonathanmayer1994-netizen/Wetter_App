@@ -1632,14 +1632,38 @@
             </div>
 
             <div class="sports-map-wrapper" id="sports-map-wrapper">
-              <div id="sports-map-container" class="sports-map-container"></div>
-              <div class="sports-map-center-hud" id="sports-map-center-hud" style="display: none;">
-                <div class="sm-hud-time" id="sm-hud-time">-- Std.</div>
-                <div class="sm-hud-dist" id="sm-hud-dist">-- km</div>
+              <div class="sports-map-stage" id="sports-map-stage">
+                <div id="sports-map-container" class="sports-map-container"></div>
+                <div class="sports-map-center-hud" id="sports-map-center-hud" style="display: none;">
+                  <div class="sm-hud-time" id="sm-hud-time">-- Std.</div>
+                  <div class="sm-hud-dist" id="sm-hud-dist">-- km</div>
+                </div>
+                <button type="button" class="sports-map-close-btn" id="sports-map-close-btn" aria-label="Vollbild schließen" title="Vollbild schließen">
+                  ✕
+                </button>
               </div>
-              <button type="button" class="sports-map-close-btn" id="sports-map-close-btn" aria-label="Vollbild schließen" title="Vollbild schließen">
-                ✕
-              </button>
+
+              <!-- KARTEN-INTEGRIERTES HÖHENPROFIL (NORMALANSICHT & VOLLBILDMODUS) -->
+              <div class="sports-map-elevation-dock" id="sports-map-elevation-dock" style="display: none;">
+                <div class="smed-header">
+                  <div class="smed-hud" id="smed-hud">
+                    <span class="smed-hud-pos" id="smed-pos">📍 km 0.0 • -- m</span>
+                    <span class="smed-hud-metric" id="smed-metric">--</span>
+                    <span class="smed-hud-weather" id="smed-weather">⏱️ --:-- Uhr • --°C</span>
+                    <span class="smed-hud-extra" id="smed-extra" style="display: none;"></span>
+                  </div>
+                  <div class="smed-right">
+                    <div class="smed-legend" id="smed-legend"></div>
+                    <button type="button" class="smed-collapse-btn" id="smed-collapse-btn" aria-expanded="true" title="Höhenprofil ein-/ausklappen">▾ Profil</button>
+                  </div>
+                </div>
+                <div class="smed-chart-wrap" id="smed-chart-wrap" role="slider" aria-label="Interaktives Höhenprofil der Tour" tabindex="0">
+                  <canvas id="sports-map-elevation-canvas" class="sports-map-elevation-canvas"></canvas>
+                  <div class="smed-crosshair-line" id="smed-crosshair-line" style="display: none;"></div>
+                  <div class="smed-crosshair-dot" id="smed-crosshair-dot" style="display: none;"></div>
+                  <div class="smed-crosshair-tooltip" id="smed-crosshair-tooltip" style="display: none;"></div>
+                </div>
+              </div>
             </div>
           </section>
 
