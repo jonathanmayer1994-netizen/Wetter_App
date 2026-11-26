@@ -22,7 +22,7 @@ pages:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
     - mkdir -p public
-    - cp -r index.html manifest.json sw.js app.js style.css microEngine.js storage.js httpClient.js gpx.worker.js physics.worker.js version.json core features css public/
+    - cp -r index.html manifest.json sw.js app.js style.css microEngine.js storage.js httpClient.js gpx.worker.js background.worker.js physics.worker.js version.json core features vendor config public/
     - cp -f apple-touch-icon.png favicon.png icon-192.png icon-512.png logo.png public/ 2>/dev/null || true
     - echo "✓ Best Weather PWA erfolgreich für GitLab Pages gepackt."
   artifacts:

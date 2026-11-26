@@ -1,5 +1,5 @@
 {
-  "version": "2.42.0",
-  "build": "20261125-1836",
-  "notes": "Full-stack architecture hardening: strict HTTPS URL/OAuth/XSS guards, IDB singleton, barometric Wet-Bulb physics parity, 0ms Warm-Start strict cache, local vendored Leaflet, background wind CPU cutoff, orphaned css/ removal & worker fixes"
+  "version": "2.43.0",
+  "build": "20261126-0848",
+  "notes": "Pan-Alpine Skitour Pro Engine (7-zone NWP, CAAMLv6 CH/AT/BY/IT/FR/SI, 5 snow station networks), 2D DEM terrain & slope overlay, full-box accordion drawers, static top hazard banner, 100% slope distribution consistency, and interactive map-integrated elevation profile (inline + fullscreen)."
 }
