@@ -3264,7 +3264,7 @@ export function renderSportsMap(timeline) {
               <span class="sm-wind">💨 ${m.windKmH} km/h</span>
               ${m.precipMm > 0 ? `<span class="sm-dot">•</span><span class="sm-rain">💧 ${m.precipMm.toFixed(1)}mm</span>` : ''}
             </div>
-            ${isSkitour && m.avalancheLevel ? `<div class="ms-detailed-eaws"><span class="ms-eaws-pill" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">⚠️ Lawinenlagebericht Stufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})</span></div>` : ''}
+            ${isSkitour && m.avalancheLevel ? `<div class="ms-detailed-eaws"><span class="ms-eaws-pill" style="background:${m.avalancheColor};color:${m.avalancheTextColor};">⚠️ Lawinenstufe ${m.avalancheLevel}/5 (${escapeHtml(m.avalancheLabel)})</span></div>` : ''}
             <div class="sm-ref-arrow"></div>
           </div>
           <div class="sm-trail-dot ${isPeak ? 'dot-peak' : ''}"></div>

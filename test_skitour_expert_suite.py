@@ -475,6 +475,21 @@ def run_skitour_suite():
         fs_map_box = page.locator("#sports-map-stage").bounding_box()
         fs_dock_box = dock.bounding_box()
         assert fs_dock_box and fs_dock_box["y"] >= fs_map_box["y"] + fs_map_box["height"] - 2 and fs_dock_box["y"] + fs_dock_box["height"] <= 902, f"Fullscreen dock must stay at bottom of viewport: map={fs_map_box}, dock={fs_dock_box}"
+        overflow_bugs = page.evaluate("""() => {
+            const bad = [];
+            document.querySelectorAll('#sports-map-container .ms-detailed-card').forEach(card => {
+                const cr = card.getBoundingClientRect();
+                if (cr.width <= 0) return;
+                card.querySelectorAll('.ms-eaws-pill, .sm-ref-sub, .sm-ref-sub span').forEach(ch => {
+                    const r = ch.getBoundingClientRect();
+                    if (r.right > cr.right + 1 || r.left < cr.left - 1) {
+                        bad.push({ text: ch.innerText, childRight: r.right, cardRight: cr.right });
+                    }
+                });
+            });
+            return bad;
+        }""")
+        assert not overflow_bugs, f"Detailed waypoint cards must never overflow: {overflow_bugs}"
         page.screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_map_with_elevation_fullscreen.png")
 
         page.click("#smed-collapse-btn", force=True)
