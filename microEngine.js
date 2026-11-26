@@ -5686,6 +5686,10 @@ export const MicroEngine = {
     let slopeCount30to34 = 0;
     let slopeCount35to39 = 0;
     let slopeCountOver40 = 0;
+    let slopeDistUnder30 = 0;
+    let slopeDist30to34 = 0;
+    let slopeDist35to39 = 0;
+    let slopeDistOver40 = 0;
     let maxSlopeDeg = 0;
     let maxTrackSlopeDeg = 0;
     let maxTerrainSlopeDeg = 0;
@@ -5710,8 +5714,14 @@ export const MicroEngine = {
         const dzM = pt.ele - prev.ele;
         const grad = (dzM / (distKm * 1000)) * 100;
 
-        // Spur-Längsneigung + wahre 2D-Hangneigung via DEM
-        trackSlopeDeg = Math.round((Math.atan2(Math.abs(dzM), Math.max(1, distKm * 1000)) * (180 / Math.PI)) * 10) / 10;
+        // Spur-Längsneigung über mind. 15 m Horizontalbasis (verhindert GPS-Jitter-Spikes) + wahre 2D-Hangneigung via DEM
+        let slopeWinStart = i - 1;
+        while (slopeWinStart > 0 && ((pt.distFromStartKm || 0) - (points[slopeWinStart].distFromStartKm || 0)) < 0.015) {
+          slopeWinStart--;
+        }
+        const winDistM = Math.max(1, ((pt.distFromStartKm || 0) - (points[slopeWinStart].distFromStartKm || 0)) * 1000);
+        const winDzM = pt.ele - points[slopeWinStart].ele;
+        trackSlopeDeg = Math.round((Math.atan2(Math.abs(winDzM), Math.max(15, winDistM)) * (180 / Math.PI)) * 10) / 10;
         if (trackSlopeDeg > maxTrackSlopeDeg) maxTrackSlopeDeg = trackSlopeDeg;
         if (terrainSlopeDeg !== null && terrainSlopeDeg > maxTerrainSlopeDeg) maxTerrainSlopeDeg = terrainSlopeDeg;
         slopeDeg = Math.max(trackSlopeDeg, terrainSlopeDeg || 0);
@@ -5724,16 +5734,20 @@ export const MicroEngine = {
           slopeBand = '≥ 40° (Extremgelände)';
           slopeColor = '#ef4444';
           slopeCountOver40++;
+          slopeDistOver40 += distKm;
         } else if (slopeDeg >= 35) {
           slopeBand = '35–39° (Schlüsselstelle)';
           slopeColor = '#f97316';
           slopeCount35to39++;
+          slopeDist35to39 += distKm;
         } else if (slopeDeg >= 30) {
           slopeBand = '30–34° (Erheblichkeitsgrenze)';
           slopeColor = '#eab308';
           slopeCount30to34++;
+          slopeDist30to34 += distKm;
         } else {
           slopeCountUnder30++;
+          slopeDistUnder30 += distKm;
         }
 
         let segHours = 0;
@@ -5806,8 +5820,6 @@ export const MicroEngine = {
           }
         }
         cumulativeHours += Math.max(0.005, segHours);
-      } else {
-        slopeCountUnder30++;
       }
 
       const arrivalMs = startTimeMs + Math.round(cumulativeHours * 3600000);
@@ -5828,13 +5840,44 @@ export const MicroEngine = {
       });
     }
 
-    // Hangneigungs-Statistik für die gesamte Route (Munter-Reduktionsmethode inkl. 2D DEM)
-    const totalSlopePoints = Math.max(1, points.length);
+    // Hangneigungs-Statistik (streckengewichtet, immer Summe = 100% & >= 1% falls Segment in Klasse vorhanden)
+    const totalSlopeDistKm = slopeDistUnder30 + slopeDist30to34 + slopeDist35to39 + slopeDistOver40;
+    const useDistWeights = totalSlopeDistKm > 0;
+    const rawSlopeVals = [
+      { key: 'under30', count: slopeCountUnder30, weight: useDistWeights ? slopeDistUnder30 : slopeCountUnder30 },
+      { key: '30to34', count: slopeCount30to34, weight: useDistWeights ? slopeDist30to34 : slopeCount30to34 },
+      { key: '35to39', count: slopeCount35to39, weight: useDistWeights ? slopeDist35to39 : slopeCount35to39 },
+      { key: 'over40', count: slopeCountOver40, weight: useDistWeights ? slopeDistOver40 : slopeCountOver40 }
+    ];
+    const sumWeights = rawSlopeVals.reduce((s, b) => s + b.weight, 0);
+    const alloc = rawSlopeVals.map(b => {
+      if (sumWeights <= 0 || b.count === 0) return { ...b, pct: 0, rem: 0 };
+      const exact = (b.weight / sumWeights) * 100;
+      const base = Math.max(1, Math.floor(exact));
+      return { ...b, pct: base, rem: exact - base };
+    });
+    let allocSum = alloc.reduce((s, b) => s + b.pct, 0);
+    if (sumWeights <= 0) {
+      alloc[0].pct = 100;
+    } else {
+      while (allocSum < 100) {
+        const best = alloc.filter(b => b.count > 0).sort((a, b) => b.rem - a.rem)[0] || alloc[0];
+        best.pct += 1;
+        best.rem -= 1;
+        allocSum++;
+      }
+      while (allocSum > 100) {
+        const donor = alloc.filter(b => b.pct > (b.count > 0 ? 1 : 0)).sort((a, b) => b.pct - a.pct)[0];
+        if (!donor) break;
+        donor.pct -= 1;
+        allocSum--;
+      }
+    }
     const slopeStats = {
-      pctUnder30: Math.round((slopeCountUnder30 / totalSlopePoints) * 100),
-      pct30to34: Math.round((slopeCount30to34 / totalSlopePoints) * 100),
-      pct35to39: Math.round((slopeCount35to39 / totalSlopePoints) * 100),
-      pctOver40: Math.round((slopeCountOver40 / totalSlopePoints) * 100),
+      pctUnder30: alloc[0].pct,
+      pct30to34: alloc[1].pct,
+      pct35to39: alloc[2].pct,
+      pctOver40: alloc[3].pct,
       maxSlopeDeg,
       maxTrackSlopeDeg,
       maxTerrainSlopeDeg,

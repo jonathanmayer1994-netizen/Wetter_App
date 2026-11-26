@@ -154,7 +154,20 @@ def run_skitour_suite():
         munter_text = page.inner_text("#munter-verdict-box")
         assert "Max:" in max_slope and "°" in max_slope, f"Max slope badge must be rendered, got: {max_slope}"
         assert "Munter" in munter_text or "Hangneigung" in munter_text, f"Munter check text must be present, got: {munter_text}"
-        print(f"✓ GPX Slope Scan & Munter 3x3 Check verified ({max_slope})")
+        # Consistency guard: sum === 100% & maxSlope band MUST be >= 1%
+        p_u30 = int(page.inner_text("#st-pct-under30").replace("%", "").strip())
+        p_30 = int(page.inner_text("#st-pct-30to34").replace("%", "").strip())
+        p_35 = int(page.inner_text("#st-pct-35to39").replace("%", "").strip())
+        p_40 = int(page.inner_text("#st-pct-over40").replace("%", "").strip())
+        max_deg_val = float(max_slope.replace("Max:", "").replace("°", "").strip())
+        assert p_u30 + p_30 + p_35 + p_40 == 100, f"Slope bands must sum to 100%, got {p_u30}+{p_30}+{p_35}+{p_40}"
+        if max_deg_val >= 40:
+            assert p_40 >= 1, f"Max {max_deg_val}° requires >= 40° bucket >= 1%, got {p_40}%"
+        elif max_deg_val >= 35:
+            assert p_35 >= 1, f"Max {max_deg_val}° requires 35-39° bucket >= 1%, got {p_35}%"
+        elif max_deg_val >= 30:
+            assert p_30 >= 1, f"Max {max_deg_val}° requires 30-34° bucket >= 1%, got {p_30}%"
+        print(f"✓ GPX Slope Scan & Munter 3x3 Check verified ({max_slope}, {p_u30}%/{p_30}%/{p_35}%/{p_40}%)")
 
         # 6. Verify Per-Waypoint Lawinenlagebericht Scale Values (Map, Table, Elevation Profile)
         print("\n--- TEST 6: Per-Waypoint EAWS Scale Values ---")

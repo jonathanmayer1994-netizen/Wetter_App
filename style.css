@@ -1164,33 +1164,18 @@ body {
    ========================================================================== */
 /* Akuter Unwetter- & Gefahren-Banner */
 .hero-hazard-alert {
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.28), rgba(245, 158, 11, 0.24));
-  border: 1px solid rgba(239, 68, 68, 0.6);
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.24), rgba(245, 158, 11, 0.20));
+  border: 1px solid rgba(239, 68, 68, 0.55);
   border-radius: 18px;
   padding: 12px 18px;
-  margin-bottom: 14px;
+  margin-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.25);
-  animation: hazardPulse 3s infinite ease-in-out;
-}
-
-@keyframes hazardPulse {
-
-  0%,
-  100% {
-    border-color: rgba(239, 68, 68, 0.5);
-    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2);
-  }
-
-  50% {
-    border-color: rgba(245, 158, 11, 0.9);
-    box-shadow: 0 6px 26px rgba(245, 158, 11, 0.4);
-  }
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.22);
 }
 
 .hha-content {
@@ -1242,11 +1227,9 @@ body {
 
 .hha-action-btn:hover {
   background: rgba(255, 255, 255, 0.28);
-  transform: scale(1.05);
 }
 
 .hha-action-btn:active {
-  transform: scale(0.96);
   background: rgba(255, 255, 255, 0.35);
 }
 
@@ -17927,7 +17910,9 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
   }
 
   .desktop-overview-grid>#hero-hazard-alert {
+    order: -1;
     grid-column: 1 / -1;
+    margin-bottom: 0;
   }
 
   .overview-col-left {
