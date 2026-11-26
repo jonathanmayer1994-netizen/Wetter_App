@@ -3431,11 +3431,28 @@ export const MicroEngine = {
     const h = rawItem.hourly;
     const times = h.time;
     const n = times.length;
+    const extractDailySun = (dailyObj) => {
+      if (!dailyObj || !Array.isArray(dailyObj.time)) return null;
+      const pickArr = (base) => {
+        if (Array.isArray(dailyObj[base])) return dailyObj[base];
+        const key = Object.keys(dailyObj).find(k => k.startsWith(`${base}_`) && Array.isArray(dailyObj[k]));
+        return key ? dailyObj[key] : [];
+      };
+      return {
+        time: dailyObj.time,
+        sunrise: pickArr('sunrise'),
+        sunset: pickArr('sunset'),
+        daylight_duration: pickArr('daylight_duration')
+      };
+    };
+    const dailySun = extractDailySun(rawItem.daily);
+
     if (h.temperature_2m && h.temperature_2m.length === n) {
       // Standard-Single-Model Antwort (z. B. best_match Fallback) mit Modell-Metadaten anreichern
       const outSingle = {
         ...h,
         _modelElevation: rawItem.elevation !== undefined ? rawItem.elevation : targetEle,
+        _dailySun: dailySun,
         _alpineModelMeta: {
           subRegion: strategy?.region || 'Alpenraum',
           weightsLabel: strategy?.displayName || 'Open-Meteo Best-Match',
@@ -3474,12 +3491,14 @@ export const MicroEngine = {
     const numericVars = [
       'temperature_2m', 'relative_humidity_2m', 'dew_point_2m',
       'precipitation', 'precipitation_probability', 'snowfall', 'snow_depth',
-      'freezing_level_height', 'wind_speed_10m', 'wind_gusts_10m', 'cloud_cover', 'shortwave_radiation'
+      'freezing_level_height', 'wind_speed_10m', 'wind_gusts_10m', 'cloud_cover', 'shortwave_radiation',
+      'uv_index', 'cape', 'visibility'
     ];
 
     const out = {
       time: times,
-      _modelElevation: rawItem.elevation !== undefined ? rawItem.elevation : targetEle
+      _modelElevation: rawItem.elevation !== undefined ? rawItem.elevation : targetEle,
+      _dailySun: dailySun
     };
     numericVars.forEach(v => { out[v] = new Array(n).fill(null); });
     out.wind_direction_10m = new Array(n).fill(null);
@@ -5192,6 +5211,8 @@ export const MicroEngine = {
         trackName = nameMatch[1].trim();
       }
 
+      const waypoints = this.extractGPXWaypoints(xmlString, points);
+
       return {
         success: true,
         name: trackName,
@@ -5202,12 +5223,62 @@ export const MicroEngine = {
         minElevationM: Math.round(minEle),
         maxElevationM: Math.round(maxEle),
         estimatedDuration: `${hFormatted} h ${mFormatted} min`,
-        points
+        points,
+        waypoints
       };
     } catch (e) {
       console.error("GPX Parse-Fehler:", e);
       return { success: false, error: e.message };
     }
+  },
+
+  /**
+   * Extrahiert <wpt>-Wegpunkte (Hütten, Gipfel, Quellen, Parkplätze, Notabstiege) aus GPX-XML
+   * und projiziert sie auf die nächste Streckendistanz entlang des Tracks.
+   */
+  extractGPXWaypoints(xmlString, points) {
+    if (!xmlString || !Array.isArray(points) || points.length === 0) return [];
+    const waypoints = [];
+    const wptRegex = /<wpt\b([^>]*?)(?:\/>|>([\s\S]*?)<\/wpt>)/gi;
+    const latAttr = /\blat=["']([^"']+)["']/i;
+    const lonAttr = /\blon=["']([^"']+)["']/i;
+    const tagVal = (xml, tag) => {
+      const m = new RegExp(`<${tag}[^>]*>([^<]+)<\\/${tag}>`, 'i').exec(xml);
+      return m && m[1] ? m[1].trim() : '';
+    };
+    let match;
+    while ((match = wptRegex.exec(xmlString)) !== null) {
+      const attrs = match[1] || '';
+      const inner = match[2] || '';
+      const laM = latAttr.exec(attrs);
+      const loM = lonAttr.exec(attrs);
+      if (!laM || !loM) continue;
+      const lat = parseFloat(laM[1]);
+      const lon = parseFloat(loM[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      const rawEle = parseFloat(tagVal(inner, 'ele'));
+      const name = tagVal(inner, 'name') || 'Wegpunkt';
+      const sym = tagVal(inner, 'sym') || tagVal(inner, 'type');
+
+      let bestPt = points[0];
+      let bestD = Infinity;
+      for (let i = 0; i < points.length; i++) {
+        const d = this.calculateHaversineDistance(lat, lon, points[i].lat, points[i].lon);
+        if (d < bestD) { bestD = d; bestPt = points[i]; }
+      }
+      if (bestD <= 1500) {
+        waypoints.push({
+          lat,
+          lon,
+          ele: Number.isFinite(rawEle) ? Math.round(rawEle) : Math.round(bestPt.ele),
+          name,
+          sym,
+          distFromStartKm: bestPt.distFromStartKm,
+          trackIndex: bestPt.index
+        });
+      }
+    }
+    return waypoints.sort((a, b) => a.distFromStartKm - b.distFromStartKm);
   },
 
   calculateHaversineDistance(lat1, lon1, lat2, lon2) {
@@ -5344,18 +5415,42 @@ export const MicroEngine = {
       'gravel_mtb': {
         name: 'Gravel & Mountainbike',
         icon: '🚵',
-        baseFlatSpeedKmH: 16.0,
+        baseFlatSpeedKmH: 18.0,
         ascentMPerHour: null,
         descentMPerHour: null,
         desc: 'Schotter & Forstwege'
       },
+      'e_bike': {
+        name: 'E-Bike / E-MTB',
+        icon: '🔋',
+        baseFlatSpeedKmH: 24.0,
+        ascentMPerHour: null,
+        descentMPerHour: null,
+        desc: 'Tretunterstützung am Anstieg & bei Gegenwind'
+      },
+      'via_ferrata': {
+        name: 'Klettersteig',
+        icon: '🧗',
+        baseFlatSpeedKmH: 3.0,
+        ascentMPerHour: 300,
+        descentMPerHour: 550,
+        desc: 'Steig- & Felsgeschwindigkeit inkl. Sicherung'
+      },
       'trailrun': {
         name: 'Trailrunning',
         icon: '🏃',
-        baseFlatSpeedKmH: 8.5,
-        ascentMPerHour: null,
-        descentMPerHour: null,
+        baseFlatSpeedKmH: 7.5,
+        ascentMPerHour: 650,
+        descentMPerHour: 1100,
         desc: 'Berglauf-Gradient'
+      },
+      'high_alpine': {
+        name: 'Hochtour',
+        icon: '🗻',
+        baseFlatSpeedKmH: 3.0,
+        ascentMPerHour: 320,
+        descentMPerHour: 600,
+        desc: 'Hochalpin / Seilschaftstempo'
       },
       'ski_touring': {
         name: 'Skitour & Skibergsteigen',
@@ -5365,14 +5460,6 @@ export const MicroEngine = {
         descentMPerHour: 2500,
         desc: 'Fell-Aufstieg & Skiabfahrt'
       },
-      'skimo': {
-        name: 'Skimo / Wettkampf',
-        icon: '🎿',
-        baseFlatSpeedKmH: 5.0,
-        ascentMPerHour: 800,
-        descentMPerHour: 4000,
-        desc: 'Express-Speed & Race'
-      }
     };
 
     const base = baseTable[sportType] || baseTable['hiking'];
@@ -5654,21 +5741,51 @@ export const MicroEngine = {
     const points = parsedGPX.points;
     const speedInfo = this.getSportSpeedInfo(sportType, fitnessLevel);
     let cumulativeHours = 0;
+    let movingHours = 0;
     const timedPoints = [];
 
     // Sportler-Kategorie: 'bike', 'mountain' oder 'skitour'
-    const category = athleteSettings.category || (sportType === 'ski_touring' || sportType === 'skimo' ? 'skitour' : (sportType === 'hiking' || sportType === 'trailrun' ? 'mountain' : 'bike'));
+    const category = athleteSettings.category || (sportType === 'ski_touring' || sportType === 'skimo' ? 'skitour' : ((sportType === 'road_bike' || sportType === 'gravel_mtb' || sportType === 'e_bike') ? 'bike' : 'mountain'));
     const bikeSpeed = athleteSettings.bikeSpeedKmH !== undefined ? athleteSettings.bikeSpeedKmH : 26.0;
     const mtnSpeed = athleteSettings.mountainSpeedKmH !== undefined ? athleteSettings.mountainSpeedKmH : 4.0;
     const mtnAscent = athleteSettings.mountainAscentHmH !== undefined ? athleteSettings.mountainAscentHmH : 400;
     const skitourSpeed = athleteSettings.skitourSpeedKmH !== undefined ? athleteSettings.skitourSpeedKmH : 3.5;
     const skitourAscent = athleteSettings.skitourAscentHmH !== undefined ? athleteSettings.skitourAscentHmH : 400;
     const skitourDescent = athleteSettings.skitourDescentKmH !== undefined ? athleteSettings.skitourDescentKmH : 25.0;
+    const userPauseMinutes = Math.max(0, Math.min(180, Number(athleteSettings.pauseMinutes) || 0));
+    const abfellPauseMinutes = category === 'skitour' ? 10 : 0;
 
     const fitFactor = speedInfo.fitnessFactor || 1.0;
     const flatV = speedInfo.baseFlatSpeedKmH;
     const ascRate = speedInfo.ascentMPerHour || 400;
     const descRate = speedInfo.descentMPerHour || 800;
+
+    const h = hourlyForecast || {};
+    const peakPkg = athleteSettings.peakForecast || null;
+    const hPeak = (peakPkg && peakPkg.hourly) ? peakPkg.hourly : h;
+    const hTimes = h.time || [];
+    const hPeakTimes = hPeak.time || hTimes;
+
+    const findClosestIdx = (timesArr, targetMs) => {
+      let bestIdx = 0;
+      let minDiff = Infinity;
+      for (let k = 0; k < timesArr.length; k++) {
+        const tMs = new Date(timesArr[k]).getTime();
+        const diff = Math.abs(tMs - targetMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestIdx = k;
+        }
+      }
+      return bestIdx;
+    };
+
+    // Hauptgipfel-Index bestimmen für reale Pausenzeit & Skitour-Abfellpuffer
+    let globalPeakIdx = 0;
+    for (let i = 1; i < points.length; i++) {
+      if ((points[i].ele || 0) > (points[globalPeakIdx].ele || 0)) globalPeakIdx = i;
+    }
+    const baseEleSpan = Math.max(100, (points[globalPeakIdx].ele || 0) - Math.min(...points.map(p => p.ele || 0)));
 
     // Hangneigungs-Zähler (Spur + 2D-DEM Hangneigung & Einzugsgebiet)
     const demSamples = Array.isArray(parsedGPX._demSamples) ? parsedGPX._demSamples : (Array.isArray(athleteSettings.demSamples) ? athleteSettings.demSamples : null);
@@ -5752,14 +5869,27 @@ export const MicroEngine = {
 
         let segHours = 0;
         if (category === 'bike') {
-          // Stufenlose Rad-Physik mit realistischer Steigungs- & Gefälle-Modellierung
-          let v = bikeSpeed;
+          // Stufenlose Rad-Physik inkl. Steigung, Gefälle, Sub-Disziplin (Rennrad / Gravel / E-Bike) & realem Relativwind
+          const isEbike = sportType === 'e_bike';
+          const isGravel = sportType === 'gravel_mtb';
+          let v = isGravel ? Math.min(bikeSpeed, bikeSpeed * 0.92) : bikeSpeed;
           if (grad > 0) {
-            // Anstieg: Watt-Widerstand drückt die Geschwindigkeit
-            v = Math.max(5.0, bikeSpeed - grad * (bikeSpeed / 20.0) * 1.35);
+            const climbPenalty = grad * (v / 20.0) * (isEbike ? 0.72 : (isGravel ? 1.48 : 1.35));
+            v = Math.max(isEbike ? 11.0 : 5.0, v - climbPenalty);
           } else if (grad < 0) {
-            // Abfahrt: Schwerkraft-Beschleunigung (Aero-Downhill)
-            v = Math.min(72.0, bikeSpeed + Math.abs(grad) * 1.6);
+            const downGain = Math.abs(grad) * (isGravel ? 1.15 : 1.6);
+            v = Math.min(isGravel ? 54.0 : 72.0, v + downGain);
+          }
+          // Wind-Einfluss auf Segment (Gegenwind bremst, Rückenwind schiebt)
+          if (hTimes.length > 0 && (prev.lat !== pt.lat || prev.lon !== pt.lon)) {
+            const segBearing = this.calculateBearing(prev.lat, prev.lon, pt.lat, pt.lon);
+            const segMs = startTimeMs + Math.round(cumulativeHours * 3600000);
+            const wHIdx = findClosestIdx(hTimes, segMs);
+            const wSpd = (h.wind_speed_10m && h.wind_speed_10m[wHIdx] !== undefined) ? h.wind_speed_10m[wHIdx] : 0;
+            const wDir = (h.wind_direction_10m && h.wind_direction_10m[wHIdx] !== undefined) ? h.wind_direction_10m[wHIdx] : segBearing;
+            const headwindKmH = wSpd * Math.cos(((wDir - segBearing) * Math.PI) / 180);
+            const aeroWeight = isEbike ? 0.14 : (isGravel ? 0.22 : 0.28);
+            v = Math.max(isEbike ? 10.0 : 5.5, Math.min(72.0, v - headwindKmH * aeroWeight));
           }
           segHours = distKm / v;
         } else if (category === 'skitour') {
@@ -5778,14 +5908,14 @@ export const MicroEngine = {
             segHours = distKm / downhillSpeed;
           }
         } else if (category === 'mountain') {
-          // Offizielle Schweizer Alpen-Club (SAC) / DAV Marschzeit-Formel mit stufenloser Pace
+          // SAC / DAV Marschzeit mit stufenloser Pace (bei Abstieg doppelte Höhenmeterleistung, Trailrun/Klettersteig angepasst)
           const tH = distKm / mtnSpeed;
-          const descentAscentRatio = mtnAscent * 2; // Im Abstieg schafft man doppelte Höhenmeter
-          const tV = (dzM > 0 ? dzM / mtnAscent : Math.abs(dzM) / descentAscentRatio);
+          const descRatio = sportType === 'trailrun' ? mtnAscent * 2.2 : mtnAscent * 2;
+          const tV = (dzM > 0 ? dzM / mtnAscent : Math.abs(dzM) / descRatio);
           segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
         } else {
           // Legacy-Fallback falls direkt sportType übergeben wurde
-          if (sportType === 'hiking') {
+          if (sportType === 'hiking' || sportType === 'via_ferrata' || sportType === 'high_alpine') {
             const tH = distKm / flatV;
             const tV = (dzM > 0 ? dzM / ascRate : Math.abs(dzM) / descRate);
             segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
@@ -5797,15 +5927,7 @@ export const MicroEngine = {
             } else {
               segHours = distKm / 25.0;
             }
-          } else if (sportType === 'skimo') {
-            if (dzM > 0) {
-              const tH = distKm / 5.0;
-              const tV = dzM / 800;
-              segHours = Math.max(tH, tV) + Math.min(tH, tV) / 2;
-            } else {
-              segHours = distKm / 40.0;
-            }
-          } else if (sportType === 'road_bike') {
+          } else if (sportType === 'road_bike' || sportType === 'e_bike') {
             const baseV = 25 * fitFactor;
             const v = Math.max(8 * fitFactor, Math.min(60 * fitFactor, baseV - grad * 1.4));
             segHours = distKm / v;
@@ -5819,7 +5941,13 @@ export const MicroEngine = {
             segHours = distKm / v;
           }
         }
-        cumulativeHours += Math.max(0.005, segHours);
+        const safeSegH = Math.max(0.005, segHours);
+        movingHours += safeSegH;
+        cumulativeHours += safeSegH;
+        // Reale Pause + 10-Min-Abfellpuffer exakt am Scheitelpunkt aufrechnen (damit alle Abfahrtszeiten stimmen)
+        if (i === globalPeakIdx && globalPeakIdx > 0 && globalPeakIdx < points.length - 1) {
+          cumulativeHours += (userPauseMinutes + abfellPauseMinutes) / 60;
+        }
       }
 
       const arrivalMs = startTimeMs + Math.round(cumulativeHours * 3600000);
@@ -5991,26 +6119,7 @@ export const MicroEngine = {
     }
 
     // Wetterdaten für jeden Meilenstein zur genauen Ankunftszeit interpolieren (Tal + Gipfel Live-Daten)
-    const h = hourlyForecast || {};
-    const peakPkg = athleteSettings.peakForecast || null;
-    const hPeak = (peakPkg && peakPkg.hourly) ? peakPkg.hourly : h;
-    const hTimes = h.time || [];
-    const hPeakTimes = hPeak.time || hTimes;
-    const eleSpan = Math.max(100, peakPoint.ele - minEle);
-
-    const findClosestIdx = (timesArr, targetMs) => {
-      let bestIdx = 0;
-      let minDiff = Infinity;
-      for (let i = 0; i < timesArr.length; i++) {
-        const tMs = new Date(timesArr[i]).getTime();
-        const diff = Math.abs(tMs - targetMs);
-        if (diff < minDiff) {
-          minDiff = diff;
-          bestIdx = i;
-        }
-      }
-      return bestIdx;
-    };
+    const eleSpan = baseEleSpan;
 
     const preMilestones = milestones.map((m, idx) => {
       const arrMs = m.arrivalMs;
@@ -6155,6 +6264,13 @@ export const MicroEngine = {
       const dewSpread = Math.max(0, pointTemp - dewPointC);
       const isWhiteoutRisk = (cloudCoverPct >= 82 && (dewSpread <= 2.3 || code === 45 || code === 48));
       const shortwaveRad = (srcH.shortwave_radiation && typeof srcH.shortwave_radiation[srcIdx] === 'number') ? Math.round(srcH.shortwave_radiation[srcIdx]) : null;
+      const baseUv = (srcH.uv_index && typeof srcH.uv_index[srcIdx] === 'number') ? srcH.uv_index[srcIdx] : 0;
+      const uvAltBoost = 1 + Math.max(0, (m.ele - minEle) / 1000) * 0.12 + (isSnow ? 0.15 : 0);
+      const uvIndex = Math.round(Math.min(14, baseUv * uvAltBoost) * 10) / 10;
+      const capeJkg = (srcH.cape && typeof srcH.cape[srcIdx] === 'number') ? Math.round(srcH.cape[srcIdx]) : 0;
+      const visibilityM = (srcH.visibility && typeof srcH.visibility[srcIdx] === 'number') ? Math.round(srcH.visibility[srcIdx]) : null;
+      const rawSd = (srcH.snow_depth && typeof srcH.snow_depth[srcIdx] === 'number') ? srcH.snow_depth[srcIdx] : 0;
+      const snowDepthCm = rawSd > 5 ? Math.round(rawSd) : Math.round(rawSd * 100);
 
       let label = `km ${m.distFromStartKm.toFixed(1)}`;
       if (idx === 0) label = 'Startpunkt';
@@ -6187,7 +6303,11 @@ export const MicroEngine = {
         cloudCoverPct,
         dewPointC,
         isWhiteoutRisk,
-        shortwaveRad
+        shortwaveRad,
+        uvIndex,
+        capeJkg,
+        visibilityM,
+        snowDepthCm
       };
     });
 
@@ -6334,7 +6454,7 @@ export const MicroEngine = {
         : '👁️ Gute Bodensicht & Kontrast entlang der Route erwartet'
     };
 
-    // Dynamische Kontext-Packliste (nur relevante Chips)
+    // Dynamische Kontext-Ausrüstung (nur Skitour — keine Berg-/Klettersteig-Packliste und keine Rad-Bekleidung per Nutzervorgabe)
     const minFelt = enrichedMilestones.reduce((mn, m) => Math.min(mn, m.feltTempC ?? 0), 99);
     const maxGust = enrichedMilestones.reduce((mx, m) => Math.max(mx, m.gustsKmH ?? 0), 0);
     const gearChecklist = [];
@@ -6348,59 +6468,53 @@ export const MicroEngine = {
       if (avalancheReport.dangerLevel >= 3) gearChecklist.push({ icon: '🎒', label: 'Lawinenairbag empfohlen', priority: 'warn' });
     }
 
-    // Optimale Startzeit-Empfehlung („Goldenes Tourenfenster“: 05:30 bis 10:00 Uhr im 30-Min-Takt)
-    let optimalStartAdvisor = null;
-    if (category === 'skitour') {
-      const tourDayRef = new Date(startTimeMs);
-      let bestCandidate = null;
-      for (let startMin = 5 * 60 + 30; startMin <= 10 * 60; startMin += 30) {
-        const sDate = new Date(tourDayRef);
-        sDate.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
-        const sMs = sDate.getTime();
-        const peakMs = sMs + Math.round(ascentDurH * 3600000);
-        const endMs = sMs + Math.round(cumulativeHours * 3600000);
-        const peakHrDec = (new Date(peakMs).getHours()) + (new Date(peakMs).getMinutes() / 60);
-        const endHrDec = (new Date(endMs).getHours()) + (new Date(endMs).getMinutes() / 60);
-        const pkHIdx = findClosestIdx(hPeakTimes, peakMs);
-        const pkWind = (hPeak.wind_gusts_10m && hPeak.wind_gusts_10m[pkHIdx] !== undefined) ? hPeak.wind_gusts_10m[pkHIdx] : 15;
-        const pkPrecip = (hPeak.precipitation && hPeak.precipitation[pkHIdx] !== undefined) ? hPeak.precipitation[pkHIdx] : 0;
+    const endTimeMsActual = timedPoints[timedPoints.length - 1].arrivalMs;
+    const daylightAnalysis = this.computeRouteDaylightAnalysis(startTimeMs, endTimeMsActual, startPoint.lat, startPoint.lon, hPeak || h);
+    const climbsAnalysis = this.computeRouteClimbs(timedPoints, enrichedMilestones, category);
+    const surfaceAnalysis = this.computeRouteSurfaceAnalysis(
+      category, sportType, hPeak, h, startTimeMs, minEle, maxEle, enrichedMilestones, avalancheReport, athleteSettings.snowStationData
+    );
+    const mappedWaypoints = this.mapGPXWaypointsToTimeline(parsedGPX.waypoints, timedPoints, enrichedMilestones);
 
-        let score = 100;
-        if (endHrDec > 16.5) score -= (endHrDec - 16.5) * 35; // Dämmerungsstrafe
-        if (!avalancheReport.isAllDayColdWinter) {
-          // Ziel: Abfahrt ins Firn-Fenster legen, vor Nachmittags-Erwärmung fertig sein!
-          const targetMid = (firnStartHr + firnEndHr) / 2;
-          score -= Math.abs(peakHrDec - targetMid) * 9;
-          if (endHrDec > 12.5 && avalancheReport.afternoonDangerLevel > avalancheReport.morningDangerLevel) score -= 22;
-        } else {
-          // Hochwinter: Gipfel ideal um 10:30–12:30 (hell & mildest)
-          score -= Math.abs(peakHrDec - 11.2) * 5;
-        }
-        score -= (pkWind * 0.25) + (pkPrecip * 12);
+    const dominantWindDeg = hPeak.wind_direction_10m && hPeak.wind_direction_10m[0] !== undefined ? hPeak.wind_direction_10m[0] : 240;
+    const pad2 = n => String(n).padStart(2, '0');
+    const sdObj = new Date(startTimeMs);
+    const selectedDateKey = `${sdObj.getFullYear()}-${pad2(sdObj.getMonth() + 1)}-${pad2(sdObj.getDate())}`;
+    const route10DayPlan = this.computeRoute10DayPlanner(
+      category, sportType, parsedGPX, hPeak, h, dominantWindDeg, avalancheReport, selectedDateKey, daylightAnalysis
+    );
 
-        if (!bestCandidate || score > bestCandidate.score) {
-          const pad2 = n => String(n).padStart(2, '0');
-          const pkDt = new Date(peakMs);
-          const enDt = new Date(endMs);
-          bestCandidate = {
-            score: Math.round(score),
-            startTimeValue: `${pad2(sDate.getHours())}:${pad2(sDate.getMinutes())}`,
-            summitTimeStr: `${pad2(pkDt.getHours())}:${pad2(pkDt.getMinutes())} Uhr`,
-            finishTimeStr: `${pad2(enDt.getHours())}:${pad2(enDt.getMinutes())} Uhr`,
-            reason: !avalancheReport.isAllDayColdWinter
-              ? `Gipfel um ${pad2(pkDt.getHours())}:${pad2(pkDt.getMinutes())} Uhr genau im Firnfenster (${dominantDescentAspect}-Abfahrt vor Sulz)`
-              : `Optimaler Tageslicht- & Windkorridor (${Math.round(pkWind)} km/h Böen am Gipfel)`
-          };
-        }
-      }
-      optimalStartAdvisor = bestCandidate;
-    }
+    // Universeller Optimal-Startzeit-Advisor (Rad, Berge & Skitour mit echtem Sonnenauf-/-untergang & CAPE)
+    const optimalStartAdvisor = this.computeOptimalStartWindow({
+      category,
+      sportType,
+      startTimeMs,
+      ascentDurH,
+      totalDurH: cumulativeHours,
+      hPeak,
+      hValley: h,
+      avalancheReport,
+      daylightAnalysis,
+      dominantDescentAspect,
+      firnStartHr,
+      firnEndHr
+    });
 
-    const hazards = this.analyzeRouteHazards(enrichedMilestones, category, avalancheReport, slopeStats);
+    const uvPeak = enrichedMilestones.reduce((mx, m) => Math.max(mx, m.uvIndex || 0), 0);
+    const capePeakJkg = enrichedMilestones.reduce((mx, m) => Math.max(mx, m.capeJkg || 0), 0);
+    const minVisibilityM = enrichedMilestones.reduce((mn, m) => (typeof m.visibilityM === 'number' ? Math.min(mn, m.visibilityM) : mn), Infinity);
+
+    const hazards = this.analyzeRouteHazards(enrichedMilestones, category, avalancheReport, slopeStats, {
+      sportType,
+      daylightAnalysis,
+      surfaceAnalysis
+    });
 
     const totalDurationHours = cumulativeHours;
     const durH = Math.floor(totalDurationHours);
     const durM = Math.round((totalDurationHours - durH) * 60);
+    const movH = Math.floor(movingHours);
+    const movM = Math.round((movingHours - movH) * 60);
 
     return {
       category,
@@ -6410,16 +6524,28 @@ export const MicroEngine = {
       skitourSpeedKmH: skitourSpeed,
       skitourAscentHmH: skitourAscent,
       skitourDescentKmH: skitourDescent,
+      pauseMinutes: userPauseMinutes,
+      abfellPauseMinutes: abfellPauseMinutes,
+      totalPauseMinutes: userPauseMinutes + abfellPauseMinutes,
+      movingDurationStr: `${movH} h ${movM} min`,
       slopeStats,
       munterAnalysis,
       munterEvaluation,
       phaseAnalysis,
       whiteoutAnalysis,
+      daylightAnalysis,
+      climbsAnalysis,
+      surfaceAnalysis,
+      mappedWaypoints,
+      route10DayPlan,
+      uvPeak,
+      capePeakJkg,
+      minVisibilityM: Number.isFinite(minVisibilityM) ? minVisibilityM : null,
       gearChecklist,
       optimalStartAdvisor,
       sportType,
-      sportName: category === 'bike' ? 'Rad' : (category === 'skitour' ? 'Skitour' : 'Berge'),
-      sportIcon: category === 'bike' ? '🚴' : (category === 'skitour' ? '⛷️' : '🏔️'),
+      sportName: speedInfo.name || (category === 'bike' ? 'Rad' : (category === 'skitour' ? 'Skitour' : 'Berge')),
+      sportIcon: speedInfo.icon || (category === 'bike' ? '🚴' : (category === 'skitour' ? '⛷️' : '🏔️')),
       fitnessLevel: speedInfo.fitnessLevel,
       fitnessName: speedInfo.fitnessName,
       fitnessFactor: speedInfo.fitnessFactor,
@@ -6432,7 +6558,7 @@ export const MicroEngine = {
       startTimeMs,
       startTimeStr: new Date(startTimeMs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
       startDateStr: new Date(startTimeMs).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }),
-      endTimeMs: timedPoints[timedPoints.length - 1].arrivalMs,
+      endTimeMs: endTimeMsActual,
       endTimeStr: timedPoints[timedPoints.length - 1].arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
       totalDurationStr: `${durH} h ${durM} min`,
       totalDistanceKm: parsedGPX.totalDistanceKm,
@@ -6448,9 +6574,541 @@ export const MicroEngine = {
   },
 
   /**
-   * STUFE 9d: Routen-Gefahrenanalyse & Passwarnung
+   * Astronomische Tageslicht-, Dämmerungs- & Licht-Prüfung für exaktes Tourendatum & Koordinate
    */
-  analyzeRouteHazards(milestones, category = 'bike', avalancheReport = null, slopeStats = null) {
+  computeRouteDaylightAnalysis(startTimeMs, endTimeMs, lat, lon, hourlyForecast) {
+    const pad2 = n => String(n).padStart(2, '0');
+    const sDt = new Date(startTimeMs);
+    const eDt = new Date(endTimeMs);
+    const dateKey = `${sDt.getFullYear()}-${pad2(sDt.getMonth() + 1)}-${pad2(sDt.getDate())}`;
+
+    let sunriseStr = '';
+    let sunsetStr = '';
+    let daylightSec = 0;
+
+    const daily = hourlyForecast && hourlyForecast._dailySun ? hourlyForecast._dailySun : null;
+    if (daily && Array.isArray(daily.time)) {
+      const idx = daily.time.findIndex(t => String(t).slice(0, 10) === dateKey);
+      if (idx >= 0) {
+        if (daily.sunrise && daily.sunrise[idx]) sunriseStr = String(daily.sunrise[idx]).slice(11, 16);
+        if (daily.sunset && daily.sunset[idx]) sunsetStr = String(daily.sunset[idx]).slice(11, 16);
+        if (daily.daylight_duration && typeof daily.daylight_duration[idx] === 'number') daylightSec = daily.daylight_duration[idx];
+      }
+    }
+
+    const toDec = (hhmm, fallback) => {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ''));
+      if (!m) return fallback;
+      return parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
+    };
+
+    const astro = this.computeSunTimesForDate(dateKey, lat, lon);
+    if (!sunriseStr) sunriseStr = astro.sunriseIso.slice(11, 16);
+    if (!sunsetStr) sunsetStr = astro.sunsetIso.slice(11, 16);
+    if (!daylightSec) daylightSec = astro.daylightSec;
+
+    const sunriseDecimalHr = toDec(sunriseStr, astro.sunriseHour);
+    const sunsetDecimalHr = toDec(sunsetStr, astro.sunsetHour);
+    const civilTwilightEndHr = Math.min(23.95, sunsetDecimalHr + 0.5);
+    const alpineValleySunsetHr = Math.max(0, sunsetDecimalHr - 0.25);
+
+    const fmtDec = (dec) => {
+      const c = Math.max(0, Math.min(23.98, dec));
+      const h = Math.floor(c);
+      const m = Math.round((c - h) * 60) % 60;
+      return `${pad2(h)}:${pad2(m)}`;
+    };
+
+    const startHr = sDt.getHours() + sDt.getMinutes() / 60;
+    const sameDay = sDt.getFullYear() === eDt.getFullYear() && sDt.getMonth() === eDt.getMonth() && sDt.getDate() === eDt.getDate();
+    const endHr = sameDay ? (eDt.getHours() + eDt.getMinutes() / 60) : (24 + eDt.getHours() + eDt.getMinutes() / 60);
+
+    const startsInDarkness = startHr < (sunriseDecimalHr - 0.35);
+    const finishesInDarkness = endHr > civilTwilightEndHr;
+    const finishesInTwilight = !finishesInDarkness && endHr > alpineValleySunsetHr;
+    const minutesAfterSunset = Math.round((endHr - sunsetDecimalHr) * 60);
+
+    const dlH = Math.floor(daylightSec / 3600);
+    const dlM = Math.round((daylightSec % 3600) / 60);
+
+    let statusBadge = `☀️ Im Hellen (Puffer ${Math.max(0, -minutesAfterSunset)} min vor Sunset)`;
+    if (finishesInDarkness) {
+      statusBadge = `🌙 Dunkelheit (${minutesAfterSunset} min nach Sonnenuntergang → Licht nötig)`;
+    } else if (finishesInTwilight) {
+      statusBadge = minutesAfterSunset > 0
+        ? `🌆 Dämmerung (${minutesAfterSunset} min nach Sonnenuntergang → Licht mitnehmen)`
+        : `🌆 Knapp vor Tal-Schatten/Sonnenuntergang (${Math.abs(minutesAfterSunset)} min Puffer)`;
+    } else if (startsInDarkness) {
+      statusBadge = `🔦 Start vor Morgendämmerung (Sonnenaufgang ${sunriseStr} Uhr)`;
+    }
+
+    return {
+      sunriseStr,
+      sunsetStr,
+      civilTwilightEndStr: fmtDec(civilTwilightEndHr),
+      sunriseDecimalHr,
+      sunsetDecimalHr,
+      civilTwilightEndHr,
+      daylightDurationStr: `${dlH} h ${dlM} min`,
+      startsInDarkness,
+      finishesInTwilight,
+      finishesInDarkness,
+      minutesAfterSunset,
+      statusBadge
+    };
+  },
+
+  /**
+   * Erkennt alle Schlüsselanstiege & Pässe einer Tour (Länge km, Hm, Ø Steigung %, Max %)
+   */
+  computeRouteClimbs(timedPoints, milestones, category) {
+    if (!Array.isArray(timedPoints) || timedPoints.length < 4) return [];
+    // Leichte Glättung gegen GPS-Mikro-Zacken
+    const smEle = timedPoints.map((p, i) => {
+      const a = Math.max(0, i - 1), b = Math.min(timedPoints.length - 1, i + 1);
+      return ((timedPoints[a].ele || 0) + (p.ele || 0) + (timedPoints[b].ele || 0)) / 3;
+    });
+
+    const minGain = category === 'bike' ? 95 : 120;
+    const climbs = [];
+    let inClimb = false;
+    let startIdx = 0;
+    let minSubEle = smEle[0];
+    let maxSubEle = smEle[0];
+    let peakIdx = 0;
+
+    const pushClimb = (sIdx, pIdx) => {
+      if (pIdx <= sIdx) return;
+      const startPt = timedPoints[sIdx];
+      const topPt = timedPoints[pIdx];
+      const lenKm = Math.round(((topPt.distFromStartKm || 0) - (startPt.distFromStartKm || 0)) * 10) / 10;
+      const gainM = Math.round((topPt.ele || 0) - (startPt.ele || 0));
+      if (lenKm < 0.3 || (gainM < minGain && !(category === 'bike' && lenKm >= 1.5 && (gainM / (lenKm * 10)) >= 3))) return;
+
+      let maxGradPct = 0;
+      for (let j = sIdx + 1; j <= pIdx; j++) {
+        let w = j - 1;
+        while (w > sIdx && ((timedPoints[j].distFromStartKm || 0) - (timedPoints[w].distFromStartKm || 0)) < 0.08) w--;
+        const dxM = Math.max(40, ((timedPoints[j].distFromStartKm || 0) - (timedPoints[w].distFromStartKm || 0)) * 1000);
+        const dz = (timedPoints[j].ele || 0) - (timedPoints[w].ele || 0);
+        const g = (dz / dxM) * 100;
+        if (g > maxGradPct) maxGradPct = g;
+      }
+      const avgGradPct = Math.round((gainM / Math.max(100, lenKm * 1000)) * 1000) / 10;
+
+      // Wetter am Kulminationspunkt
+      let topMs = milestones[0];
+      let bestD = Infinity;
+      for (const ms of (milestones || [])) {
+        const d = Math.abs((ms.distFromStartKm || 0) - (topPt.distFromStartKm || 0));
+        if (d < bestD) { bestD = d; topMs = ms; }
+      }
+
+      climbs.push({
+        index: climbs.length + 1,
+        startKm: Math.round((startPt.distFromStartKm || 0) * 10) / 10,
+        endKm: Math.round((topPt.distFromStartKm || 0) * 10) / 10,
+        lengthKm: lenKm,
+        gainM,
+        avgGradPct,
+        maxGradPct: Math.round(maxGradPct * 10) / 10,
+        startEleM: Math.round(startPt.ele || 0),
+        summitEleM: Math.round(topPt.ele || 0),
+        arrivalTimeStr: topPt.arrivalDate ? `${topPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr` : '--:--',
+        tempC: topMs ? topMs.tempC : null,
+        relWindBadge: topMs ? topMs.relWindBadge : ''
+      });
+    };
+
+    for (let i = 1; i < smEle.length; i++) {
+      const e = smEle[i];
+      if (!inClimb) {
+        if (e < minSubEle) {
+          minSubEle = e;
+          startIdx = i;
+        } else if (e - minSubEle >= 28) {
+          inClimb = true;
+          maxSubEle = e;
+          peakIdx = i;
+        }
+      } else {
+        if (e >= maxSubEle) {
+          maxSubEle = e;
+          peakIdx = i;
+        } else if (maxSubEle - e >= 35) {
+          pushClimb(startIdx, peakIdx);
+          inClimb = false;
+          minSubEle = e;
+          startIdx = i;
+        }
+      }
+    }
+    if (inClimb) pushClimb(startIdx, peakIdx);
+    return climbs;
+  },
+
+  /**
+   * Untergrund-, Fahrbahn-, Felsnässe-/Vereisungs- & Schneegrenzen-Check aus Vortageswetter (past_days=3) + Tourdaten
+   */
+  computeRouteSurfaceAnalysis(category, sportType, hPeak, hValley, startTimeMs, minEle, maxEle, milestones, avalancheReport, snowStationData) {
+    const times = (hValley && hValley.time) || (hPeak && hPeak.time) || [];
+    const pre48Start = startTimeMs - 48 * 3600000;
+    let rain48hMm = 0;
+    let rain12hMm = 0;
+    let minPre24TempC = 20;
+    let maxWindPre24 = 0;
+
+    for (let i = 0; i < times.length; i++) {
+      const tMs = new Date(times[i]).getTime();
+      if (tMs >= pre48Start && tMs <= startTimeMs) {
+        const p = (hValley && hValley.precipitation && hValley.precipitation[i]) || 0;
+        const t = (hPeak && hPeak.temperature_2m && hPeak.temperature_2m[i] !== undefined) ? hPeak.temperature_2m[i] : 8;
+        const w = (hPeak && hPeak.wind_speed_10m && hPeak.wind_speed_10m[i] !== undefined) ? hPeak.wind_speed_10m[i] : 10;
+        rain48hMm += p;
+        if (tMs >= startTimeMs - 12 * 3600000) rain12hMm += p;
+        if (tMs >= startTimeMs - 24 * 3600000) {
+          if (t < minPre24TempC) minPre24TempC = t;
+          if (w > maxWindPre24) maxWindPre24 = w;
+        }
+      }
+    }
+
+    const routeMaxPrecip = milestones.reduce((mx, m) => Math.max(mx, m.precipMm || 0), 0);
+    const routeMinTemp = milestones.reduce((mn, m) => Math.min(mn, m.tempC ?? 10), 99);
+    const peakSnowDepthCm = Math.max(
+      milestones.reduce((mx, m) => Math.max(mx, m.snowDepthCm || 0), 0),
+      (snowStationData && snowStationData.peakStation && snowStationData.peakStation.snowDepthCm) || 0,
+      (avalancheReport && avalancheReport.snowDepthPeakCm) || 0
+    );
+
+    const isWetPre = rain12hMm >= 1.2 || rain48hMm >= 5.0;
+    const isMuddy = rain48hMm >= 6.0 || rain12hMm >= 2.0;
+
+    // Schneeauflage am Berg bestimmen
+    let snowlineOnRouteM = null;
+    if (peakSnowDepthCm >= 3) {
+      snowlineOnRouteM = (avalancheReport && avalancheReport.skiableSnowlineM) ? avalancheReport.skiableSnowlineM : Math.round(minEle + (maxEle - minEle) * 0.65);
+    }
+
+    let statusLabel = '🟢 Trockene Verhältnisse';
+    let detailText = 'Untergrund voraussichtlich trocken und griffig.';
+    let severity = 'green';
+    let batteryNote = '';
+
+    if (category === 'bike') {
+      if (sportType === 'gravel_mtb') {
+        if (routeMinTemp <= 0.5 && (isWetPre || routeMaxPrecip > 0)) {
+          severity = 'red';
+          statusLabel = '🧊 Vereiste Trails / Glätte';
+          detailText = 'Nässe plus Frost erzeugen auf Forstwegen und Holzbrücken akute Eisglätte.';
+        } else if (isMuddy || routeMaxPrecip >= 1.0) {
+          severity = 'yellow';
+          statusLabel = '🟤 Feuchte / schlammige Trails';
+          detailText = `${rain48hMm.toFixed(1)} mm Niederschlag in den letzten 48h — tiefe Böden, nasse Wurzeln & längeres Bremsen.`;
+        } else {
+          statusLabel = '🟢 Fester, trockener Schotter & Trail';
+          detailText = 'Kaum Vortagesregen — kompakte Forstwege und sauberer Grip.';
+        }
+      } else {
+        if (routeMinTemp <= 1.0 && (isWetPre || routeMaxPrecip > 0)) {
+          severity = 'red';
+          statusLabel = '🧊 Reif-/Frostglätte auf Asphalt';
+          detailText = 'Nasse Fahrbahn in Schattenpassagen kann unter 1 °C gefrieren!';
+        } else if (rain12hMm >= 0.8 || routeMaxPrecip >= 0.5) {
+          severity = 'yellow';
+          statusLabel = '💧 Feuchte Straßen & Spritzwasser';
+          detailText = 'Vorheriger oder aktiver Regen — längerer Bremsweg auf Abfahrten und feuchte Kurven in Wald/Schatten.';
+        } else {
+          statusLabel = '🟢 Trockener Asphalt';
+          detailText = `Nur ${rain48hMm.toFixed(1)} mm in den letzten 48h — beste Rollbedingungen.`;
+        }
+      }
+      if (sportType === 'e_bike') {
+        batteryNote = routeMinTemp < 5
+          ? `🔋 Akku-Kältehinweis: Bei ${Math.round(routeMinTemp)} °C ca. −15 bis −25 % Reichweiten-Puffer einplanen.`
+          : '🔋 Akku-Temperaturbereich optimal (volle Kapazität verfügbar).';
+      }
+    } else if (category === 'mountain') {
+      const isIceThreat = (minPre24TempC <= 0.5 || routeMinTemp <= 0.5) && (isWetPre || peakSnowDepthCm >= 2 || routeMaxPrecip > 0);
+      if (isIceThreat && maxEle >= 1600) {
+        severity = (sportType === 'via_ferrata' || sportType === 'high_alpine') ? 'red' : 'yellow';
+        statusLabel = (sportType === 'via_ferrata' || sportType === 'high_alpine')
+          ? `🧊 Vereisung / Reif auf Fels & Drahtseil`
+          : `❄️ Schnee-/Frost-Steige ab ca. ${Math.round(snowlineOnRouteM || (maxEle - 300)).toLocaleString('de-DE')} m`;
+        detailText = `Vortagesfeuchte + Frost (${Math.round(routeMinTemp)} °C am Berg${peakSnowDepthCm >= 3 ? `, ca. ${peakSnowDepthCm} cm Schnee oben` : ''}) – rutschige Felsen, Tritte & Stahlseile.`;
+      } else if (peakSnowDepthCm >= 5 && snowlineOnRouteM && maxEle >= snowlineOnRouteM) {
+        severity = 'yellow';
+        statusLabel = `❄️ Schneeauflage ab ca. ${snowlineOnRouteM.toLocaleString('de-DE')} m (${peakSnowDepthCm} cm)`;
+        detailText = 'Oberhalb dieser Höhe liegt noch Altschnee bzw. geschlossene Schneedecke auf dem Steig.';
+      } else if (isWetPre || routeMaxPrecip >= 0.5) {
+        severity = 'yellow';
+        statusLabel = '💧 Nasser Fels & schmierige Wurzeln';
+        detailText = `${rain48hMm.toFixed(1)} mm Regen in den letzten 48h — erhöhte Rutschgefahr auf Kalk-/Lehmpfaden und Eisenstiften.`;
+      } else {
+        statusLabel = '🟢 Trockener Fels & griffige Steige';
+        detailText = 'Kein relevanter Vortagesniederschlag — trockene Tritte und gute Reibung am Fels.';
+      }
+    }
+
+    // Skitour: Ski-Tragestrecke unterhalb fahrbarer Schneegrenze berechnen
+    let carrySkiInfo = null;
+    if (category === 'skitour' && avalancheReport && typeof avalancheReport.skiableSnowlineM === 'number') {
+      const snowlineM = avalancheReport.skiableSnowlineM;
+      if (minEle < snowlineM - 20) {
+        const carryHm = Math.max(0, Math.round(snowlineM - minEle));
+        // Finde ersten Trackpunkt >= snowlineM
+        const firstSnowPt = milestones.find(m => m.ele >= snowlineM);
+        const carryKm = firstSnowPt ? Math.round(firstSnowPt.distFromStartKm * 10) / 10 : Math.round(((snowlineM - minEle) / Math.max(100, maxEle - minEle)) * 2.5 * 10) / 10;
+        carrySkiInfo = {
+          needed: true,
+          snowlineM,
+          carryHm,
+          carryKm,
+          summary: `🥾 Voraussichtlich Ski tragen bis ca. ${snowlineM.toLocaleString('de-DE')} m (~${carryKm.toFixed(1)} km / +${carryHm} Hm ab Talstart)`
+        };
+        statusLabel = carrySkiInfo.summary;
+        detailText = `Talhöhe ${Math.round(minEle).toLocaleString('de-DE')} m liegt unter der fahrbaren Schneegrenze (${snowlineM.toLocaleString('de-DE')} m).`;
+        severity = 'yellow';
+      } else {
+        carrySkiInfo = {
+          needed: false,
+          snowlineM,
+          carryHm: 0,
+          carryKm: 0,
+          summary: `⛷️ Durchgehend Ski ab Tal (${Math.round(minEle).toLocaleString('de-DE')} m ≥ Schneegrenze ${snowlineM.toLocaleString('de-DE')} m)`
+        };
+        statusLabel = carrySkiInfo.summary;
+      }
+    }
+
+    return {
+      severity,
+      statusLabel,
+      detailText,
+      batteryNote,
+      snowlineOnRouteM,
+      peakSnowDepthCm,
+      rain48hMm: Math.round(rain48hMm * 10) / 10,
+      carrySkiInfo
+    };
+  },
+
+  /**
+   * Ordnet eingebettete GPX-<wpt> Wegpunkte der berechneten Timeline inkl. Ankunftszeit & Wetter zu
+   */
+  mapGPXWaypointsToTimeline(rawWpts, timedPoints, milestones) {
+    if (!Array.isArray(rawWpts) || rawWpts.length === 0 || !Array.isArray(timedPoints) || timedPoints.length === 0) return [];
+    return rawWpts.map(w => {
+      let bestPt = timedPoints[0], bestD = Infinity;
+      for (const tp of timedPoints) {
+        const d = Math.abs((tp.distFromStartKm || 0) - (w.distFromStartKm || 0));
+        if (d < bestD) { bestD = d; bestPt = tp; }
+      }
+      let bestMs = milestones[0], bestMsD = Infinity;
+      for (const ms of (milestones || [])) {
+        const d = Math.abs((ms.distFromStartKm || 0) - (w.distFromStartKm || 0));
+        if (d < bestMsD) { bestMsD = d; bestMs = ms; }
+      }
+      const nLower = `${w.name} ${w.sym || ''}`.toLowerCase();
+      let icon = '📌';
+      if (/hütte|alm|haus|hut|shelter|refuge/.test(nLower)) icon = '🏠';
+      else if (/gipfel|peak|summit|horn|spitze|kopf|kreuz/.test(nLower)) icon = '🏔️';
+      else if (/wasser|quelle|brunnen|water/.test(nLower)) icon = '🚰';
+      else if (/park|start|bahnhof|p\+r/.test(nLower)) icon = '🅿️';
+      else if (/not|rettung|abstieg/.test(nLower)) icon = '🆘';
+
+      return {
+        ...w,
+        icon,
+        arrivalTimeStr: bestPt.arrivalDate ? `${bestPt.arrivalDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr` : '--:--',
+        tempC: bestMs ? bestMs.tempC : null,
+        weatherIcon: bestMs ? bestMs.weatherIcon : ''
+      };
+    });
+  },
+
+  /**
+   * 10-Tage Touren-Fenster-Planer für ALLE Sportarten (Rad, Berge, Skitour)
+   */
+  computeRoute10DayPlanner(category, sportType, parsedGPX, hPeak, hValley, dominantWindDir, avalancheReport, selectedDateKey) {
+    if (category === 'skitour' && avalancheReport && Array.isArray(avalancheReport.forecast10Days)) {
+      return avalancheReport.forecast10Days;
+    }
+    const h = hPeak || hValley || {};
+    const hTimes = h.time || [];
+    const pad2 = n => String(n).padStart(2, '0');
+    const buildDateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const buckets = {};
+    for (let i = 0; i < hTimes.length; i++) {
+      const dt = new Date(hTimes[i]);
+      if (isNaN(dt.getTime())) continue;
+      const k = buildDateStr(dt);
+      if (!buckets[k]) buckets[k] = [];
+      buckets[k].push({ idx: i, hr: dt.getHours() });
+    }
+
+    const baseToday = new Date();
+    baseToday.setHours(0, 0, 0, 0);
+    const wdNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    const days = [];
+    const maxEle = parsedGPX.maxElevationM || 1500;
+    const modelEle = h._modelElevation !== undefined ? h._modelElevation : maxEle;
+    const tempCorr = (maxEle - modelEle) * 0.0065;
+
+    for (let d = 0; d < 10; d++) {
+      const td = new Date(baseToday.getTime() + d * 86400000);
+      const dKey = buildDateStr(td);
+      const wd = td.getDay();
+      const entries = buckets[dKey] || [];
+      const dayEntries = entries.filter(e => e.hr >= 7 && e.hr <= 19);
+      const mornEntries = entries.filter(e => e.hr >= 7 && e.hr < 12);
+      const aftEntries = entries.filter(e => e.hr >= 12 && e.hr <= 18);
+
+      const scoreSlot = (slotEntries) => {
+        if (slotEntries.length === 0) return { label: 'GUT', color: '#22c55e', textColor: '#052e16', score: 80, tempC: 12 };
+        let rain = 0, maxG = 0, maxC = 0, tSum = 0, tCnt = 0;
+        slotEntries.forEach(({ idx }) => {
+          rain += (h.precipitation && h.precipitation[idx]) || 0;
+          maxG = Math.max(maxG, (h.wind_gusts_10m && h.wind_gusts_10m[idx]) || 0);
+          maxC = Math.max(maxC, (h.cape && h.cape[idx]) || 0);
+          if (h.temperature_2m && typeof h.temperature_2m[idx] === 'number') {
+            tSum += (h.temperature_2m[idx] - tempCorr);
+            tCnt++;
+          }
+        });
+        const avgT = tCnt > 0 ? Math.round(tSum / tCnt) : 10;
+        if (maxC >= 1100 || rain >= 6 || maxG >= 60) {
+          return { label: 'KRITISCH', color: '#ef4444', textColor: '#ffffff', score: 25, tempC: avgT };
+        }
+        if (maxC >= 500 || rain >= 1.5 || maxG >= 42) {
+          return { label: 'MITTEL', color: '#eab308', textColor: '#0f172a', score: 60, tempC: avgT };
+        }
+        return { label: 'TOP', color: '#22c55e', textColor: '#052e16', score: 92, tempC: avgT };
+      };
+
+      const morn = scoreSlot(mornEntries);
+      const aft = scoreSlot(aftEntries);
+      let dayRain = 0, dayMaxGust = 0, dayMaxCape = 0, dayMaxUv = 0, minT = 99, maxT = -99;
+      dayEntries.forEach(({ idx }) => {
+        dayRain += (h.precipitation && h.precipitation[idx]) || 0;
+        dayMaxGust = Math.max(dayMaxGust, (h.wind_gusts_10m && h.wind_gusts_10m[idx]) || 0);
+        dayMaxCape = Math.max(dayMaxCape, (h.cape && h.cape[idx]) || 0);
+        dayMaxUv = Math.max(dayMaxUv, (h.uv_index && h.uv_index[idx]) || 0);
+        if (h.temperature_2m && typeof h.temperature_2m[idx] === 'number') {
+          const t = h.temperature_2m[idx] - tempCorr;
+          if (t < minT) minT = t;
+          if (t > maxT) maxT = t;
+        }
+      });
+      if (minT > 90) { minT = 6; maxT = 14; }
+
+      const sun = this.computeRouteDaylightAnalysis(td.getTime() + 9 * 3600000, td.getTime() + 14 * 3600000, parsedGPX.points[0].lat, parsedGPX.points[0].lon, h);
+      const mainScore = Math.round((morn.score + aft.score) / 2);
+      const mainBadge = mainScore >= 80
+        ? (category === 'bike' ? '☀️ Trocken & ideal zum Fahren' : '☀️ Stabil & klare Sicht')
+        : (mainScore >= 55 ? '⛅ Wechselhaft / Wind oder Schauer' : '⚠️ Gewitter-, Sturm- oder Regenrisiko');
+
+      days.push({
+        dateKey: dKey,
+        dayLabel: d === 0 ? 'Heute' : (d === 1 ? 'Morgen' : `${wdNames[wd]} ${td.getDate()}.${td.getMonth() + 1}.`),
+        isWeekend: wd === 0 || wd === 6,
+        isSelected: dKey === selectedDateKey,
+        mainBadge,
+        subMetric: `💧 ${dayRain.toFixed(1)} mm • 💨 Böen ${Math.round(dayMaxGust)} km/h${dayMaxCape >= 450 ? ` • ⚡ CAPE ${Math.round(dayMaxCape)}` : ''}`,
+        tempRangeStr: `${Math.round(minT)}°–${Math.round(maxT)}°C • ☀️ ${sun.sunriseStr}–${sun.sunsetStr} • UV ${dayMaxUv.toFixed(0)}`,
+        morning: morn,
+        afternoon: aft,
+        score: mainScore
+      });
+    }
+    return days;
+  },
+
+  /**
+   * Berechnet die optimale Startzeit (inkl. echtem Sonnenauf-/-untergang, CAPE, Wind & Firn)
+   */
+  computeOptimalStartWindow({ category, startTimeMs, ascentDurH, totalDurH, hPeak, hValley, avalancheReport, daylightAnalysis, dominantDescentAspect, firnStartHr, firnEndHr }) {
+    const hP = hPeak || hValley || {};
+    const hTimes = hP.time || [];
+    const findClosest = (arr, targetMs) => {
+      let best = 0, minD = Infinity;
+      for (let i = 0; i < arr.length; i++) {
+        const diff = Math.abs(new Date(arr[i]).getTime() - targetMs);
+        if (diff < minD) { minD = diff; best = i; }
+      }
+      return best;
+    };
+
+    const tourDayRef = new Date(startTimeMs);
+    const sunsetCutoff = (daylightAnalysis && daylightAnalysis.sunsetDecimalHr) ? daylightAnalysis.sunsetDecimalHr - 0.2 : 17.0;
+    const sunriseStart = (daylightAnalysis && daylightAnalysis.sunriseDecimalHr) ? Math.max(5.5, daylightAnalysis.sunriseDecimalHr - 0.25) : 6.0;
+    const minStartMin = Math.round(sunriseStart * 60);
+    const maxStartMin = category === 'skitour' ? 10 * 60 + 30 : 13 * 60;
+
+    let bestCandidate = null;
+    for (let startMin = minStartMin; startMin <= maxStartMin; startMin += 30) {
+      const sDate = new Date(tourDayRef);
+      sDate.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
+      const sMs = sDate.getTime();
+      const peakMs = sMs + Math.round(ascentDurH * 3600000);
+      const endMs = sMs + Math.round(totalDurH * 3600000);
+      const sameDay = new Date(endMs).getDate() === sDate.getDate();
+      const peakHrDec = new Date(peakMs).getHours() + new Date(peakMs).getMinutes() / 60;
+      const endHrDec = sameDay ? (new Date(endMs).getHours() + new Date(endMs).getMinutes() / 60) : 25;
+
+      const pkIdx = findClosest(hTimes, peakMs);
+      const endIdx = findClosest(hTimes, endMs);
+      const pkWind = (hP.wind_gusts_10m && hP.wind_gusts_10m[pkIdx] !== undefined) ? hP.wind_gusts_10m[pkIdx] : 15;
+      const pkPrecip = (hP.precipitation && hP.precipitation[pkIdx] !== undefined) ? hP.precipitation[pkIdx] : 0;
+      const endPrecip = (hP.precipitation && hP.precipitation[endIdx] !== undefined) ? hP.precipitation[endIdx] : 0;
+      const pkCape = (hP.cape && hP.cape[pkIdx] !== undefined) ? hP.cape[pkIdx] : 0;
+      const endCape = (hP.cape && hP.cape[endIdx] !== undefined) ? hP.cape[endIdx] : 0;
+
+      let score = 100;
+      if (endHrDec > sunsetCutoff) score -= (endHrDec - sunsetCutoff) * 40;
+      if (category === 'skitour' && avalancheReport) {
+        if (!avalancheReport.isAllDayColdWinter) {
+          const targetMid = (firnStartHr + firnEndHr) / 2;
+          score -= Math.abs(peakHrDec - targetMid) * 9;
+          if (endHrDec > 12.5 && avalancheReport.afternoonDangerLevel > avalancheReport.morningDangerLevel) score -= 22;
+        } else {
+          score -= Math.abs(peakHrDec - 11.2) * 5;
+        }
+      } else if (category === 'mountain') {
+        score -= (pkCape >= 600 ? 30 : 0) + (endCape >= 600 ? 25 : 0);
+        score -= Math.abs(peakHrDec - 11.0) * 3;
+      } else {
+        score -= (endCape >= 600 ? 25 : 0);
+        score -= Math.abs(peakHrDec - 12.5) * 2.5;
+      }
+      score -= (pkWind * 0.25) + ((pkPrecip + endPrecip) * 12);
+
+      if (!bestCandidate || score > bestCandidate.score) {
+        const pad2 = n => String(n).padStart(2, '0');
+        const pkDt = new Date(peakMs);
+        const enDt = new Date(endMs);
+        let reason = `Optimaler Tageslicht- & Windkorridor (${Math.round(pkWind)} km/h Böen, Rückkehr ${pad2(enDt.getHours())}:${pad2(enDt.getMinutes())} Uhr)`;
+        if (category === 'skitour' && avalancheReport && !avalancheReport.isAllDayColdWinter) {
+          reason = `Gipfel um ${pad2(pkDt.getHours())}:${pad2(pkDt.getMinutes())} Uhr genau im Firnfenster (${dominantDescentAspect}-Abfahrt vor Sulz)`;
+        } else if (category === 'mountain' && Math.max(pkCape, endCape) >= 500) {
+          reason = `Frühes Zeitfenster vor nachmittäglichem Gewitterpotenzial (Ziel ${pad2(enDt.getHours())}:${pad2(enDt.getMinutes())} Uhr)`;
+        }
+        bestCandidate = {
+          score: Math.round(score),
+          startTimeValue: `${pad2(sDate.getHours())}:${pad2(sDate.getMinutes())}`,
+          summitTimeStr: `${pad2(pkDt.getHours())}:${pad2(pkDt.getMinutes())} Uhr`,
+          finishTimeStr: `${pad2(enDt.getHours())}:${pad2(enDt.getMinutes())} Uhr`,
+          reason
+        };
+      }
+    }
+    return bestCandidate;
+  },
+
+  /**
+   * STUFE 9d: Routen-Gefahrenanalyse & Passwarnung (inkl. Tageslicht, CAPE, Untergrund)
+   */
+  analyzeRouteHazards(milestones, category = 'bike', avalancheReport = null, slopeStats = null, context = {}) {
     const alerts = [];
     let worstSeverity = 'green';
 
@@ -6495,13 +7153,53 @@ export const MicroEngine = {
         ele: firstWo.ele || 1800,
         time: firstWo.arrivalTimeStr || 'Tourverlauf',
         title: `Dichte Wolken / Whiteout ab ${Math.round(firstWo.ele || 1800).toLocaleString('de-DE')} m (${whiteoutPts.length} Wegpunkte)`,
-        desc: 'Kontrastverlust im freien Skigelände durch dichte Bewölkung und geringe Taupunkt-Differenz. Kontrastbrille & GPX-Tracking nutzen.'
+        desc: 'Kontrastverlust im freien Gelände durch dichte Bewölkung und geringe Taupunkt-Differenz. GPX-Spur & Sichtmarker im Blick behalten.'
       });
       if (worstSeverity === 'green') worstSeverity = 'yellow';
     }
 
+    // Tageslicht- & Dämmerungswarnung für alle Sportarten
+    const dl = context.daylightAnalysis;
+    if (dl && (dl.finishesInDarkness || dl.finishesInTwilight || dl.startsInDarkness)) {
+      const lastMs = milestones[milestones.length - 1] || {};
+      const isDark = dl.finishesInDarkness;
+      alerts.push({
+        severity: isDark ? 'red' : 'yellow',
+        icon: isDark ? '🌙' : '🌆',
+        type: 'Tageslicht & Dämmerung',
+        km: lastMs.distFromStartKm || 0,
+        ele: lastMs.ele || 1000,
+        time: dl.sunsetStr ? `Sonnenuntergang ${dl.sunsetStr} Uhr` : 'Dämmerung',
+        title: dl.statusBadge,
+        desc: isDark
+          ? `Zielankunft liegt nach Einbruch der bürgerlichen Dämmerung (${dl.civilTwilightEndStr} Uhr). Beleuchtung/Stirnlampe nötig oder früher starten.`
+          : `Ankunft liegt im Tal-Schatten- bzw. Dämmerungsbereich rund um ${dl.sunsetStr} Uhr.`
+      });
+      if (isDark) worstSeverity = 'red';
+      else if (worstSeverity === 'green') worstSeverity = 'yellow';
+    }
+
+    // Untergrund-, Nässe- & Vereisungs-Warnung
+    const surf = context.surfaceAnalysis;
+    if (surf && surf.severity && surf.severity !== 'green' && category !== 'skitour') {
+      alerts.push({
+        severity: surf.severity,
+        icon: surf.severity === 'red' ? '🧊' : '🪨',
+        type: category === 'bike' ? 'Fahrbahn & Untergrund' : 'Fels, Steig & Schneeauflage',
+        km: 0,
+        ele: surf.snowlineOnRouteM || (milestones[milestones.length - 1]?.ele || 1500),
+        time: 'Untergrund-Check',
+        title: surf.statusLabel,
+        desc: surf.detailText
+      });
+      if (surf.severity === 'red') worstSeverity = 'red';
+      else if (worstSeverity === 'green') worstSeverity = 'yellow';
+    }
+
+    let capeAlertEmitted = false;
+    let visAlertEmitted = false;
     milestones.forEach(m => {
-      // 1. Gewitter & Blitzgefahr (Kritisches Alpin-Fenster)
+      // 1. Gewitter & Blitzgefahr (Kritisches Alpin-Fenster) + CAPE-Vorstufe
       if (m.weatherCode >= 95 || m.weatherCondition.includes('Gewitter')) {
         alerts.push({
           severity: 'red',
@@ -6514,6 +7212,36 @@ export const MicroEngine = {
           desc: `Auf ${m.ele} m Höhe akute Blitzschlaggefahr! Grate und exponierte Steige vor ${m.arrivalTimeStr} verlassen oder Tourstart vorverlegen.`
         });
         worstSeverity = 'red';
+      } else if (!capeAlertEmitted && (m.capeJkg || 0) >= 600) {
+        capeAlertEmitted = true;
+        const isHighCape = m.capeJkg >= 1200;
+        alerts.push({
+          severity: isHighCape ? 'red' : 'yellow',
+          icon: '⛈️',
+          type: 'Konvektives Gewitterpotenzial (CAPE)',
+          km: m.distFromStartKm,
+          ele: m.ele,
+          time: m.arrivalTimeStr,
+          title: `Gewitter-Vorstufe ab ${m.arrivalTimeStr} (CAPE ${m.capeJkg} J/kg)`,
+          desc: `Thermische Labilisierung ab ${m.arrivalTimeStr} bei ${m.label}. Exponierte Grate, Klettersteige und Pässe frühzeitig passieren.`
+        });
+        if (isHighCape) worstSeverity = 'red';
+        else if (worstSeverity === 'green') worstSeverity = 'yellow';
+      }
+
+      if (!visAlertEmitted && typeof m.visibilityM === 'number' && m.visibilityM > 0 && m.visibilityM < 500) {
+        visAlertEmitted = true;
+        alerts.push({
+          severity: 'yellow',
+          icon: '👁️',
+          type: 'Starke Sichtbehinderung',
+          km: m.distFromStartKm,
+          ele: m.ele,
+          time: m.arrivalTimeStr,
+          title: `Nebel / Sichtweite unter ${m.visibilityM} m bei ${m.label} (${m.arrivalTimeStr})`,
+          desc: 'Erhöhte Orientierungs- und Kollisionsgefahr auf Straßen und Steigen.'
+        });
+        if (worstSeverity === 'green') worstSeverity = 'yellow';
       }
 
       // 2. Sturmböen & Seitenwind
@@ -6538,7 +7266,7 @@ export const MicroEngine = {
           ele: m.ele,
           time: m.arrivalTimeStr,
           title: `Böenspitzen ${m.gustsKmH} km/h bei km ${m.distFromStartKm.toFixed(1)}`,
-          desc: `Windweste / winddichte Bekleidung empfohlen.`
+          desc: `Erhöhte Windanfälligkeit auf ungeschützten Kamm- und Brückenabschnitten.`
         });
         if (worstSeverity === 'green') worstSeverity = 'yellow';
       }
@@ -6553,7 +7281,7 @@ export const MicroEngine = {
           ele: m.ele,
           time: m.arrivalTimeStr,
           title: `Kräftiger Gegenwind (-${m.relWindKmH} km/h) bei km ${m.distFromStartKm.toFixed(1)}`,
-          desc: `Frontaler Gegenwind kostet viel Watt & Ausdauer. Kraftreserven / Akku einteilen.`
+          desc: `Frontaler Gegenwind senkt das Tempo und verlängert die Fahrzeit (im Timing bereits eingerechnet).`
         });
         if (worstSeverity === 'green') worstSeverity = 'yellow';
       }
@@ -6568,7 +7296,7 @@ export const MicroEngine = {
           ele: m.ele,
           time: m.arrivalTimeStr,
           title: `Seitenwind-Böen bis ${m.gustsKmH} km/h bei km ${m.distFromStartKm.toFixed(1)}`,
-          desc: `Achtung auf schnellen Abschnitten & Brücken! Seitenwind greift quer in Laufräder / Felgen ein.`
+          desc: `Achtung auf schnellen Abfahrten & Brücken! Seitenwind greift quer in Laufräder ein.`
         });
         if (m.gustsKmH >= 55) worstSeverity = 'red';
         else if (worstSeverity === 'green') worstSeverity = 'yellow';
@@ -6579,12 +7307,12 @@ export const MicroEngine = {
         alerts.push({
           severity: m.descentWindchillC <= 0 ? 'red' : 'yellow',
           icon: '🥶',
-          type: 'Abfahrts-Unterkühlung',
+          type: 'Abfahrts-Auskühlung',
           km: m.distFromStartKm,
           ele: m.ele,
           time: m.arrivalTimeStr,
           title: `Abfahrts-RealFeel nur ${m.descentWindchillC}°C bei ${m.label}`,
-          desc: `Durch den Fahrtwind kühlt der Körper bei schneller Talfahrt extrem schnell aus. Windweste, Membranjacke & Handschuhe unbedingt erforderlich!`
+          desc: `Durch den hohen Fahrtwind auf der Abfahrt kühlt der Körper stark aus.`
         });
         if (m.descentWindchillC <= 0 && worstSeverity !== 'red') worstSeverity = 'yellow';
         else if (worstSeverity === 'green') worstSeverity = 'yellow';
@@ -6615,7 +7343,7 @@ export const MicroEngine = {
           ele: m.ele,
           time: m.arrivalTimeStr,
           title: `Starker Regen (${m.precipMm} mm/h) um ${m.arrivalTimeStr}`,
-          desc: `Gute Regenbekleidung und Schutz vor Auskühlung erforderlich.`
+          desc: `Nässe-, Sicht- und Rutschgefahr auf Straßen und Wegen beachten.`
         });
         if (worstSeverity === 'green') worstSeverity = 'yellow';
       }
@@ -6626,10 +7354,10 @@ export const MicroEngine = {
 
     if (worstSeverity === 'red') {
       overallVerdict = '🚨 Akute Wetterwarnungen auf der Route!';
-      overallSummary = 'Auf einzelnen Streckenabschnitten drohen schwere Wettergefahren (Gewitter / Sturm). Passe deine Startzeit an oder wähle eine wettergeschützte Alternativroute!';
+      overallSummary = 'Auf einzelnen Streckenabschnitten drohen schwere Gefahren (Gewitter, Sturm, Vereisung oder Dunkelheit). Passe Startzeit oder Route an!';
     } else if (worstSeverity === 'yellow') {
       overallVerdict = '🟡 Erhöhte Vorsicht & wechselhaftes Wetter';
-      overallSummary = 'Auf exponierten Höhenabschnitten sind Windböen, Schauer oder Kälte möglich. Passende Bekleidung (Regenschutz, Zwiebelprinzip) einpacken.';
+      overallSummary = 'Auf exponierten Höhen- oder Untergrundabschnitten sind Wind, Schauer, Nässe oder Gewitterpotenzial aktiv.';
     }
 
     return {

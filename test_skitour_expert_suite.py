@@ -515,7 +515,8 @@ def run_skitour_suite():
 <trkpt lat="47.26400" lon="10.12000"><ele>1250</ele></trkpt>
 </trkseg></trk></gpx>'''
         page.set_input_files("#sports-file-input", files=[{"name": "DoublePeak.gpx", "mimeType": "application/gpx+xml", "buffer": double_peak_gpx.encode("utf-8")}])
-        page.wait_for_function("() => document.getElementById('skitour-agency-tag') && document.getElementById('skitour-agency-tag').innerText.includes('2.060')", timeout=10000)
+        page.wait_for_function("() => window.state?.sports?.timeline?.maxElevationM === 2060 && document.getElementById('skitour-agency-tag')?.innerText.includes('2.060')", timeout=10000)
+        page.locator("#sports-map-elevation-dock").scroll_into_view_if_needed()
         page.wait_for_timeout(200)
         c_box = page.locator("#smed-chart-wrap").bounding_box()
         assert c_box
@@ -533,6 +534,68 @@ def run_skitour_suite():
         assert "Abfahrt" in m4, f"Expected Abfahrt on descent 2, got {m4}"
         assert "(Limit" not in ex1, f"No cryptic Limit suffix allowed, got {ex1}"
         print("✓ Map-Integrated Elevation Profile (Inline, Fullscreen, Double-Ascent Phase Detection, Clean Labels & Collapse) verified!")
+
+        print("\n--- TEST 14: Profi-Sportplanung (Rad/Berge/Skitour, Sub-Disziplinen, Pause, <wpt>, Daylight, 10-Day) ---")
+        # 1. Verbotene / nicht gewünschte Module strikt ausgeschlossen prüfen
+        assert page.locator("#sports-subsport-selector [data-subsport='skimo']").count() == 0, "Skimo Race must NOT be present"
+        # 2. Globaler Notfall-Button & Briefing-Button bei Rad/Berge prüfen
+        page.locator('.sports-route-preset[data-tour="allgaeu-radtour"]').click(force=True)
+        page.wait_for_function("() => window.state?.sports?.category === 'bike' && document.getElementById('sports-pro-planner-card')?.style.display !== 'none'", timeout=8000)
+        page.click("#sports-global-emergency-btn", force=True)
+        assert page.is_visible("#skitour-emergency-modal"), "Global Emergency modal must open for Bike category"
+        page.click("#skitour-emergency-close", force=True)
+        assert page.is_visible("#sports-briefing-btn"), "Briefing export button must be visible"
+        assert page.is_visible("#sports-pro-meta-strip"), "Daylight & UV strip must be visible"
+        assert page.locator("#sp-10day-list .skitour-10day-row").count() == 10, "Bike must render 10-day planner"
+        page.locator("#sports-pro-planner-card").scroll_into_view_if_needed()
+        page.wait_for_timeout(150)
+        page.locator("#sports-pro-planner-card").screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_rad_pro_cockpit.png")
+
+        # 3. Sub-Disziplin Gravel / E-Bike umschalten
+        page.eval_on_selector("#sports-setup-drawer", "el => el.open = true")
+        page.locator("#sss-pills-bike [data-subsport='e_bike']").click(force=True)
+        page.wait_for_function("() => window.state?.sports?.sportType === 'e_bike'", timeout=5000)
+
+        # 4. Pause-Steuerung prüft echte Ankunftszeit-Verschiebung (+30 min)
+        end_before = page.evaluate("() => window.state.sports.timeline.endTimeMs")
+        page.locator("#sports-pause-presets [data-pause-min='30']").click(force=True)
+        page.wait_for_function("(prevEnd) => window.state.sports.timeline.endTimeMs >= prevEnd + 25 * 60000", arg=end_before, timeout=5000)
+        page.locator("#sports-pause-presets [data-pause-min='0']").click(force=True)
+
+        # 5. Berge-Subdisziplinen + Klettersteig + GPX <wpt> Pins & Dämmerungs-Warnung
+        page.locator('.sports-route-preset[data-tour="nebelhorn-oberstdorf"]').click(force=True)
+        page.wait_for_function("() => window.state?.sports?.category === 'mountain'", timeout=8000)
+        page.locator("#sss-pills-mountain [data-subsport='via_ferrata']").click(force=True)
+        page.wait_for_function("() => window.state?.sports?.sportType === 'via_ferrata'", timeout=5000)
+
+        wpt_gpx = '''<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1">
+<wpt lat="47.4125" lon="10.3085"><ele>1280</ele><name>Seealpe Hütte</name></wpt>
+<wpt lat="47.4223" lon="10.3444"><ele>2224</ele><name>Nebelhorn Gipfelkreuz</name></wpt>
+<trk><name>Nebelhorn Pro Test</name><trkseg>
+<trkpt lat="47.4080" lon="10.2790"><ele>813</ele></trkpt>
+<trkpt lat="47.4125" lon="10.3085"><ele>1280</ele></trkpt>
+<trkpt lat="47.4185" lon="10.3280"><ele>1800</ele></trkpt>
+<trkpt lat="47.4223" lon="10.3444"><ele>2224</ele></trkpt>
+<trkpt lat="47.4420" lon="10.3010"><ele>867</ele></trkpt>
+</trkseg></trk></gpx>'''
+        page.set_input_files("#sports-file-input", files=[{"name": "NebelhornWpt.gpx", "mimeType": "application/gpx+xml", "buffer": wpt_gpx.encode("utf-8")}])
+        page.wait_for_function("() => (window.state?.sports?.timeline?.mappedWaypoints?.length || 0) >= 2", timeout=8000)
+        page.eval_on_selector("#sports-waypoints-drawer", "el => el.open = true")
+        assert page.locator("#sports-gpx-wpts-strip .sgws-chip").count() >= 2, "Embedded GPX <wpt> chips must render"
+        assert page.locator("#sports-map-container .sports-gpx-wpt-marker").count() >= 2, "Embedded GPX <wpt> markers must render on map"
+
+        # Spät-Start (16:00 Uhr) muss echte Dämmerungs-/Dunkelheitswarnung erzeugen
+        page.fill("#sports-time-input", "16:00")
+        page.dispatch_event("#sports-time-input", "change")
+        page.wait_for_function("() => Boolean(window.state?.sports?.timeline?.daylightAnalysis?.finishesInDarkness || window.state?.sports?.timeline?.daylightAnalysis?.finishesInTwilight)", timeout=5000)
+        page.locator("#sports-hero-card").scroll_into_view_if_needed()
+        page.wait_for_timeout(150)
+        page.locator("#sports-hero-card").screenshot(path="/Users/jona/.gemini/antigravity/brain/651643d1-e15d-4786-a068-5a561de2bd2f/verified_mountain_pro_hero.png")
+
+        # 6. Skitour Abfellpuffer & Tragestrecken-Prüfung
+        page.locator('.sports-route-preset[data-tour="skitour-sellrain"]').click(force=True)
+        page.wait_for_function("() => window.state?.sports?.category === 'skitour' && window.state?.sports?.timeline?.abfellPauseMinutes === 10", timeout=8000)
+        print("✓ Profi-Sportplanung (Rad/Berge/Skitour, Sub-Disziplinen, Pause+Abfellpuffer, <wpt>, Daylight, 10-Day) verified!")
 
         context.close()
         browser.close()

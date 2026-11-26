@@ -391,6 +391,49 @@ export function updateSportsStartTime(newDateStr, newTimeStr) {
   recomputeSportsTimeline();
 }
 
+export function syncSubSportUI() {
+  const cat = state.sports.category || 'mountain';
+  const bGroup = document.getElementById('sss-pills-bike');
+  const mGroup = document.getElementById('sss-pills-mountain');
+  const sGroup = document.getElementById('sss-pills-skitour');
+  if (bGroup) bGroup.style.display = cat === 'bike' ? 'flex' : 'none';
+  if (mGroup) mGroup.style.display = cat === 'mountain' ? 'flex' : 'none';
+  if (sGroup) sGroup.style.display = cat === 'skitour' ? 'flex' : 'none';
+
+  document.querySelectorAll('#sports-subsport-selector .sss-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.subsport === state.sports.sportType);
+  });
+  const pauseHint = document.getElementById('sports-pause-hint');
+  if (pauseHint) {
+    pauseHint.innerText = cat === 'skitour'
+      ? 'Pause am Gipfel (zzgl. +10 Min automatischer Abfellpuffer).'
+      : 'Wird am Scheitelpunkt auf Ankunfts- & Wetterzeiten aufgerechnet.';
+  }
+}
+
+export function setAthleteSubSport(subSport, applyDefaultPace = true) {
+  state.sports.sportType = subSport;
+  if (applyDefaultPace) {
+    if (subSport === 'road_bike') state.sports.bikeSpeedKmH = 26.0;
+    else if (subSport === 'gravel_mtb') state.sports.bikeSpeedKmH = 18.0;
+    else if (subSport === 'e_bike') state.sports.bikeSpeedKmH = 24.0;
+    else if (subSport === 'hiking') { state.sports.mountainSpeedKmH = 4.0; state.sports.mountainAscentHmH = 400; }
+    else if (subSport === 'via_ferrata') { state.sports.mountainSpeedKmH = 3.0; state.sports.mountainAscentHmH = 300; }
+    else if (subSport === 'trailrun') { state.sports.mountainSpeedKmH = 7.0; state.sports.mountainAscentHmH = 650; }
+    else if (subSport === 'high_alpine') { state.sports.mountainSpeedKmH = 3.0; state.sports.mountainAscentHmH = 320; }
+  }
+  const bikeSlider = document.getElementById('bike-speed-slider');
+  const mtnSpeedSlider = document.getElementById('mtn-speed-slider');
+  const mtnAscentSlider = document.getElementById('mtn-ascent-slider');
+  if (bikeSlider) bikeSlider.value = state.sports.bikeSpeedKmH;
+  if (mtnSpeedSlider) mtnSpeedSlider.value = state.sports.mountainSpeedKmH;
+  if (mtnAscentSlider) mtnAscentSlider.value = state.sports.mountainAscentHmH;
+
+  syncSubSportUI();
+  updateSportPaceBadges();
+  recomputeSportsTimeline();
+}
+
 export function setAthleteCategory(cat) {
   state.sports.category = cat;
   state.sports.sportType = cat === 'bike' ? 'road_bike' : (cat === 'skitour' ? 'ski_touring' : 'hiking');
@@ -418,6 +461,7 @@ export function setAthleteCategory(cat) {
     sp.classList.toggle('active', sp.dataset.sport === state.sports.sportType);
   });
 
+  syncSubSportUI();
   updateSportPaceBadges();
   recomputeSportsTimeline();
 
@@ -835,28 +879,88 @@ export function setupSportsTab() {
     });
   }
 
-  // Optimalen Tourstart übernehmen
+  // Sub-Disziplin Auswahl (Rennrad, Gravel/MTB, E-Bike | Bergtour, Klettersteig, Trailrun, Hochtour | Skitour)
+  const subSportBtns = document.querySelectorAll('#sports-subsport-selector .sss-pill');
+  subSportBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sp = btn.dataset.subsport;
+      if (sp) setAthleteSubSport(sp, true);
+    });
+  });
+
+  // Geplante Gipfel-/Zwischenpause
+  const pauseBtns = document.querySelectorAll('#sports-pause-presets .stsp-preset-btn');
+  pauseBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      pauseBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.sports.pauseMinutes = parseInt(btn.dataset.pauseMin, 10) || 0;
+      recomputeSportsTimeline();
+    });
+  });
+
+  // Optimalen Tourstart übernehmen (gemeinsam für Skitour + Rad/Berge)
+  const applyOptimalStart = (btn) => {
+    const targetTime = btn?.dataset?.startTime;
+    if (!targetTime) return;
+    const topBefore = btn.getBoundingClientRect().top;
+    const timeInputEl = document.getElementById('sports-time-input');
+    if (timeInputEl) timeInputEl.value = targetTime;
+    document.querySelectorAll('#sports-time-presets .stsp-preset-btn').forEach(b => b.classList.remove('active'));
+    updateSportsStartTime(null, targetTime);
+    const topAfter = btn.getBoundingClientRect().top;
+    if (Math.abs(topAfter - topBefore) > 1) window.scrollBy(0, topAfter - topBefore);
+  };
   const optStartBtn = document.getElementById('st-optimal-start-btn');
-  if (optStartBtn) {
-    optStartBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const targetTime = optStartBtn.dataset.startTime;
-      if (!targetTime) return;
-      const topBefore = optStartBtn.getBoundingClientRect().top;
-      const timeInput = document.getElementById('sports-time-input');
-      if (timeInput) timeInput.value = targetTime;
-      document.querySelectorAll('#sports-time-presets .stsp-preset-btn').forEach(b => b.classList.remove('active'));
-      updateSportsStartTime(null, targetTime);
-      const topAfter = optStartBtn.getBoundingClientRect().top;
-      if (Math.abs(topAfter - topBefore) > 1) window.scrollBy(0, topAfter - topBefore);
+  const spOptStartBtn = document.getElementById('sp-optimal-start-btn');
+  if (optStartBtn) optStartBtn.addEventListener('click', (e) => { e.preventDefault(); applyOptimalStart(optStartBtn); });
+  if (spOptStartBtn) spOptStartBtn.addEventListener('click', (e) => { e.preventDefault(); applyOptimalStart(spOptStartBtn); });
+
+  // 1-Klick Tour-Briefing Export/Kopieren
+  const briefingBtn = document.getElementById('sports-briefing-btn');
+  if (briefingBtn) {
+    briefingBtn.addEventListener('click', async () => {
+      const tl = state.sports.timeline;
+      if (!tl) return;
+      const dl = tl.daylightAnalysis;
+      const av = tl.avalancheReport;
+      const surf = tl.surfaceAnalysis;
+      const lines = [
+        `📍 TOUR-BRIEFING: ${state.sports.gpxName || 'Tour'}`,
+        `🏅 Sportart: ${tl.sportName} (${tl.paceLabel})`,
+        `📅 Datum & Zeit: ${tl.startDateStr} • Start ${tl.startTimeStr} Uhr ➔ Ziel ${tl.endTimeStr} Uhr (${tl.totalDurationStr}${tl.totalPauseMinutes > 0 ? `, inkl. ${tl.totalPauseMinutes} min Pause/Puffer` : ''})`,
+        `📏 Eckdaten: ${tl.totalDistanceKm.toFixed(1)} km • +${Math.round(tl.totalAscentM)} Hm / -${Math.round(tl.totalDescentM)} Hm (Gipfel ${Math.round(tl.maxElevationM)} m)`,
+        dl ? `☀️ Tageslicht: ${dl.sunriseStr}–${dl.sunsetStr} Uhr • ${dl.statusBadge}` : '',
+        surf ? `🪨 Untergrund: ${surf.statusLabel}` : '',
+        tl.category === 'skitour' && av ? `⚠️ Lawinenlage: ${av.dangerTitle} über ${av.criticalElevation} m • ${av.problems?.[0]?.name || 'Triebschnee'} • Munter: ${tl.munterAnalysis?.verdictText || ''}` : '',
+        `⚠️ Wetter-Fazit: ${tl.hazards?.verdict || 'Geprüft'} • Spitzen-UV ${tl.uvPeak || 0}`,
+        `🆘 Bergrettung: AT 140 | CH 1414 | IT 118 | DE/EU 112`
+      ].filter(Boolean);
+      const txt = lines.join('\n');
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: `Tour-Briefing: ${state.sports.gpxName || 'Tour'}`, text: txt });
+        } else if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(txt);
+        }
+        briefingBtn.innerText = '✅ Kopiert';
+        setTimeout(() => { briefingBtn.innerText = '📋 Briefing'; }, 2000);
+      } catch (_) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(txt);
+          briefingBtn.innerText = '✅ Kopiert';
+          setTimeout(() => { briefingBtn.innerText = '📋 Briefing'; }, 2000);
+        } catch (__) {}
+      }
     });
   }
 
-  // Offline Alpine Notfallkarte Modal
+  // Offline Alpine Notfallkarte Modal (für ALLE Sportarten über globalen Hero-Button + Skitour-Button erreichbar)
   const emergencyBtn = document.getElementById('skitour-emergency-btn');
+  const globalEmergencyBtn = document.getElementById('sports-global-emergency-btn');
   const emergencyModal = document.getElementById('skitour-emergency-modal');
   const emergencyClose = document.getElementById('skitour-emergency-close');
-  if (emergencyBtn && emergencyModal) {
+  if (emergencyModal && (emergencyBtn || globalEmergencyBtn)) {
     const toDms = (deg, posChar, negChar) => {
       const dir = deg >= 0 ? posChar : negChar;
       const abs = Math.abs(deg);
@@ -866,7 +970,7 @@ export function setupSportsTab() {
       const s = ((mFloat - m) * 60).toFixed(1);
       return `${d}°${String(m).padStart(2, '0')}'${s}"${dir}`;
     };
-    emergencyBtn.addEventListener('click', () => {
+    const openEmergencyModal = () => {
       const tl = state.sports.timeline;
       const pt = (tl && tl.timedPoints && tl.timedPoints[state.sports.currentPointIndex || 0])
         || (tl && tl.timedPoints && tl.timedPoints[0])
@@ -885,7 +989,9 @@ export function setupSportsTab() {
         eleEl.innerText = `Höhe: ${ele.toLocaleString('de-DE')} m • Tour/Ort: ${valleyName}`;
       }
       emergencyModal.style.display = 'flex';
-    });
+    };
+    if (emergencyBtn) emergencyBtn.addEventListener('click', openEmergencyModal);
+    if (globalEmergencyBtn) globalEmergencyBtn.addEventListener('click', openEmergencyModal);
     if (emergencyClose) {
       emergencyClose.addEventListener('click', () => { emergencyModal.style.display = 'none'; });
     }
@@ -1254,7 +1360,8 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
     return cachedEntry;
   }
 
-  const hourlyVars = 'temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height,snowfall,snow_depth,cloud_cover,shortwave_radiation';
+  const hourlyVars = 'temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,freezing_level_height,snowfall,snow_depth,cloud_cover,shortwave_radiation,uv_index,cape,visibility';
+  const dailyVars = 'sunrise,sunset,daylight_duration';
   const currentVars = 'temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,snowfall,snow_depth,cloud_cover';
 
   // Offiziellen Lawinenlagebericht (gesamter Alpenraum CAAMLv6) + 5-Netz-Live-Schneepegel + GeoSphere AROME 1 km + 2D DEM parallel anfragen
@@ -1302,7 +1409,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
       const lats = `${Number(startPt.lat).toFixed(3)},${Number(peakPt.lat).toFixed(3)}`;
       const lons = `${Number(startPt.lon).toFixed(3)},${Number(peakPt.lon).toFixed(3)}`;
       const eles = `${Math.round(startPt.ele || 800)},${Math.round(peakPt.ele || 2000)}`;
-      const multiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&elevation=${eles}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=10&timezone=auto${modelsQuery}`;
+      const multiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&elevation=${eles}&current=${currentVars}&hourly=${hourlyVars}&daily=${dailyVars}&past_days=3&forecast_days=10&timezone=auto${modelsQuery}`;
       let [res, officialBulletin, snowStationData, arome1kmPkg, demSamples] = await Promise.all([
         resilientFetch(multiUrl, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh }).catch(() => null),
         officialPromise,
@@ -1311,7 +1418,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
         demPromise
       ]);
       if (!res) {
-        const plainUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&elevation=${eles}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=10&timezone=auto`;
+        const plainUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&elevation=${eles}&current=${currentVars}&hourly=${hourlyVars}&daily=${dailyVars}&past_days=3&forecast_days=10&timezone=auto`;
         res = await resilientFetch(plainUrl, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh });
       }
       const items = Array.isArray(res) ? res : (res && res.hourly ? [res] : []);
@@ -1339,7 +1446,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
     // Fallback / Single-Point Live Query (mit past_days=3 & 10 Tagen Vorhersage + Alpine-Ensemble)
     const targetPt = peakPt || startPt;
     const eleParam = targetPt.ele !== undefined ? `&elevation=${Math.round(targetPt.ele)}` : '';
-    const multiSingleUrl = `https://api.open-meteo.com/v1/forecast?latitude=${Number(targetPt.lat).toFixed(3)}&longitude=${Number(targetPt.lon).toFixed(3)}${eleParam}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=10&timezone=auto${modelsQuery}`;
+    const multiSingleUrl = `https://api.open-meteo.com/v1/forecast?latitude=${Number(targetPt.lat).toFixed(3)}&longitude=${Number(targetPt.lon).toFixed(3)}${eleParam}&current=${currentVars}&hourly=${hourlyVars}&daily=${dailyVars}&past_days=3&forecast_days=10&timezone=auto${modelsQuery}`;
     let [data, officialBulletin, snowStationData, arome1kmPkg, demSamples] = await Promise.all([
       resilientFetch(multiSingleUrl, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh }).catch(() => null),
       officialPromise,
@@ -1348,7 +1455,7 @@ export async function fetchHourlyForRoute(lat, lon, parsedGPX = null, forceRefre
       demPromise
     ]);
     if (!data) {
-      const plainSingleUrl = `https://api.open-meteo.com/v1/forecast?latitude=${Number(targetPt.lat).toFixed(3)}&longitude=${Number(targetPt.lon).toFixed(3)}${eleParam}&current=${currentVars}&hourly=${hourlyVars}&past_days=3&forecast_days=10&timezone=auto`;
+      const plainSingleUrl = `https://api.open-meteo.com/v1/forecast?latitude=${Number(targetPt.lat).toFixed(3)}&longitude=${Number(targetPt.lon).toFixed(3)}${eleParam}&current=${currentVars}&hourly=${hourlyVars}&daily=${dailyVars}&past_days=3&forecast_days=10&timezone=auto`;
       data = await resilientFetch(plainSingleUrl, { ttlMs: LIVE_TTL_MS, persist: true, forceRefresh });
     }
     if (data && data.hourly && data.hourly.time && data.hourly.time.length > 0) {
@@ -1409,6 +1516,9 @@ export function generateSyntheticSportsHourly() {
   const snowfall = [];
   const snowDepth = [];
   const clouds = [];
+  const uvArr = [];
+  const capeArr = [];
+  const visArr = [];
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
@@ -1429,6 +1539,9 @@ export function generateSyntheticSportsHourly() {
     winds.push(isSnowBurst ? 30 : 15);
     gusts.push(isSnowBurst ? 48 : 24);
     freezing.push(1600);
+    uvArr.push(hr >= 9 && hr <= 16 ? 3.5 : 0);
+    capeArr.push(hr >= 13 && hr <= 17 ? 120 : 20);
+    visArr.push(isSnowBurst ? 800 : 20000);
   }
 
   return {
@@ -1443,7 +1556,10 @@ export function generateSyntheticSportsHourly() {
     freezing_level_height: freezing,
     snowfall,
     snow_depth: snowDepth,
-    cloud_cover: clouds
+    cloud_cover: clouds,
+    uv_index: uvArr,
+    cape: capeArr,
+    visibility: visArr
   };
 }
 
@@ -1855,6 +1971,17 @@ export function renderSkitourDashboard(timeline) {
       whiteEl.innerText = timeline.whiteoutAnalysis.summary;
       whiteEl.classList.toggle('is-warn', !!timeline.whiteoutAnalysis.active);
     }
+    const carryEl = document.getElementById('st-carry-ski-row');
+    if (carryEl) {
+      const carry = timeline.surfaceAnalysis && timeline.surfaceAnalysis.carrySkiInfo;
+      if (carry && carry.summary) {
+        carryEl.style.display = 'block';
+        carryEl.innerText = carry.summary;
+        carryEl.classList.toggle('is-warn', !!carry.needed);
+      } else {
+        carryEl.style.display = 'none';
+      }
+    }
     if (optBtn) {
       const opt = timeline.optimalStartAdvisor;
       if (opt && opt.startTimeValue) {
@@ -2078,6 +2205,7 @@ export function recomputeSportsTimeline() {
       skitourSpeedKmH: state.sports.skitourSpeedKmH,
       skitourAscentHmH: state.sports.skitourAscentHmH,
       skitourDescentKmH: state.sports.skitourDescentKmH,
+      pauseMinutes: state.sports.pauseMinutes || 0,
       peakForecast: state.sports.cachedPeakForecast || null,
       officialBulletin: state.sports.officialBulletin || null,
       snowStationData: state.sports.snowStationData || null,
@@ -2098,6 +2226,7 @@ export function recomputeSportsTimeline() {
   updateSportPaceBadges();
   renderInFlightTrackingPanel(timeline);
   renderSportsMetrics(timeline);
+  renderSportsProPlanner(timeline);
   renderSkitourDashboard(timeline);
   renderSportsHazards(timeline.hazards);
   updateNavigationWarningBadges();
@@ -2201,6 +2330,180 @@ export function renderSportsMetrics(timeline) {
       const dayName = finishDate.toLocaleDateString('de-DE', { weekday: 'short' });
       dFin.innerText = `${timeline.endTimeStr} Uhr (${dayName})`;
     }
+  }
+
+  // Hero Untertitel & Profi-Meta-Streifen (Tageslicht, Sonnenuntergang, Spitzen-UV, Pause/Abfellpuffer)
+  const heroSub = document.getElementById('sports-active-tour-sub');
+  if (heroSub) {
+    heroSub.innerText = `${timeline.sportName} • ${timeline.paceLabel} • Relativ-Wind & Höhenwetter`;
+  }
+  const metaStrip = document.getElementById('sports-pro-meta-strip');
+  if (metaStrip) {
+    metaStrip.style.display = 'flex';
+    const dlEl = document.getElementById('spms-daylight');
+    const ssEl = document.getElementById('spms-sunset-status');
+    const uvEl = document.getElementById('spms-uv');
+    const pEl = document.getElementById('spms-pause');
+    const dl = timeline.daylightAnalysis;
+    if (dlEl && dl) dlEl.innerText = `☀️ ${dl.sunriseStr}–${dl.sunsetStr} Uhr (${dl.daylightDurationStr})`;
+    if (ssEl && dl) {
+      ssEl.innerText = dl.statusBadge;
+      ssEl.className = `spms-chip ${dl.finishesInDarkness ? 'chip-red' : ((dl.finishesInTwilight || dl.startsInDarkness) ? 'chip-warn' : 'chip-ok')}`;
+    }
+    if (uvEl) {
+      const uv = timeline.uvPeak || 0;
+      uvEl.innerText = `🧴 Spitzen-UV ${uv.toFixed(1)}`;
+      uvEl.className = `spms-chip ${uv >= 8 ? 'chip-red' : (uv >= 5 ? 'chip-warn' : '')}`;
+    }
+    if (pEl) {
+      if ((timeline.totalPauseMinutes || 0) > 0) {
+        pEl.style.display = 'inline-flex';
+        pEl.innerText = timeline.abfellPauseMinutes > 0 && timeline.pauseMinutes > 0
+          ? `⏸️ Pause ${timeline.pauseMinutes} min + 10 min Abfellpuffer`
+          : (timeline.abfellPauseMinutes > 0 ? '⏸️ inkl. 10 min Abfellpuffer' : `⏸️ Pause ${timeline.pauseMinutes} min`);
+      } else {
+        pEl.style.display = 'none';
+      }
+    }
+  }
+}
+
+/**
+ * Rendert das universelle Profi-Cockpit & den 10-Tage-Best-Day-Planer für Rad & Berge
+ */
+export function renderSportsProPlanner(timeline) {
+  const card = document.getElementById('sports-pro-planner-card');
+  if (!card) return;
+  if (!timeline || timeline.category === 'skitour') {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+
+  const isBike = timeline.category === 'bike';
+  const iconEl = document.getElementById('sp-planner-icon');
+  const titleEl = document.getElementById('sp-planner-title');
+  if (iconEl) iconEl.innerText = timeline.sportIcon || (isBike ? '🚴' : '🏔️');
+  if (titleEl) titleEl.innerText = isBike
+    ? `RAD-COCKPIT (${timeline.sportName.toUpperCase()}): UNTERGRUND, ANSTIEGE & 10-TAGE-FENSTER`
+    : `BERGE-COCKPIT (${timeline.sportName.toUpperCase()}): FELS/SCHNEE, GEWITTER & 10-TAGE-FENSTER`;
+
+  // 1. Optimaler Startzeit-Button
+  const optBtn = document.getElementById('sp-optimal-start-btn');
+  if (optBtn) {
+    const opt = timeline.optimalStartAdvisor;
+    if (opt && opt.startTimeValue) {
+      optBtn.style.display = 'inline-flex';
+      optBtn.dataset.startTime = opt.startTimeValue;
+      optBtn.innerText = `⭐ Empfohlen: Start ${opt.startTimeValue} Uhr`;
+      optBtn.title = opt.reason || '';
+    } else {
+      optBtn.style.display = 'none';
+    }
+  }
+
+  // 2. Untergrund-, Nässe-, Vereisungs-, Schnee- & CAPE-Box
+  const surfBox = document.getElementById('sp-surface-box');
+  const surfTitle = document.getElementById('sp-surface-title');
+  const surfDesc = document.getElementById('sp-surface-desc');
+  const capeBadge = document.getElementById('sp-cape-badge');
+  const batNote = document.getElementById('sp-battery-note');
+  const surf = timeline.surfaceAnalysis;
+  if (surfBox && surf) {
+    surfBox.className = `sp-surface-box sev-${surf.severity || 'green'}`;
+    if (surfTitle) surfTitle.innerText = surf.statusLabel;
+    if (surfDesc) surfDesc.innerText = surf.detailText;
+    if (batNote) {
+      if (surf.batteryNote) {
+        batNote.style.display = 'block';
+        batNote.innerText = surf.batteryNote;
+      } else {
+        batNote.style.display = 'none';
+      }
+    }
+  }
+  if (capeBadge) {
+    const cape = timeline.capePeakJkg || 0;
+    if (cape >= 500) {
+      capeBadge.style.display = 'inline-flex';
+      capeBadge.className = `spsb-badge ${cape >= 1200 ? 'badge-red' : 'badge-warn'}`;
+      capeBadge.innerText = `⛈️ Gewitterpotenzial CAPE ${cape} J/kg`;
+    } else {
+      capeBadge.style.display = 'none';
+    }
+  }
+
+  // 3. Schlüsselanstiege & Pässe
+  const climbsSec = document.getElementById('sp-climbs-section');
+  const climbsList = document.getElementById('sp-climbs-list');
+  const climbs = timeline.climbsAnalysis || [];
+  if (climbsSec && climbsList) {
+    if (climbs.length > 0) {
+      climbsSec.style.display = 'block';
+      climbsList.innerHTML = climbs.map(c => `
+        <button type="button" class="sp-climb-chip" data-km="${c.endKm}" title="Kulminationspunkt auf Karte fokussieren">
+          <div class="scc-top">
+            <strong>Anstieg ${c.index}: km ${c.startKm} → ${c.endKm}</strong>
+            <span class="scc-ele">${c.summitEleM.toLocaleString('de-DE')} m (${escapeHtml(c.arrivalTimeStr)})</span>
+          </div>
+          <div class="scc-meta">
+            <span>+${c.gainM} Hm auf ${c.lengthKm.toFixed(1)} km</span>
+            <span>•</span>
+            <span>Ø ${c.avgGradPct}% (Max ${c.maxGradPct}%)</span>
+            ${c.tempC !== null ? `<span>• ${c.tempC}°C</span>` : ''}
+          </div>
+        </button>
+      `).join('');
+      climbsList.querySelectorAll('.sp-climb-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const km = parseFloat(btn.dataset.km);
+          if (!isNaN(km)) updateSportsScrubber(km);
+        });
+      });
+    } else {
+      climbsSec.style.display = 'none';
+    }
+  }
+
+  // 4. 10-Tage Best-Day Planer (Rad & Berge)
+  const dayList = document.getElementById('sp-10day-list');
+  if (dayList && Array.isArray(timeline.route10DayPlan)) {
+    dayList.innerHTML = timeline.route10DayPlan.map(d => `
+      <button type="button" class="skitour-10day-row ${d.isSelected ? 'is-selected' : ''}" data-date="${d.dateKey}">
+        <div class="s10d-day-col">
+          <div class="s10d-day-name">
+            <span>${escapeHtml(d.dayLabel)}</span>
+            ${d.isWeekend ? '<span class="s10d-wknd-tag">Wochenende</span>' : ''}
+          </div>
+          <span class="s10d-src-mini">${escapeHtml(d.tempRangeStr)}</span>
+        </div>
+        <div class="s10d-snow-col">
+          <span class="s10d-snow-main">${escapeHtml(d.mainBadge)}</span>
+          <span class="s10d-snow-sub">${escapeHtml(d.subMetric)}</span>
+        </div>
+        <div class="s10d-periods-col">
+          <span class="s10d-period-pill" style="background:${d.morning.color};color:${d.morning.textColor};">Vormittag ${escapeHtml(d.morning.label)} (${d.morning.tempC}°)</span>
+          <span class="s10d-period-pill" style="background:${d.afternoon.color};color:${d.afternoon.textColor};">Nachmittag ${escapeHtml(d.afternoon.label)} (${d.afternoon.tempC}°)</span>
+        </div>
+      </button>
+    `).join('');
+
+    dayList.querySelectorAll('.skitour-10day-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chosenDate = btn.dataset.date;
+        if (!chosenDate) return;
+        const topBefore = btn.getBoundingClientRect().top;
+        const dateInput = document.getElementById('sports-date-input');
+        if (dateInput) dateInput.value = chosenDate;
+        document.querySelectorAll('#sports-date-presets .stsp-preset-btn').forEach(b => b.classList.remove('active'));
+        updateSportsStartTime(chosenDate, null);
+        const freshBtn = dayList.querySelector(`.skitour-10day-row[data-date="${chosenDate}"]`);
+        if (freshBtn) {
+          const delta = freshBtn.getBoundingClientRect().top - topBefore;
+          if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+        }
+      });
+    });
   }
 }
 
@@ -2623,6 +2926,37 @@ function drawSportsMapProfileCanvas(timeline) {
   } else if (cat === 'mountain' && Array.isArray(timeline.milestones) && timeline.milestones.length > 0) {
     const fl = timeline.milestones[Math.floor(timeline.milestones.length / 2)].freezingLevelM;
     drawRefLine(fl, 'rgba(96, 165, 250, 0.85)', `❄️ 0°-Grenze ${Math.round(fl)}m`, true);
+    if (timeline.surfaceAnalysis && timeline.surfaceAnalysis.snowlineOnRouteM) {
+      drawRefLine(timeline.surfaceAnalysis.snowlineOnRouteM, 'rgba(186, 230, 253, 0.88)', `❄️ Schneeauflage ${Math.round(timeline.surfaceAnalysis.snowlineOnRouteM)}m`, false);
+    }
+  }
+
+  // Dämmerungs-/Dunkelheitszone im Höhenprofil markieren, falls Tour nach Sonnenuntergang endet
+  const dl = timeline.daylightAnalysis;
+  if (dl && (dl.finishesInDarkness || dl.finishesInTwilight)) {
+    const firstDarkPt = pts.find(p => {
+      if (!p.arrivalDate) return false;
+      const pHr = p.arrivalDate.getHours() + p.arrivalDate.getMinutes() / 60;
+      return pHr >= dl.sunsetDecimalHr;
+    });
+    if (firstDarkPt) {
+      const darkX = getX(firstDarkPt.distFromStartKm);
+      ctx.save();
+      ctx.fillStyle = 'rgba(139, 92, 246, 0.16)';
+      ctx.fillRect(darkX, padT, Math.max(4, (W - padR) - darkX), plotH);
+      ctx.strokeStyle = 'rgba(167, 139, 250, 0.7)';
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(darkX, padT);
+      ctx.lineTo(darkX, padT + plotH);
+      ctx.stroke();
+      ctx.fillStyle = '#ddd6fe';
+      ctx.font = '700 8.5px Plus Jakarta Sans, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`🌙 Sunset ${dl.sunsetStr}`, Math.max(darkX + 65, W - padR - 4), padT + 2);
+      ctx.restore();
+    }
   }
 
   // (Kein starrer Einfach-Gipfel-Split bei Skitouren, da Touren mehrere Anstiege/Abfahrten haben können –
@@ -2708,6 +3042,28 @@ function drawSportsMapProfileCanvas(timeline) {
 export function renderSportsWaypointsTable(timeline) {
   const container = document.getElementById('sports-waypoints-list');
   if (!container || !timeline) return;
+
+  const wptsStrip = document.getElementById('sports-gpx-wpts-strip');
+  if (wptsStrip) {
+    const wpts = timeline.mappedWaypoints || [];
+    if (wpts.length > 0) {
+      wptsStrip.style.display = 'flex';
+      wptsStrip.innerHTML = `<span class="sgws-title">📌 GPX-Wegpunkte:</span>` + wpts.map(w => `
+        <button type="button" class="sgws-chip" data-km="${w.distFromStartKm}">
+          ${escapeHtml(w.icon)} <strong>${escapeHtml(w.name)}</strong> (${w.distFromStartKm.toFixed(1)} km • ${Math.round(w.ele)} m • ${escapeHtml(w.arrivalTimeStr)})
+        </button>
+      `).join('');
+      wptsStrip.querySelectorAll('.sgws-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const km = parseFloat(btn.dataset.km);
+          if (!isNaN(km)) updateSportsScrubber(km);
+        });
+      });
+    } else {
+      wptsStrip.style.display = 'none';
+      wptsStrip.innerHTML = '';
+    }
+  }
 
   container.innerHTML = '';
 
@@ -3307,14 +3663,40 @@ export function renderSportsMap(timeline) {
     if (hudDist) hudDist.innerText = `${timeline.totalDistanceKm.toFixed(1)} km • +${Math.round(timeline.totalAscentM)} Hm`;
   }
 
+  // 4b. Eingebettete GPX-<wpt> Pins (Hütten, Gipfel, Quellen, Parkplätze)
+  if (Array.isArray(timeline.mappedWaypoints) && timeline.mappedWaypoints.length > 0) {
+    timeline.mappedWaypoints.forEach(w => {
+      const wIcon = L.divIcon({
+        className: 'sports-gpx-wpt-marker',
+        html: `<div class="sgw-pin" title="${escapeHtml(w.name)} (${Math.round(w.ele)} m)"><span>${escapeHtml(w.icon)}</span></div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+      const wMarker = L.marker([w.lat, w.lon], { icon: wIcon, zIndexOffset: 1600 }).addTo(state.sports.map);
+      wMarker.bindPopup(`
+        <div class="sports-map-popup-card">
+          <div class="smp-title">${escapeHtml(w.icon)} ${escapeHtml(w.name)}</div>
+          <div class="smp-meta">⏱️ Durchgang: <b>${escapeHtml(w.arrivalTimeStr)}</b> • km ${w.distFromStartKm.toFixed(1)} (${Math.round(w.ele)} m)</div>
+          <button type="button" class="smp-jump-btn" onclick="window.jumpToSportsKm && window.jumpToSportsKm(${w.distFromStartKm})">
+            📍 Auf Profil &amp; Cockpit fokussieren
+          </button>
+        </div>
+      `);
+      state.sports.milestoneMarkers.push(wMarker);
+    });
+  }
+
   // 5. Interaktiver Scrubber-Marker (Athleten-Pin ohne störende Animationen)
-  const athleteIcon = timeline.sportType === 'road_bike'
-    ? '🚴'
-    : (timeline.sportType === 'gravel_mtb'
-      ? '🚵'
-      : (timeline.sportType === 'trailrun'
-        ? '🏃'
-        : (timeline.category === 'skitour' || timeline.sportType === 'ski_touring' || timeline.sportType === 'skimo' ? '⛷️' : '🥾')));
+  const athleteIconMap = {
+    road_bike: '🚴',
+    gravel_mtb: '🚵',
+    e_bike: '🔋',
+    trailrun: '🏃',
+    via_ferrata: '🧗',
+    high_alpine: '🗻',
+    ski_touring: '⛷️'
+  };
+  const athleteIcon = athleteIconMap[timeline.sportType] || (timeline.category === 'skitour' ? '⛷️' : (timeline.category === 'bike' ? '🚴' : '🥾'));
   const scrubberIcon = L.divIcon({
     className: 'sports-scrubber-map-marker',
     html: `<div class="scrubber-pin-wrap"><div class="scrubber-live-pill" id="scrubber-map-live-pill" style="display:none;"></div><div class="scrubber-pin-static">${athleteIcon}</div></div>`,
@@ -3684,11 +4066,22 @@ export function updateSportsScrubber(km, opts = {}) {
       smedExt.innerText = closestMs.descentWindchillC <= 5 && curGrad < -3
         ? `🥶 Abfahrt ${closestMs.descentWindchillC}°C`
         : closestMs.relWindBadge;
-    } else if (cat === 'mountain' && closestMs.isSnow) {
+    } else if (cat === 'mountain' && (closestMs.isSnow || (closestMs.capeJkg || 0) >= 600)) {
       smedExt.style.display = 'inline-flex';
-      smedExt.style.background = 'rgba(56, 189, 248, 0.18)';
-      smedExt.style.color = '#bae6fd';
-      smedExt.innerText = '❄️ Frostzone';
+      if ((closestMs.capeJkg || 0) >= 600) {
+        smedExt.style.background = 'rgba(245, 158, 11, 0.22)';
+        smedExt.style.color = '#fde68a';
+        smedExt.innerText = `⛈️ CAPE ${closestMs.capeJkg} J/kg`;
+      } else {
+        smedExt.style.background = 'rgba(56, 189, 248, 0.18)';
+        smedExt.style.color = '#bae6fd';
+        smedExt.innerText = '❄️ Frostzone';
+      }
+    } else if ((closestMs.uvIndex || 0) >= 5) {
+      smedExt.style.display = 'inline-flex';
+      smedExt.style.background = 'rgba(245, 158, 11, 0.16)';
+      smedExt.style.color = '#fef08a';
+      smedExt.innerText = `🧴 UV ${closestMs.uvIndex.toFixed(1)}`;
     } else {
       smedExt.style.display = 'none';
     }

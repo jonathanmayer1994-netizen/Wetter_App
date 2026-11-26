@@ -1220,6 +1220,8 @@
               </div>
               <div class="sports-hero-actions">
                 <button type="button" class="sports-quick-gpx-btn" id="sports-custom-gpx-trigger" title="Eigene GPX-Datei laden">📂 GPX</button>
+                <button type="button" class="sports-quick-gpx-btn" id="sports-briefing-btn" title="Komplettes Touren-Briefing kopieren oder teilen">📋 Briefing</button>
+                <button type="button" class="skitour-emergency-btn" id="sports-global-emergency-btn" title="Offline-Notfallkarte mit Koordinaten &amp; Alpiner Bergrettung öffnen">🆘 Notfall</button>
               </div>
             </div>
 
@@ -1241,6 +1243,14 @@
                 <span class="sm-label">Zielankunft</span>
                 <span class="sm-val text-yellow" id="sm-val-finish">--:-- Uhr</span>
               </div>
+            </div>
+
+            <!-- Kompakter Profi-Meta-Streifen: Tageslicht, Spitzen-UV & Geplante Pause -->
+            <div class="sports-pro-meta-strip" id="sports-pro-meta-strip" style="display: none;">
+              <span class="spms-chip" id="spms-daylight">☀️ Tageslicht --</span>
+              <span class="spms-chip" id="spms-sunset-status">☀️ Im Hellen</span>
+              <span class="spms-chip" id="spms-uv">🧴 Spitzen-UV --</span>
+              <span class="spms-chip" id="spms-pause" style="display: none;">⏸️ Pause --</span>
             </div>
           </section>
 
@@ -1369,6 +1379,25 @@
                     <p class="acc-desc">Skitouren, Skibergsteigen &amp; Skiabfahrt</p>
                   </div>
                 </button>
+              </div>
+
+              <!-- Sub-Disziplin Auswahl (kontextbezogen je Sportart, ohne Skimo Race) -->
+              <div class="sports-subsport-selector" id="sports-subsport-selector">
+                <span class="sss-label">Disziplin:</span>
+                <div class="sss-pills" id="sss-pills-bike" style="display: none;">
+                  <button type="button" class="sss-pill active" data-subsport="road_bike">🚴 Rennrad</button>
+                  <button type="button" class="sss-pill" data-subsport="gravel_mtb">🚵 Gravel / MTB</button>
+                  <button type="button" class="sss-pill" data-subsport="e_bike">🔋 E-Bike</button>
+                </div>
+                <div class="sss-pills" id="sss-pills-mountain">
+                  <button type="button" class="sss-pill active" data-subsport="hiking">🥾 Bergtour / Wandern</button>
+                  <button type="button" class="sss-pill" data-subsport="via_ferrata">🧗 Klettersteig</button>
+                  <button type="button" class="sss-pill" data-subsport="trailrun">🏃 Trailrun</button>
+                  <button type="button" class="sss-pill" data-subsport="high_alpine">🗻 Hochtour</button>
+                </div>
+                <div class="sss-pills" id="sss-pills-skitour" style="display: none;">
+                  <button type="button" class="sss-pill active" data-subsport="ski_touring">⛷️ Skitour (inkl. 10 Min Abfellpuffer)</button>
+                </div>
               </div>
 
               <!-- Stufenlose Geschwindigkeits- & Höhenmeter-Steuerung (Slider & Stepper) -->
@@ -1551,6 +1580,22 @@
                     <button type="button" class="stsp-preset-btn" data-time-preset="13:00">13:00</button>
                   </div>
                 </div>
+
+                <div class="stsp-divider"></div>
+
+                <div class="stsp-col stsp-pause-col">
+                  <div class="stsp-header">
+                    <span class="stsp-icon">⏸️</span>
+                    <span class="stsp-label">Gipfel-/Zwischenpause:</span>
+                  </div>
+                  <div class="stsp-presets" id="sports-pause-presets">
+                    <button type="button" class="stsp-preset-btn active" data-pause-min="0">0 min</button>
+                    <button type="button" class="stsp-preset-btn" data-pause-min="15">15 min</button>
+                    <button type="button" class="stsp-preset-btn" data-pause-min="30">30 min</button>
+                    <button type="button" class="stsp-preset-btn" data-pause-min="45">45 min</button>
+                  </div>
+                  <span class="stsp-pause-hint" id="sports-pause-hint">Wird am Scheitelpunkt auf Ankunfts- &amp; Wetterzeiten aufgerechnet.</span>
+                </div>
               </div>
 
               <!-- GPX Hinweis -->
@@ -1588,6 +1633,7 @@
             </summary>
 
             <div class="alpine-drawer-body">
+              <div class="sports-gpx-wpts-strip" id="sports-gpx-wpts-strip" style="display: none;"></div>
               <div class="swt-filter-group" id="swt-filter-group">
                 <button type="button" class="swt-filter-pill active" data-wpt-filter="all">🌐 Alle Wegpunkte</button>
                 <button type="button" class="swt-filter-pill" data-wpt-filter="hazards">⚠️ Nur Warnungen</button>
@@ -1664,6 +1710,50 @@
                   <div class="smed-crosshair-tooltip" id="smed-crosshair-tooltip" style="display: none;"></div>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <!-- 6A. PROFI-COCKPIT & 10-TAGE-PLANER FÜR RAD & BERGE -->
+          <section class="glass-card sports-pro-planner-card" id="sports-pro-planner-card" style="display: none;">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="card-icon" id="sp-planner-icon">🏔️</span>
+                <span id="sp-planner-title">PROFI-TOURPLANUNG &amp; BEDINGUNGEN</span>
+              </div>
+              <div class="skitour-live-actions">
+                <button type="button" class="st-optimal-start-btn" id="sp-optimal-start-btn" style="display: none;" title="Empfohlene Startuhrzeit direkt übernehmen">⭐ Optimaler Start</button>
+              </div>
+            </div>
+
+            <!-- Untergrund-, Fahrbahn-, Fels- & Schnee-Check + CAPE-Gewitterfenster -->
+            <div class="sp-surface-box" id="sp-surface-box">
+              <div class="spsb-head">
+                <strong id="sp-surface-title">Untergrund wird geprüft...</strong>
+                <span class="spsb-badge" id="sp-cape-badge" style="display: none;"></span>
+              </div>
+              <p class="spsb-desc" id="sp-surface-desc">—</p>
+              <p class="spsb-battery" id="sp-battery-note" style="display: none;"></p>
+            </div>
+
+            <!-- Schlüsselanstiege & Pässe -->
+            <div class="sp-climbs-section" id="sp-climbs-section" style="display: none;">
+              <div class="spcs-header">
+                <span>⛰️</span>
+                <strong id="sp-climbs-title">Schlüsselanstiege &amp; Pässe</strong>
+              </div>
+              <div class="spcs-list" id="sp-climbs-list"></div>
+            </div>
+
+            <!-- 10-Tage Touren-Fenster-Planer (Rad & Berge) -->
+            <div class="skitour-10day-card" id="sp-10day-card">
+              <div class="s10d-header">
+                <div class="s10d-title">
+                  <span>📅</span>
+                  <strong id="sp-10day-title">10-Tage Best-Day Planer: Wetter, Wind, CAPE &amp; Tageslicht</strong>
+                </div>
+                <span class="s10d-hint">Tag anklicken, um die gesamte Route für diesen Tag neu zu berechnen</span>
+              </div>
+              <div class="s10d-list" id="sp-10day-list"></div>
             </div>
           </section>
 
@@ -1851,6 +1941,7 @@
                   <span class="spc-box-sub" id="st-phase-quality">—</span>
                 </div>
               </div>
+              <div class="spc-whiteout-row spc-carry-row" id="st-carry-ski-row" style="display: none;">🥾 Ski-Tragestrecke wird berechnet...</div>
               <div class="spc-whiteout-row" id="st-whiteout-row">👁️ Sichtweiten-Diagnose wird berechnet...</div>
               <div class="skitour-gear-chips" id="skitour-gear-chips"></div>
             </div>

@@ -82,7 +82,7 @@ export const state = {
   sports: {
     initialized: false,
     category: 'mountain', // 'bike', 'mountain' oder 'skitour'
-    sportType: 'hiking',
+    sportType: 'hiking',  // 'road_bike', 'gravel_mtb', 'e_bike', 'hiking', 'via_ferrata', 'trailrun', 'high_alpine', 'ski_touring'
     fitnessLevel: 'normal',
     bikeSpeedKmH: 26.0,
     mountainSpeedKmH: 4.0,
@@ -90,6 +90,7 @@ export const state = {
     skitourAscentHmH: 400,
     skitourSpeedKmH: 3.5,
     skitourDescentKmH: 25.0,
+    pauseMinutes: 0,
     startDateStr: new Date().toISOString().slice(0, 10),
     startTimeStr: '08:00',
     waypointFilter: 'all',

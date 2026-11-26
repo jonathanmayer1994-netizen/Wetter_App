@@ -205,6 +205,48 @@ function parseGPXFast(xmlString) {
   const hFormatted = Math.floor(totalHours);
   const mFormatted = Math.round((totalHours - hFormatted) * 60);
 
+  // Eingebettete GPX-Wegpunkte (<wpt> — Hütten, Gipfel, Wasser, Parkplätze, Notabstiege) auf Track projizieren
+  const waypoints = [];
+  const wptRegex = /<wpt\b([^>]*?)(?:\/>|>([\s\S]*?)<\/wpt>)/gi;
+  const tagVal = (xml, tag) => {
+    const m = new RegExp(`<${tag}[^>]*>([^<]+)<\\/${tag}>`, 'i').exec(xml);
+    return m && m[1] ? m[1].trim() : '';
+  };
+  let wMatch;
+  while ((wMatch = wptRegex.exec(xmlString)) !== null) {
+    const attrs = wMatch[1] || '';
+    const inner = wMatch[2] || '';
+    const laM = latAttrRegex.exec(attrs);
+    const loM = lonAttrRegex.exec(attrs);
+    if (!laM || !loM) continue;
+    const wLat = parseFloat(laM[1]);
+    const wLon = parseFloat(loM[1]);
+    if (!Number.isFinite(wLat) || !Number.isFinite(wLon)) continue;
+    const rawEle = parseFloat(tagVal(inner, 'ele'));
+    const wName = tagVal(inner, 'name') || 'Wegpunkt';
+    const wSym = tagVal(inner, 'sym') || tagVal(inner, 'type');
+
+    // Nächsten Trackpunkt bestimmen
+    let bestPt = points[0];
+    let bestD = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const d = calculateHaversineDistance(wLat, wLon, points[i].lat, points[i].lon);
+      if (d < bestD) { bestD = d; bestPt = points[i]; }
+    }
+    if (bestD <= 1500) {
+      waypoints.push({
+        lat: wLat,
+        lon: wLon,
+        ele: Number.isFinite(rawEle) ? Math.round(rawEle) : Math.round(bestPt.ele),
+        name: wName,
+        sym: wSym,
+        distFromStartKm: bestPt.distFromStartKm,
+        trackIndex: bestPt.index
+      });
+    }
+  }
+  waypoints.sort((a, b) => a.distFromStartKm - b.distFromStartKm);
+
   return {
     success: true,
     name: trackName,
@@ -217,6 +259,7 @@ function parseGPXFast(xmlString) {
     maxElevationM: Math.round(maxEle),
     estimatedDuration: `${hFormatted} h ${mFormatted} min`,
     points,
-    decimatedPoints
+    decimatedPoints,
+    waypoints
   };
 }
