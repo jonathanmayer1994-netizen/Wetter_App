@@ -9,11 +9,11 @@ export const WeatherTourCache = {
   WEATHER_KEY: 'alpine_offline_weather_data',
   SPORTS_TOUR_KEY: 'alpine_offline_sports_tour',
 
-  async saveLocationAndWeather(loc, weatherData, microData) {
+  async saveLocationAndWeather(loc, weatherData, microData, extras = {}) {
     if (!loc) return;
     AlpineStorage.safeSetItem(this.LOCATION_KEY, loc);
     if (weatherData) {
-      await AlpineStorage.saveWeatherCache(loc, weatherData, microData);
+      await AlpineStorage.saveWeatherCache(loc, weatherData, microData, extras);
     }
   },
 

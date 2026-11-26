@@ -180,6 +180,7 @@ export function validateMultiModel(mm) {
 
   return {
     timestamp: mm.timestamp || new Date().toISOString(),
+    elevation: typeof mm.elevation === 'number' ? mm.elevation : null,
     consensusScore: typeof mm.consensusScore === 'number' ? Math.max(50, Math.min(99, mm.consensusScore)) : 82,
     consensusText: mm.consensusText || 'Gute Modell-Übereinstimmung',
     hourlyTime: Array.isArray(mm.hourlyTime) ? mm.hourlyTime : [],

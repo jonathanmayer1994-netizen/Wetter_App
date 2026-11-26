@@ -282,11 +282,16 @@ export async function loadLocation(loc, options = {}) {
       if (cached?.weatherData) {
         state.weatherData = cached.weatherData;
         if (cached.microData) state.microData = { ...cached.microData, weatherRaw: cached.weatherData };
+        if (cached.multiModel) state.multiModel = cached.multiModel;
+        if (cached.airQuality) state.airQuality = cached.airQuality;
         state.lastWeatherLoadedAt = cached.timestamp || Date.now();
         state.lastWeatherDayKey = getLocalDateKey(state.lastWeatherLoadedAt);
 
         // 0ms First Paint: Dashboard steht sofort komplett mit echten Daten!
         renderOverviewTab();
+        if (state.multiModel) renderMultiModelComparison();
+        if (state.airQuality) renderAirQualityAndUV();
+        if (state.actualVerification) renderVerificationDashboard();
         renderAdaptiveTab2();
         renderFavoritesTab();
         updateNavigationWarningBadges();
@@ -391,7 +396,10 @@ export async function loadLocation(loc, options = {}) {
       MicroEngine.applyMultiModelWeightsToWeather(state.weatherData, state.microData, state.multiModel);
     }
 
-    await WeatherTourCache.saveLocationAndWeather(validLoc, state.weatherData, state.microData);
+    await WeatherTourCache.saveLocationAndWeather(validLoc, state.weatherData, state.microData, {
+      multiModel: state.multiModel,
+      airQuality: state.airQuality
+    });
 
     const heroTime = document.getElementById('hero-update-time');
     if (heroTime) {
@@ -440,7 +448,12 @@ export async function loadLocation(loc, options = {}) {
       hideConnectionErrorOverlay();
       state.weatherData = cached.weatherData;
       if (cached.microData) state.microData = { ...cached.microData, weatherRaw: cached.weatherData };
+      if (cached.multiModel) state.multiModel = cached.multiModel;
+      if (cached.airQuality) state.airQuality = cached.airQuality;
       renderOverviewTab();
+      if (state.multiModel) renderMultiModelComparison();
+      if (state.airQuality) renderAirQualityAndUV();
+      if (state.actualVerification) renderVerificationDashboard();
       renderAdaptiveTab2();
       renderFavoritesTab();
       updateNavigationWarningBadges();

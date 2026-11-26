@@ -7,7 +7,6 @@ import { MicroEngine } from '../microEngine.js';
 
 import { state } from '../core/state.js';
 import { WMO_CODES } from '../core/constants.js';
-import { MeteogramCanvas } from './meteogram/meteogramCanvas.js';
 import { escapeHtml, getLocalDateKey } from '../httpClient.js';
 import { updateFavStarUI } from './favorites.js';
 import { AlpineStorage } from '../storage.js';
@@ -346,7 +345,10 @@ export function renderOverviewTab() {
   updateAlpineSkyIllumination(w, state.currentLocation.elevation);
 
   // Exact Temperature (harmonisiert & dynamisch bias-korrigiert inkl. adiabatischer Höhenanpassung)
-  const finalTemp = (m && state.currentLocation.isMountain) ? m.microWeather.temperature10m : cur.temperature_2m;
+  const isMtnLoc = Boolean(state.currentLocation?.isMountain);
+  const finalTemp = (m && isMtnLoc && m.microWeather && typeof m.microWeather.temperature10m === 'number')
+    ? m.microWeather.temperature10m
+    : cur.temperature_2m;
   const heroTempEl = document.getElementById('hero-current-temp');
   if (heroTempEl) {
     heroTempEl.innerText = Math.round(convertTemp(finalTemp));
@@ -358,15 +360,15 @@ export function renderOverviewTab() {
     if (m && m.biasCorrection && m.biasCorrection.stationApplied) {
       const stName = m.biasCorrection.stationName || 'Bodenstation';
       const net = m.biasCorrection.stationNetwork || 'Station';
-      src.innerText = `${stName} (${net})`;
+      src.innerText = `📡 ${stName} (${net})`;
     } else if (w._providerFallback) {
-      src.innerText = `${w._providerFallback.replace(' (Fallback)', '')} • Live`;
+      src.innerText = `🌐 ${w._providerFallback.replace(' (Fallback)', '')} • Live`;
     } else if (state.multiModel && state.multiModel.activeRegionalModel) {
-      src.innerText = `${state.multiModel.activeRegionalModel} / ECMWF`;
+      src.innerText = `📡 ${state.multiModel.activeRegionalModel} / ECMWF`;
     } else if (m && m.regionalModelName) {
-      src.innerText = `${m.regionalModelName} / ECMWF`;
+      src.innerText = `📡 ${m.regionalModelName} / ECMWF`;
     } else {
-      src.innerText = 'ICON-EU / ECMWF';
+      src.innerText = '📡 ICON-EU / ECMWF';
     }
   }
   // Präzise Bestimmung von Niederschlagstyp (Schnee/Schneeregen/Regen) und Schneefallgrenze / 0°C-Niveau
@@ -428,30 +430,26 @@ export function renderOverviewTab() {
     const isInversionActive = (m && m.atmosphere && m.atmosphere.inversionActive);
     const invTopMeters = (m && m.atmosphere && m.atmosphere.inversionTopMeters) ? m.atmosphere.inversionTopMeters : 1450;
     const invTopStr = invTopMeters.toLocaleString('de-DE');
-    const hasInversionFog = (state.actualData && state.actualData.orographicInsights && state.actualData.orographicInsights.some(i => i.type === 'inversion_fog_detected')) ||
+    const orographicInsights = state.actualVerification && Array.isArray(state.actualVerification.orographicInsights)
+      ? state.actualVerification.orographicInsights : [];
+    const hasInversionFog = orographicInsights.some(i => i.type === 'inversion_fog_detected' || i.type === 'webcam_inversion_groundtruth') ||
       (isInversionActive && (cur.relative_humidity_2m >= 80 || cur.weather_code <= 2));
 
     const isMountainSummitAboveFog = state.currentLocation.isMountain && state.currentLocation.elevation >= (invTopMeters - 50);
 
     if (hasInversionFog || (isInversionActive && isMountainSummitAboveFog)) {
       if (!isMountainSummitAboveFog && state.currentLocation.elevation <= invTopMeters) {
-        conditionLabel = `Dichter Hochnebel (Inversion bis ~${invTopStr} m)`;
-        const iconEl = document.getElementById('hero-weather-icon');
-        if (iconEl) iconEl.innerText = '🌫️';
+        conditionLabel = `🌫️ Dichter Hochnebel (Inversion bis ~${invTopStr} m)`;
       } else {
         conditionLabel = isDay
-          ? `Sonnig über dem Nebelmeer (Inversion bis ~${invTopStr} m)`
-          : `Sternenklar über dem Nebelmeer (Inversion bis ~${invTopStr} m)`;
-        const iconEl = document.getElementById('hero-weather-icon');
-        if (iconEl) iconEl.innerText = isDay ? '☀️🏔️' : '🌙🏔️';
+          ? `☀️ Sonnig über dem Nebelmeer (Inversion bis ~${invTopStr} m)`
+          : `🌙 Sternenklar über dem Nebelmeer (Inversion bis ~${invTopStr} m)`;
       }
     } else {
       // Trocken: Cloud-Cover in die Bedingung einbeziehen (Hero und Karte konsistent)
       const cloud = cur.cloud_cover !== undefined ? cur.cloud_cover : (w.hourly && w.hourly.cloud_cover ? w.hourly.cloud_cover[curHourIdx] : 0);
       if (isMountainSummitAboveFog && m && m.atmosphere && m.atmosphere.freezingLevelMeters > state.currentLocation.elevation + 400 && cloud < 45) {
         conditionLabel = 'Klar / Wolkenlos';
-        const iconEl = document.getElementById('hero-weather-icon');
-        if (iconEl) iconEl.innerText = isDay ? '☀️' : '🌙';
       } else if (cloud >= 75) conditionLabel = 'Bedeckt';
       else if (cloud >= 50) conditionLabel = 'Wolkig';
       else if (cloud >= 25) conditionLabel = 'Teilweise bewölkt';
@@ -716,9 +714,9 @@ export function setupExpertModeToggle() {
       btn.setAttribute('aria-expanded', 'true');
       if (arrow) arrow.innerText = '▴';
       AlpineStorage.safeSetItem('alpine_expert_mode_enabled', true);
-      // Neuzeichnung des Meteogramm-Canvas anstoßen, falls zuvor verborgen
-      if (typeof renderSpaghettiMeteogram === 'function' && state.weatherData) {
-        setTimeout(() => renderSpaghettiMeteogram(state.weatherData), 50);
+      // Neuzeichnung des Ensemble-Meteogramms anstoßen, falls zuvor verborgen
+      if (state.weatherData) {
+        setTimeout(() => renderEnsembleMeteogram(), 50);
       }
     } else {
       container.classList.add('is-hidden');
@@ -745,106 +743,68 @@ export function setupHourlyGranularityToggle() {
   });
 }
 
+function parseForecastTimeMs(tsStr, utcOffsetSec = null) {
+  if (!tsStr) return NaN;
+  const s = String(tsStr);
+  const hasZone = /[Z+\-]\d{2}:?\d{2}$/.test(s);
+  if (!hasZone && typeof utcOffsetSec === 'number' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
+    return Date.parse(`${s.slice(0, 16)}:00Z`) - utcOffsetSec * 1000;
+  }
+  return new Date(s).getTime();
+}
+
+function findTimeBracket(times, targetTs, utcOffsetSec = null) {
+  if (!Array.isArray(times) || times.length === 0) return null;
+  let i0 = 0;
+  for (let i = 0; i < times.length; i++) {
+    const tMs = parseForecastTimeMs(times[i], utcOffsetSec);
+    if (!Number.isFinite(tMs)) continue;
+    if (tMs <= targetTs) i0 = i;
+    else break;
+  }
+  const i1 = Math.min(times.length - 1, i0 + 1);
+  const t0 = parseForecastTimeMs(times[i0], utcOffsetSec);
+  const t1 = parseForecastTimeMs(times[i1], utcOffsetSec);
+  const span = Math.max(1, (Number.isFinite(t1) && Number.isFinite(t0)) ? (t1 - t0) : 0);
+  const frac = (i1 > i0 && span > 0 && Number.isFinite(t0))
+    ? Math.max(0, Math.min(1, (targetTs - t0) / span))
+    : 0;
+  return { i0, i1, frac, inRange: Number.isFinite(t0) && targetTs >= t0 - 15 * 60000 && targetTs <= (Number.isFinite(t1) ? t1 : t0) + 15 * 60000 };
+}
+
 function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffset) {
   const targetTs = nowMs + minuteOffset * 60000;
   const targetDate = new Date(targetTs);
-  const cur = (state.weatherData && state.weatherData.current) ? state.weatherData.current : {};
+  const w = state.weatherData || {};
+  const m = state.microData;
+  const cur = w.current || {};
+  const utcOffsetSec = typeof w.utc_offset_seconds === 'number' ? w.utc_offset_seconds : null;
+  const isMtnLoc = Boolean(state.currentLocation?.isMountain);
+  const heroNowTemp = (m && isMtnLoc && m.microWeather && typeof m.microWeather.temperature10m === 'number')
+    ? m.microWeather.temperature10m
+    : (typeof cur.temperature_2m === 'number'
+      ? cur.temperature_2m
+      : (hourly.temperature_2m ? hourly.temperature_2m[currentClosestIdx] : 12));
 
-  if (minuteOffset > 0) {
-    const hFloat = minuteOffset / 60;
-    const baseHour = Math.floor(hFloat);
-    const h0 = Math.min(hourly.time.length - 1, currentClosestIdx + baseHour);
-    const h1 = Math.min(hourly.time.length - 1, h0 + 1);
-    const frac = hFloat - baseHour;
+  const bracket = findTimeBracket(hourly.time, targetTs, utcOffsetSec);
+  const h0 = bracket ? bracket.i0 : Math.min(hourly.time.length - 1, currentClosestIdx);
+  const h1 = bracket ? bracket.i1 : Math.min(hourly.time.length - 1, h0 + 1);
+  const frac = bracket ? bracket.frac : 0;
 
-    const t0 = (hourly.temperature_2m && hourly.temperature_2m[h0] !== undefined) ? hourly.temperature_2m[h0] : 12;
-    const t1 = (hourly.temperature_2m && hourly.temperature_2m[h1] !== undefined) ? hourly.temperature_2m[h1] : t0;
-    const temp = t0 * (1 - frac) + t1 * frac;
+  const interpArr = (arr, fallback = 0) => {
+    if (!Array.isArray(arr)) return fallback;
+    const v0 = (typeof arr[h0] === 'number' && !isNaN(arr[h0])) ? arr[h0] : fallback;
+    const v1 = (typeof arr[h1] === 'number' && !isNaN(arr[h1])) ? arr[h1] : v0;
+    return v0 * (1 - frac) + v1 * frac;
+  };
 
-    const p0 = (hourly.precipitation_probability && hourly.precipitation_probability[h0] !== undefined) ? hourly.precipitation_probability[h0] : 0;
-    const p1 = (hourly.precipitation_probability && hourly.precipitation_probability[h1] !== undefined) ? hourly.precipitation_probability[h1] : p0;
-    const pop = Math.round(p0 * (1 - frac) + p1 * frac);
-
-    const w0 = (hourly.wind_speed_10m && hourly.wind_speed_10m[h0] !== undefined) ? hourly.wind_speed_10m[h0] : 10;
-    const w1 = (hourly.wind_speed_10m && hourly.wind_speed_10m[h1] !== undefined) ? hourly.wind_speed_10m[h1] : w0;
-    const wind = Math.round(w0 * (1 - frac) + w1 * frac);
-
-    const pr0 = (hourly.precipitation && hourly.precipitation[h0] !== undefined) ? hourly.precipitation[h0] : 0;
-    const pr1 = (hourly.precipitation && hourly.precipitation[h1] !== undefined) ? hourly.precipitation[h1] : pr0;
-    const precip = Math.round((pr0 * (1 - frac) + pr1 * frac) * 10) / 10;
-
-    const s0 = (hourly.sunshine_duration && hourly.sunshine_duration[h0] !== undefined) ? hourly.sunshine_duration[h0] : 0;
-    const s1 = (hourly.sunshine_duration && hourly.sunshine_duration[h1] !== undefined) ? hourly.sunshine_duration[h1] : s0;
-    const sunSec = Math.round(s0 * (1 - frac) + s1 * frac);
-
-    const cc0 = (hourly.cloud_cover && hourly.cloud_cover[h0] !== undefined) ? hourly.cloud_cover[h0] : null;
-    const cc1 = (hourly.cloud_cover && hourly.cloud_cover[h1] !== undefined) ? hourly.cloud_cover[h1] : cc0;
-    const cloudCover = (cc0 !== null && cc1 !== null) ? Math.round(cc0 * (1 - frac) + cc1 * frac) : null;
-
-    const code = frac < 0.5
-      ? (hourly.weather_code ? hourly.weather_code[h0] : 0)
-      : (hourly.weather_code ? hourly.weather_code[h1] : 0);
-
-    const dayIdx = frac < 0.5 ? h0 : h1;
-    const isDay = (hourly.is_day && hourly.is_day[dayIdx] !== undefined)
-      ? hourly.is_day[dayIdx] === 1
-      : (targetDate.getHours() >= 6 && targetDate.getHours() <= 20);
-
-    return {
-      timestamp: targetDate,
-      minuteOffset,
-      temp,
-      pop,
-      wind,
-      precip,
-      sunSec,
-      cloudCover,
-      code,
-      isDay
-    };
-  } else if (minuteOffset < 0) {
-    const prevHourIdx = Math.max(0, currentClosestIdx - 1);
-    const frac = (60 + minuteOffset) / 60; // 0 at -60m, 1 at 0m
-    const t0 = (hourly.temperature_2m && hourly.temperature_2m[prevHourIdx] !== undefined) ? hourly.temperature_2m[prevHourIdx] : 12;
-    const t1 = cur.temperature_2m !== undefined ? cur.temperature_2m : t0;
-    const temp = t0 * (1 - frac) + t1 * frac;
-
-    const pop = (hourly.precipitation_probability && hourly.precipitation_probability[currentClosestIdx] !== undefined) ? hourly.precipitation_probability[currentClosestIdx] : 0;
-    const wind = cur.wind_speed_10m !== undefined ? Math.round(cur.wind_speed_10m) : 10;
-    const precip = cur.precipitation !== undefined ? cur.precipitation : 0;
-    const s0 = (hourly.sunshine_duration && hourly.sunshine_duration[prevHourIdx] !== undefined) ? hourly.sunshine_duration[prevHourIdx] : 0;
-    const s1 = (hourly.sunshine_duration && hourly.sunshine_duration[currentClosestIdx] !== undefined) ? hourly.sunshine_duration[currentClosestIdx] : s0;
-    const sunSec = Math.round(s0 * (1 - frac) + s1 * frac);
-
-    const cc0 = (hourly.cloud_cover && hourly.cloud_cover[prevHourIdx] !== undefined) ? hourly.cloud_cover[prevHourIdx] : null;
-    const cc1 = (hourly.cloud_cover && hourly.cloud_cover[currentClosestIdx] !== undefined) ? hourly.cloud_cover[currentClosestIdx] : cc0;
-    const cloudCover = (cc0 !== null && cc1 !== null) ? Math.round(cc0 * (1 - frac) + cc1 * frac) : null;
-
-    const code = cur.weather_code !== undefined ? cur.weather_code : 0;
-    const isDay = (hourly.is_day && hourly.is_day[currentClosestIdx] !== undefined)
-      ? hourly.is_day[currentClosestIdx] === 1
-      : (targetDate.getHours() >= 6 && targetDate.getHours() <= 20);
-
-    return {
-      timestamp: targetDate,
-      minuteOffset,
-      temp,
-      pop,
-      wind,
-      precip,
-      sunSec,
-      cloudCover,
-      code,
-      isDay
-    };
-  } else {
-    const temp = cur.temperature_2m !== undefined ? cur.temperature_2m : (hourly.temperature_2m ? hourly.temperature_2m[currentClosestIdx] : 12);
-    const pop = hourly.precipitation_probability ? hourly.precipitation_probability[currentClosestIdx] : 0;
-    const wind = cur.wind_speed_10m !== undefined ? Math.round(cur.wind_speed_10m) : 10;
-    const precip = cur.precipitation !== undefined ? cur.precipitation : 0;
-    const sunSec = (hourly.sunshine_duration && hourly.sunshine_duration[currentClosestIdx] !== undefined) ? hourly.sunshine_duration[currentClosestIdx] : 0;
-    const cloudCover = (hourly.cloud_cover && hourly.cloud_cover[currentClosestIdx] !== undefined) ? hourly.cloud_cover[currentClosestIdx] : null;
-    const code = cur.weather_code !== undefined ? cur.weather_code : 0;
+  if (minuteOffset === 0) {
+    const pop = hourly.precipitation_probability ? Math.round(hourly.precipitation_probability[currentClosestIdx] ?? 0) : 0;
+    const wind = Math.round(cur.wind_speed_10m ?? interpArr(hourly.wind_speed_10m, 10));
+    const precip = Math.round((cur.precipitation ?? interpArr(hourly.precipitation, 0)) * 10) / 10;
+    const sunSec = Math.round(hourly.sunshine_duration?.[currentClosestIdx] ?? 0);
+    const cloudCover = hourly.cloud_cover ? Math.round(hourly.cloud_cover[currentClosestIdx] ?? 0) : null;
+    const code = cur.weather_code ?? (hourly.weather_code ? hourly.weather_code[currentClosestIdx] : 0);
     const isDay = (hourly.is_day && hourly.is_day[currentClosestIdx] !== undefined)
       ? hourly.is_day[currentClosestIdx] === 1
       : (targetDate.getHours() >= 6 && targetDate.getHours() <= 20);
@@ -852,7 +812,7 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
     return {
       timestamp: targetDate,
       minuteOffset: 0,
-      temp,
+      temp: heroNowTemp,
       pop,
       wind,
       precip,
@@ -863,6 +823,110 @@ function getInterpolatedHourlyPoint(hourly, nowMs, currentClosestIdx, minuteOffs
       isNow: true
     };
   }
+
+  let temp = interpArr(hourly.temperature_2m, heroNowTemp);
+  const pop = Math.round(interpArr(hourly.precipitation_probability, 0));
+  let wind = Math.round(interpArr(hourly.wind_speed_10m, cur.wind_speed_10m ?? 10));
+  let precip = Math.round(interpArr(hourly.precipitation, 0) * 10) / 10;
+  const sunSec = Math.round(interpArr(hourly.sunshine_duration, 0));
+  const ccRaw = hourly.cloud_cover ? interpArr(hourly.cloud_cover, null) : null;
+  const cloudCover = (ccRaw !== null && !isNaN(ccRaw)) ? Math.round(ccRaw) : null;
+  let code = frac < 0.5
+    ? (hourly.weather_code ? hourly.weather_code[h0] : (cur.weather_code ?? 0))
+    : (hourly.weather_code ? hourly.weather_code[h1] : (cur.weather_code ?? 0));
+
+  // Echtes Open-Meteo 15-Minuten-Detailraster (minutely_15) einbeziehen falls vorhanden
+  const m15 = w.minutely_15;
+  let hasMin15Precip = false;
+  if (m15 && Array.isArray(m15.time) && m15.time.length >= 2) {
+    const mBracket = findTimeBracket(m15.time, targetTs, utcOffsetSec);
+    if (mBracket && mBracket.inRange) {
+      const m0 = mBracket.i0;
+      const m1 = mBracket.i1;
+      const mFrac = mBracket.frac;
+      if (Array.isArray(m15.temperature_2m) && typeof m15.temperature_2m[m0] === 'number') {
+        const mt0 = m15.temperature_2m[m0];
+        const mt1 = (typeof m15.temperature_2m[m1] === 'number') ? m15.temperature_2m[m1] : mt0;
+        const mTemp = mt0 * (1 - mFrac) + mt1 * mFrac;
+        // Wenn Berg-Mikroklima oder Stationsbias aktiv ist, Offset sanft mitziehen
+        const baseModelNow = cur.temperature_2m ?? temp;
+        const microDelta = heroNowTemp - baseModelNow;
+        temp = mTemp + (Math.abs(minuteOffset) <= 60 ? microDelta * (1 - Math.abs(minuteOffset) / 90) : 0);
+      }
+      if (Array.isArray(m15.precipitation) && typeof m15.precipitation[m0] === 'number') {
+        const mp0 = Math.max(0, m15.precipitation[m0]);
+        const mp1 = (typeof m15.precipitation[m1] === 'number') ? Math.max(0, m15.precipitation[m1]) : mp0;
+        precip = Math.round((mp0 * (1 - mFrac) + mp1 * mFrac) * 10) / 10;
+        hasMin15Precip = true;
+      }
+      if (Array.isArray(m15.wind_speed_10m) && typeof m15.wind_speed_10m[m0] === 'number') {
+        const mw0 = m15.wind_speed_10m[m0];
+        const mw1 = (typeof m15.wind_speed_10m[m1] === 'number') ? m15.wind_speed_10m[m1] : mw0;
+        wind = Math.round(mw0 * (1 - mFrac) + mw1 * mFrac);
+      }
+      if (Array.isArray(m15.weather_code)) {
+        const mCode = mFrac < 0.5 ? m15.weather_code[m0] : m15.weather_code[m1];
+        if (typeof mCode === 'number' && !isNaN(mCode)) code = mCode;
+      }
+    }
+  }
+
+  // Sanfte Anbindung an aktuellen Mess-/Hero-Stand innerhalb von +/- 30 Min.
+  if (Math.abs(minuteOffset) < 45) {
+    const anchorW = 1 - Math.abs(minuteOffset) / 45;
+    temp = heroNowTemp * anchorW + temp * (1 - anchorW);
+    if (minuteOffset < 0 && typeof cur.wind_speed_10m === 'number') {
+      wind = Math.round(cur.wind_speed_10m * anchorW + wind * (1 - anchorW));
+    }
+  }
+
+  // Radar-Vektor-Nowcast (0..90 Min.) koppeln — aber echtes minutely_15 nicht mit trockenem Basis-Nullwert überschreiben
+  let finalPop = pop;
+  const radarIntervals = m?.biasCorrection?.radarNowcast90m?.intervals;
+  if (minuteOffset > 0 && minuteOffset <= 90 && Array.isArray(radarIntervals) && radarIntervals.length > 0) {
+    let rBest = radarIntervals[0];
+    let bestMinDiff = Infinity;
+    for (const iv of radarIntervals) {
+      const d = Math.abs((iv.minute || 0) - minuteOffset);
+      if (d < bestMinDiff) {
+        bestMinDiff = d;
+        rBest = iv;
+      }
+    }
+    if (rBest && typeof rBest.precipMm === 'number') {
+      const hasActiveRadarOrStation = Boolean(m?.biasCorrection?.stationApplied || rBest.precipMm > 0.05);
+      if (!hasMin15Precip || hasActiveRadarOrStation) {
+        const wRadar = hasMin15Precip
+          ? Math.max(0.25, 0.65 - (minuteOffset / 90) * 0.40)
+          : Math.max(0.25, 0.85 - (minuteOffset / 90) * 0.60);
+        precip = Math.round((wRadar * rBest.precipMm + (1 - wRadar) * precip) * 10) / 10;
+      }
+      if (typeof rBest.probability === 'number' && rBest.precipMm > 0.05) {
+        finalPop = Math.max(finalPop, rBest.probability);
+      }
+      if (precip >= 0.15 && code < 51) {
+        code = temp <= 1.0 ? 71 : 61;
+      }
+    }
+  }
+
+  const dayIdx = frac < 0.5 ? h0 : h1;
+  const isDay = (hourly.is_day && hourly.is_day[dayIdx] !== undefined)
+    ? hourly.is_day[dayIdx] === 1
+    : (targetDate.getHours() >= 6 && targetDate.getHours() <= 20);
+
+  return {
+    timestamp: targetDate,
+    minuteOffset,
+    temp,
+    pop: finalPop,
+    wind,
+    precip,
+    sunSec,
+    cloudCover,
+    code,
+    isDay
+  };
 }
 
 function getExactHourlyLlbBadge(ptDate) {
@@ -1020,21 +1084,36 @@ export function renderHourlySlider(hourly) {
     const startIdx = Math.max(0, currentClosestIdx - 6);
     const endIdx = Math.min(hourly.time.length, startIdx + 30);
 
+    const curForNow = (state.weatherData && state.weatherData.current) ? state.weatherData.current : null;
+    const mForNow = state.microData;
+    const isMtnNow = Boolean(state.currentLocation?.isMountain);
+    const heroNowTemp = (mForNow && isMtnNow && mForNow.microWeather && typeof mForNow.microWeather.temperature10m === 'number')
+      ? mForNow.microWeather.temperature10m
+      : (curForNow && typeof curForNow.temperature_2m === 'number' ? curForNow.temperature_2m : null);
+
     for (let i = startIdx; i < endIdx; i++) {
       const t = new Date(hourly.time[i]);
       const isNow = i === currentClosestIdx;
       const label = isNow ? 'Jetzt' : `${String(t.getHours()).padStart(2, '0')}:00`;
-      const temp = Math.round(convertTemp(hourly.temperature_2m[i]));
+      const rawT = (isNow && heroNowTemp !== null) ? heroNowTemp : hourly.temperature_2m[i];
+      const temp = Math.round(convertTemp(rawT));
       const pop = hourly.precipitation_probability ? (hourly.precipitation_probability[i] || 0) : 0;
-      const precip = hourly.precipitation ? (hourly.precipitation[i] || 0) : 0;
+      const precip = (isNow && curForNow && typeof curForNow.precipitation === 'number')
+        ? curForNow.precipitation
+        : (hourly.precipitation ? (hourly.precipitation[i] || 0) : 0);
       const sunSec = hourly.sunshine_duration ? (hourly.sunshine_duration[i] || 0) : 0;
       const cloudCover = hourly.cloud_cover ? hourly.cloud_cover[i] : null;
-      const code = hourly.weather_code ? hourly.weather_code[i] : 0;
+      const code = (isNow && curForNow && typeof curForNow.weather_code === 'number')
+        ? curForNow.weather_code
+        : (hourly.weather_code ? hourly.weather_code[i] : 0);
       const isDay = (hourly.is_day && hourly.is_day[i] !== undefined)
         ? hourly.is_day[i] === 1
         : (t.getHours() >= 6 && t.getHours() <= 20);
-      const harm = getHarmonizedHourlyCondition({ code, sunSec, precip, pop, cloudCover, isDay, temp: hourly.temperature_2m[i] });
-      const wind = hourly.wind_speed_10m ? Math.round(hourly.wind_speed_10m[i]) : '--';
+      const harm = getHarmonizedHourlyCondition({ code, sunSec, precip, pop, cloudCover, isDay, temp: rawT });
+      const windSource = (isNow && curForNow && typeof curForNow.wind_speed_10m === 'number')
+        ? curForNow.wind_speed_10m
+        : (hourly.wind_speed_10m ? hourly.wind_speed_10m[i] : null);
+      const wind = windSource !== null && windSource !== undefined ? Math.round(windSource) : '--';
 
       let metricText = '';
       if (precip > 0.05) {
@@ -1909,8 +1988,8 @@ export function render10DayForecast(daily, hourly) {
             hourlySunSecList,
             hourlyPrecip,
             hourlyPop,
-            tMin: convertTemp(minVal),
-            tMax: convertTemp(maxVal)
+            tMin: harmonizedMin,
+            tMax: harmonizedMax
           });
         }
       }
@@ -1939,8 +2018,8 @@ export function render10DayForecast(daily, hourly) {
         hourlySunSecList,
         hourlyPrecip,
         hourlyPop,
-        tMin: convertTemp(minVal),
-        tMax: convertTemp(maxVal)
+        tMin: harmonizedMin,
+        tMax: harmonizedMax
       });
     }
 
@@ -2147,83 +2226,94 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
     ? mm.hourlyTime
     : rawH.time.slice(curHourIdx);
 
-  // Zeitbasis: bis zu 168 Stunden (7 Tage) oder min. 72 Stunden
-  const count = Math.min(168, alignedTimes.length);
+  // Zeitbasis: echte verfügbare Stunden bis maximal 240h (10 Tage)
+  const count = Math.min(240, alignedTimes.length);
   if (count < 2) return;
 
-  // Datenreihen extrahieren
-  let ecmwfData = [];
-  let gfsData = [];
-  let iconData = [];
+  const titleEl = document.getElementById('meteogram-title');
+  if (titleEl) {
+    const daysCount = Math.max(1, Math.min(10, Math.ceil(count / 24)));
+    titleEl.innerText = `📈 ENSEMBLE-METEOGRAMM (${daysCount}-TAGE SPAGHETTI-VERGLEICH):`;
+  }
+
+  // Echte Datenreihen extrahieren (strikt ohne synthetische Sinus-/Faktor-Kurven; fehlende Horizont-Stunden bleiben null)
+  const ecmwfData = [];
+  const gfsData = [];
+  const iconData = [];
   let unit = '°C';
+  const hasRegionalSeries = Boolean(mm && mm.regional);
+
+  const toFiniteNum = (v) => (typeof v === 'number' && !isNaN(v)) ? v : null;
 
   if (metric === 'temp') {
     unit = state.unit === 'fahrenheit' ? '°F' : '°C';
-    const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyTemp) && mm.regional.hourlyTemp.length > 0)
-      ? mm.regional.hourlyTemp
+    const rawIcon = hasRegionalSeries
+      ? (mm.regional.hourlyTemp || [])
       : (rawH.temperature_2m || []).slice(curHourIdx);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyTemp) ? mm.ecmwf.hourlyTemp : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyTemp) ? mm.gfs.hourlyTemp : [];
 
     for (let i = 0; i < count; i++) {
-      const iconVal = rawIcon[i] !== undefined ? rawIcon[i] : 10;
-      const ecVal = rawEc[i] !== undefined ? rawEc[i] : (iconVal + Math.sin(i * 0.4) * 1.5 - 0.4);
-      const gfsVal = rawGfs[i] !== undefined ? rawGfs[i] : (iconVal + Math.cos(i * 0.35) * 1.8 + 0.5);
-
-      iconData.push(convertTemp(iconVal));
-      ecmwfData.push(convertTemp(ecVal));
-      gfsData.push(convertTemp(gfsVal));
+      const iv = toFiniteNum(rawIcon[i]);
+      const ev = toFiniteNum(rawEc[i]);
+      const gv = toFiniteNum(rawGfs[i]);
+      iconData.push(iv !== null ? convertTemp(iv) : null);
+      ecmwfData.push(ev !== null ? convertTemp(ev) : null);
+      gfsData.push(gv !== null ? convertTemp(gv) : null);
     }
   } else if (metric === 'precip') {
     unit = 'mm';
-    const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyPrecip) && mm.regional.hourlyPrecip.length > 0)
-      ? mm.regional.hourlyPrecip
+    const rawIcon = hasRegionalSeries
+      ? (mm.regional.hourlyPrecip || [])
       : (rawH.precipitation || []).slice(curHourIdx);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyPrecip) ? mm.ecmwf.hourlyPrecip : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyPrecip) ? mm.gfs.hourlyPrecip : [];
 
     for (let i = 0; i < count; i++) {
-      const iconVal = Math.max(0, rawIcon[i] !== undefined ? rawIcon[i] : 0);
-      const ecVal = Math.max(0, rawEc[i] !== undefined ? rawEc[i] : (iconVal * 1.15));
-      const gfsVal = Math.max(0, rawGfs[i] !== undefined ? rawGfs[i] : (iconVal * 0.85));
-
-      iconData.push(Math.round(iconVal * 10) / 10);
-      ecmwfData.push(Math.round(ecVal * 10) / 10);
-      gfsData.push(Math.round(gfsVal * 10) / 10);
+      const iv = toFiniteNum(rawIcon[i]);
+      const ev = toFiniteNum(rawEc[i]);
+      const gv = toFiniteNum(rawGfs[i]);
+      iconData.push(iv !== null ? Math.round(Math.max(0, iv) * 10) / 10 : null);
+      ecmwfData.push(ev !== null ? Math.round(Math.max(0, ev) * 10) / 10 : null);
+      gfsData.push(gv !== null ? Math.round(Math.max(0, gv) * 10) / 10 : null);
     }
   } else if (metric === 'wind') {
     unit = 'km/h';
-    const rawIcon = (mm && mm.regional && Array.isArray(mm.regional.hourlyWind) && mm.regional.hourlyWind.length > 0)
-      ? mm.regional.hourlyWind
+    const rawIcon = hasRegionalSeries
+      ? (mm.regional.hourlyWind || [])
       : (rawH.wind_speed_10m || []).slice(curHourIdx);
     const rawEc = (mm && mm.ecmwf && mm.ecmwf.hourlyWind) ? mm.ecmwf.hourlyWind : [];
     const rawGfs = (mm && mm.gfs && mm.gfs.hourlyWind) ? mm.gfs.hourlyWind : [];
 
     for (let i = 0; i < count; i++) {
-      const iconVal = Math.max(0, rawIcon[i] !== undefined ? rawIcon[i] : 15);
-      const ecVal = Math.max(0, rawEc[i] !== undefined ? rawEc[i] : (iconVal * 0.95 + 2));
-      const gfsVal = Math.max(0, rawGfs[i] !== undefined ? rawGfs[i] : (iconVal * 1.1 - 1));
-
-      iconData.push(Math.round(iconVal));
-      ecmwfData.push(Math.round(ecVal));
-      gfsData.push(Math.round(gfsVal));
+      const iv = toFiniteNum(rawIcon[i]);
+      const ev = toFiniteNum(rawEc[i]);
+      const gv = toFiniteNum(rawGfs[i]);
+      iconData.push(iv !== null ? Math.round(Math.max(0, iv)) : null);
+      ecmwfData.push(ev !== null ? Math.round(Math.max(0, ev)) : null);
+      gfsData.push(gv !== null ? Math.round(Math.max(0, gv)) : null);
     }
   }
 
   // Aktualisiere Legende auf das tatsächliche regionale High-Res Modell
   const iconLeg = document.querySelector('.m-legend-item .icon')?.parentElement;
   if (iconLeg && mm && mm.activeRegionalModel) {
-    iconLeg.innerHTML = `<span class="m-leg-dot icon"></span> ${mm.activeRegionalModel}`;
+    iconLeg.innerHTML = `<span class="m-leg-dot icon"></span> ${escapeHtml(mm.activeRegionalModel)}`;
   }
 
-  // Min- und Max-Werte für Skalierung
+  // Min- und Max-Werte nur über tatsächlich vorhandene Modell-Werte bestimmen
   let minVal = Infinity;
   let maxVal = -Infinity;
   for (let i = 0; i < count; i++) {
-    const mn = Math.min(ecmwfData[i], gfsData[i], iconData[i]);
-    const mx = Math.max(ecmwfData[i], gfsData[i], iconData[i]);
-    if (mn < minVal) minVal = mn;
-    if (mx > maxVal) maxVal = mx;
+    const vals = [ecmwfData[i], gfsData[i], iconData[i]].filter(v => v !== null);
+    for (const v of vals) {
+      if (v < minVal) minVal = v;
+      if (v > maxVal) maxVal = v;
+    }
+  }
+  if (!Number.isFinite(minVal) || !Number.isFinite(maxVal)) {
+    minVal = 0;
+    maxVal = 10;
   }
 
   if (metric === 'precip') {
@@ -2249,38 +2339,50 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
   const getX = idx => padL + (idx / safeCountDenom) * plotW;
   const getY = val => padT + plotH - ((val - minVal) / range) * plotH;
 
-  // Canvas direkt an .meteogram-chart-wrapper / #ensemble-meteogram-canvas binden (SVG behält Achsen & Interaktiven Tooltip)
-  try {
-    if (!window._meteogramCanvasInstance) {
-      window._meteogramCanvasInstance = new MeteogramCanvas('ensemble-meteogram-section');
-    }
-    // Canvas nicht doppelt über SVG-Linien zeichnen, sondern sauber ausgeblendet als Fallback-Buffer bereithalten
-    if (window._meteogramCanvasInstance && window._meteogramCanvasInstance.canvas) {
-      window._meteogramCanvasInstance.canvas.style.display = 'none';
-    }
-  } catch (err) {
-    console.warn('[MeteogramCanvas] Init warning:', err);
-  }
-
-  // SVG-Pfade generieren
-  let corridorTop = [];
-  let corridorBot = [];
-  let ecPoints = [];
-  let gfsPoints = [];
-  let iconPoints = [];
-
+  // Unsicherheits-Korridor & segmentierte SVG-Polylines (sauberes Ende bei Modellhorizont ohne NaN-Sprung)
+  const corridorPolys = [];
+  let segTop = [];
+  let segBot = [];
   for (let i = 0; i < count; i++) {
     const x = getX(i);
-    const topV = Math.max(ecmwfData[i], gfsData[i], iconData[i]);
-    const botV = Math.min(ecmwfData[i], gfsData[i], iconData[i]);
-
-    corridorTop.push(`${x.toFixed(1)},${getY(topV).toFixed(1)}`);
-    corridorBot.unshift(`${x.toFixed(1)},${getY(botV).toFixed(1)}`);
-
-    ecPoints.push(`${x.toFixed(1)},${getY(ecmwfData[i]).toFixed(1)}`);
-    gfsPoints.push(`${x.toFixed(1)},${getY(gfsData[i]).toFixed(1)}`);
-    iconPoints.push(`${x.toFixed(1)},${getY(iconData[i]).toFixed(1)}`);
+    const vals = [ecmwfData[i], gfsData[i], iconData[i]].filter(v => v !== null);
+    if (vals.length >= 2) {
+      const topV = Math.max(...vals);
+      const botV = Math.min(...vals);
+      segTop.push(`${x.toFixed(1)},${getY(topV).toFixed(1)}`);
+      segBot.unshift(`${x.toFixed(1)},${getY(botV).toFixed(1)}`);
+    } else if (segTop.length > 1) {
+      corridorPolys.push(segTop.concat(segBot).join(' '));
+      segTop = [];
+      segBot = [];
+    } else {
+      segTop = [];
+      segBot = [];
+    }
   }
+  if (segTop.length > 1) {
+    corridorPolys.push(segTop.concat(segBot).join(' '));
+  }
+
+  const buildPolylines = (series, color, width = 2.5) => {
+    const segments = [];
+    let current = [];
+    for (let i = 0; i < count; i++) {
+      const val = series[i];
+      if (val !== null) {
+        current.push(`${getX(i).toFixed(1)},${getY(val).toFixed(1)}`);
+      } else if (current.length > 1) {
+        segments.push(current.join(' '));
+        current = [];
+      } else {
+        current = [];
+      }
+    }
+    if (current.length > 1) segments.push(current.join(' '));
+    return segments
+      .map(pts => `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" />`)
+      .join('');
+  };
 
   // Horizontale Gitterlinien
   let gridHtml = '';
@@ -2309,7 +2411,9 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
     `;
   }
 
-  const corridorPoly = corridorTop.concat(corridorBot).join(' ');
+  const corridorHtml = corridorPolys
+    .map(poly => `<polygon points="${poly}" fill="url(#corridor-gradient)" />`)
+    .join('');
 
   svg.innerHTML = `
     <!-- Defs: Farb-Verläufe -->
@@ -2324,13 +2428,13 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
     ${gridHtml}
     ${dayMarkersHtml}
 
-    <!-- Unsicherheits-Streubereich (Korridor) -->
-    <polygon points="${corridorPoly}" fill="url(#corridor-gradient)" />
+    <!-- Echter Unsicherheits-Streubereich (Korridor) -->
+    ${corridorHtml}
 
-    <!-- Modell-Kurven -->
-    <polyline points="${ecPoints.join(' ')}" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-    <polyline points="${gfsPoints.join(' ')}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-    <polyline points="${iconPoints.join(' ')}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- Echte Modell-Kurven -->
+    ${buildPolylines(ecmwfData, '#38bdf8', 2.5)}
+    ${buildPolylines(gfsData, '#f59e0b', 2.5)}
+    ${buildPolylines(iconData, '#10b981', 2.5)}
 
     <!-- Interaktives Hover-Overlay -->
     <line id="met-hover-line" x1="0" y1="${padT}" x2="0" y2="${H - padB}" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-dasharray="4,3" style="display:none;" />
@@ -2347,6 +2451,7 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
   const dotGfs = document.getElementById('met-dot-gfs');
   const dotIcon = document.getElementById('met-dot-icon');
   const tooltip = document.getElementById('meteogram-tooltip');
+  const regLabel = (mm && mm.activeRegionalModel) ? escapeHtml(mm.activeRegionalModel) : 'ICON Best-Match';
 
   if (hitbox) {
     hitbox.addEventListener('mousemove', e => {
@@ -2356,43 +2461,51 @@ export function renderEnsembleMeteogram(metric = activeMeteogramMetric) {
       const idx = Math.min(count - 1, Math.max(0, Math.round((relX / plotW) * (count - 1))));
 
       const cx = getX(idx);
-      const ecY = getY(ecmwfData[idx]);
-      const gfsY = getY(gfsData[idx]);
-      const iconY = getY(iconData[idx]);
-
       hoverLine.setAttribute('x1', cx);
       hoverLine.setAttribute('x2', cx);
       hoverLine.style.display = 'block';
 
-      dotEc.setAttribute('cx', cx);
-      dotEc.setAttribute('cy', ecY);
-      dotEc.style.display = 'block';
+      const activeYs = [];
+      const setDot = (dotEl, val) => {
+        if (!dotEl) return;
+        if (val !== null) {
+          const py = getY(val);
+          dotEl.setAttribute('cx', cx);
+          dotEl.setAttribute('cy', py);
+          dotEl.style.display = 'block';
+          activeYs.push(py);
+        } else {
+          dotEl.style.display = 'none';
+        }
+      };
 
-      dotGfs.setAttribute('cx', cx);
-      dotGfs.setAttribute('cy', gfsY);
-      dotGfs.style.display = 'block';
-
-      dotIcon.setAttribute('cx', cx);
-      dotIcon.setAttribute('cy', iconY);
-      dotIcon.style.display = 'block';
+      setDot(dotEc, ecmwfData[idx]);
+      setDot(dotGfs, gfsData[idx]);
+      setDot(dotIcon, iconData[idx]);
 
       if (tooltip) {
         const d = new Date(alignedTimes[idx] || rawH.time[idx]);
         const dayStr = isNaN(d.getTime()) ? '' : d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
         const timeStr = isNaN(d.getTime()) ? '--:--' : d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-        const delta = Math.abs(ecmwfData[idx] - gfsData[idx]).toFixed(1);
+        const validAtIdx = [ecmwfData[idx], gfsData[idx], iconData[idx]].filter(v => v !== null);
+        const delta = validAtIdx.length >= 2
+          ? (Math.max(...validAtIdx) - Math.min(...validAtIdx)).toFixed(1)
+          : '—';
+
+        const fmtVal = v => v !== null ? `${v} ${unit}` : '<span style="color:#94a3b8;">Horizont ende</span>';
+        const topY = activeYs.length ? Math.min(...activeYs) : (padT + 20);
 
         tooltip.innerHTML = `
           <div style="font-weight:700; color:var(--ios-cyan); margin-bottom:4px;">⏱️ ${dayStr} • ${timeStr} Uhr</div>
-          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#38bdf8;">🇪🇺 ECMWF IFS:</span> <strong>${ecmwfData[idx]} ${unit}</strong></div>
-          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#f59e0b;">🇺🇸 GFS Seamless:</span> <strong>${gfsData[idx]} ${unit}</strong></div>
-          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#10b981;">🇩🇪 ICON Best-Match:</span> <strong>${iconData[idx]} ${unit}</strong></div>
+          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#38bdf8;">🇪🇺 ECMWF IFS:</span> <strong>${fmtVal(ecmwfData[idx])}</strong></div>
+          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#f59e0b;">🇺🇸 GFS Seamless:</span> <strong>${fmtVal(gfsData[idx])}</strong></div>
+          <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:#10b981;">🇩🇪 ${regLabel}:</span> <strong>${fmtVal(iconData[idx])}</strong></div>
           <div style="border-top:1px solid rgba(255,255,255,0.15); margin-top:4px; padding-top:4px; color:#cbd5e1; font-size:10px;">
-            Streubreite: <strong>Δ ${delta} ${unit}</strong>
+            Streubreite: <strong>${delta === '—' ? '1 Modell' : `Δ ${delta} ${unit}`}</strong>
           </div>
         `;
         tooltip.style.left = `${(cx / W) * 100}%`;
-        tooltip.style.top = `${Math.min(ecY, gfsY, iconY) - 10}px`;
+        tooltip.style.top = `${topY - 10}px`;
         tooltip.style.display = 'block';
       }
     });
@@ -2546,8 +2659,11 @@ export function openDayDetailModal(dayIndex, daily, hourly) {
   document.getElementById('modal-max-temp').innerText = `${maxT}°`;
   document.getElementById('modal-min-temp').innerText = `${minT}°`;
 
-  const appMax = daily.apparent_temperature_max ? Math.round(convertTemp(daily.apparent_temperature_max[dayIndex])) : maxT;
-  const appMin = daily.apparent_temperature_min ? Math.round(convertTemp(daily.apparent_temperature_min[dayIndex])) : minT;
+  const validHoursApp = hoursApparent.filter(v => typeof v === 'number' && !isNaN(v)).map(t => convertTemp(t));
+  const rawAppMax = daily.apparent_temperature_max ? convertTemp(daily.apparent_temperature_max[dayIndex]) : maxT;
+  const rawAppMin = daily.apparent_temperature_min ? convertTemp(daily.apparent_temperature_min[dayIndex]) : minT;
+  const appMax = Math.round(validHoursApp.length ? Math.max(rawAppMax, ...validHoursApp) : rawAppMax);
+  const appMin = Math.round(validHoursApp.length ? Math.min(rawAppMin, ...validHoursApp) : rawAppMin);
   document.getElementById('modal-apparent-range').innerText = `Gefühlt: ${appMin}° bis ${appMax}°`;
 
   const popMax = daily.precipitation_probability_max ? (daily.precipitation_probability_max[dayIndex] || 0) : 0;
@@ -2988,54 +3104,338 @@ if (typeof document !== 'undefined') {
   });
 }
 
-export function renderBentoGrid(cur, daily, hourly) {
-  const todayIdx = getTodayDailyIndex(daily).idx;
-  const curHourIdx = getClosestHourlyIndex(hourly);
+export function getUvRiskMeta(uvRaw) {
+  const uv = Math.max(0, Math.round(uvRaw ?? 0));
+  if (uv === 0) {
+    return {
+      uv,
+      label: 'Keine UV (Nacht)',
+      color: '#30d158',
+      hint: 'Kein UV-Schutz erforderlich.',
+      sheetDesc: 'Aktuell keine relevante UV-Strahlung.',
+      skinTimes: { I: '> 60 Min.', II: '> 60 Min.', III: '> 90 Min.', IV: '> 120 Min.' }
+    };
+  }
+  const fmtMin = (m) => (m > 60 ? '> 60 Min.' : `~${Math.max(5, Math.round(m))} Min.`);
+  const skinTimes = {
+    I: fmtMin(150 / uv),
+    II: fmtMin(210 / uv),
+    III: fmtMin(300 / uv),
+    IV: fmtMin(450 / uv)
+  };
+  if (uv <= 2) {
+    return {
+      uv,
+      label: 'Gering',
+      color: '#30d158',
+      hint: 'Kein besonderer Schutz erforderlich.',
+      sheetDesc: 'Geringe UV-Belastung. Schutz nur bei extremer Schneereflexion im Hochgebirge.',
+      skinTimes
+    };
+  }
+  if (uv <= 5) {
+    return {
+      uv,
+      label: 'Mäßig',
+      color: '#ffd166',
+      hint: 'Sonnenschutz (LSF 30+) bei längerer Exposition.',
+      sheetDesc: 'Sonnenschutz bei längerer Exposition empfohlen (Hut, Sonnenbrille, LSF 30+).',
+      skinTimes
+    };
+  }
+  if (uv <= 7) {
+    return {
+      uv,
+      label: 'Hoch',
+      color: '#ff9f0a',
+      hint: 'Schutz nötig: LSF 30+, Sonnenbrille & Mittagsschatten.',
+      sheetDesc: 'Schutz dringend erforderlich! Schatten suchen, LSF 30+, Sonnenbrille UV400.',
+      skinTimes
+    };
+  }
+  if (uv <= 10) {
+    return {
+      uv,
+      label: 'Sehr hoch',
+      color: '#ff453a',
+      hint: 'Intensive Strahlung: LSF 50+, Mittagssonne meiden.',
+      sheetDesc: 'Intensive Berg-/Mittagssonne! Aufenthalt in der prallen Sonne meiden, LSF 50+.',
+      skinTimes
+    };
+  }
+  return {
+    uv,
+    label: 'Extrem',
+    color: '#bf5af2',
+    hint: 'Gefährlich! LSF 50+, Kleidung & UV-Schutz zwingend.',
+    sheetDesc: 'Gefährliche Strahlung! Ungeschützter Aufenthalt führt rasch zu Verbrennungen.',
+    skinTimes
+  };
+}
 
-  const uv = cur.uv_index !== undefined ? Math.round(cur.uv_index) : 0;
-  document.getElementById('uv-index-val').innerText = uv;
-  document.getElementById('uv-gauge-pointer').style.left = `${Math.min(100, (uv / 11) * 100)}%`;
+export function getHumidityAndDewPoint(cur, hourly, curHourIdx) {
+  const temp = cur?.temperature_2m ?? hourly?.temperature_2m?.[curHourIdx] ?? 10;
+  const rhRaw = cur?.relative_humidity_2m ?? hourly?.relative_humidity_2m?.[curHourIdx] ?? 65;
+  const rh = Math.max(1, Math.min(100, Math.round(rhRaw)));
+  const hDew = hourly?.dew_point_2m?.[curHourIdx];
+  const dewPoint = (typeof hDew === 'number' && !isNaN(hDew))
+    ? Math.round(hDew * 10) / 10
+    : MicroEngine.computeDewPoint(temp, rh);
+  const spread = Math.round((temp - dewPoint) * 10) / 10;
 
-  const windSpd = Math.round(cur.wind_speed_10m || 0);
-  const windDir = cur.wind_direction_10m || 0;
-  const windGusts = Math.round(cur.wind_gusts_10m || windSpd * 1.4);
-  document.getElementById('wind-speed-val').innerHTML = `${windSpd} <small>km/h</small>`;
-  document.getElementById('compass-arrow').style.transform = `rotate(${windDir}deg)`;
-  document.getElementById('wind-direction-text').innerText = `${windDir}°`;
-  document.getElementById('wind-gusts-text').innerText = `Böenspitzen bis ${windGusts} km/h`;
-
-  if (daily && daily.sunrise && daily.sunset && daily.sunrise.length > 0) {
-    const sunrise = new Date(daily.sunrise[todayIdx] || daily.sunrise[0]);
-    const sunset = new Date(daily.sunset[todayIdx] || daily.sunset[0]);
-    document.getElementById('sunrise-time-val').innerText = sunrise.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    document.getElementById('sunset-time-val').innerText = sunset.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    const diffHours = ((sunset - sunrise) / (1000 * 60 * 60)).toFixed(1);
-    document.getElementById('daylight-hours-val').innerText = `${diffHours} h Licht`;
+  let riskShort = 'Normal';
+  let fogRisk = 'Gering (Trocken / Klar)';
+  let riskClass = 'text-green';
+  if (spread <= 1.5) {
+    riskShort = 'Hoch (Nebel-/Tau-Gefahr)';
+    fogRisk = 'Sehr hoch (Nebel & Taubeschlag)';
+    riskClass = 'text-accent';
+  } else if (spread <= 3.5) {
+    riskShort = 'Mäßig (Dunst / feucht)';
+    fogRisk = 'Mäßig (Dunst & lokale Nebelneigung)';
+    riskClass = 'text-yellow';
+  } else if (spread <= 8.0) {
+    riskShort = 'Normal (Ausgeglichen)';
+    fogRisk = 'Gering bis normal';
+    riskClass = 'text-green';
+  } else {
+    riskShort = 'Gering (Trockene Luft)';
+    fogRisk = 'Sehr gering (Trockene Luftmasse)';
+    riskClass = 'text-green';
   }
 
-  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum[todayIdx] != null) ? Number(daily.precipitation_sum[todayIdx]) : 0;
-  document.getElementById('precip-total-val').innerHTML = `${pSum.toFixed(1)} <small>mm</small>`;
-  const pHintEl = document.getElementById('precip-forecast-hint');
-  if (pHintEl) {
-    if (pSum > 0) {
-      const fl = (hourly && hourly.freezing_level_height && hourly.freezing_level_height.length) ? hourly.freezing_level_height[curHourIdx] : null;
-      if (fl) {
-        pHintEl.innerText = `Niederschlag aktiv • Schneefallgrenze bei ca. ${Math.round(fl).toLocaleString('de-DE')} m`;
-      } else {
-        pHintEl.innerText = `24h Niederschlagssumme ca. ${pSum.toFixed(1)} mm`;
+  return { temp, rh, dewPoint, spread, riskShort, fogRisk, riskClass };
+}
+
+export function getBarometricTrend(cur, hourly, curHourIdx) {
+  const pArr = hourly && Array.isArray(hourly.pressure_msl) ? hourly.pressure_msl : null;
+  const qnhVal = cur?.pressure_msl ?? pArr?.[curHourIdx] ?? 1013;
+  const qfeVal = cur?.surface_pressure ?? hourly?.surface_pressure?.[curHourIdx] ?? qnhVal;
+  const qnh = Math.round(qnhVal);
+  const qfe = Math.round(qfeVal);
+
+  let delta3h = 0;
+  let isForecastTrend = false;
+  if (pArr && pArr.length > 0) {
+    const pNow = typeof pArr[curHourIdx] === 'number' ? pArr[curHourIdx] : qnhVal;
+    if (curHourIdx >= 1) {
+      const step = Math.min(3, curHourIdx);
+      const pPast = pArr[curHourIdx - step];
+      if (typeof pPast === 'number' && !isNaN(pPast)) {
+        delta3h = Math.round((((pNow - pPast) / step) * 3) * 10) / 10;
       }
-    } else {
-      pHintEl.innerText = 'Kein wesentlicher Niederschlag erwartet.';
+    } else if (pArr.length > 3 && typeof pArr[3] === 'number' && !isNaN(pArr[3])) {
+      delta3h = Math.round((pArr[3] - pNow) * 10) / 10;
+      isForecastTrend = true;
     }
   }
 
-  const rh = Math.round(cur.relative_humidity_2m || 0);
-  const dew = (cur.temperature_2m - ((100 - rh) / 5)).toFixed(1);
-  document.getElementById('humidity-val').innerText = `${rh}%`;
-  document.getElementById('dew-point-sub').innerText = `Taupunkt: ${dew}°C`;
+  const signed = `${delta3h >= 0 ? '+' : ''}${delta3h.toFixed(1)}`;
+  const unitLabel = isForecastTrend ? 'hPa/3h Prog.' : 'hPa/3h';
+  let arrow = '➡️';
+  let trendLabel = 'Stabil';
+  let trendDesc = `Ausgeglichener Luftdruckverlauf (${signed} ${unitLabel}).`;
 
-  const pQNH = Math.round(cur.pressure_msl || 1013);
-  const pQFE = Math.round(cur.surface_pressure || pQNH);
-  document.getElementById('pressure-val').innerHTML = `${pQNH} <small>hPa</small>`;
-  document.getElementById('pressure-qfe').innerText = `Stationsdruck (QFE): ${pQFE} hPa`;
+  if (delta3h <= -3.0) {
+    arrow = '⏬';
+    trendLabel = 'Stark fallend';
+    trendDesc = `Rascher Druckfall (${signed} ${unitLabel}) deutet auf Frontdurchzug oder Sturmgefahr hin.`;
+  } else if (delta3h <= -0.8) {
+    arrow = '↘️';
+    trendLabel = 'Fallend';
+    trendDesc = `Leichter bis mäßiger Druckfall (${signed} ${unitLabel}): Bewölkungszunahme oder Schauer möglich.`;
+  } else if (delta3h >= 3.0) {
+    arrow = '⏫';
+    trendLabel = 'Stark steigend';
+    trendDesc = `Kräftiger Druckanstieg (${signed} ${unitLabel}) signalisiert rasche Wetterberuhigung auf der Rückseite.`;
+  } else if (delta3h >= 0.8) {
+    arrow = '↗️';
+    trendLabel = 'Steigend';
+    trendDesc = `Steigender Luftdruck (${signed} ${unitLabel}): Zunehmender Hochdruckeinfluss.`;
+  } else if (qnh > 1022) {
+    trendDesc = `Stabiles Hochdruckgebiet (${signed} ${unitLabel}) sorgt für ruhige Verhältnisse.`;
+  } else if (qnh < 1004) {
+    trendDesc = `Tiefdruckeinfluss (${signed} ${unitLabel}) begünstigt Quellwolken und wechselhaftes Wetter.`;
+  }
+
+  return {
+    qnh,
+    qfe,
+    delta3h,
+    signed,
+    arrow,
+    trendLabel,
+    compactText: `Tendenz: ${arrow} ${trendLabel} (${signed} hPa/3h)`,
+    trendDesc
+  };
+}
+
+export function getRolling24hPrecipSummary(cur, daily, hourly, curHourIdx, todayIdx, micro = null) {
+  let rollingPrecip = 0;
+  let rollingSnowCm = 0;
+  let hasHourlyPrecip = false;
+
+  if (hourly && Array.isArray(hourly.precipitation) && hourly.precipitation.length > 0) {
+    const startIdx = Math.max(0, curHourIdx);
+    const endIdx = Math.min(hourly.precipitation.length, startIdx + 24);
+    for (let i = startIdx; i < endIdx; i++) {
+      const p = hourly.precipitation[i];
+      if (typeof p === 'number' && !isNaN(p)) {
+        rollingPrecip += Math.max(0, p);
+        hasHourlyPrecip = true;
+      }
+      if (Array.isArray(hourly.snowfall) && typeof hourly.snowfall[i] === 'number' && !isNaN(hourly.snowfall[i])) {
+        rollingSnowCm += Math.max(0, hourly.snowfall[i]);
+      }
+    }
+  }
+
+  const dailyPrecip = (daily && daily.precipitation_sum && daily.precipitation_sum[todayIdx] != null)
+    ? Number(daily.precipitation_sum[todayIdx]) : 0;
+  const total24hMm = Math.round((hasHourlyPrecip ? rollingPrecip : dailyPrecip) * 10) / 10;
+  const totalSnowCm = Math.round((hasHourlyPrecip ? rollingSnowCm : (daily?.snowfall_sum?.[todayIdx] || 0)) * 10) / 10;
+
+  const fl = micro?.atmosphere?.freezingLevelMeters ??
+    micro?.microWeather?.freezingLevelMeters ??
+    hourly?.freezing_level_height?.[curHourIdx] ?? null;
+  const snowLevel = micro?.atmosphere?.snowLevelMeters ??
+    micro?.microWeather?.snowLevelMeters ??
+    (fl !== null ? Math.max(0, fl - 300) : null);
+
+  return { total24hMm, totalSnowCm, dailyPrecip, freezingLevel: fl, snowLevel };
+}
+
+export function computeAstronomicalSunData(daily, todayIdx, lat = 48) {
+  const now = new Date();
+  let sunriseStr = '--:--';
+  let sunsetStr = '--:--';
+  let daylightStr = '-- h Licht';
+  let progressPct = 0;
+  let isSunUp = true;
+
+  if (daily && Array.isArray(daily.sunrise) && Array.isArray(daily.sunset) && daily.sunrise.length > 0) {
+    const rise = new Date(daily.sunrise[todayIdx] || daily.sunrise[0]);
+    const set = new Date(daily.sunset[todayIdx] || daily.sunset[0]);
+    if (!isNaN(rise.getTime()) && !isNaN(set.getTime()) && set > rise) {
+      sunriseStr = rise.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      sunsetStr = set.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const totalMin = (set.getTime() - rise.getTime()) / 60000;
+      const elapsedMin = (now.getTime() - rise.getTime()) / 60000;
+      daylightStr = `${(totalMin / 60).toFixed(1)} h Licht`;
+      isSunUp = now >= rise && now <= set;
+      progressPct = Math.max(0, Math.min(100, (elapsedMin / totalMin) * 100));
+    }
+  }
+
+  // Quadratischer Bezier-Punkt auf M 5 35 Q 50 5 95 35 (viewBox 0 0 100 40)
+  const t = progressPct / 100;
+  const omt = 1 - t;
+  const arcX = (omt * omt * 5) + (2 * omt * t * 50) + (t * t * 95);
+  const arcY = (omt * omt * 35) + (2 * omt * t * 5) + (t * t * 35);
+
+  // Astronomische bürgerliche Dämmerungsdauer (Sonnenstand -0.833° bis -6°)
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const doy = Math.floor((now - startOfYear) / 86400000);
+  const rad = Math.PI / 180;
+  const deg = 180 / Math.PI;
+  const decl = 23.44 * rad * Math.sin((2 * Math.PI / 365) * (doy - 81));
+  const latRad = Math.max(-65, Math.min(65, Number(lat) || 48)) * rad;
+  const cosH0 = Math.max(-0.99, Math.min(0.99, (Math.cos(90.833 * rad) / (Math.cos(latRad) * Math.cos(decl))) - Math.tan(latRad) * Math.tan(decl)));
+  const cosH6 = Math.max(-0.99, Math.min(0.99, (Math.cos(96.0 * rad) / (Math.cos(latRad) * Math.cos(decl))) - Math.tan(latRad) * Math.tan(decl)));
+  const twilightMin = Math.max(20, Math.min(90, Math.round((Math.acos(cosH6) * deg - Math.acos(cosH0) * deg) * 4)));
+
+  return { sunriseStr, sunsetStr, daylightStr, progressPct, isSunUp, arcX, arcY, twilightMin };
+}
+
+export function renderBentoGrid(cur, daily, hourly) {
+  const todayIdx = getTodayDailyIndex(daily).idx;
+  const curHourIdx = getClosestHourlyIndex(hourly);
+  const micro = state.microData;
+  const loc = state.currentLocation || { lat: 48, elevation: 520 };
+
+  // 1. UV-Index
+  const uvMeta = getUvRiskMeta(cur.uv_index ?? hourly?.uv_index?.[curHourIdx] ?? 0);
+  const uvValEl = document.getElementById('uv-index-val');
+  const uvDescEl = document.getElementById('uv-index-desc');
+  const uvHintEl = document.getElementById('uv-index-hint');
+  const uvPtrEl = document.getElementById('uv-gauge-pointer');
+  if (uvValEl) uvValEl.innerText = uvMeta.uv;
+  if (uvDescEl) {
+    uvDescEl.innerText = uvMeta.label;
+    uvDescEl.style.color = uvMeta.color;
+  }
+  if (uvHintEl) {
+    const uvMaxToday = daily?.uv_index_max?.[todayIdx] != null ? Math.round(daily.uv_index_max[todayIdx]) : null;
+    uvHintEl.innerText = (uvMeta.uv === 0 && uvMaxToday !== null && uvMaxToday > 0)
+      ? `${uvMeta.hint} • Tagesmax: UV ${uvMaxToday}`
+      : uvMeta.hint;
+  }
+  if (uvPtrEl) uvPtrEl.style.left = `${Math.min(100, (uvMeta.uv / 11) * 100)}%`;
+
+  // 2. Wind & Böen
+  const windSpd = Math.round(cur.wind_speed_10m ?? hourly?.wind_speed_10m?.[curHourIdx] ?? 0);
+  const windDir = cur.wind_direction_10m ?? hourly?.wind_direction_10m?.[curHourIdx] ?? 0;
+  const windGusts = Math.round(cur.wind_gusts_10m ?? hourly?.wind_gusts_10m?.[curHourIdx] ?? windSpd * 1.4);
+  const compass = getCompassDirectionName(windDir);
+  document.getElementById('wind-speed-val').innerHTML = `${windSpd} <small>km/h</small>`;
+  document.getElementById('compass-arrow').style.transform = `rotate(${windDir}deg)`;
+  document.getElementById('wind-direction-text').innerText = `${compass.code} (${Math.round(windDir)}°)`;
+  document.getElementById('wind-gusts-text').innerText = `Böenspitzen bis ${windGusts} km/h`;
+
+  // 3. Sonnenstand & animierter Sonnenbogen
+  const sunData = computeAstronomicalSunData(daily, todayIdx, loc.lat);
+  document.getElementById('sunrise-time-val').innerText = sunData.sunriseStr;
+  document.getElementById('sunset-time-val').innerText = sunData.sunsetStr;
+  document.getElementById('daylight-hours-val').innerText = sunData.daylightStr;
+  const sunsetLabelEl = document.getElementById('sunset-label');
+  if (sunsetLabelEl) {
+    sunsetLabelEl.innerText = sunData.isSunUp ? 'Sonnenuntergang' : 'Sonnenuntergang (Nacht)';
+  }
+  const sunProgressPath = document.getElementById('sun-arc-progress');
+  const sunPoint = document.getElementById('sun-arc-point');
+  if (sunProgressPath) {
+    const arcLen = 112;
+    sunProgressPath.setAttribute('stroke-dasharray', `${arcLen}`);
+    sunProgressPath.setAttribute('stroke-dashoffset', `${(arcLen * (1 - sunData.progressPct / 100)).toFixed(1)}`);
+  }
+  if (sunPoint) {
+    sunPoint.setAttribute('cx', sunData.arcX.toFixed(1));
+    sunPoint.setAttribute('cy', sunData.arcY.toFixed(1));
+    sunPoint.setAttribute('fill', sunData.isSunUp ? '#ffb703' : 'rgba(255, 255, 255, 0.35)');
+  }
+
+  // 4. Niederschlag (rollierende 24h-Summe inkl. Nowcast & Schneefallgrenze)
+  const precipSummary = getRolling24hPrecipSummary(cur, daily, hourly, curHourIdx, todayIdx, micro);
+  document.getElementById('precip-total-val').innerHTML = `${precipSummary.total24hMm.toFixed(1)} <small>mm</small>`;
+  const pHintEl = document.getElementById('precip-forecast-hint');
+  if (pHintEl) {
+    if (precipSummary.total24hMm > 0.05) {
+      const snowNote = precipSummary.totalSnowCm >= 0.5 ? ` (~${precipSummary.totalSnowCm.toFixed(0)} cm Schnee)` : '';
+      if (precipSummary.snowLevel !== null) {
+        pHintEl.innerText = `Nächste 24h${snowNote} • Schneefallgrenze ca. ${Math.round(precipSummary.snowLevel).toLocaleString('de-DE')} m`;
+      } else {
+        pHintEl.innerText = `Erwartet in den nächsten 24h${snowNote}: ${precipSummary.total24hMm.toFixed(1)} mm`;
+      }
+    } else {
+      pHintEl.innerText = 'Kein wesentlicher Niederschlag in den nächsten 24h.';
+    }
+  }
+
+  // 5. Feuchte, Taupunkt & Kondensationsrisiko
+  const hum = getHumidityAndDewPoint(cur, hourly, curHourIdx);
+  document.getElementById('humidity-val').innerText = `${hum.rh}%`;
+  document.getElementById('dew-point-sub').innerText = `Taupunkt: ${hum.dewPoint.toFixed(1)}°C`;
+  const condHintEl = document.getElementById('condensation-risk-hint');
+  if (condHintEl) {
+    condHintEl.innerText = `Spread ${hum.spread.toFixed(1)}°C • Risiko: ${hum.riskShort}`;
+  }
+
+  // 6. Luftdruck & echte 3h-Tendenz
+  const baro = getBarometricTrend(cur, hourly, curHourIdx);
+  document.getElementById('pressure-val').innerHTML = `${baro.qnh} <small>hPa</small>`;
+  document.getElementById('pressure-qfe').innerText = `Stationsdruck (QFE): ${baro.qfe} hPa`;
+  const pTrendEl = document.getElementById('pressure-trend');
+  if (pTrendEl) {
+    pTrendEl.innerText = baro.compactText;
+  }
 }

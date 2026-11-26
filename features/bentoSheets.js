@@ -5,7 +5,16 @@
 
 import { state } from '../core/state.js';
 import { escapeHtml } from '../httpClient.js';
-import { convertTemp, getTodayDailyIndex, getClosestHourlyIndex } from './overview.js';
+import {
+  convertTemp,
+  getTodayDailyIndex,
+  getClosestHourlyIndex,
+  getUvRiskMeta,
+  getHumidityAndDewPoint,
+  getBarometricTrend,
+  getRolling24hPrecipSummary,
+  computeAstronomicalSunData
+} from './overview.js';
 
 let isInitialized = false;
 
@@ -117,19 +126,19 @@ export function openBentoSheet(type) {
       renderWindSheet(cur, loc, title, subtitle, body);
       break;
     case 'sun':
-      renderSunSheet(daily, loc, title, subtitle, body);
+      renderSunSheet(daily, loc, m, title, subtitle, body);
       break;
     case 'uv':
-      renderUvSheet(cur, loc, title, subtitle, body);
+      renderUvSheet(cur, daily, loc, title, subtitle, body);
       break;
     case 'precip':
       renderPrecipSheet(cur, daily, w?.hourly, loc, m, title, subtitle, body);
       break;
     case 'humidity':
-      renderHumiditySheet(cur, loc, title, subtitle, body);
+      renderHumiditySheet(cur, w?.hourly, loc, title, subtitle, body);
       break;
     case 'pressure':
-      renderPressureSheet(cur, loc, title, subtitle, body);
+      renderPressureSheet(cur, w?.hourly, loc, title, subtitle, body);
       break;
     default:
       body.innerHTML = '<p>Details werden geladen...</p>';
@@ -154,9 +163,9 @@ function renderWindSheet(cur, loc, titleEl, subtitleEl, bodyEl) {
   if (titleEl) titleEl.innerText = '💨 Wind & Böen — Detailanalyse';
   if (subtitleEl) subtitleEl.innerText = 'Windrose, orografische Grat-Verstärkung & Beaufort-Skala';
 
-  const spd = Math.round(cur.wind_speed_10m || 0);
-  const dir = Math.round(cur.wind_direction_10m || 0);
-  const gusts = Math.round(cur.wind_gusts_10m || spd * 1.4);
+  const spd = Math.round(cur.wind_speed_10m ?? 0);
+  const dir = Math.round(cur.wind_direction_10m ?? 0);
+  const gusts = Math.round(cur.wind_gusts_10m ?? spd * 1.4);
 
   // Windrichtungs-Name
   const directions = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -232,37 +241,22 @@ function renderWindSheet(cur, loc, titleEl, subtitleEl, bodyEl) {
 /* =============================================================================
    2. SONNENSTAND & DÄMMERUNG DETAIL SHEET
    ============================================================================= */
-function renderSunSheet(daily, loc, titleEl, subtitleEl, bodyEl) {
+function renderSunSheet(daily, loc, micro, titleEl, subtitleEl, bodyEl) {
   if (titleEl) titleEl.innerText = '🌅 Sonnenstand & Dämmerungsphasen';
   if (subtitleEl) subtitleEl.innerText = 'Solarer Verlauf, Tageslichtdauer und Einstrahlungswinkel';
 
-  let sunriseStr = '--:--';
-  let sunsetStr = '--:--';
-  let daylightStr = '-- h';
-  let sunProgressPct = 50;
-  let isSunUp = true;
-
   const todayIdx = getTodayDailyIndex(daily).idx;
-  if (daily && daily.sunrise && daily.sunset && daily.sunrise.length > 0) {
-    const rise = new Date(daily.sunrise[todayIdx] || daily.sunrise[0]);
-    const set = new Date(daily.sunset[todayIdx] || daily.sunset[0]);
-    const now = new Date();
+  const sunData = computeAstronomicalSunData(daily, todayIdx, loc?.lat ?? 48);
+  const { sunriseStr, sunsetStr, daylightStr, progressPct: sunProgressPct, isSunUp, twilightMin } = sunData;
 
-    sunriseStr = rise.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    sunsetStr = set.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-
-    const totalMin = (set.getTime() - rise.getTime()) / 60000;
-    const elapsedMin = (now.getTime() - rise.getTime()) / 60000;
-    daylightStr = `${(totalMin / 60).toFixed(1)} h Licht`;
-
-    isSunUp = now >= rise && now <= set;
-    sunProgressPct = Math.max(0, Math.min(100, (elapsedMin / totalMin) * 100));
-  }
+  const terrain = micro?.terrain;
+  const aspectText = (loc?.isMountain && terrain && terrain.tilt > 0)
+    ? `${escapeHtml(terrain.aspectName || 'Exposition')} (${Math.round(terrain.tilt)}° Neigung)`
+    : escapeHtml(terrain?.aspectName || 'Freier Horizont');
 
   // Calculate sun position on SVG parabola (viewBox 0 0 300 120)
   // Parabola from (20, 100) to (280, 100) with peak at (150, 20)
   const x = 20 + (sunProgressPct / 100) * 260;
-  // normalized -1 at start, 0 at peak, 1 at end
   const normX = ((sunProgressPct / 100) * 2) - 1;
   const y = 20 + 80 * (normX * normX);
 
@@ -290,7 +284,7 @@ function renderSunSheet(daily, loc, titleEl, subtitleEl, bodyEl) {
             <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10" fill="#ffd166" filter="drop-shadow(0 0 8px rgba(255, 209, 102, 0.8))" />
             <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="#ffffff" />
           ` : `
-            <circle cx="280" cy="100" r="8" fill="rgba(255,255,255,0.3)" />
+            <circle cx="${sunProgressPct <= 0 ? 20 : 280}" cy="100" r="8" fill="rgba(255,255,255,0.3)" />
           `}
         </svg>
 
@@ -323,12 +317,12 @@ function renderSunSheet(daily, loc, titleEl, subtitleEl, bodyEl) {
             <div class="sp-item">
               <span class="sp-icon">🕯️</span>
               <span class="sp-label">Bürgerliche Dämmerung</span>
-              <strong class="sp-val">~32 Min.</strong>
+              <strong class="sp-val">~${twilightMin} Min.</strong>
             </div>
             <div class="sp-item">
               <span class="sp-icon">🏔️</span>
               <span class="sp-label">Hang-Exposition</span>
-              <strong class="sp-val">Volle Süd-Besonnung</strong>
+              <strong class="sp-val">${aspectText}</strong>
             </div>
           </div>
         </div>
@@ -340,55 +334,31 @@ function renderSunSheet(daily, loc, titleEl, subtitleEl, bodyEl) {
 /* =============================================================================
    3. UV-INDEX & HÖHENEXPOSITION DETAIL SHEET
    ============================================================================= */
-function renderUvSheet(cur, loc, titleEl, subtitleEl, bodyEl) {
+function renderUvSheet(cur, daily, loc, titleEl, subtitleEl, bodyEl) {
   if (titleEl) titleEl.innerText = '☀️ UV-Index & Höhenstrahlung';
   if (subtitleEl) subtitleEl.innerText = 'Atmosphärische UV-Intensität & Schutzzeit nach Hauttyp';
 
-  const uv = cur.uv_index !== undefined ? Math.round(cur.uv_index) : 0;
-  const elev = loc.elevation || 520;
+  const uvMeta = getUvRiskMeta(cur.uv_index ?? 0);
+  const uv = uvMeta.uv;
+  const elev = loc.elevation ?? 520;
   const altitudeBoostPct = Math.round((elev / 1000) * 11);
-
-  let uvCategory = 'Gering';
-  let uvColor = '#30d158';
-  let protectionNeeded = 'Kein besonderer Schutz erforderlich.';
-  let skinTimeMin = 'Über 60 Minuten';
-
-  if (uv >= 3) {
-    uvCategory = 'Mäßig';
-    uvColor = '#ffd166';
-    protectionNeeded = 'Sonnenschutz bei längerer Exposition empfohlen (Hut, Sonnencreme).';
-    skinTimeMin = '30–45 Minuten (Hauttyp II)';
-  }
-  if (uv >= 6) {
-    uvCategory = 'Hoch';
-    uvColor = '#ff9f0a';
-    protectionNeeded = 'Schutz dringend erforderlich! Schatten suchen, LSF 30+, Sonnenbrille UV400.';
-    skinTimeMin = '20–30 Minuten (Hauttyp II)';
-  }
-  if (uv >= 8) {
-    uvCategory = 'Sehr hoch';
-    uvColor = '#ff453a';
-    protectionNeeded = 'Intensive Bergsonne! Aufenthalt in der Mittagssonne meiden, LSF 50+.';
-    skinTimeMin = '15–20 Minuten';
-  }
-  if (uv >= 11) {
-    uvCategory = 'Extrem';
-    uvColor = '#bf5af2';
-    protectionNeeded = 'Gefährliche Strahlung! Ungeschützter Aufenthalt führt rasch zu Verbrennungen.';
-    skinTimeMin = '< 10 Minuten';
-  }
+  const todayIdx = getTodayDailyIndex(daily).idx;
+  const uvMaxToday = daily?.uv_index_max?.[todayIdx] != null ? Math.round(daily.uv_index_max[todayIdx]) : null;
+  const maxNote = (uvMaxToday !== null && uvMaxToday > uv)
+    ? ` <span style="opacity:0.75;">(Tagesmaximum: UV ${uvMaxToday})</span>`
+    : '';
 
   bodyEl.innerHTML = `
     <div class="bdm-grid">
       <!-- 1. UV Hero Gauge -->
       <div class="bdm-hero-box uv-hero-box">
-        <div class="uv-score-circle" style="border-color: ${uvColor}; color: ${uvColor};">
+        <div class="uv-score-circle" style="border-color: ${uvMeta.color}; color: ${uvMeta.color};">
           <span class="usc-num">${uv}</span>
           <span class="usc-label">UV-INDEX</span>
         </div>
         <div class="uv-hero-text">
-          <h3 class="uht-title" style="color: ${uvColor};">${uvCategory} Belastung</h3>
-          <p class="uht-desc">${protectionNeeded}</p>
+          <h3 class="uht-title" style="color: ${uvMeta.color};">${uvMeta.label}${maxNote}</h3>
+          <p class="uht-desc">${uvMeta.sheetDesc}</p>
           <div class="uv-bar-gauge full-gauge">
             <div class="uv-pointer" style="left: ${Math.min(100, (uv / 11) * 100)}%;"></div>
           </div>
@@ -411,10 +381,10 @@ function renderUvSheet(cur, loc, titleEl, subtitleEl, bodyEl) {
         <div class="bsc-title">🛡️ EIGENSCHUTZZEIT OHNE SONNENCREME</div>
         <div class="bsc-content">
           <div class="skin-type-grid">
-            <div class="st-row"><span>Hauttyp I (Keltisch, rotblond)</span><strong>${uv >= 6 ? '~15 Min.' : '~25 Min.'}</strong></div>
-            <div class="st-row"><span>Hauttyp II (Hellblond, hellhäutig)</span><strong>${uv >= 6 ? '~20 Min.' : '~35 Min.'}</strong></div>
-            <div class="st-row"><span>Hauttyp III (Dunkelblond / Braun)</span><strong>${uv >= 6 ? '~30 Min.' : '~50 Min.'}</strong></div>
-            <div class="st-row"><span>Hauttyp IV (Mediterran / Dunkel)</span><strong>${uv >= 6 ? '~45 Min.' : '> 60 Min.'}</strong></div>
+            <div class="st-row"><span>Hauttyp I (Keltisch, rotblond)</span><strong>${uvMeta.skinTimes.I}</strong></div>
+            <div class="st-row"><span>Hauttyp II (Hellblond, hellhäutig)</span><strong>${uvMeta.skinTimes.II}</strong></div>
+            <div class="st-row"><span>Hauttyp III (Dunkelblond / Braun)</span><strong>${uvMeta.skinTimes.III}</strong></div>
+            <div class="st-row"><span>Hauttyp IV (Mediterran / Dunkel)</span><strong>${uvMeta.skinTimes.IV}</strong></div>
           </div>
         </div>
       </div>
@@ -431,13 +401,13 @@ function renderPrecipSheet(cur, daily, hourly, loc, micro, titleEl, subtitleEl, 
 
   const todayIdx = getTodayDailyIndex(daily).idx;
   const hIdx = getClosestHourlyIndex(hourly);
-  const pSum = (daily && daily.precipitation_sum && daily.precipitation_sum[todayIdx] != null) ? Number(daily.precipitation_sum[todayIdx]) : 0;
-  const pop = (daily && daily.precipitation_probability_max && daily.precipitation_probability_max[todayIdx] != null) ? Math.round(daily.precipitation_probability_max[todayIdx]) : 0;
-  
-  const elev = loc.elevation || 520;
-  const freezingLevel = (micro && micro.atmosphere && micro.atmosphere.freezingLevelMeters) ||
-    (hourly && hourly.freezing_level_height ? hourly.freezing_level_height[hIdx] : 2200);
-  const snowLevel = (micro && micro.atmosphere && micro.atmosphere.snowLevelMeters) || Math.max(0, freezingLevel - 300);
+  const precipSummary = getRolling24hPrecipSummary(cur, daily, hourly, hIdx, todayIdx, micro);
+  const pop = (daily && daily.precipitation_probability_max && daily.precipitation_probability_max[todayIdx] != null)
+    ? Math.round(daily.precipitation_probability_max[todayIdx]) : 0;
+
+  const elev = loc.elevation ?? 520;
+  const freezingLevel = precipSummary.freezingLevel ?? 2200;
+  const snowLevel = precipSummary.snowLevel ?? Math.max(0, freezingLevel - 300);
 
   let phase = 'Regen';
   if (elev >= snowLevel) phase = 'Schneefall / Flocken';
@@ -448,13 +418,13 @@ function renderPrecipSheet(cur, daily, hourly, loc, micro, titleEl, subtitleEl, 
       <!-- 1. Niederschlags Hero Box -->
       <div class="bdm-hero-box precip-hero-box">
         <div class="precip-stat-col">
-          <div class="bdm-big-num text-cyan">${pSum.toFixed(1)} <small>mm</small></div>
-          <span class="bdm-sub-label">24h Gesamtsumme</span>
+          <div class="bdm-big-num text-cyan">${precipSummary.total24hMm.toFixed(1)} <small>mm</small></div>
+          <span class="bdm-sub-label">Nächste 24h (Heute: ${precipSummary.dailyPrecip.toFixed(1)} mm)</span>
         </div>
         <div class="precip-divider"></div>
         <div class="precip-stat-col">
           <div class="bdm-big-num text-accent">${pop}%</div>
-          <span class="bdm-sub-label">Regenrisiko</span>
+          <span class="bdm-sub-label">Regenrisiko${precipSummary.totalSnowCm >= 0.5 ? ` • ❄️ ${precipSummary.totalSnowCm.toFixed(1)} cm` : ''}</span>
         </div>
       </div>
 
@@ -464,7 +434,7 @@ function renderPrecipSheet(cur, daily, hourly, loc, micro, titleEl, subtitleEl, 
         <div class="bsc-content">
           <div class="snowline-stat-grid">
             <div class="sls-item">
-              <span class="sls-label">Schneefallgrenze</span>
+              <span class="sls-label">Schneefallgrenze (Wet-Bulb)</span>
               <strong class="sls-val text-cyan">~${Math.round(snowLevel).toLocaleString('de-DE')} m</strong>
               <small class="sls-sub">Höhe des Übergangs</small>
             </div>
@@ -475,7 +445,7 @@ function renderPrecipSheet(cur, daily, hourly, loc, micro, titleEl, subtitleEl, 
             </div>
           </div>
           <div class="sls-status-bar">
-            <span>Standort (${elev} m): <b>${phase}</b></span>
+            <span>Standort (${Math.round(elev)} m): <b>${phase}</b></span>
           </div>
         </div>
       </div>
@@ -486,24 +456,12 @@ function renderPrecipSheet(cur, daily, hourly, loc, micro, titleEl, subtitleEl, 
 /* =============================================================================
    5. FEUCHTIGKEIT & TAUPUNKT DETAIL SHEET
    ============================================================================= */
-function renderHumiditySheet(cur, loc, titleEl, subtitleEl, bodyEl) {
+function renderHumiditySheet(cur, hourly, loc, titleEl, subtitleEl, bodyEl) {
   if (titleEl) titleEl.innerText = '💧 Luftfeuchte & Taupunkt';
   if (subtitleEl) subtitleEl.innerText = 'Kondensationspotenzial, Sättigung und Behaglichkeits-Index';
 
-  const t = cur.temperature_2m || 10;
-  const rh = Math.round(cur.relative_humidity_2m || 65);
-  const dew = (t - ((100 - rh) / 5)).toFixed(1);
-  const spread = (t - parseFloat(dew)).toFixed(1);
-
-  let fogRisk = 'Gering';
-  let fogClass = 'text-green';
-  if (spread <= 1.5) {
-    fogRisk = 'Sehr hoch (Nebel & Wolkenbildung am Hang)';
-    fogClass = 'text-accent';
-  } else if (spread <= 3.0) {
-    fogRisk = 'Mäßig (Dunst & Talneigung)';
-    fogClass = 'text-yellow';
-  }
+  const hIdx = getClosestHourlyIndex(hourly);
+  const hum = getHumidityAndDewPoint(cur, hourly, hIdx);
 
   bodyEl.innerHTML = `
     <div class="bdm-grid">
@@ -511,13 +469,13 @@ function renderHumiditySheet(cur, loc, titleEl, subtitleEl, bodyEl) {
       <div class="bdm-hero-box humidity-hero-box">
         <div class="bdm-stat-pair">
           <div class="bsp-item">
-            <span class="bsp-val">${rh}%</span>
+            <span class="bsp-val">${hum.rh}%</span>
             <span class="bsp-label">Relative Feuchte</span>
           </div>
           <div class="bsp-divider"></div>
           <div class="bsp-item">
-            <span class="bsp-val text-cyan">${dew}°C</span>
-            <span class="bsp-label">Berechneter Taupunkt</span>
+            <span class="bsp-val text-cyan">${hum.dewPoint.toFixed(1)}°C</span>
+            <span class="bsp-label">Taupunkt (Magnus-Tetens)</span>
           </div>
         </div>
       </div>
@@ -527,8 +485,8 @@ function renderHumiditySheet(cur, loc, titleEl, subtitleEl, bodyEl) {
         <div class="bsc-title">🌫️ SPREAD (T − T_TAU) &amp; KONDENSATION</div>
         <div class="bsc-content">
           <p class="bsc-text">
-            Temperatur-Taupunkt-Differenz (Spread): <b>Δ ${spread}°C</b>.<br>
-            Nebel- &amp; Kondensationsneigung: <b class="${fogClass}">${fogRisk}</b>.
+            Aktuelle Temperatur: <b>${hum.temp.toFixed(1)}°C</b> • Temperatur-Taupunkt-Differenz (Spread): <b>Δ ${hum.spread.toFixed(1)}°C</b>.<br>
+            Nebel- &amp; Kondensationsneigung: <b class="${hum.riskClass}">${hum.fogRisk}</b>.
           </p>
         </div>
       </div>
@@ -539,17 +497,12 @@ function renderHumiditySheet(cur, loc, titleEl, subtitleEl, bodyEl) {
 /* =============================================================================
    6. LUFTPDRUCK & BAROMETER DETAIL SHEET
    ============================================================================= */
-function renderPressureSheet(cur, loc, titleEl, subtitleEl, bodyEl) {
+function renderPressureSheet(cur, hourly, loc, titleEl, subtitleEl, bodyEl) {
   if (titleEl) titleEl.innerText = '⏲️ Luftdruck & Barometer-Tendenz';
   if (subtitleEl) subtitleEl.innerText = 'Meeresniveau-Druck (QNH) vs. Stationsdruck (QFE)';
 
-  const qnh = Math.round(cur.pressure_msl || 1013);
-  const qfe = Math.round(cur.surface_pressure || qnh);
-
-  let trend = 'Stabil';
-  let trendDesc = 'Gleichbleibender Druckverlauf in den letzten 3 Stunden.';
-  if (qnh > 1020) trendDesc = 'Stabiles Hochdruckgebiet sorgt für absteigende Luftmassen und sonnige Abschnitte.';
-  else if (qnh < 1005) trendDesc = 'Tiefdruckrinne begünstigt aufsteigende Luftmassen, Quellwolken und Schauer.';
+  const hIdx = getClosestHourlyIndex(hourly);
+  const baro = getBarometricTrend(cur, hourly, hIdx);
 
   bodyEl.innerHTML = `
     <div class="bdm-grid">
@@ -557,13 +510,13 @@ function renderPressureSheet(cur, loc, titleEl, subtitleEl, bodyEl) {
       <div class="bdm-hero-box pressure-hero-box">
         <div class="bdm-stat-pair">
           <div class="bsp-item">
-            <span class="bsp-val text-accent">${qnh} <small>hPa</small></span>
+            <span class="bsp-val text-accent">${baro.qnh} <small>hPa</small></span>
             <span class="bsp-label">Meeresniveau (QNH)</span>
           </div>
           <div class="bsp-divider"></div>
           <div class="bsp-item">
-            <span class="bsp-val">${qfe} <small>hPa</small></span>
-            <span class="bsp-label">Vor Ort (${loc.elevation || 520} m, QFE)</span>
+            <span class="bsp-val">${baro.qfe} <small>hPa</small></span>
+            <span class="bsp-label">Vor Ort (${Math.round(loc.elevation ?? 520)} m, QFE)</span>
           </div>
         </div>
       </div>
@@ -573,8 +526,8 @@ function renderPressureSheet(cur, loc, titleEl, subtitleEl, bodyEl) {
         <div class="bsc-title">📈 BAROMETERTREND &amp; SYNOPTIK</div>
         <div class="bsc-content">
           <p class="bsc-text">
-            <b>Tendenz:</b> ${trend}<br>
-            ${trendDesc}
+            <b>Tendenz:</b> ${baro.arrow} ${baro.trendLabel} (${baro.signed} hPa/3h)<br>
+            ${baro.trendDesc}
           </p>
         </div>
       </div>

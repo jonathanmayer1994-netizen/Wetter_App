@@ -203,13 +203,15 @@ export const AlpineStorage = {
   /**
    * Speichert Wetterdaten für Offline-Nutzung
    */
-  async saveWeatherCache(loc, weatherData, microData) {
+  async saveWeatherCache(loc, weatherData, microData, extras = {}) {
     const payload = {
       id: `${loc.lat.toFixed(3)}_${loc.lon.toFixed(3)}`,
       locName: loc.name,
       loc,
       weatherData,
       microData,
+      ...(extras && extras.multiModel ? { multiModel: extras.multiModel } : {}),
+      ...(extras && extras.airQuality ? { airQuality: extras.airQuality } : {}),
       timestamp: Date.now()
     };
 

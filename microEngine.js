@@ -80,9 +80,13 @@ export const MicroEngine = {
     };
     const weatherRaw = await this.fetchOpenMeteoMultiLayer(lat, lon, terrain, reqOpts);
     const isAlpineLoc = isMountain || terrain.elevation >= 800;
+    const embeddedHistory = weatherRaw?._modelHistory;
+    const hasEmbeddedHistory = Boolean(embeddedHistory && Array.isArray(embeddedHistory.time) && embeddedHistory.time.length >= 6);
     const [stationData, modelHistory, radarData, alpineFoehn, officialBulletin, snowStationData] = await Promise.all([
       this.fetchStationData(lat, lon, terrain, isMountain, country, reqOpts),
-      isApiCoolingDown('https://api.open-meteo.com') ? Promise.resolve(null) : this.fetchModelHistory(lat, lon, terrain.elevation, reqOpts),
+      hasEmbeddedHistory
+        ? Promise.resolve(embeddedHistory)
+        : (isApiCoolingDown('https://api.open-meteo.com') ? Promise.resolve(null) : this.fetchModelHistory(lat, lon, terrain.elevation, reqOpts)),
       this.fetchRadarNowcastData(lat, lon, reqOpts),
       isApiCoolingDown('https://api.open-meteo.com') ? Promise.resolve(null) : this.fetchAlpinePressureGradient(lat, lon, reqOpts),
       isAlpineLoc ? this.fetchOfficialAvalancheBulletin(lat, lon).catch(() => null) : Promise.resolve(null),
@@ -558,6 +562,14 @@ export const MicroEngine = {
       "wind_gusts_10m_max"
     ].join(",");
 
+    const minutely15Vars = [
+      "temperature_2m",
+      "precipitation",
+      "weather_code",
+      "wind_speed_10m",
+      "wind_gusts_10m"
+    ].join(",");
+
     const params = new URLSearchParams({
       latitude: Number(lat).toFixed(3),
       longitude: Number(lon).toFixed(3),
@@ -566,7 +578,11 @@ export const MicroEngine = {
       azimuth: Math.round(terrain.openMeteoAzimuth).toString(),
       current: currentVars,
       hourly: hourlyVars,
+      minutely_15: minutely15Vars,
       daily: dailyVars,
+      past_hours: "12",
+      past_minutely_15: "4",
+      forecast_minutely_15: "24",
       forecast_days: "10",
       timezone: "auto",
     });
@@ -616,20 +632,69 @@ export const MicroEngine = {
 
     if (raw) {
       raw._regionalModel = modelPriority;
-      // Sanity-Check: Fehlende Tageswerte (z. B. Min/Max) aus stündlichen Daten rekonstruieren
+
+      // Extrahiere vergangene 12h direkt aus past_hours=12 als _modelHistory (spart 2. API-Call)
+      // und trimme raw.hourly sauber ab 00:00 des ersten forecast-Tages, sodass alle Index-Annahmen konsistent bleiben
+      if (raw.hourly && Array.isArray(raw.hourly.time) && raw.hourly.time.length > 0) {
+        const utcOffsetSec = typeof raw.utc_offset_seconds === 'number' ? raw.utc_offset_seconds : null;
+        const nowMs = Date.now();
+        const histTime = [];
+        const histTemp = [];
+        const histPrecip = [];
+        const histWind = [];
+        for (let i = 0; i < raw.hourly.time.length; i++) {
+          const tStr = String(raw.hourly.time[i] || '');
+          const tMs = (utcOffsetSec !== null && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(tStr))
+            ? (Date.parse(`${tStr.slice(0, 16)}:00Z`) - utcOffsetSec * 1000)
+            : new Date(tStr).getTime();
+          if (Number.isFinite(tMs) && tMs <= nowMs + 45 * 60000 && tMs >= nowMs - 14 * 3600000) {
+            histTime.push(tStr);
+            histTemp.push(raw.hourly.temperature_2m ? raw.hourly.temperature_2m[i] : null);
+            histPrecip.push(raw.hourly.precipitation ? raw.hourly.precipitation[i] : null);
+            histWind.push(raw.hourly.wind_speed_10m ? raw.hourly.wind_speed_10m[i] : null);
+          }
+        }
+        if (histTime.length > 0) {
+          raw._modelHistory = {
+            time: histTime,
+            temperature_2m: histTemp,
+            precipitation: histPrecip,
+            wind_speed_10m: histWind,
+            utc_offset_seconds: utcOffsetSec
+          };
+        }
+
+        const firstDailyKey = (raw.daily && Array.isArray(raw.daily.time) && raw.daily.time[0])
+          ? String(raw.daily.time[0]).slice(0, 10)
+          : todayKey;
+        const trimIdx = raw.hourly.time.findIndex(t => String(t).slice(0, 10) >= firstDailyKey);
+        if (trimIdx > 0) {
+          const origLen = raw.hourly.time.length;
+          for (const [k, arr] of Object.entries(raw.hourly)) {
+            if (Array.isArray(arr) && arr.length === origLen) {
+              raw.hourly[k] = arr.slice(trimIdx);
+            }
+          }
+        }
+      }
+
+      // Sanity-Check: Fehlende Tageswerte (z. B. Min/Max) aus stündlichen Daten datumsgenau rekonstruieren
       if (raw.daily && raw.hourly && raw.hourly.temperature_2m && Array.isArray(raw.daily.time)) {
         for (let i = 0; i < raw.daily.time.length; i++) {
-          const sH = i * 24;
-          const eH = Math.min((i + 1) * 24, raw.hourly.temperature_2m.length);
-          if (eH > sH) {
-            const dayTemps = raw.hourly.temperature_2m.slice(sH, eH).filter(v => typeof v === 'number' && !isNaN(v));
-            if (dayTemps.length > 0) {
-              if (raw.daily.temperature_2m_min[i] == null || isNaN(raw.daily.temperature_2m_min[i])) {
-                raw.daily.temperature_2m_min[i] = Math.min(...dayTemps);
-              }
-              if (raw.daily.temperature_2m_max[i] == null || isNaN(raw.daily.temperature_2m_max[i])) {
-                raw.daily.temperature_2m_max[i] = Math.max(...dayTemps);
-              }
+          const dKey = String(raw.daily.time[i] || '').slice(0, 10);
+          const dayTemps = [];
+          for (let h = 0; h < raw.hourly.time.length; h++) {
+            if (String(raw.hourly.time[h] || '').startsWith(dKey)) {
+              const tv = raw.hourly.temperature_2m[h];
+              if (typeof tv === 'number' && !isNaN(tv)) dayTemps.push(tv);
+            }
+          }
+          if (dayTemps.length > 0) {
+            if (raw.daily.temperature_2m_min[i] == null || isNaN(raw.daily.temperature_2m_min[i])) {
+              raw.daily.temperature_2m_min[i] = Math.min(...dayTemps);
+            }
+            if (raw.daily.temperature_2m_max[i] == null || isNaN(raw.daily.temperature_2m_max[i])) {
+              raw.daily.temperature_2m_max[i] = Math.max(...dayTemps);
             }
           }
         }
@@ -1430,6 +1495,65 @@ export const MicroEngine = {
   },
 
   /**
+   * Gefühlte Temperatur (Steadman Apparent Temperature, identisch zur Open-Meteo Definition)
+   */
+  computeApparentTemp(tempC, rhPct = 65, windKmh = 10) {
+    if (typeof tempC !== 'number' || isNaN(tempC)) return 0;
+    const rh = Math.max(1, Math.min(100, (typeof rhPct === 'number' && !isNaN(rhPct)) ? rhPct : 65));
+    const windMs = Math.max(0, ((typeof windKmh === 'number' && !isNaN(windKmh)) ? windKmh : 10) / 3.6);
+    const e = (rh / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
+    return Math.round((tempC + 0.33 * e - 0.70 * windMs - 4.00) * 10) / 10;
+  },
+
+  /**
+   * Exakter Taupunkt (°C) nach Magnus-Tetens (Sonntag 1990)
+   */
+  computeDewPoint(tempC, rhPct = 65) {
+    if (typeof tempC !== 'number' || isNaN(tempC)) return 0;
+    const rh = Math.max(1, Math.min(100, (typeof rhPct === 'number' && !isNaN(rhPct)) ? rhPct : 65));
+    const a = 17.625;
+    const b = 243.04;
+    const gamma = Math.log(rh / 100) + (a * tempC) / (b + tempC);
+    return Math.round(((b * gamma) / (a - gamma)) * 10) / 10;
+  },
+
+  /**
+   * Re-synchronisiert Tagessummen/-Extrema (daily) mit korrigierten Stundenwerten (hourly)
+   */
+  syncDailyFromHourlyForDate(weatherRaw, dateKey = null) {
+    if (!weatherRaw || !weatherRaw.daily || !weatherRaw.hourly || !Array.isArray(weatherRaw.daily.time) || !Array.isArray(weatherRaw.hourly.time)) return;
+    const targetKey = String(dateKey || '').slice(0, 10) || getLocalDateKey(Date.now());
+    const dIdx = weatherRaw.daily.time.findIndex(t => String(t).slice(0, 10) === targetKey);
+    if (dIdx < 0) return;
+
+    let pSum = 0;
+    let tMin = Infinity;
+    let tMax = -Infinity;
+    let hasP = false;
+    let hasT = false;
+    for (let i = 0; i < weatherRaw.hourly.time.length; i++) {
+      if (!String(weatherRaw.hourly.time[i] || '').startsWith(targetKey)) continue;
+      if (Array.isArray(weatherRaw.hourly.precipitation) && typeof weatherRaw.hourly.precipitation[i] === 'number' && !isNaN(weatherRaw.hourly.precipitation[i])) {
+        pSum += Math.max(0, weatherRaw.hourly.precipitation[i]);
+        hasP = true;
+      }
+      if (Array.isArray(weatherRaw.hourly.temperature_2m) && typeof weatherRaw.hourly.temperature_2m[i] === 'number' && !isNaN(weatherRaw.hourly.temperature_2m[i])) {
+        const tv = weatherRaw.hourly.temperature_2m[i];
+        if (tv < tMin) tMin = tv;
+        if (tv > tMax) tMax = tv;
+        hasT = true;
+      }
+    }
+    if (hasP && Array.isArray(weatherRaw.daily.precipitation_sum)) {
+      weatherRaw.daily.precipitation_sum[dIdx] = Math.round(pSum * 10) / 10;
+    }
+    if (hasT) {
+      if (Array.isArray(weatherRaw.daily.temperature_2m_min)) weatherRaw.daily.temperature_2m_min[dIdx] = Math.round(tMin * 10) / 10;
+      if (Array.isArray(weatherRaw.daily.temperature_2m_max)) weatherRaw.daily.temperature_2m_max[dIdx] = Math.round(tMax * 10) / 10;
+    }
+  },
+
+  /**
    * STUFE 2f: Dynamische Bias-Korrektur (Temperatur, Niederschlag & Höhen-Gewichtung)
    * - Vergleicht Station (Bright Sky / DWD) vs. Modell der letzten 6–12 h mit adiabatischer Höhenkorrektur.
    * - Gewichtung: Station > ICON-EU/AROME > ECMWF/GFS basierend auf horizontalem & vertikalem Abstand.
@@ -1507,20 +1631,35 @@ export const MicroEngine = {
         let weightedBiasSum = 0;
         let weightSum = 0;
 
-        // Historischer Abgleich über die letzten 6-12 Stunden
+        // Historischer Abgleich über die letzten 6-12 Stunden (zeitzonenunabhängiger UTC-Stundenabgleich)
         if (modelHistory && Array.isArray(modelHistory.time) && Array.isArray(stationData.history) && stationData.history.length > 0) {
+          const histUtcOffsetSec = (typeof modelHistory.utc_offset_seconds === 'number')
+            ? modelHistory.utc_offset_seconds
+            : (typeof weatherRaw.utc_offset_seconds === 'number' ? weatherRaw.utc_offset_seconds : null);
+          const toUtcHourKey = (tsStr, offSec = null) => {
+            if (!tsStr) return null;
+            const s = String(tsStr);
+            const hasZone = /[Z+\-]\d{2}:?\d{2}$/.test(s);
+            const ms = (!hasZone && typeof offSec === 'number' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s))
+              ? (Date.parse(`${s.slice(0, 16)}:00Z`) - offSec * 1000)
+              : new Date(s).getTime();
+            return Number.isFinite(ms) ? Math.floor(ms / 3600000) : null;
+          };
+
           const modelMap = new Map();
           for (let m = 0; m < modelHistory.time.length; m++) {
-            const key = modelHistory.time[m].slice(0, 13);
-            modelMap.set(key, modelHistory.temperature_2m[m]);
+            const key = toUtcHourKey(modelHistory.time[m], histUtcOffsetSec);
+            if (key !== null && typeof modelHistory.temperature_2m[m] === 'number') {
+              modelMap.set(key, modelHistory.temperature_2m[m]);
+            }
           }
 
           const obsList = stationData.history.slice(-12);
           for (let k = 0; k < obsList.length; k++) {
             const obs = obsList[k];
             if (obs && typeof obs.temperature === 'number' && obs.timestamp) {
-              const key = obs.timestamp.slice(0, 13);
-              const modelVal = modelMap.get(key);
+              const key = toUtcHourKey(obs.timestamp, null);
+              const modelVal = key !== null ? modelMap.get(key) : undefined;
               if (typeof modelVal === 'number') {
                 // Stationswert adiabatisch / inversionskorrigiert an Zielhöhe anpassen
                 const stationAtTargetZ = obs.temperature + lapseDeltaT;
@@ -1549,19 +1688,28 @@ export const MicroEngine = {
           const effectiveBias = Math.round(clampedBias * stationWeight * 10) / 10;
 
           if (Math.abs(effectiveBias) >= 0.1) {
-            // Lineare Korrektur auf current anwenden
+            // Lineare Korrektur auf current anwenden & gefühlte Temperatur physikalisch nachrechnen
             cur.temperature_2m = Math.round((cur.temperature_2m + effectiveBias) * 10) / 10;
             if (cur.apparent_temperature !== undefined) {
-              cur.apparent_temperature = Math.round((cur.apparent_temperature + effectiveBias) * 10) / 10;
+              cur.apparent_temperature = this.computeApparentTemp(
+                cur.temperature_2m,
+                cur.relative_humidity_2m ?? (h.relative_humidity_2m ? h.relative_humidity_2m[curIdx] : 65),
+                cur.wind_speed_10m ?? (h.wind_speed_10m ? h.wind_speed_10m[curIdx] : 10)
+              );
             }
 
-            // Korrektur STRIKT nur für current und die nächsten 1–2 Stunden (Hours 0..2)
-            const decay1to2h = [1.0, 0.60, 0.25];
-            for (let offset = 0; offset < decay1to2h.length && (curIdx + offset) < h.time.length; offset++) {
-              const stepCorr = effectiveBias * decay1to2h[offset];
-              h.temperature_2m[curIdx + offset] = Math.round((h.temperature_2m[curIdx + offset] + stepCorr) * 10) / 10;
-              if (h.apparent_temperature && h.apparent_temperature[curIdx + offset] !== undefined) {
-                h.apparent_temperature[curIdx + offset] = Math.round((h.apparent_temperature[curIdx + offset] + stepCorr) * 10) / 10;
+            // Korrektur mit sanftem Abklingen für Hours 0..3
+            const decay1to3h = [1.0, 0.70, 0.40, 0.15];
+            for (let offset = 0; offset < decay1to3h.length && (curIdx + offset) < h.time.length; offset++) {
+              const targetIdx = curIdx + offset;
+              const stepCorr = effectiveBias * decay1to3h[offset];
+              h.temperature_2m[targetIdx] = Math.round((h.temperature_2m[targetIdx] + stepCorr) * 10) / 10;
+              if (h.apparent_temperature && h.apparent_temperature[targetIdx] !== undefined) {
+                h.apparent_temperature[targetIdx] = this.computeApparentTemp(
+                  h.temperature_2m[targetIdx],
+                  h.relative_humidity_2m ? h.relative_humidity_2m[targetIdx] : 65,
+                  h.wind_speed_10m ? h.wind_speed_10m[targetIdx] : 10
+                );
               }
             }
 
@@ -1699,6 +1847,9 @@ export const MicroEngine = {
     // FEAT-01: 90-Minuten-Radar-Nowcasting mit Vektor-Extrapolation
     result.radarNowcast90m = this.compute90MinRadarNowcast(weatherRaw, radarData, stationData, curOroMultiplier);
 
+    // Tages-Summen und -Extrema für heute konsistent mit angepassten Stundenwerten halten
+    this.syncDailyFromHourlyForDate(weatherRaw, getLocalDateKey(Date.now()));
+
     return result;
   },
 
@@ -1711,11 +1862,21 @@ export const MicroEngine = {
     const cur = weatherRaw?.current || {};
     const h = weatherRaw?.hourly || {};
     const intervals = [];
+    const nowMs = Date.now();
+    let curIdx = 0;
+    let minDiff = Infinity;
+    if (Array.isArray(h.time)) {
+      for (let i = 0; i < Math.min(48, h.time.length); i++) {
+        const d = Math.abs(new Date(h.time[i]).getTime() - nowMs);
+        if (d < minDiff) { minDiff = d; curIdx = i; }
+      }
+    }
+    const nextIdx = Math.min((h.time?.length || 1) - 1, curIdx + 1);
     const baseRate = (stationData?.current?.precipitation_60 ?? cur.precipitation) || 0;
-    const modelH0 = (h.precipitation && h.precipitation[0]) || 0;
-    const modelH1 = (h.precipitation && h.precipitation[1]) || 0;
-    const pop0 = (h.precipitation_probability && h.precipitation_probability[0]) || 0;
-    const pop1 = (h.precipitation_probability && h.precipitation_probability[1]) || 0;
+    const modelH0 = (h.precipitation && h.precipitation[curIdx]) || 0;
+    const modelH1 = (h.precipitation && h.precipitation[nextIdx]) || 0;
+    const pop0 = (h.precipitation_probability && h.precipitation_probability[curIdx]) || 0;
+    const pop1 = (h.precipitation_probability && h.precipitation_probability[nextIdx]) || 0;
 
     for (let m = 15; m <= 90; m += 15) {
       const frac = m / 60;
@@ -1755,16 +1916,28 @@ export const MicroEngine = {
     const h = weatherRaw.hourly;
     const consensusT = multiModel.weightedConsensus.currentTemp;
 
-    // Falls keine physische Messstation die Daten bereits direkt korrigiert hat
+    // Höhen-Plausibilitäts-Check: Multi-Model nur einmischen, wenn Zielhöhe übereinstimmt
+    const targetElev = microData?.terrain?.elevation;
+    const elevMatched = (
+      typeof multiModel.elevation !== 'number' ||
+      typeof targetElev !== 'number' ||
+      Math.abs(multiModel.elevation - targetElev) <= 200
+    );
+
+    // Falls keine physische Messstation die Daten bereits direkt korrigiert hat und Höhe konsistent ist
     const stationApplied = microData?.biasCorrection?.stationApplied;
-    if (!stationApplied && typeof consensusT === 'number') {
+    if (!stationApplied && elevMatched && typeof consensusT === 'number') {
       const curT = cur.temperature_2m;
       const diff = consensusT - curT;
       if (Math.abs(diff) >= 0.1) {
         const adj = Math.round(diff * 0.75 * 10) / 10;
         cur.temperature_2m = Math.round((cur.temperature_2m + adj) * 10) / 10;
         if (cur.apparent_temperature !== undefined) {
-          cur.apparent_temperature = Math.round((cur.apparent_temperature + adj) * 10) / 10;
+          cur.apparent_temperature = this.computeApparentTemp(
+            cur.temperature_2m,
+            cur.relative_humidity_2m ?? 65,
+            cur.wind_speed_10m ?? 10
+          );
         }
 
         const nowMs = Date.now();
@@ -1780,10 +1953,19 @@ export const MicroEngine = {
           }
         }
 
+        // Weiches 6h-Abklingfenster statt abruptem Bruch bei Stunde +3
         if (h && h.temperature_2m) {
-          const decay1to2h = [1.0, 0.60, 0.25];
-          for (let k = 0; k < decay1to2h.length && (curIdx + k) < h.temperature_2m.length; k++) {
-            h.temperature_2m[curIdx + k] = Math.round((h.temperature_2m[curIdx + k] + adj * decay1to2h[k]) * 10) / 10;
+          const decay6h = [1.0, 0.75, 0.50, 0.30, 0.15, 0.05];
+          for (let k = 0; k < decay6h.length && (curIdx + k) < h.temperature_2m.length; k++) {
+            const tIdx = curIdx + k;
+            h.temperature_2m[tIdx] = Math.round((h.temperature_2m[tIdx] + adj * decay6h[k]) * 10) / 10;
+            if (h.apparent_temperature && h.apparent_temperature[tIdx] !== undefined) {
+              h.apparent_temperature[tIdx] = this.computeApparentTemp(
+                h.temperature_2m[tIdx],
+                h.relative_humidity_2m ? h.relative_humidity_2m[tIdx] : 65,
+                h.wind_speed_10m ? h.wind_speed_10m[tIdx] : 10
+              );
+            }
           }
         }
         if (microData && microData.microWeather) {
@@ -1797,16 +1979,30 @@ export const MicroEngine = {
       }
     }
 
-    // Niederschlag ab Stunde 4 mit gewichtetem Ensemble glätten
-    if (h && h.precipitation && Array.isArray(multiModel.weightedConsensus.hourlyPrecip)) {
-      for (let offset = 4; offset < Math.min(24, h.precipitation.length); offset++) {
+    // Niederschlag ab Stunde 4 relativ zu curIdx mit gewichtetem Ensemble glätten (höhen- & zeitabgleichgesichert)
+    if (elevMatched && h && h.precipitation && Array.isArray(multiModel.weightedConsensus.hourlyPrecip)) {
+      const nowMs = Date.now();
+      let curIdx = 0;
+      let minDiff = Infinity;
+      if (h.time) {
+        for (let i = 0; i < Math.min(36, h.time.length); i++) {
+          const d = Math.abs(new Date(h.time[i]).getTime() - nowMs);
+          if (d < minDiff) { minDiff = d; curIdx = i; }
+        }
+      }
+      for (let offset = 4; offset < Math.min(24, multiModel.weightedConsensus.hourlyPrecip.length); offset++) {
+        const hIdx = curIdx + offset;
+        if (hIdx >= h.precipitation.length) break;
         const mmP = multiModel.weightedConsensus.hourlyPrecip[offset];
-        if (typeof mmP === 'number') {
-          const baseP = h.precipitation[offset] || 0;
-          h.precipitation[offset] = Math.round((0.60 * mmP + 0.40 * baseP) * 10) / 10;
+        if (typeof mmP === 'number' && !isNaN(mmP)) {
+          const baseP = h.precipitation[hIdx] || 0;
+          h.precipitation[hIdx] = Math.round((0.60 * mmP + 0.40 * baseP) * 10) / 10;
         }
       }
     }
+
+    // Tages-Summen und -Extrema für heute konsistent halten
+    this.syncDailyFromHourlyForDate(weatherRaw, getLocalDateKey(Date.now()));
   },
 
   /**
@@ -3015,8 +3211,9 @@ export const MicroEngine = {
       const strategy = this.getRegionalModelPriority(lat, lon, elevation);
       const qLat = Number(lat).toFixed(3);
       const qLon = Number(lon).toFixed(3);
+      const elevParam = Math.round(elevation);
       const queryModels = Array.from(new Set(strategy.modelsToQuery || ['icon_eu', 'ecmwf_ifs025', 'gfs_seamless'])).join(',');
-      let url = `https://api.open-meteo.com/v1/forecast?latitude=${qLat}&longitude=${qLon}&hourly=temperature_2m,precipitation,wind_speed_10m&models=${queryModels}&forecast_days=7`;
+      let url = `https://api.open-meteo.com/v1/forecast?latitude=${qLat}&longitude=${qLon}&elevation=${elevParam}&hourly=temperature_2m,precipitation,wind_speed_10m&models=${queryModels}&forecast_days=10&timezone=auto`;
 
       let data = null;
       const forceRefresh = Boolean(options?.forceRefresh);
@@ -3035,7 +3232,7 @@ export const MicroEngine = {
 
       // Robuster Fallback auf Standard ECMWF + GFS NUR bei leerem Regionalmodell (NIEMALS bei 429 oder Circuit Breaker!)
       if ((!data || !data.hourly) && !isApiCoolingDown('https://api.open-meteo.com')) {
-        url = `https://api.open-meteo.com/v1/forecast?latitude=${qLat}&longitude=${qLon}&hourly=temperature_2m,precipitation,wind_speed_10m&models=ecmwf_ifs025,gfs_seamless&forecast_days=7`;
+        url = `https://api.open-meteo.com/v1/forecast?latitude=${qLat}&longitude=${qLon}&elevation=${elevParam}&hourly=temperature_2m,precipitation,wind_speed_10m&models=ecmwf_ifs025,gfs_seamless&forecast_days=10&timezone=auto`;
         data = await resilientFetch(url, {
           ttlMs: 45 * 60 * 1000,
           persist: true,
@@ -3047,13 +3244,18 @@ export const MicroEngine = {
       const h = data ? data.hourly : null;
       if (!h || !h.time) return null;
 
-      // Finde aktuellen Zeitstempel
+      // Finde aktuellen Zeitstempel (mit Standort-UTC-Offset falls fremde Zeitzone)
       const nowMs = Date.now();
+      const utcOff = typeof data.utc_offset_seconds === 'number' ? data.utc_offset_seconds : null;
       let idx = 0;
       let minDiff = Infinity;
       for (let i = 0; i < h.time.length; i++) {
-        const diff = Math.abs(new Date(h.time[i]).getTime() - nowMs);
-        if (diff < minDiff) {
+        const s = String(h.time[i] || '');
+        const tMs = (utcOff !== null && !/[Z+\-]\d{2}:?\d{2}$/.test(s) && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s))
+          ? (Date.parse(`${s.slice(0, 16)}:00Z`) - utcOff * 1000)
+          : new Date(s).getTime();
+        const diff = Math.abs(tMs - nowMs);
+        if (Number.isFinite(diff) && diff < minDiff) {
           minDiff = diff;
           idx = i;
         }
@@ -3125,27 +3327,96 @@ export const MicroEngine = {
       const weightedPrecip24h = Math.round(((regPrecipSum * wReg + ecmwfPrecipSum * wEc + gfsPrecipSum * wGfs) / wTotal) * 10) / 10;
       const weightedMaxWind = Math.round((regMaxWind * wReg + ecmwfMaxWind * wEc + gfsMaxWind * wGfs) / wTotal);
 
-      // Stündlicher gewichteter Vektor
+      // Stündlicher gewichteter Vektor (nur über tatsächlich verfügbare Modell-Werte je Zeitschritt)
       const sliceLen = Math.min(maxSlice, h.time.length - idx);
       const weightedHourlyTemp = [];
       const weightedHourlyPrecip = [];
       const weightedHourlyWind = [];
+      const hourlyTempP10 = [];
+      const hourlyTempP50 = [];
+      const hourlyTempP90 = [];
+      const hourlyPrecipP10 = [];
+      const hourlyPrecipP50 = [];
+      const hourlyPrecipP90 = [];
+
+      const blendMetric = (entries, fallback) => {
+        if (entries.length === 0) return fallback;
+        let sumW = 0;
+        let sumVal = 0;
+        for (const [val, w] of entries) {
+          const wt = w > 0 ? w : 0.1;
+          sumVal += val * wt;
+          sumW += wt;
+        }
+        return sumW > 0 ? (sumVal / sumW) : fallback;
+      };
+
       for (let s = 0; s < sliceLen; s++) {
         const i = idx + s;
-        const rT = regHourlyTemp[s] ?? ecmwfTemp ?? 10;
-        const eT = (h.temperature_2m_ecmwf_ifs025 ? h.temperature_2m_ecmwf_ifs025[i] : ecmwfTemp) ?? 10;
-        const gT = (h.temperature_2m_gfs_seamless ? h.temperature_2m_gfs_seamless[i] : gfsTemp) ?? 10;
-        weightedHourlyTemp.push(Math.round(((rT * wReg + eT * wEc + gT * wGfs) / wTotal) * 10) / 10);
+        const rT = (typeof regHourlyTemp[s] === 'number' && !isNaN(regHourlyTemp[s])) ? regHourlyTemp[s] : null;
+        const eT = (h.temperature_2m_ecmwf_ifs025 && typeof h.temperature_2m_ecmwf_ifs025[i] === 'number' && !isNaN(h.temperature_2m_ecmwf_ifs025[i]))
+          ? h.temperature_2m_ecmwf_ifs025[i] : null;
+        const gT = (h.temperature_2m_gfs_seamless && typeof h.temperature_2m_gfs_seamless[i] === 'number' && !isNaN(h.temperature_2m_gfs_seamless[i]))
+          ? h.temperature_2m_gfs_seamless[i] : null;
 
-        const rP = regHourlyPrecip[s] ?? 0;
-        const eP = (h.precipitation_ecmwf_ifs025 ? h.precipitation_ecmwf_ifs025[i] : 0) || 0;
-        const gP = (h.precipitation_gfs_seamless ? h.precipitation_gfs_seamless[i] : 0) || 0;
-        weightedHourlyPrecip.push(Math.round(((rP * wReg + eP * wEc + gP * wGfs) / wTotal) * 10) / 10);
+        const tEntries = [];
+        if (rT !== null) tEntries.push([rT, wReg]);
+        if (eT !== null) tEntries.push([eT, wEc]);
+        if (gT !== null) tEntries.push([gT, wGfs]);
 
-        const rW = regHourlyWind[s] ?? 10;
-        const eW = (h.wind_speed_10m_ecmwf_ifs025 ? h.wind_speed_10m_ecmwf_ifs025[i] : 10) || 10;
-        const gW = (h.wind_speed_10m_gfs_seamless ? h.wind_speed_10m_gfs_seamless[i] : 10) || 10;
-        weightedHourlyWind.push(Math.round((rW * wReg + eW * wEc + gW * wGfs) / wTotal));
+        const meanWeightedT = Math.round(blendMetric(tEntries, ecmwfTemp ?? gfsTemp ?? 10) * 10) / 10;
+        weightedHourlyTemp.push(meanWeightedT);
+
+        const rP = (typeof regHourlyPrecip[s] === 'number' && !isNaN(regHourlyPrecip[s])) ? Math.max(0, regHourlyPrecip[s]) : null;
+        const eP = (h.precipitation_ecmwf_ifs025 && typeof h.precipitation_ecmwf_ifs025[i] === 'number' && !isNaN(h.precipitation_ecmwf_ifs025[i]))
+          ? Math.max(0, h.precipitation_ecmwf_ifs025[i]) : null;
+        const gP = (h.precipitation_gfs_seamless && typeof h.precipitation_gfs_seamless[i] === 'number' && !isNaN(h.precipitation_gfs_seamless[i]))
+          ? Math.max(0, h.precipitation_gfs_seamless[i]) : null;
+
+        const pEntries = [];
+        if (rP !== null) pEntries.push([rP, wReg]);
+        if (eP !== null) pEntries.push([eP, wEc]);
+        if (gP !== null) pEntries.push([gP, wGfs]);
+
+        const meanWeightedP = Math.round(blendMetric(pEntries, 0) * 10) / 10;
+        weightedHourlyPrecip.push(meanWeightedP);
+
+        const rW = (typeof regHourlyWind[s] === 'number' && !isNaN(regHourlyWind[s])) ? Math.max(0, regHourlyWind[s]) : null;
+        const eW = (h.wind_speed_10m_ecmwf_ifs025 && typeof h.wind_speed_10m_ecmwf_ifs025[i] === 'number' && !isNaN(h.wind_speed_10m_ecmwf_ifs025[i]))
+          ? Math.max(0, h.wind_speed_10m_ecmwf_ifs025[i]) : null;
+        const gW = (h.wind_speed_10m_gfs_seamless && typeof h.wind_speed_10m_gfs_seamless[i] === 'number' && !isNaN(h.wind_speed_10m_gfs_seamless[i]))
+          ? Math.max(0, h.wind_speed_10m_gfs_seamless[i]) : null;
+
+        const wEntries = [];
+        if (rW !== null) wEntries.push([rW, wReg]);
+        if (eW !== null) wEntries.push([eW, wEc]);
+        if (gW !== null) wEntries.push([gW, wGfs]);
+        weightedHourlyWind.push(Math.round(blendMetric(wEntries, 10)));
+
+        // Echte Ensemble-Spannbreite (P10 / P50 / P90) über vorhandene Modelle
+        const tVals = tEntries.map(x => x[0]).sort((a, b) => a - b);
+        if (tVals.length > 0) {
+          const tLo = tVals[0];
+          const tHi = tVals[tVals.length - 1];
+          hourlyTempP10.push(Math.round((tLo - (tHi - tLo) * 0.1) * 10) / 10);
+          hourlyTempP50.push(meanWeightedT);
+          hourlyTempP90.push(Math.round((tHi + (tHi - tLo) * 0.1) * 10) / 10);
+        } else {
+          hourlyTempP10.push(meanWeightedT);
+          hourlyTempP50.push(meanWeightedT);
+          hourlyTempP90.push(meanWeightedT);
+        }
+
+        const pVals = pEntries.map(x => x[0]).sort((a, b) => a - b);
+        if (pVals.length > 0) {
+          hourlyPrecipP10.push(Math.round(pVals[0] * 10) / 10);
+          hourlyPrecipP50.push(meanWeightedP);
+          hourlyPrecipP90.push(Math.round((pVals[pVals.length - 1] * 1.25) * 10) / 10);
+        } else {
+          hourlyPrecipP10.push(0);
+          hourlyPrecipP50.push(0);
+          hourlyPrecipP90.push(0);
+        }
       }
 
       // MET-03 & QW-03: Konsistenter Modell-Diskrepanz-Algorithmus unter Einbezug von Regionalmodellen (ICON-D2 / AROME)
@@ -3157,37 +3428,11 @@ export const MicroEngine = {
       const penalty = (stdDevT * 10) + (spreadP * 3.2);
       const consensus = Math.max(45, Math.min(99, Math.round(100 - penalty)));
 
-      // MET-01: Probabilistische Multi-Modell Ensembles (EPS P10, P50, P90 Perzentil-Spannen)
-      const hourlyTempP10 = [];
-      const hourlyTempP50 = [];
-      const hourlyTempP90 = [];
-      const hourlyPrecipP10 = [];
-      const hourlyPrecipP50 = [];
-      const hourlyPrecipP90 = [];
-
-      for (let s = 0; s < sliceLen; s++) {
-        const i = idx + s;
-        const rT = regHourlyTemp[s] ?? ecmwfTemp ?? 10;
-        const eT = (h.temperature_2m_ecmwf_ifs025 ? h.temperature_2m_ecmwf_ifs025[i] : ecmwfTemp) ?? 10;
-        const gT = (h.temperature_2m_gfs_seamless ? h.temperature_2m_gfs_seamless[i] : gfsTemp) ?? 10;
-        const sortedT = [rT, eT, gT].sort((a, b) => a - b);
-        hourlyTempP10.push(Math.round((sortedT[0] - (sortedT[2] - sortedT[0]) * 0.1) * 10) / 10);
-        hourlyTempP50.push(weightedHourlyTemp[s]);
-        hourlyTempP90.push(Math.round((sortedT[2] + (sortedT[2] - sortedT[0]) * 0.1) * 10) / 10);
-
-        const rP = regHourlyPrecip[s] ?? 0;
-        const eP = (h.precipitation_ecmwf_ifs025 ? h.precipitation_ecmwf_ifs025[i] : 0) || 0;
-        const gP = (h.precipitation_gfs_seamless ? h.precipitation_gfs_seamless[i] : 0) || 0;
-        const sortedP = [rP, eP, gP].sort((a, b) => a - b);
-        hourlyPrecipP10.push(Math.round(sortedP[0] * 10) / 10);
-        hourlyPrecipP50.push(weightedHourlyPrecip[s]);
-        hourlyPrecipP90.push(Math.round((sortedP[2] * 1.25) * 10) / 10);
-      }
-
       const regName = strategy.displayName;
 
       return validateMultiModel({
         timestamp: h.time[idx],
+        elevation: elevParam,
         consensusScore: consensus,
         consensusText: consensus >= 88 ? 'Sehr hohe Modell-Einigkeit' : consensus >= 75 ? 'Gute Modell-Übereinstimmung' : 'Erhöhte Modell-Diskrepanz',
         strategy: strategy,

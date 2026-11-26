@@ -1,5 +1,5 @@
 {
-  "version": "2.44.0",
-  "build": "20261126-1400",
-  "notes": "Pan-Alpine Skitour Pro Engine (7-zone NWP, CAAMLv6 CH/AT/BY/IT/FR/SI, 5 snow station networks), 2D DEM terrain & slope overlay, full-box accordion drawers, static top hazard banner, 100% slope distribution consistency, and interactive map-integrated elevation profile (inline + fullscreen)."
+  "version": "2.45.0",
+  "build": "20261126-1820",
+  "notes": "Overview Meteorological & Physics Overhaul (Multi-Model elevation/timezone fix, true 15-min/radar nowcast, honest 10-day spaghetti meteogram, live Bento telemetry & sheets, Magnus-Tetens dew point, 3h barometric tendency, warm cache sync) and ultra-compact inline Pause control bar in Sports planner."
 }

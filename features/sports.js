@@ -406,8 +406,8 @@ export function syncSubSportUI() {
   const pauseHint = document.getElementById('sports-pause-hint');
   if (pauseHint) {
     pauseHint.innerText = cat === 'skitour'
-      ? 'Pause am Gipfel (zzgl. +10 Min automatischer Abfellpuffer).'
-      : 'Wird am Scheitelpunkt auf Ankunfts- & Wetterzeiten aufgerechnet.';
+      ? 'zzgl. +10m Abfellpuffer'
+      : 'am Scheitelpunkt';
   }
 }
 
@@ -950,7 +950,7 @@ export function setupSportsTab() {
           if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(txt);
           briefingBtn.innerText = '✅ Kopiert';
           setTimeout(() => { briefingBtn.innerText = '📋 Briefing'; }, 2000);
-        } catch (__) {}
+        } catch (__) { }
       }
     });
   }
@@ -1582,10 +1582,10 @@ function getGpxWorkerSingleton() {
     };
     _gpxWorkerSingleton.onerror = () => {
       for (const [, entry] of _gpxWorkerPending.entries()) {
-        try { entry.resolve(null); } catch (_) {}
+        try { entry.resolve(null); } catch (_) { }
       }
       _gpxWorkerPending.clear();
-      try { _gpxWorkerSingleton.terminate(); } catch (_) {}
+      try { _gpxWorkerSingleton.terminate(); } catch (_) { }
       _gpxWorkerSingleton = null;
     };
     return _gpxWorkerSingleton;
@@ -1614,7 +1614,7 @@ export async function parseGPXAsync(gpxXml) {
         worker.postMessage({ id, action: 'parseGPX', payload: { xmlString: gpxXml } });
       });
       if (res) return res;
-    } catch (_) {}
+    } catch (_) { }
   }
   return MicroEngine.parseGPXData(gpxXml);
 }
@@ -3821,7 +3821,7 @@ export async function renderSportsSlopeOverlay(timeline) {
       ctx.putImageData(imgData, 0, 0);
       L.imageOverlay(canvas.toDataURL('image/png'), [[s, w], [n, e]], { opacity: 0.75, interactive: false }).addTo(group);
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 export function updateSportsScrubber(km, opts = {}) {

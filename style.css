@@ -1427,11 +1427,26 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 12px;
   color: var(--text-tertiary);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 10px;
   margin-top: 4px;
+}
+
+.hero-source-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.hero-source-badge:empty {
+  display: none;
 }
 
 /* ==========================================================================
@@ -4727,7 +4742,7 @@ details.glass-card.alpine-drawer {
   padding: 0 !important;
 }
 
-details.glass-card.alpine-drawer > .alpine-drawer-summary {
+details.glass-card.alpine-drawer>.alpine-drawer-summary {
   margin: 0 !important;
   padding: 18px 20px !important;
   border-radius: 20px;
@@ -4735,12 +4750,12 @@ details.glass-card.alpine-drawer > .alpine-drawer-summary {
   box-sizing: border-box;
 }
 
-details.glass-card.alpine-drawer[open] > .alpine-drawer-summary {
+details.glass-card.alpine-drawer[open]>.alpine-drawer-summary {
   border-radius: 20px 20px 0 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-details.glass-card.alpine-drawer > .alpine-drawer-summary:hover {
+details.glass-card.alpine-drawer>.alpine-drawer-summary:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -4757,7 +4772,7 @@ details.glass-card.alpine-drawer > .alpine-drawer-summary:hover {
   padding-top: 10px;
 }
 
-details.glass-card.alpine-drawer > .alpine-drawer-body {
+details.glass-card.alpine-drawer>.alpine-drawer-body {
   padding: 14px 20px 18px;
 }
 
@@ -14066,7 +14081,7 @@ details.glass-card.alpine-drawer > .alpine-drawer-body {
     padding: 0 !important;
   }
 
-  details.glass-card.alpine-drawer > .alpine-drawer-summary {
+  details.glass-card.alpine-drawer>.alpine-drawer-summary {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
@@ -14077,11 +14092,11 @@ details.glass-card.alpine-drawer > .alpine-drawer-body {
     border-radius: 18px !important;
   }
 
-  details.glass-card.alpine-drawer[open] > .alpine-drawer-summary {
+  details.glass-card.alpine-drawer[open]>.alpine-drawer-summary {
     border-radius: 18px 18px 0 0 !important;
   }
 
-  details.glass-card.alpine-drawer > .alpine-drawer-body {
+  details.glass-card.alpine-drawer>.alpine-drawer-body {
     padding: 12px 14px 14px !important;
   }
 
@@ -15138,7 +15153,8 @@ details.glass-card.alpine-drawer > .alpine-drawer-body {
   .sports-waypoints-card:not(.alpine-drawer) {
     padding: 12px 10px !important;
   }
-  details.glass-card.sports-waypoints-card.alpine-drawer > .alpine-drawer-body {
+
+  details.glass-card.sports-waypoints-card.alpine-drawer>.alpine-drawer-body {
     padding: 10px 10px 12px !important;
   }
 
@@ -18680,6 +18696,7 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
     gap: 7px 10px;
     padding: 8px 10px;
   }
+
   .s10d-snow-col,
   .s10d-hazard-col {
     grid-column: 1 / -1;
@@ -18692,6 +18709,7 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
     justify-content: flex-start;
     gap: 5px;
   }
+
   .s10d-period-pill {
     font-size: 10px;
     padding: 2.5px 7px;
@@ -18881,6 +18899,7 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
     font-size: 9px;
     padding: 1px 5px;
   }
+
   .ish-llb-badge {
     white-space: normal;
     max-width: 100%;
@@ -19650,6 +19669,7 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
   .aspect-firn-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
   .spc-split-grid {
     grid-template-columns: 1fr;
   }
@@ -19873,11 +19893,77 @@ body.sports-map-fullscreen-active #sports-map-card>.card-header {
   color: #ffffff;
 }
 
+.stsp-pause-col {
+  grid-column: 1 / -1;
+  flex-direction: row !important;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px !important;
+  padding-top: 6px;
+  margin-top: -4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.stsp-pause-col .stsp-header {
+  gap: 4px !important;
+  margin-bottom: 0 !important;
+  flex-shrink: 0;
+}
+
+.stsp-pause-col .stsp-icon {
+  font-size: 10px !important;
+  opacity: 0.75;
+}
+
+.stsp-pause-col .stsp-label {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  letter-spacing: 0.1px !important;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.stsp-pause-col .stsp-presets {
+  width: auto !important;
+  gap: 4px !important;
+  flex-wrap: nowrap;
+}
+
+.stsp-pause-col .stsp-preset-btn {
+  padding: 1px 6px !important;
+  font-size: 10px !important;
+  border-radius: 7px !important;
+  line-height: 1.35;
+}
+
 .stsp-pause-hint {
-  display: block;
-  margin-top: 6px;
-  font-size: 11px;
-  color: #94a3b8;
+  display: inline-block;
+  margin-top: 0;
+  margin-left: auto;
+  font-size: 9.5px;
+  color: rgba(148, 163, 184, 0.58);
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .stsp-pause-col {
+    gap: 5px !important;
+    padding-top: 5px;
+    margin-top: 0;
+  }
+
+  .stsp-pause-col .stsp-label {
+    font-size: 9.5px !important;
+  }
+
+  .stsp-pause-col .stsp-preset-btn {
+    padding: 1px 5px !important;
+    font-size: 9.5px !important;
+  }
+
+  .stsp-pause-hint {
+    display: none;
+  }
 }
 
 .sports-pro-planner-card {
