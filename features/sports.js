@@ -2618,7 +2618,7 @@ function drawSportsMapProfileCanvas(timeline) {
   };
 
   if (cat === 'skitour' && av) {
-    drawRefLine(av.criticalElevation, 'rgba(245, 158, 11, 0.9)', `⚠️ Kernhöhe ${Math.round(av.criticalElevation)}m`, true);
+    drawRefLine(av.criticalElevation, 'rgba(245, 158, 11, 0.9)', `⚠️ Lawinengefahr ab ${Math.round(av.criticalElevation)}m`, true);
     drawRefLine(av.skiableSnowlineM, 'rgba(56, 189, 248, 0.85)', `❄️ Schneegrenze ${Math.round(av.skiableSnowlineM)}m`, false);
   } else if (cat === 'mountain' && Array.isArray(timeline.milestones) && timeline.milestones.length > 0) {
     const fl = timeline.milestones[Math.floor(timeline.milestones.length / 2)].freezingLevelM;

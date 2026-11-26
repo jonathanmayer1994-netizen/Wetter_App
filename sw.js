@@ -9,8 +9,8 @@
  */
 
 const SW_URL = new URL(self.location.href);
-const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.43.2';
-const CACHE_NAME = `best-weather-v2.43.2-${DEPLOY_TOKEN}`;
+const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.43.3';
+const CACHE_NAME = `best-weather-v2.43.3-${DEPLOY_TOKEN}`;
 const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
 const MAX_TILES = 600;
 
