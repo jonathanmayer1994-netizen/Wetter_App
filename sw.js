@@ -11,8 +11,12 @@
 const SW_URL = new URL(self.location.href);
 const DEPLOY_TOKEN = SW_URL.searchParams.get('v') || 'v2.45.0';
 const CACHE_NAME = `best-weather-v2.45.0-${DEPLOY_TOKEN}`;
-const TILE_CACHE_NAME = 'best-weather-tiles-v2.2';
-const MAX_TILES = 600;
+const STATIC_TILE_CACHE_NAME = 'best-weather-static-tiles-v1';
+const RADAR_TILE_CACHE_NAME = 'best-weather-radar-tiles-v1';
+const MAX_STATIC_TILES = 800;
+const MAX_RADAR_TILES = 250;
+const STATIC_TILE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const RADAR_TILE_TTL_MS = 45 * 60 * 1000;
 
 let activeBustToken = DEPLOY_TOKEN;
 
@@ -48,6 +52,12 @@ const STATIC_ASSETS = [
   './features/mountain.js',
   './features/sports.js',
   './features/map.js',
+  './features/map/mapMercator.js',
+  './features/map/mapStores.js',
+  './features/map/mapCanvas.js',
+  './features/map/mapCanvas.worker.js',
+  './features/map/mapTimeline.js',
+  './features/map/mapHud.js',
   './features/mapSolar.js',
   './features/search.js',
   './features/favorites.js',
@@ -93,18 +103,43 @@ function appendBustParam(rawUrl, key, value) {
   }
 }
 
-async function putTileCacheWithQuota(req, res) {
+async function putTileCacheWithQuota(cacheName, maxTiles, req, res) {
   try {
-    const cache = await caches.open(TILE_CACHE_NAME);
-    await cache.put(req, res);
+    const cache = await caches.open(cacheName);
+    let storedRes = res;
+    if (res && res.type === 'basic') {
+      const headers = new Headers(res.headers);
+      headers.set('x-bw-cached-at', String(Date.now()));
+      storedRes = new Response(await res.clone().arrayBuffer(), {
+        status: res.status,
+        statusText: res.statusText,
+        headers
+      });
+    } else if (res && res.type === 'cors') {
+      const headers = new Headers(res.headers);
+      headers.set('x-bw-cached-at', String(Date.now()));
+      storedRes = new Response(await res.clone().arrayBuffer(), {
+        status: res.status,
+        statusText: res.statusText,
+        headers
+      });
+    }
+    await cache.put(req, storedRes);
     const keys = await cache.keys();
-    if (keys.length > MAX_TILES) {
-      const deleteCount = keys.length - MAX_TILES;
+    if (keys.length > maxTiles) {
+      const deleteCount = keys.length - maxTiles;
       for (let i = 0; i < deleteCount; i++) {
         await cache.delete(keys[i]);
       }
     }
   } catch (_) { }
+}
+
+function isTileFresh(res, ttlMs) {
+  if (!res) return false;
+  const cachedAt = Number(res.headers && res.headers.get('x-bw-cached-at'));
+  if (!Number.isFinite(cachedAt) || cachedAt <= 0) return true;
+  return (Date.now() - cachedAt) < ttlMs;
 }
 
 async function fetchWithTimeout(url, opts = {}, timeoutMs = 4500) {
@@ -284,7 +319,7 @@ self.addEventListener('message', (event) => {
     event.waitUntil(
       caches.keys().then((keys) => Promise.all(
         keys
-          .filter((k) => k !== TILE_CACHE_NAME)
+          .filter((k) => k !== STATIC_TILE_CACHE_NAME && k !== RADAR_TILE_CACHE_NAME)
           .map((k) => caches.delete(k))
       ))
     );
@@ -304,7 +339,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME && key !== TILE_CACHE_NAME) {
+          if (key !== CACHE_NAME && key !== STATIC_TILE_CACHE_NAME && key !== RADAR_TILE_CACHE_NAME) {
             return caches.delete(key);
           }
         })
@@ -336,30 +371,59 @@ self.addEventListener('fetch', (event) => {
 
   if (req.method !== 'GET') return;
 
-  const isMapTile =
+  const isStaticMapTile =
+    url.hostname.includes('tile.openstreetmap.org') ||
     url.hostname.includes('opentopomap.org') ||
     url.hostname.includes('arcgisonline.com') ||
-    (url.hostname.includes('rainviewer.com') && !url.pathname.endsWith('.json'));
+    url.hostname.includes('elevation-tiles-prod.s3.amazonaws.com');
+
+  const isRadarTile =
+    url.hostname.includes('rainviewer.com') && !url.pathname.endsWith('.json');
 
   const isMeteorologicalAPI =
     url.hostname.includes('open-meteo.com') ||
     (url.hostname.includes('rainviewer.com') && url.pathname.endsWith('.json'));
 
-  // A1. Map Tiles: Bounded Tile Cache with Quota Management
-  if (isMapTile) {
+  // A1a. Static Basemap & Terrarium Elevation Tiles: Cache-First / Stale-While-Revalidate (14d TTL)
+  if (isStaticMapTile) {
+    event.respondWith(
+      caches.open(STATIC_TILE_CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(req, { ignoreSearch: true });
+        if (cached && isTileFresh(cached, STATIC_TILE_TTL_MS)) {
+          return cached;
+        }
+        const netPromise = fetch(req).then((networkRes) => {
+          if (networkRes && networkRes.status === 200) {
+            putTileCacheWithQuota(STATIC_TILE_CACHE_NAME, MAX_STATIC_TILES, req, networkRes.clone());
+          }
+          return networkRes;
+        }).catch(() => cached || new Response(null, { status: 504, statusText: 'Offline Static Tile Not Cached' }));
+
+        if (cached) {
+          event.waitUntil(netPromise);
+          return cached;
+        }
+        return netPromise;
+      })
+    );
+    return;
+  }
+
+  // A1b. Ephemeral Radar Tiles: Network-First with Short TTL Separate Quota (never evicts basemaps)
+  if (isRadarTile) {
     event.respondWith(
       fetch(req)
         .then((networkRes) => {
           if (networkRes && networkRes.status === 200) {
-            const clone = networkRes.clone();
-            putTileCacheWithQuota(req, clone);
+            putTileCacheWithQuota(RADAR_TILE_CACHE_NAME, MAX_RADAR_TILES, req, networkRes.clone());
           }
           return networkRes;
         })
         .catch(async () => {
-          const cached = await caches.match(req, { ignoreSearch: true });
-          if (cached) return cached;
-          return new Response(null, { status: 504, statusText: 'Offline Tile Not Cached' });
+          const cache = await caches.open(RADAR_TILE_CACHE_NAME);
+          const cached = await cache.match(req, { ignoreSearch: true });
+          if (cached && isTileFresh(cached, RADAR_TILE_TTL_MS)) return cached;
+          return cached || new Response(null, { status: 504, statusText: 'Offline Radar Tile Not Cached' });
         })
     );
     return;

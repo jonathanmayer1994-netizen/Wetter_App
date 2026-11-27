@@ -2170,12 +2170,6 @@
         <!-- 2D LEAFLET MULTI-LAYER & 48H MODELL-RADAR KARTE                     -->
         <!-- =================================================================== -->
         <section class="glass-card map-view-card">
-          <div class="card-header" style="margin-bottom: 12px;">
-            <div class="card-title">
-              <span class="card-icon">🗺️</span>
-              <span>2D-GROSSRAUMRADAR & 48H-MODELLPROGNOSE (DWD & ECMWF)</span>
-            </div>
-          </div>
           <!-- Fullscreen-capable MeteoSwiss-Style Map View with Floating Controls Dock -->
           <div class="fullscreen-map-wrapper ms-map-theme" id="fullscreen-map-wrapper">
             <div id="interactive-map"></div>
@@ -2223,7 +2217,7 @@
             </div>
 
             <!-- Subtle Top-Left & Top-Right Radar Attribution / Watermark -->
-            <div class="ms-map-attribution" aria-hidden="true">© Map</div>
+            <div class="ms-map-attribution" id="ms-map-attribution">© Esri, © OpenStreetMap · Radar: RainViewer · NWP: Open-Meteo / DWD</div>
             <div class="ms-radar-watermark" id="ms-radar-watermark">--.--.-- | --:--</div>
 
             <!-- Right-Edge MeteoSwiss Quick Layer FAB Stack -->
@@ -2253,6 +2247,10 @@
                     stroke="none" />
                 </svg>
               </button>
+              <div class="ms-zoom-pill" id="ms-zoom-pill" role="group" aria-label="Kartenzoom">
+                <button class="ms-zoom-btn" id="ms-fab-zoom-in" type="button" title="Hineinzoomen (+)" aria-label="Hineinzoomen">+</button>
+                <button class="ms-zoom-btn" id="ms-fab-zoom-out" type="button" title="Herauszoomen (−)" aria-label="Herauszoomen">−</button>
+              </div>
               <button class="ms-fab-btn" id="ms-fab-recenter" type="button"
                 title="Auf meinen aktuellen Standort zentrieren" aria-label="Standort zentrieren">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
@@ -2500,6 +2498,12 @@
                   <span class="mpw-fm-title">Zugrichtung:</span>
                   <span class="mpw-fm-val" id="mpw-front-motion-val">WNW ➔ OSO (15 km/h)</span>
                 </div>
+                <div class="mpw-inspect-actions" id="mpw-inspect-actions" style="display:none;">
+                  <button type="button" class="mpw-load-primary-btn" id="mpw-load-primary-btn"
+                    title="Diesen Kartenpunkt als Hauptstandort für die gesamte App übernehmen">📍 Als Hauptort laden</button>
+                  <button type="button" class="mpw-clear-inspect-btn" id="mpw-clear-inspect-btn"
+                    title="Inspektor schließen" aria-label="Inspektor schließen">✕</button>
+                </div>
               </div>
             </div>
 
@@ -2557,9 +2561,6 @@
                 <div class="radar-top-actions">
                   <div class="ms-callout-badge" id="ms-timeline-callout">
                     <span class="mscb-solar-pill" id="mscb-solar-pill" title="Sonnenstand">☀️</span>
-                    <span class="mscb-time" id="mscb-time">14:55</span>
-                    <span class="mscb-sep">·</span>
-                    <span class="mscb-day" id="mscb-day">Heute</span>
                     <span class="mscb-kind is-live" id="mscb-kind">Messung</span>
                   </div>
                   <button type="button" id="radar-player-toggle-btn" class="radar-player-toggle-btn"

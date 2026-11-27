@@ -8525,6 +8525,7 @@ export const MicroEngine = {
       const ws = new Array(len);
       const wd = new Array(len);
       const wg = new Array(len);
+      const cp = new Array(len);
 
       for (let k = 0; k < len; k++) {
         const idx = fromIdx + k;
@@ -8543,6 +8544,7 @@ export const MicroEngine = {
         const wsVal = h.wind_speed_10m ? (h.wind_speed_10m[idx] || 0) : 15;
         const wdVal = h.wind_direction_10m ? (h.wind_direction_10m[idx] || 0) : 240;
         const wgVal = h.wind_gusts_10m ? (h.wind_gusts_10m[idx] || Math.round(wsVal * 1.35)) : Math.round(wsVal * 1.35);
+        const cpVal = h.cape && h.cape[idx] !== undefined ? (h.cape[idx] || 0) : 0;
 
         p[k] = Math.round(pVal * 100) / 100;
         rs[k] = Math.round((rVal + shVal) * 100) / 100;
@@ -8556,9 +8558,10 @@ export const MicroEngine = {
         ws[k] = Math.round(wsVal * 10) / 10;
         wd[k] = Math.round(wdVal);
         wg[k] = Math.round(wgVal * 10) / 10;
+        cp[k] = Math.round(cpVal);
       }
 
-      return { e, p, rs, sn, t, rh, fl, wc, cc, pr, ws, wd, wg };
+      return { e, p, rs, sn, t, rh, fl, wc, cc, pr, ws, wd, wg, cp };
     });
 
     return {
@@ -8632,6 +8635,7 @@ export const MicroEngine = {
         const windSpd = col.ws[idx] !== undefined ? col.ws[idx] : 15;
         const windDir = col.wd[idx] !== undefined ? col.wd[idx] : 240;
         const windGusts = col.wg[idx] !== undefined ? col.wg[idx] : Math.round(windSpd * 1.35);
+        const capeVal = (col.cp && col.cp[idx] !== undefined) ? col.cp[idx] : 0;
 
         const phaseInfo = this.classifyPrecipPhase({
           tempC: temp,
@@ -8668,6 +8672,7 @@ export const MicroEngine = {
           windSpeed: Math.round(windSpd),
           windDirection: Math.round(windDir),
           windGusts: Math.round(windGusts),
+          cape: Math.round(capeVal),
           isSnow
         });
 
@@ -8722,7 +8727,7 @@ export const MicroEngine = {
       const lats = stations.map(s => s.lat.toFixed(3)).join(',');
       const lons = stations.map(s => s.lon.toFixed(3)).join(',');
       // forecast_days=3 deckt bis zu 72h ab (+48h inkl. UTC-Mitternachtsversatz) -> 25% weniger API-Gewicht als 4 Tage!
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=precipitation,snowfall,rain,showers,temperature_2m,relative_humidity_2m,freezing_level_height,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m&forecast_days=3&timezone=GMT`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=precipitation,snowfall,rain,showers,temperature_2m,relative_humidity_2m,freezing_level_height,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cape&forecast_days=3&timezone=GMT`;
 
       const compacted = await resilientFetch(url, {
         ttlMs: CACHE_TTL,

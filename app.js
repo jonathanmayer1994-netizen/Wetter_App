@@ -105,21 +105,35 @@ export function switchTab(tabId) {
     if (isMobile) {
       enterMobileMapFullscreen();
     }
-    ensureFreshMapRadar();
     resumeWindCanvasIfActive();
-    setTimeout(() => {
-      if (state.map.instance) {
-        state.map.instance.invalidateSize();
-        if (state.currentLocation) state.map.instance.panTo([state.currentLocation.lat, state.currentLocation.lon], { animate: false });
+
+    // Saubere Single-Pass Tab-Aktivierung (verhindert Mehrfach-Renders pro Tab-Wechsel)
+    const token = (state._mapTabActivationToken = (state._mapTabActivationToken || 0) + 1);
+    const runSingleMapSync = () => {
+      if (state._mapTabActivationToken !== token || state.activeTab !== 'tab-map') return;
+      if (state.map && state.map.instance) {
+        state.map._suppressNextMoveEndRender = true;
+        state.map.instance.invalidateSize({ animate: false });
+        if (state.currentLocation && !state.map.inspectedPoint) {
+          const c = state.map.instance.getCenter();
+          if (!c || Math.hypot(c.lat - state.currentLocation.lat, c.lng - state.currentLocation.lon) > 0.002) {
+            state.map.instance.panTo([state.currentLocation.lat, state.currentLocation.lon], { animate: false });
+          }
+        }
+        state.map._suppressNextMoveEndRender = false;
         updateWeatherOverlay();
       }
-    }, 80);
-    setTimeout(() => {
-      if (state.map.instance) {
-        state.map.instance.invalidateSize();
-        updateWeatherOverlay();
+    };
+
+    requestAnimationFrame(() => {
+      const mapEl = document.getElementById('interactive-map');
+      const rect = mapEl ? mapEl.getBoundingClientRect() : null;
+      if (rect && rect.width > 0 && rect.height > 0) {
+        runSingleMapSync();
+      } else {
+        setTimeout(runSingleMapSync, 90);
       }
-    }, 250);
+    });
   }
 }
 
